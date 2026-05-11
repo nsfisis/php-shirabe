@@ -34,3 +34,18 @@ pub struct InvalidArgumentException {
     pub message: String,
     pub code: i64,
 }
+
+#[derive(Debug)]
+pub struct PharData {
+    path: String,
+}
+
+impl PharData {
+    pub fn new(a: String) -> Self {
+        todo!()
+    }
+
+    pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
+        todo!()
+    }
+}
