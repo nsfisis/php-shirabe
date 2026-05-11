@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PhpMixed {
     Null,
     Bool(bool),
@@ -46,6 +46,54 @@ pub fn defined(name: &str) -> bool {
 pub fn hash(algo: &str, data: &str) -> String {
     todo!()
 }
+
+pub fn extension_loaded(name: &str) -> bool {
+    todo!()
+}
+
+pub fn gzopen(file: &str, mode: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn gzread(file: PhpMixed, length: i64) -> String {
+    todo!()
+}
+
+pub fn gzclose(file: PhpMixed) {
+    todo!()
+}
+
+pub fn fopen(file: &str, mode: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn fwrite(file: PhpMixed, data: &str, length: i64) {
+    todo!()
+}
+
+pub fn fclose(file: PhpMixed) {
+    todo!()
+}
+
+pub fn parse_url(url: &str, component: i64) -> PhpMixed {
+    todo!()
+}
+
+pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
+    todo!()
+}
+
+pub fn strtr(str: &str, from: &str, to: &str) -> String {
+    todo!()
+}
+
+pub fn implode(glue: &str, pieces: &[String]) -> String {
+    todo!()
+}
+
+pub const PHP_URL_PATH: i64 = 5;
+pub const PATHINFO_FILENAME: i64 = 64;
+pub const DIRECTORY_SEPARATOR: &str = "/";
 
 pub const HHVM_VERSION: Option<&str> = None;
 
