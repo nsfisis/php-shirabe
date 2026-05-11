@@ -1,0 +1,4 @@
+[package]
+name = "shirabe"
+version.workspace = true
+edition.workspace = true
