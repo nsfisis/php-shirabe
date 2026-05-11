@@ -35,6 +35,10 @@ pub struct InvalidArgumentException {
     pub code: i64,
 }
 
+pub fn hash(algo: &str, data: &str) -> String {
+    todo!()
+}
+
 #[derive(Debug)]
 pub struct PharData {
     path: String,
