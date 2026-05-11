@@ -28,3 +28,9 @@ pub struct UnexpectedValueException {
     pub message: String,
     pub code: i64,
 }
+
+#[derive(Debug)]
+pub struct InvalidArgumentException {
+    pub message: String,
+    pub code: i64,
+}
