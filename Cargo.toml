@@ -7,3 +7,4 @@ version = "0.0.1"
 edition = "2024"
 
 [workspace.dependencies]
+shirabe-php-shim = { path = "crates/shirabe-php-shim" }

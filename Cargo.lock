@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "shirabe"
 version = "0.0.1"
+dependencies = [
+ "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-php-shim"
+version = "0.0.1"
