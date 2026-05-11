@@ -35,6 +35,10 @@ pub struct InvalidArgumentException {
     pub code: i64,
 }
 
+pub fn get_debug_type(value: &PhpMixed) -> String {
+    todo!()
+}
+
 pub fn hash(algo: &str, data: &str) -> String {
     todo!()
 }
