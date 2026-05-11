@@ -71,4 +71,8 @@ impl PharData {
     pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
         todo!()
     }
+
+    pub fn add_empty_dir(&self, a: &str) {
+        todo!()
+    }
 }
