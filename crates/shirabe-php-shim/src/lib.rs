@@ -40,6 +40,21 @@ pub fn hash(algo: &str, data: &str) -> String {
 }
 
 #[derive(Debug)]
+pub struct Phar {
+    path: String,
+}
+
+impl Phar {
+    pub fn new(a: String) -> Self {
+        todo!()
+    }
+
+    pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
 pub struct PharData {
     path: String,
 }
