@@ -39,9 +39,15 @@ pub fn get_debug_type(value: &PhpMixed) -> String {
     todo!()
 }
 
+pub fn defined(name: &str) -> bool {
+    todo!()
+}
+
 pub fn hash(algo: &str, data: &str) -> String {
     todo!()
 }
+
+pub const HHVM_VERSION: Option<&str> = None;
 
 #[derive(Debug)]
 pub struct Phar {
