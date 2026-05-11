@@ -1,4 +1,10 @@
 #[derive(Debug)]
+pub struct Exception {
+    pub message: String,
+    pub code: i64,
+}
+
+#[derive(Debug)]
 pub struct RuntimeException {
     pub message: String,
     pub code: i64,
