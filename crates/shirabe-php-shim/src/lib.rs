@@ -1,3 +1,16 @@
+use indexmap::IndexMap;
+
+#[derive(Debug)]
+pub enum PhpMixed {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    String(String),
+    List(Vec<Box<PhpMixed>>),
+    Array(IndexMap<String, Box<PhpMixed>>),
+}
+
 #[derive(Debug)]
 pub struct Exception {
     pub message: String,

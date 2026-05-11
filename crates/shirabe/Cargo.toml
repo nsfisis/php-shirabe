@@ -5,3 +5,12 @@ edition.workspace = true
 
 [dependencies]
 shirabe-php-shim.workspace = true
+anyhow.workspace = true
+base64.workspace = true
+indexmap.workspace = true
+md5.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+url.workspace = true

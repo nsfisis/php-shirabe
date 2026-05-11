@@ -2,3 +2,6 @@
 name = "shirabe-php-shim"
 version.workspace = true
 edition.workspace = true
+
+[dependencies]
+indexmap.workspace = true
