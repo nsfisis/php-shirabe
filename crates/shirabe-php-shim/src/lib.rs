@@ -11,6 +11,54 @@ pub enum PhpMixed {
     Array(IndexMap<String, Box<PhpMixed>>),
 }
 
+impl PhpMixed {
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            PhpMixed::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_int(&self) -> Option<i64> {
+        match self {
+            PhpMixed::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+
+    pub fn as_float(&self) -> Option<f64> {
+        match self {
+            PhpMixed::Float(f) => Some(*f),
+            _ => None,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            PhpMixed::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn as_list(&self) -> Option<&Vec<Box<PhpMixed>>> {
+        match self {
+            PhpMixed::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn as_array(&self) -> Option<&IndexMap<String, Box<PhpMixed>>> {
+        match self {
+            PhpMixed::Array(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, PhpMixed::Null)
+    }
+}
+
 #[derive(Debug)]
 pub struct Exception {
     pub message: String,
