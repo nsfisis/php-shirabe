@@ -10,6 +10,7 @@ edition = "2024"
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
 anyhow = "1.0.102"
 base64 = "0.22.1"
+chrono = "0.4.44"
 indexmap = { version = "2.14.0", features = ["serde"] }
 md5 = "0.7.0"
 regex = "1.12.3"
