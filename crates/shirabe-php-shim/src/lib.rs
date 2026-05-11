@@ -59,6 +59,23 @@ impl Phar {
 }
 
 #[derive(Debug)]
+pub struct PharFileInfo;
+
+impl PharFileInfo {
+    pub fn get_content(&self) -> String {
+        todo!()
+    }
+
+    pub fn get_basename(&self) -> String {
+        todo!()
+    }
+
+    pub fn is_dir(&self) -> bool {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
 pub struct PharData {
     path: String,
 }
@@ -66,6 +83,19 @@ pub struct PharData {
 impl PharData {
     pub fn new(a: String) -> Self {
         todo!()
+    }
+
+    pub fn valid(&self) -> bool {
+        todo!()
+    }
+
+    pub fn get(&self, key: &str) -> Option<PharFileInfo> {
+        todo!()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = PharFileInfo> {
+        todo!();
+        std::iter::empty()
     }
 
     pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
