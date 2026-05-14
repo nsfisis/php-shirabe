@@ -219,3 +219,33 @@ impl PharData {
         todo!()
     }
 }
+
+pub fn class_exists(name: &str) -> bool {
+    todo!()
+}
+
+#[derive(Debug)]
+pub struct RarEntry;
+
+impl RarEntry {
+    pub fn extract(&self, path: &str) -> bool {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct RarArchive;
+
+impl RarArchive {
+    pub fn open(file: &str) -> Option<Self> {
+        todo!()
+    }
+
+    pub fn get_entries(&self) -> Option<Vec<RarEntry>> {
+        todo!()
+    }
+
+    pub fn close(&self) {
+        todo!()
+    }
+}
