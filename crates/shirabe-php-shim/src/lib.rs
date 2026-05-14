@@ -139,6 +139,10 @@ pub fn implode(glue: &str, pieces: &[String]) -> String {
     todo!()
 }
 
+pub fn version_compare(v1: &str, v2: &str, op: &str) -> bool {
+    todo!()
+}
+
 pub fn error_reporting(level: Option<i64>) -> i64 {
     todo!()
 }
