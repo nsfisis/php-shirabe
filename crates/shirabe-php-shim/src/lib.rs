@@ -83,6 +83,14 @@ pub struct InvalidArgumentException {
     pub code: i64,
 }
 
+pub fn is_bool(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn empty(value: &PhpMixed) -> bool {
+    todo!()
+}
+
 pub fn get_debug_type(value: &PhpMixed) -> String {
     todo!()
 }
