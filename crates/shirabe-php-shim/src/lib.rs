@@ -190,6 +190,10 @@ pub fn parse_url(url: &str, component: i64) -> PhpMixed {
     todo!()
 }
 
+pub fn parse_url_all(url: &str) -> PhpMixed {
+    todo!()
+}
+
 pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
     todo!()
 }
