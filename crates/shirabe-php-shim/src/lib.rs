@@ -254,8 +254,51 @@ impl PharData {
     }
 }
 
+#[derive(Debug)]
+pub struct ZipArchive {
+    pub num_files: i64,
+}
+
+impl ZipArchive {
+    pub fn new() -> Self {
+        todo!()
+    }
+
+    pub fn open(&mut self, filename: &str) -> bool {
+        todo!()
+    }
+
+    pub fn close(&self) {
+        todo!()
+    }
+
+    pub fn locate_name(&self, name: &str) -> Option<i64> {
+        todo!()
+    }
+
+    pub fn get_from_index(&self, index: i64) -> Option<String> {
+        todo!()
+    }
+
+    pub fn get_name_index(&self, index: i64) -> String {
+        todo!()
+    }
+
+    pub fn get_stream(&self, name: &str) -> Option<PhpMixed> {
+        todo!()
+    }
+}
+
 pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
+}
+
+pub fn dirname(path: &str) -> String {
+    todo!()
+}
+
+pub fn stream_get_contents(stream: PhpMixed) -> Option<String> {
+    todo!()
 }
 
 pub fn class_exists(name: &str) -> bool {

@@ -18,3 +18,4 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 sha1 = "0.10.6"
 url = "2.5.8"
+zip = "8.6.0"

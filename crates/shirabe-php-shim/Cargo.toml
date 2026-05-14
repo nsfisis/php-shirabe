@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 indexmap.workspace = true
+zip.workspace = true
