@@ -323,6 +323,14 @@ pub fn class_exists(name: &str) -> bool {
     todo!()
 }
 
+pub fn touch(path: &str) -> bool {
+    todo!()
+}
+
+pub fn chmod(path: &str, mode: u32) -> bool {
+    todo!()
+}
+
 #[derive(Debug)]
 pub struct RarEntry;
 
