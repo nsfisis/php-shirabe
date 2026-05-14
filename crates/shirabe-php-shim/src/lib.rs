@@ -139,6 +139,17 @@ pub fn implode(glue: &str, pieces: &[String]) -> String {
     todo!()
 }
 
+pub fn error_reporting(level: Option<i64>) -> i64 {
+    todo!()
+}
+
+pub const E_WARNING: i64 = 2;
+pub const E_NOTICE: i64 = 8;
+pub const E_USER_WARNING: i64 = 512;
+pub const E_USER_NOTICE: i64 = 1024;
+pub const E_DEPRECATED: i64 = 8192;
+pub const E_USER_DEPRECATED: i64 = 16384;
+
 pub const PHP_URL_PATH: i64 = 5;
 pub const PATHINFO_FILENAME: i64 = 64;
 pub const DIRECTORY_SEPARATOR: &str = "/";
