@@ -226,6 +226,8 @@ pub const E_USER_NOTICE: i64 = 1024;
 pub const E_DEPRECATED: i64 = 8192;
 pub const E_USER_DEPRECATED: i64 = 16384;
 
+pub const PHP_URL_HOST: i64 = 1;
+pub const PHP_URL_PORT: i64 = 2;
 pub const PHP_URL_PATH: i64 = 5;
 pub const PATHINFO_FILENAME: i64 = 64;
 pub const DIRECTORY_SEPARATOR: &str = "/";
