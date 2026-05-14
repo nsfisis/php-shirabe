@@ -95,6 +95,16 @@ pub fn hash(algo: &str, data: &str) -> String {
     todo!()
 }
 
+pub fn hash_raw(algo: &str, data: &str) -> Vec<u8> {
+    todo!()
+}
+
+pub fn unpack(format: &str, data: &[u8]) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub const PHP_VERSION_ID: i64 = 80100;
+
 pub fn extension_loaded(name: &str) -> bool {
     todo!()
 }
