@@ -97,4 +97,8 @@ impl RuleLiterals for MultiConflictRule {
     fn get_literals(&self) -> &Vec<i64> {
         &self.literals
     }
+
+    fn is_multi_conflict_rule(&self) -> bool {
+        true
+    }
 }

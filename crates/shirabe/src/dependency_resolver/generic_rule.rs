@@ -67,6 +67,7 @@ impl GenericRule {
 
 pub trait RuleLiterals {
     fn get_literals(&self) -> &Vec<i64>;
+    fn is_multi_conflict_rule(&self) -> bool { false }
 }
 
 impl RuleLiterals for GenericRule {
