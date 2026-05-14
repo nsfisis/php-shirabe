@@ -87,7 +87,19 @@ pub fn is_bool(value: &PhpMixed) -> bool {
     todo!()
 }
 
+pub fn is_string(value: &PhpMixed) -> bool {
+    todo!()
+}
+
 pub fn empty(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn method_exists(object: &PhpMixed, method_name: &str) -> bool {
+    todo!()
+}
+
+pub fn get_class(object: &PhpMixed) -> String {
     todo!()
 }
 
