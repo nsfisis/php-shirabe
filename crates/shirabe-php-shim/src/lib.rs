@@ -348,6 +348,10 @@ pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
     todo!()
 }
 
+pub fn realpath(path: &str) -> Option<String> {
+    todo!()
+}
+
 pub fn dirname(path: &str) -> String {
     todo!()
 }
