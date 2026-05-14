@@ -141,6 +141,20 @@ pub fn gzclose(file: PhpMixed) {
     todo!()
 }
 
+pub fn fseek(stream: PhpMixed, offset: i64) -> i64 {
+    todo!()
+}
+
+pub fn rewind(stream: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn strip_tags(str: &str) -> String {
+    todo!()
+}
+
+pub const PHP_EOL: &str = "\n";
+
 pub fn fopen(file: &str, mode: &str) -> PhpMixed {
     todo!()
 }
