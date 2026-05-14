@@ -471,3 +471,11 @@ impl RarArchive {
         todo!()
     }
 }
+
+pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
+    todo!()
+}
