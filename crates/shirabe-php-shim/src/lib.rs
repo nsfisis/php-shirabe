@@ -83,6 +83,21 @@ pub struct InvalidArgumentException {
     pub code: i64,
 }
 
+#[derive(Debug)]
+pub struct LogicException {
+    pub message: String,
+    pub code: i64,
+}
+
+#[derive(Debug)]
+pub struct ErrorException {
+    pub message: String,
+    pub code: i64,
+    pub severity: i64,
+    pub filename: String,
+    pub lineno: i64,
+}
+
 pub fn is_bool(value: &PhpMixed) -> bool {
     todo!()
 }
@@ -191,6 +206,7 @@ pub fn error_reporting(level: Option<i64>) -> i64 {
     todo!()
 }
 
+pub const E_ALL: i64 = 32767;
 pub const E_WARNING: i64 = 2;
 pub const E_NOTICE: i64 = 8;
 pub const E_USER_WARNING: i64 = 512;
@@ -301,6 +317,27 @@ impl ZipArchive {
     pub fn get_stream(&self, name: &str) -> Option<PhpMixed> {
         todo!()
     }
+
+    pub fn add_empty_dir(&self, local_name: &str) -> bool {
+        todo!()
+    }
+
+    pub fn add_file(&self, filepath: &str, local_name: &str) -> bool {
+        todo!()
+    }
+
+    pub fn set_external_attributes_name(&self, name: &str, opsys: i64, attr: i64) -> bool {
+        todo!()
+    }
+
+    pub fn get_status_string(&self) -> String {
+        todo!()
+    }
+}
+
+impl ZipArchive {
+    pub const CREATE: i64 = 1;
+    pub const OPSYS_UNIX: i64 = 3;
 }
 
 pub trait JsonSerializable {
@@ -328,6 +365,52 @@ pub fn touch(path: &str) -> bool {
 }
 
 pub fn chmod(path: &str, mode: u32) -> bool {
+    todo!()
+}
+
+pub fn strpbrk(haystack: &str, char_list: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn rawurldecode(s: &str) -> String {
+    todo!()
+}
+
+pub fn rawurlencode(s: &str) -> String {
+    todo!()
+}
+
+pub fn base64_encode(data: &str) -> String {
+    todo!()
+}
+
+pub fn fileperms(path: &str) -> i64 {
+    todo!()
+}
+
+pub const FILTER_VALIDATE_BOOLEAN: i64 = 258;
+
+pub fn filter_var(value: &str, filter: i64) -> bool {
+    todo!()
+}
+
+pub fn ini_get(option: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn set_error_handler(callback: fn(i64, &str, &str, i64) -> bool) {
+    todo!()
+}
+
+pub fn debug_backtrace() -> Vec<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub const PHP_VERSION: &str = "8.1.0";
+
+pub const STDERR: i64 = 2;
+
+pub fn is_resource(value: &PhpMixed) -> bool {
     todo!()
 }
 
