@@ -134,6 +134,10 @@ pub fn hash_raw(algo: &str, data: &str) -> Vec<u8> {
     todo!()
 }
 
+pub fn pack(format: &str, values: &[PhpMixed]) -> Vec<u8> {
+    todo!()
+}
+
 pub fn unpack(format: &str, data: &[u8]) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }

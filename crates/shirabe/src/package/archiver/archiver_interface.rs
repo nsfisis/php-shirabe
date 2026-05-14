@@ -8,7 +8,7 @@ pub trait ArchiverInterface {
         format: String,
         excludes: Vec<String>,
         ignore_filters: bool,
-    ) -> String;
+    ) -> anyhow::Result<String>;
 
     fn supports(&self, format: String, source_type: Option<String>) -> bool;
 }
