@@ -352,6 +352,10 @@ pub fn realpath(path: &str) -> Option<String> {
     todo!()
 }
 
+pub fn json_encode(value: &PhpMixed) -> Option<String> {
+    todo!()
+}
+
 pub fn dirname(path: &str) -> String {
     todo!()
 }

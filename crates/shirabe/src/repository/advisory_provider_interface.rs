@@ -20,5 +20,5 @@ pub struct SecurityAdvisoryResult {
 pub trait AdvisoryProviderInterface {
     fn has_security_advisories(&self) -> bool;
 
-    fn get_security_advisories(&self, package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>, allow_partial_advisories: bool) -> SecurityAdvisoryResult;
+    fn get_security_advisories(&self, package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>, allow_partial_advisories: bool) -> anyhow::Result<SecurityAdvisoryResult>;
 }
