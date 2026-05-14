@@ -356,6 +356,10 @@ pub fn json_encode(value: &PhpMixed) -> Option<String> {
     todo!()
 }
 
+pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
+    todo!()
+}
+
 pub fn dirname(path: &str) -> String {
     todo!()
 }
