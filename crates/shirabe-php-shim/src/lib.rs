@@ -220,6 +220,10 @@ impl PharData {
     }
 }
 
+pub trait JsonSerializable {
+    fn json_serialize(&self) -> PhpMixed;
+}
+
 pub fn class_exists(name: &str) -> bool {
     todo!()
 }
