@@ -271,6 +271,10 @@ impl RarEntry {
     }
 }
 
+pub fn var_export(_value: &PhpMixed, _return: bool) -> String {
+    todo!()
+}
+
 #[derive(Debug)]
 pub struct RarArchive;
 
