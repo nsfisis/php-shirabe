@@ -293,6 +293,10 @@ pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
 }
 
+pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
+    todo!()
+}
+
 pub fn dirname(path: &str) -> String {
     todo!()
 }
