@@ -348,6 +348,10 @@ pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
 }
 
+pub trait Countable {
+    fn count(&self) -> i64;
+}
+
 pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
     todo!()
 }
