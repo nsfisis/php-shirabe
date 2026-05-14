@@ -2,14 +2,15 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{JsonSerializable, PhpMixed};
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 use crate::advisory::ignored_security_advisory::IgnoredSecurityAdvisory;
 use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SecurityAdvisory {
+    #[serde(flatten)]
     inner: PartialSecurityAdvisory,
     pub title: String,
     pub cve: Option<String>,
@@ -57,36 +58,5 @@ impl SecurityAdvisory {
             ignore_reason,
             self.severity.clone(),
         )
-    }
-}
-
-impl JsonSerializable for SecurityAdvisory {
-    fn json_serialize(&self) -> PhpMixed {
-        let mut data = match self.inner.json_serialize() {
-            PhpMixed::Array(m) => m,
-            _ => IndexMap::new(),
-        };
-        data.insert("title".to_string(), Box::new(PhpMixed::String(self.title.clone())));
-        data.insert("cve".to_string(), Box::new(match &self.cve {
-            Some(s) => PhpMixed::String(s.clone()),
-            None => PhpMixed::Null,
-        }));
-        data.insert("link".to_string(), Box::new(match &self.link {
-            Some(s) => PhpMixed::String(s.clone()),
-            None => PhpMixed::Null,
-        }));
-        data.insert("reportedAt".to_string(), Box::new(PhpMixed::String(self.reported_at.to_rfc3339())));
-        data.insert("sources".to_string(), Box::new(PhpMixed::List(
-            self.sources.iter().map(|source| {
-                Box::new(PhpMixed::Array(
-                    source.iter().map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone())))).collect()
-                ))
-            }).collect()
-        )));
-        data.insert("severity".to_string(), Box::new(match &self.severity {
-            Some(s) => PhpMixed::String(s.clone()),
-            None => PhpMixed::Null,
-        }));
-        PhpMixed::Array(data)
     }
 }

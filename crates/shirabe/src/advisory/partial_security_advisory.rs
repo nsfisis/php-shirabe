@@ -4,16 +4,25 @@ use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{JsonSerializable, PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::version_parser::VersionParser;
 use crate::advisory::security_advisory::SecurityAdvisory;
 
-#[derive(Debug)]
+fn serialize_constraint<S: serde::Serializer>(
+    c: &Box<dyn ConstraintInterface>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&c.get_pretty_string())
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PartialSecurityAdvisory {
     pub advisory_id: String,
     pub package_name: String,
+    #[serde(serialize_with = "serialize_constraint")]
     pub affected_versions: Box<dyn ConstraintInterface>,
 }
 
@@ -74,16 +83,5 @@ impl PartialSecurityAdvisory {
         affected_versions: Box<dyn ConstraintInterface>,
     ) -> Self {
         Self { advisory_id, package_name, affected_versions }
-    }
-}
-
-impl JsonSerializable for PartialSecurityAdvisory {
-    fn json_serialize(&self) -> PhpMixed {
-        use indexmap::IndexMap;
-        let mut data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        data.insert("advisoryId".to_string(), Box::new(PhpMixed::String(self.advisory_id.clone())));
-        data.insert("packageName".to_string(), Box::new(PhpMixed::String(self.package_name.clone())));
-        data.insert("affectedVersions".to_string(), Box::new(PhpMixed::String(self.affected_versions.get_pretty_string())));
-        PhpMixed::Array(data)
     }
 }
