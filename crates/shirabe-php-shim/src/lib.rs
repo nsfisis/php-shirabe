@@ -592,6 +592,10 @@ pub fn file_exists(path: &str) -> bool {
     todo!()
 }
 
+pub fn is_writable(path: &str) -> bool {
+    todo!()
+}
+
 pub fn unlink(path: &str) -> bool {
     todo!()
 }
