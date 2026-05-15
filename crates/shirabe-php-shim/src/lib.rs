@@ -580,7 +580,7 @@ pub fn getcwd() -> Option<String> {
     todo!()
 }
 
-pub fn chdir(path: &str) -> bool {
+pub fn chdir(path: &str) -> Result<()> {
     todo!()
 }
 
