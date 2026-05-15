@@ -463,6 +463,26 @@ pub fn base64_encode(data: &str) -> String {
     todo!()
 }
 
+pub fn base64_decode(data: &str) -> Option<Vec<u8>> {
+    todo!()
+}
+
+pub fn substr_count(haystack: &str, needle: &str) -> i64 {
+    todo!()
+}
+
+pub fn openssl_x509_parse(certificate: &str, short_names: bool) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub fn openssl_get_publickey(certificate: &str) -> Option<PhpMixed> {
+    todo!()
+}
+
+pub fn openssl_pkey_get_details(key: PhpMixed) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
 pub fn fileperms(path: &str) -> i64 {
     todo!()
 }
