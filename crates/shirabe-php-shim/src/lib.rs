@@ -667,3 +667,15 @@ pub fn random_bytes(length: usize) -> Vec<u8> {
 pub fn is_dir(path: &str) -> bool {
     todo!()
 }
+
+pub fn file_get_contents(path: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn strtolower(s: &str) -> String {
+    todo!()
+}
+
+pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
+    todo!()
+}
