@@ -90,6 +90,12 @@ pub struct LogicException {
 }
 
 #[derive(Debug)]
+pub struct BadMethodCallException {
+    pub message: String,
+    pub code: i64,
+}
+
+#[derive(Debug)]
 pub struct ErrorException {
     pub message: String,
     pub code: i64,
