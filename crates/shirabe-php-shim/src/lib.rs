@@ -230,6 +230,9 @@ pub const PHP_URL_HOST: i64 = 1;
 pub const PHP_URL_PORT: i64 = 2;
 pub const PHP_URL_PATH: i64 = 5;
 pub const PATHINFO_FILENAME: i64 = 64;
+pub const PATHINFO_EXTENSION: i64 = 4;
+pub const PATHINFO_DIRNAME: i64 = 1;
+pub const PATHINFO_BASENAME: i64 = 2;
 pub const DIRECTORY_SEPARATOR: &str = "/";
 
 pub const HHVM_VERSION: Option<&str> = None;
