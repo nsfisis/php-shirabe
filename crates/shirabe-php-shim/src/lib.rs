@@ -655,3 +655,15 @@ pub const CURL_VERSION_HTTPS_PROXY: i64 = 2097152;
 pub fn curl_version() -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
+
+pub fn bin2hex(data: &[u8]) -> String {
+    todo!()
+}
+
+pub fn random_bytes(length: usize) -> Vec<u8> {
+    todo!()
+}
+
+pub fn is_dir(path: &str) -> bool {
+    todo!()
+}
