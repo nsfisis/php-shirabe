@@ -521,3 +521,7 @@ pub fn html_entity_decode(s: &str) -> String {
 pub fn hash_file(algo: &str, filename: &str) -> Option<String> {
     todo!()
 }
+
+pub fn strnatcasecmp(s1: &str, s2: &str) -> i64 {
+    todo!()
+}
