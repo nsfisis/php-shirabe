@@ -591,6 +591,10 @@ pub fn basename(path: &str) -> String {
     todo!()
 }
 
+pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
+    todo!()
+}
+
 pub struct FilesystemIterator;
 
 impl FilesystemIterator {
