@@ -391,6 +391,11 @@ pub fn realpath(path: &str) -> Option<String> {
     todo!()
 }
 
+pub const JSON_UNESCAPED_UNICODE: i64 = 256;
+pub const JSON_UNESCAPED_SLASHES: i64 = 64;
+pub const JSON_PRETTY_PRINT: i64 = 128;
+pub const JSON_THROW_ON_ERROR: i64 = 4194304;
+
 pub fn json_encode(value: &PhpMixed) -> Option<String> {
     todo!()
 }
