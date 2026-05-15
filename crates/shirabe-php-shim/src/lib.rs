@@ -602,3 +602,16 @@ impl FilesystemIterator {
     pub const KEY_AS_PATHNAME: i64 = 256;
     pub const CURRENT_AS_FILEINFO: i64 = 0;
 }
+
+pub const CURLOPT_PROXY: i64 = 10004;
+pub const CURLOPT_NOPROXY: i64 = 10177;
+pub const CURLOPT_PROXYAUTH: i64 = 111;
+pub const CURLOPT_PROXYUSERPWD: i64 = 10006;
+pub const CURLAUTH_BASIC: i64 = 1;
+pub const CURLOPT_PROXY_CAINFO: i64 = 246;
+pub const CURLOPT_PROXY_CAPATH: i64 = 247;
+pub const CURL_VERSION_HTTPS_PROXY: i64 = 2097152;
+
+pub fn curl_version() -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
