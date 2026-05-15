@@ -575,6 +575,22 @@ pub fn bzcompress(data: &[u8]) -> Option<Vec<u8>> {
     todo!()
 }
 
+pub fn getcwd() -> Option<String> {
+    todo!()
+}
+
+pub fn chdir(path: &str) -> bool {
+    todo!()
+}
+
+pub fn glob(pattern: &str) -> Vec<String> {
+    todo!()
+}
+
+pub fn basename(path: &str) -> String {
+    todo!()
+}
+
 pub struct FilesystemIterator;
 
 impl FilesystemIterator {
