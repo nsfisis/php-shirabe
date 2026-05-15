@@ -448,6 +448,7 @@ pub fn fileperms(path: &str) -> i64 {
 }
 
 pub const FILTER_VALIDATE_BOOLEAN: i64 = 258;
+pub const FILTER_VALIDATE_URL: i64 = 273;
 
 pub fn filter_var(value: &str, filter: i64) -> bool {
     todo!()
