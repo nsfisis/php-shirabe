@@ -5,5 +5,5 @@ use shirabe_php_shim::PhpMixed;
 use crate::package::base_package::BasePackage;
 
 pub trait LoaderInterface {
-    fn load(&self, config: IndexMap<String, PhpMixed>, class: Option<String>) -> Box<BasePackage>;
+    fn load(&self, config: IndexMap<String, PhpMixed>, class: Option<String>) -> anyhow::Result<Box<BasePackage>>;
 }

@@ -31,6 +31,6 @@ impl JsonLoader {
             }
         };
 
-        Ok(self.loader.load(config, None))
+        self.loader.load(config, None)
     }
 }

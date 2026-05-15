@@ -517,3 +517,7 @@ pub fn ob_get_clean() -> Option<String> {
 pub fn html_entity_decode(s: &str) -> String {
     todo!()
 }
+
+pub fn hash_file(algo: &str, filename: &str) -> Option<String> {
+    todo!()
+}
