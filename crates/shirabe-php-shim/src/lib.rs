@@ -96,6 +96,12 @@ pub struct BadMethodCallException {
 }
 
 #[derive(Debug)]
+pub struct OutOfBoundsException {
+    pub message: String,
+    pub code: i64,
+}
+
+#[derive(Debug)]
 pub struct ErrorException {
     pub message: String,
     pub code: i64,
