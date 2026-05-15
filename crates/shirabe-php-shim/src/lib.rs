@@ -240,6 +240,11 @@ pub struct Phar {
 }
 
 impl Phar {
+    pub const ZIP: i64 = 1;
+    pub const TAR: i64 = 2;
+    pub const GZ: i64 = 4096;
+    pub const BZ2: i64 = 8192;
+
     pub fn new(a: String) -> Self {
         todo!()
     }
@@ -276,6 +281,14 @@ impl PharData {
         todo!()
     }
 
+    pub fn new_with_format(path: String, flags: i64, alias: &str, format: i64) -> Self {
+        todo!()
+    }
+
+    pub fn can_compress(algo: i64) -> bool {
+        todo!()
+    }
+
     pub fn valid(&self) -> bool {
         todo!()
     }
@@ -294,6 +307,14 @@ impl PharData {
     }
 
     pub fn add_empty_dir(&self, a: &str) {
+        todo!()
+    }
+
+    pub fn build_from_iterator(&self, iter: &mut dyn Iterator<Item = std::path::PathBuf>, base: &str) {
+        todo!()
+    }
+
+    pub fn compress(&self, algo: i64) {
         todo!()
     }
 }
@@ -524,4 +545,39 @@ pub fn hash_file(algo: &str, filename: &str) -> Option<String> {
 
 pub fn strnatcasecmp(s1: &str, s2: &str) -> i64 {
     todo!()
+}
+
+pub fn file_exists(path: &str) -> bool {
+    todo!()
+}
+
+pub fn unlink(path: &str) -> bool {
+    todo!()
+}
+
+pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
+    todo!()
+}
+
+pub fn str_repeat(s: &str, count: usize) -> String {
+    todo!()
+}
+
+pub fn strrpos(haystack: &str, needle: &str) -> Option<usize> {
+    todo!()
+}
+
+pub fn gzcompress(data: &[u8]) -> Option<Vec<u8>> {
+    todo!()
+}
+
+pub fn bzcompress(data: &[u8]) -> Option<Vec<u8>> {
+    todo!()
+}
+
+pub struct FilesystemIterator;
+
+impl FilesystemIterator {
+    pub const KEY_AS_PATHNAME: i64 = 256;
+    pub const CURRENT_AS_FILEINFO: i64 = 0;
 }
