@@ -390,6 +390,14 @@ pub fn class_exists(name: &str) -> bool {
     todo!()
 }
 
+pub fn function_exists(name: &str) -> bool {
+    todo!()
+}
+
+pub fn mb_convert_encoding(string: Vec<u8>, to_encoding: &str, from_encoding: &str) -> String {
+    todo!()
+}
+
 pub fn touch(path: &str) -> bool {
     todo!()
 }
