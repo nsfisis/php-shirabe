@@ -481,3 +481,7 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
 pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
     todo!()
 }
+
+pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
+    todo!()
+}
