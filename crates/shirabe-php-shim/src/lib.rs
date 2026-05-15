@@ -493,3 +493,27 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
 pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
     todo!()
 }
+
+pub fn constant(name: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn get_loaded_extensions() -> Vec<String> {
+    todo!()
+}
+
+pub fn phpversion(extension: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn ob_start() -> bool {
+    todo!()
+}
+
+pub fn ob_get_clean() -> Option<String> {
+    todo!()
+}
+
+pub fn html_entity_decode(s: &str) -> String {
+    todo!()
+}
