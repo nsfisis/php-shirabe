@@ -5,6 +5,7 @@ use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
+use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
 
 pub enum FindPackageConstraint {
     String(String),
@@ -60,4 +61,10 @@ pub trait RepositoryInterface: Countable {
     fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo>;
 
     fn get_repo_name(&self) -> String;
+
+    fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
+        None
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }
