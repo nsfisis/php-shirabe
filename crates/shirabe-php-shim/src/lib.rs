@@ -1796,3 +1796,15 @@ impl Phar {
         todo!()
     }
 }
+
+pub fn php_strip_whitespace(path: &str) -> String {
+    todo!()
+}
+
+pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub fn is_readable(path: &str) -> bool {
+    todo!()
+}
