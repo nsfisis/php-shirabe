@@ -1142,6 +1142,40 @@ pub fn r#eval(code: &str) -> PhpMixed {
     todo!()
 }
 
+pub fn array_is_list(array: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
+    todo!()
+}
+
+pub fn array_splice<T>(
+    array: &mut Vec<T>,
+    offset: i64,
+    length: Option<i64>,
+    replacement: Vec<T>,
+) -> Vec<T> {
+    todo!()
+}
+
+pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
+    todo!()
+}
+
+pub fn reset_first<T: Clone>(array: &[T]) -> Option<T> {
+    todo!()
+}
+
+pub fn call_user_func<T>(callback: &str, args: &[PhpMixed]) -> T
+where
+    T: From<PhpMixed>,
+{
+    todo!()
+}
+
+pub const PHP_EOL: &str = "\n";
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
