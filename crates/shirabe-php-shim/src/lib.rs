@@ -730,3 +730,19 @@ pub const GLOB_BRACE: i64 = 4096;
 pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
     todo!()
 }
+
+pub fn time() -> i64 {
+    todo!()
+}
+
+pub fn date(format: &str, timestamp: Option<i64>) -> String {
+    todo!()
+}
+
+pub fn trigger_error(message: &str, error_level: i64) {
+    todo!()
+}
+
+pub fn sys_get_temp_dir() -> String {
+    todo!()
+}
