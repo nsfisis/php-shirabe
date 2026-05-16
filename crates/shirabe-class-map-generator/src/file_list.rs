@@ -9,6 +9,12 @@ pub struct FileList {
 }
 
 impl FileList {
+    pub fn new() -> Self {
+        FileList {
+            files: IndexMap::new(),
+        }
+    }
+
     pub fn add(&mut self, path: String) {
         self.files.insert(path, true);
     }

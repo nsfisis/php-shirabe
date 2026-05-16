@@ -2,8 +2,8 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::class_map_generator::class_map::ClassMap;
-use shirabe_external_packages::composer::class_map_generator::class_map_generator::ClassMapGenerator;
+use shirabe_class_map_generator::class_map::ClassMap;
+use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::{

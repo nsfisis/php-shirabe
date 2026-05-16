@@ -1808,3 +1808,7 @@ pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
 pub fn is_readable(path: &str) -> bool {
     todo!()
 }
+
+pub fn stream_get_wrappers() -> Vec<String> {
+    todo!()
+}
