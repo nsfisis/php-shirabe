@@ -118,6 +118,56 @@ pub fn is_string(value: &PhpMixed) -> bool {
     todo!()
 }
 
+pub fn is_int(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn is_scalar(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn is_numeric(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn trim(s: &str, chars: &str) -> String {
+    todo!()
+}
+
+pub fn strtotime(time: &str) -> Option<i64> {
+    todo!()
+}
+
+pub fn strcasecmp(s1: &str, s2: &str) -> i64 {
+    todo!()
+}
+
+pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
+    todo!()
+}
+
+pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
+    todo!()
+}
+
+pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
+    todo!()
+}
+
+pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
+    todo!()
+}
+
+pub fn php_to_string(value: &PhpMixed) -> String {
+    todo!()
+}
+
+pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
+    todo!()
+}
+
+pub const FILTER_VALIDATE_EMAIL: i64 = 274;
+
 pub fn empty(value: &PhpMixed) -> bool {
     todo!()
 }
