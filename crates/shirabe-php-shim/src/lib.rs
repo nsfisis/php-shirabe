@@ -1178,6 +1178,10 @@ pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
     todo!()
 }
 
+pub fn is_object(value: &PhpMixed) -> bool {
+    todo!()
+}
+
 pub const PHP_EOL: &str = "\n";
 
 pub const PHP_INT_MAX: i64 = i64::MAX;
