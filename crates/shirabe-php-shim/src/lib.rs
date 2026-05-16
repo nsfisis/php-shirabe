@@ -972,6 +972,33 @@ pub fn array_shift<T>(array: &mut Vec<T>) -> Option<T> {
     todo!()
 }
 
+pub fn array_pop<T>(array: &mut Vec<T>) -> Option<T> {
+    todo!()
+}
+
+pub fn array_unshift<T>(array: &mut Vec<T>, value: T) {
+    todo!()
+}
+
+pub fn array_reverse<T: Clone>(array: &[T], preserve_keys: bool) -> Vec<T> {
+    todo!()
+}
+
+pub fn array_filter<T: Clone, F>(array: &[T], callback: F) -> Vec<T>
+where
+    F: Fn(&T) -> bool,
+{
+    todo!()
+}
+
+pub fn array_intersect<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
+    todo!()
+}
+
+pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
+    todo!()
+}
+
 pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
