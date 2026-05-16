@@ -825,6 +825,22 @@ pub fn strcmp(s1: &str, s2: &str) -> i64 {
     todo!()
 }
 
+pub fn rtrim(s: &str, chars: Option<&str>) -> String {
+    todo!()
+}
+
+pub fn rmdir(dir: &str) -> bool {
+    todo!()
+}
+
+pub fn is_link(path: &str) -> bool {
+    todo!()
+}
+
+pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
+    todo!()
+}
+
 impl Phar {
     pub const SHA512: i64 = 16;
 
