@@ -168,6 +168,88 @@ pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
 
 pub const FILTER_VALIDATE_EMAIL: i64 = 274;
 
+pub const PATH_SEPARATOR: &str = ":";
+
+pub fn spl_autoload_functions() -> Vec<PhpMixed> {
+    todo!()
+}
+
+pub fn spl_autoload_register(callback: PhpMixed) {
+    todo!()
+}
+
+pub fn spl_autoload_unregister(callback: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn array_pop(array: &mut Vec<String>) -> Option<String> {
+    todo!()
+}
+
+pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
+    todo!()
+}
+
+pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
+    todo!()
+}
+
+pub fn array_splice<T: Clone>(array: &mut Vec<T>, offset: usize, length: usize, replacement: &[T]) -> Vec<T> {
+    todo!()
+}
+
+pub fn array_map_str_fn<F: Fn(&str) -> String>(callback: F, array: &[String]) -> Vec<String> {
+    todo!()
+}
+
+pub fn is_callable(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn is_object(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn is_a(object_or_class: &PhpMixed, class: &str, allow_string: bool) -> bool {
+    todo!()
+}
+
+pub fn str_contains(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
+pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
+pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
+pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
+    todo!()
+}
+
+pub fn strtoupper(s: &str) -> String {
+    todo!()
+}
+
+pub fn strlen(s: &str) -> i64 {
+    todo!()
+}
+
+pub fn krsort<V>(array: &mut IndexMap<i64, V>) {
+    todo!()
+}
+
+pub fn max_i64(a: i64, b: i64) -> i64 {
+    todo!()
+}
+
+pub fn count_mixed(value: &PhpMixed) -> i64 {
+    todo!()
+}
+
 pub fn empty(value: &PhpMixed) -> bool {
     todo!()
 }
