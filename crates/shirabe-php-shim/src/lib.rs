@@ -250,6 +250,14 @@ pub fn count_mixed(value: &PhpMixed) -> i64 {
     todo!()
 }
 
+pub fn array_slice(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
+    todo!()
+}
+
+pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+    todo!()
+}
+
 pub fn empty(value: &PhpMixed) -> bool {
     todo!()
 }
