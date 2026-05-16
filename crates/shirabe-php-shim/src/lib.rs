@@ -370,6 +370,10 @@ pub fn version_compare(v1: &str, v2: &str, op: &str) -> bool {
     todo!()
 }
 
+pub fn version_compare_2(v1: &str, v2: &str) -> i64 {
+    todo!()
+}
+
 pub fn microtime(get_as_float: bool) -> f64 {
     todo!()
 }
