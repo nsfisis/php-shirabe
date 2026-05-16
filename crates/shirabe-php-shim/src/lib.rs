@@ -1091,6 +1091,20 @@ pub fn iconv(in_charset: &str, out_charset: &str, string: &str) -> Option<String
     todo!()
 }
 
+pub const JSON_ERROR_NONE: i64 = 0;
+pub const JSON_ERROR_DEPTH: i64 = 1;
+pub const JSON_ERROR_STATE_MISMATCH: i64 = 2;
+pub const JSON_ERROR_CTRL_CHAR: i64 = 3;
+pub const JSON_ERROR_UTF8: i64 = 5;
+
+pub fn json_last_error() -> i64 {
+    todo!()
+}
+
+pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
