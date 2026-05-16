@@ -519,6 +519,8 @@ pub fn fileperms(path: &str) -> i64 {
 
 pub const FILTER_VALIDATE_BOOLEAN: i64 = 258;
 pub const FILTER_VALIDATE_URL: i64 = 273;
+pub const FILTER_VALIDATE_IP: i64 = 275;
+pub const FILTER_VALIDATE_INT: i64 = 257;
 
 pub fn filter_var(value: &str, filter: i64) -> bool {
     todo!()
@@ -1050,6 +1052,30 @@ pub fn umask() -> u32 {
 }
 
 pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+    todo!()
+}
+
+pub fn inet_pton(host: &str) -> Option<Vec<u8>> {
+    todo!()
+}
+
+pub fn ltrim(s: &str, chars: Option<&str>) -> String {
+    todo!()
+}
+
+pub fn floor(value: f64) -> f64 {
+    todo!()
+}
+
+pub fn chr(value: u8) -> String {
+    todo!()
+}
+
+pub fn filter_var_with_options(
+    value: &str,
+    filter: i64,
+    options: &IndexMap<String, PhpMixed>,
+) -> PhpMixed {
     todo!()
 }
 
