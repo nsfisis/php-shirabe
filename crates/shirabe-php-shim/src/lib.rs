@@ -767,7 +767,157 @@ pub const CURLOPT_PROXY_CAINFO: i64 = 246;
 pub const CURLOPT_PROXY_CAPATH: i64 = 247;
 pub const CURL_VERSION_HTTPS_PROXY: i64 = 2097152;
 
+pub const CURLM_OK: i64 = 0;
+pub const CURLM_BAD_HANDLE: i64 = 1;
+pub const CURLM_BAD_EASY_HANDLE: i64 = 2;
+pub const CURLM_OUT_OF_MEMORY: i64 = 3;
+pub const CURLM_INTERNAL_ERROR: i64 = 4;
+pub const CURLM_CALL_MULTI_PERFORM: i64 = -1;
+
+pub const CURLMOPT_PIPELINING: i64 = 3;
+pub const CURLMOPT_MAX_HOST_CONNECTIONS: i64 = 7;
+
+pub const CURLSHOPT_SHARE: i64 = 1;
+pub const CURL_LOCK_DATA_COOKIE: i64 = 2;
+pub const CURL_LOCK_DATA_DNS: i64 = 3;
+pub const CURL_LOCK_DATA_SSL_SESSION: i64 = 4;
+
+pub const CURLOPT_URL: i64 = 10002;
+pub const CURLOPT_FOLLOWLOCATION: i64 = 52;
+pub const CURLOPT_CONNECTTIMEOUT: i64 = 78;
+pub const CURLOPT_TIMEOUT: i64 = 13;
+pub const CURLOPT_WRITEHEADER: i64 = 10029;
+pub const CURLOPT_FILE: i64 = 10001;
+pub const CURLOPT_ENCODING: i64 = 10102;
+pub const CURLOPT_PROTOCOLS: i64 = 181;
+pub const CURLOPT_CUSTOMREQUEST: i64 = 10036;
+pub const CURLOPT_POSTFIELDS: i64 = 10015;
+pub const CURLOPT_HTTPHEADER: i64 = 10023;
+pub const CURLOPT_CAINFO: i64 = 10065;
+pub const CURLOPT_CAPATH: i64 = 10097;
+pub const CURLOPT_SSL_VERIFYPEER: i64 = 64;
+pub const CURLOPT_SSL_VERIFYHOST: i64 = 81;
+pub const CURLOPT_SSLCERT: i64 = 10025;
+pub const CURLOPT_SSLKEY: i64 = 10087;
+pub const CURLOPT_SSLKEYPASSWD: i64 = 10026;
+pub const CURLOPT_IPRESOLVE: i64 = 113;
+pub const CURLOPT_SHARE: i64 = 10100;
+pub const CURLOPT_HTTP_VERSION: i64 = 84;
+
+pub const CURLPROTO_HTTP: i64 = 1;
+pub const CURLPROTO_HTTPS: i64 = 2;
+
+pub const CURL_IPRESOLVE_V4: i64 = 1;
+pub const CURL_IPRESOLVE_V6: i64 = 2;
+
+pub const CURL_HTTP_VERSION_2_0: i64 = 3;
+pub const CURL_HTTP_VERSION_3: i64 = 30;
+
+pub const CURL_VERSION_HTTP2: i64 = 65536;
+pub const CURL_VERSION_HTTP3: i64 = 33554432;
+pub const CURL_VERSION_LIBZ: i64 = 8;
+
+pub const CURLE_OK: i64 = 0;
+pub const CURLE_OPERATION_TIMEDOUT: i64 = 28;
+
+#[derive(Debug)]
+pub struct CurlHandle;
+
+#[derive(Debug)]
+pub struct CurlMultiHandle;
+
+#[derive(Debug)]
+pub struct CurlShareHandle;
+
 pub fn curl_version() -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub fn curl_init() -> CurlHandle {
+    todo!()
+}
+
+pub fn curl_close(handle: CurlHandle) {
+    todo!()
+}
+
+pub fn curl_setopt(handle: &CurlHandle, option: i64, value: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn curl_setopt_array(handle: &CurlHandle, options: &IndexMap<i64, PhpMixed>) -> bool {
+    todo!()
+}
+
+pub fn curl_getinfo(handle: &CurlHandle) -> PhpMixed {
+    todo!()
+}
+
+pub fn curl_error(handle: &CurlHandle) -> String {
+    todo!()
+}
+
+pub fn curl_errno(handle: &CurlHandle) -> i64 {
+    todo!()
+}
+
+pub fn curl_strerror(errornum: i64) -> Option<String> {
+    todo!()
+}
+
+pub fn curl_multi_init() -> CurlMultiHandle {
+    todo!()
+}
+
+pub fn curl_multi_setopt(mh: &CurlMultiHandle, option: i64, value: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn curl_multi_add_handle(mh: &CurlMultiHandle, handle: &CurlHandle) -> i64 {
+    todo!()
+}
+
+pub fn curl_multi_remove_handle(mh: &CurlMultiHandle, handle: &CurlHandle) -> i64 {
+    todo!()
+}
+
+pub fn curl_multi_exec(mh: &CurlMultiHandle, still_running: &mut bool) -> i64 {
+    todo!()
+}
+
+pub fn curl_multi_select(mh: &CurlMultiHandle, timeout: f64) -> i64 {
+    todo!()
+}
+
+pub fn curl_multi_info_read(mh: &CurlMultiHandle) -> PhpMixed {
+    todo!()
+}
+
+pub fn curl_share_init() -> CurlShareHandle {
+    todo!()
+}
+
+pub fn curl_share_setopt(sh: &CurlShareHandle, option: i64, value: PhpMixed) -> bool {
+    todo!()
+}
+
+/// Cast a `\CurlHandle` to int (its spl_object_id) as `(int) $curlHandle` in PHP.
+pub fn curl_handle_id(handle: &CurlHandle) -> i64 {
+    todo!()
+}
+
+pub fn restore_error_handler() {
+    todo!()
+}
+
+/// Closure-capturing variant of PHP `set_error_handler()`.
+pub fn set_error_handler_closure(callback: Box<dyn FnMut(i64, &str) -> bool>) {
+    let _ = callback;
+    todo!()
+}
+
+pub fn stream_get_contents_with_max(stream: PhpMixed, max_length: Option<i64>) -> Option<String> {
+    let _ = (stream, max_length);
     todo!()
 }
 

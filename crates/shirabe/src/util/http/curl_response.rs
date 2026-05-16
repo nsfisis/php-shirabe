@@ -7,7 +7,7 @@ use super::response::Response;
 
 #[derive(Debug)]
 pub struct CurlResponse {
-    inner: Response,
+    pub(crate) inner: Response,
     curl_info: IndexMap<String, PhpMixed>,
 }
 
