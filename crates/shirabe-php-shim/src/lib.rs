@@ -870,6 +870,18 @@ pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
 
 pub const DATE_ATOM: &str = "Y-m-d\\TH:i:sP";
 
+pub fn ucfirst(s: &str) -> String {
+    todo!()
+}
+
+pub fn is_scalar(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn strval(value: &PhpMixed) -> String {
+    todo!()
+}
+
 pub fn usleep(microseconds: u64) {
     todo!()
 }
