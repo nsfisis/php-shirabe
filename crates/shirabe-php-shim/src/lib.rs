@@ -968,6 +968,17 @@ pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
     todo!()
 }
 
+pub fn array_shift<T>(array: &mut Vec<T>) -> Option<T> {
+    todo!()
+}
+
+pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
+where
+    F: Fn(&T) -> U,
+{
+    todo!()
+}
+
 impl Phar {
     pub const SHA512: i64 = 16;
 
