@@ -1019,6 +1019,24 @@ pub fn filemtime(filename: &str) -> Option<i64> {
     todo!()
 }
 
+/// Equivalent to PHP's __DIR__ magic constant
+pub fn php_dir() -> String {
+    todo!()
+}
+
+/// Equivalent to PHP's `require <file>` returning the file's return value
+pub fn require_php_file(filename: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn array_flip(array: &PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
+    todo!()
+}
+
 pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
