@@ -4,7 +4,7 @@ use anyhow::bail;
 
 use shirabe_php_shim as php;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
     version: String,
     is_inclusive: bool,

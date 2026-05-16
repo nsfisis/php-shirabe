@@ -16,4 +16,11 @@ pub trait ConstraintInterface {
     fn set_pretty_string(&mut self, pretty_string: Option<String>);
 
     fn __to_string(&self) -> String;
+
+    // Rust-specific helpers for instanceof checks in MultiConstraint::matches and optimizeConstraints.
+    fn is_disjunctive(&self) -> bool {
+        false
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }

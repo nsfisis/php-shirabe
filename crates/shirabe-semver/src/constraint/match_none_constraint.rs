@@ -34,6 +34,10 @@ impl ConstraintInterface for MatchNoneConstraint {
         "[]".to_string()
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_upper_bound(&self) -> Bound {
         Bound::new("0.0.0.0-dev".to_string(), false)
     }

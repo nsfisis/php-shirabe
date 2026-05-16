@@ -34,6 +34,10 @@ impl ConstraintInterface for MatchAllConstraint {
         "*".to_string()
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_upper_bound(&self) -> Bound {
         Bound::positive_infinity()
     }
