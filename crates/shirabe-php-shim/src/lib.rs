@@ -773,6 +773,14 @@ pub fn strtolower(s: &str) -> String {
     todo!()
 }
 
+pub fn ctype_alnum(s: &str) -> bool {
+    todo!()
+}
+
+pub fn ord(c: &str) -> i64 {
+    todo!()
+}
+
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
