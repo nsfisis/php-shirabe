@@ -1182,6 +1182,26 @@ pub fn is_object(value: &PhpMixed) -> bool {
     todo!()
 }
 
+pub fn is_numeric(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn levenshtein(string1: &str, string2: &str) -> i64 {
+    todo!()
+}
+
+pub fn array_slice<V: Clone>(
+    array: &IndexMap<String, V>,
+    offset: i64,
+    length: Option<i64>,
+) -> IndexMap<String, V> {
+    todo!()
+}
+
+pub fn asort<V: Ord>(array: &mut IndexMap<String, V>) {
+    todo!()
+}
+
 pub const PHP_EOL: &str = "\n";
 
 pub const PHP_INT_MAX: i64 = i64::MAX;
