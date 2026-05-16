@@ -130,10 +130,6 @@ pub fn is_numeric(value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn trim(s: &str, chars: &str) -> String {
-    todo!()
-}
-
 pub fn strtotime(time: &str) -> Option<i64> {
     todo!()
 }
@@ -174,32 +170,11 @@ pub fn spl_autoload_functions() -> Vec<PhpMixed> {
     todo!()
 }
 
-pub fn spl_autoload_register(callback: PhpMixed) {
-    todo!()
-}
-
-pub fn spl_autoload_unregister(callback: PhpMixed) -> bool {
-    todo!()
-}
-
-pub fn array_pop(array: &mut Vec<String>) -> Option<String> {
-    todo!()
-}
-
 pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
     todo!()
 }
 
 pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
-    todo!()
-}
-
-pub fn array_splice<T: Clone>(
-    array: &mut Vec<T>,
-    offset: usize,
-    length: usize,
-    replacement: &[T],
-) -> Vec<T> {
     todo!()
 }
 
@@ -255,19 +230,11 @@ pub fn count_mixed(value: &PhpMixed) -> i64 {
     todo!()
 }
 
-pub fn array_slice(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
+pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
     todo!()
 }
 
 pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
-    todo!()
-}
-
-pub fn array_shift<T>(array: &mut Vec<T>) -> T {
-    todo!()
-}
-
-pub fn array_unshift<T>(array: &mut Vec<T>, value: T) -> i64 {
     todo!()
 }
 
@@ -912,7 +879,7 @@ pub fn getcwd() -> Option<String> {
     todo!()
 }
 
-pub fn chdir(path: &str) -> Result<()> {
+pub fn chdir(path: &str) -> anyhow::Result<()> {
     todo!()
 }
 
@@ -1156,7 +1123,6 @@ pub fn get_current_user() -> String {
 }
 
 pub const FILE_IGNORE_NEW_LINES: i64 = 2;
-pub const FILTER_VALIDATE_EMAIL: i64 = 274;
 
 pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
     todo!()
@@ -1235,7 +1201,6 @@ pub fn reset<T: Clone>(array: &[T]) -> Option<T> {
 }
 
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
-pub const PHP_VERSION_ID: i64 = 80100;
 
 pub fn array_intersect_key(
     array1: &IndexMap<String, Box<PhpMixed>>,
@@ -1378,10 +1343,6 @@ pub fn is_link(path: &str) -> bool {
     todo!()
 }
 
-pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
-    todo!()
-}
-
 pub fn str_pad(input: &str, length: usize, pad_string: &str, pad_type: i64) -> String {
     todo!()
 }
@@ -1394,21 +1355,9 @@ pub fn abs(value: i64) -> i64 {
     todo!()
 }
 
-pub fn str_contains(haystack: &str, needle: &str) -> bool {
-    todo!()
-}
-
-pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
-    todo!()
-}
-
 pub const DATE_ATOM: &str = "Y-m-d\\TH:i:sP";
 
 pub fn ucfirst(s: &str) -> String {
-    todo!()
-}
-
-pub fn is_scalar(value: &PhpMixed) -> bool {
     todo!()
 }
 
@@ -1421,18 +1370,6 @@ pub fn usleep(microseconds: u64) {
 }
 
 pub fn mb_strlen(s: &str, encoding: &str) -> i64 {
-    todo!()
-}
-
-pub fn strlen(s: &str) -> i64 {
-    todo!()
-}
-
-pub fn substr(s: &str, offset: i64, length: Option<i64>) -> String {
-    todo!()
-}
-
-pub fn strtoupper(s: &str) -> String {
     todo!()
 }
 
@@ -1506,19 +1443,11 @@ pub fn env_contains_key(name: &str) -> bool {
     todo!()
 }
 
-pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
-    todo!()
-}
-
 pub fn trim(s: &str, chars: Option<&str>) -> String {
     todo!()
 }
 
 pub fn count(value: &PhpMixed) -> i64 {
-    todo!()
-}
-
-pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
     todo!()
 }
 
@@ -1567,10 +1496,6 @@ where
 }
 
 pub fn array_intersect<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
-    todo!()
-}
-
-pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
     todo!()
 }
 
@@ -1674,10 +1599,6 @@ pub fn json_last_error() -> i64 {
     todo!()
 }
 
-pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
-    todo!()
-}
-
 pub fn sort<T: Ord>(array: &mut Vec<T>) {
     todo!()
 }
@@ -1703,10 +1624,6 @@ pub fn ksort<V>(array: &mut IndexMap<String, V>) {
     todo!()
 }
 
-pub fn is_int(value: &PhpMixed) -> bool {
-    todo!()
-}
-
 pub fn is_null(value: &PhpMixed) -> bool {
     todo!()
 }
@@ -1716,10 +1633,6 @@ pub fn r#eval(code: &str) -> PhpMixed {
 }
 
 pub fn array_is_list(array: &PhpMixed) -> bool {
-    todo!()
-}
-
-pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
     todo!()
 }
 
@@ -1751,14 +1664,6 @@ pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
     todo!()
 }
 
-pub fn is_object(value: &PhpMixed) -> bool {
-    todo!()
-}
-
-pub fn is_numeric(value: &PhpMixed) -> bool {
-    todo!()
-}
-
 pub fn levenshtein(string1: &str, string2: &str) -> i64 {
     todo!()
 }
@@ -1774,8 +1679,6 @@ pub fn array_slice<V: Clone>(
 pub fn asort<V: Ord>(array: &mut IndexMap<String, V>) {
     todo!()
 }
-
-pub const PHP_EOL: &str = "\n";
 
 pub const PHP_INT_MAX: i64 = i64::MAX;
 pub const PHP_INT_MIN: i64 = i64::MIN;
