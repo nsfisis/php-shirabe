@@ -690,6 +690,11 @@ pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
     todo!()
 }
 
+pub fn explode_with_limit(delimiter: &str, string: &str, limit: i64) -> Vec<String> {
+    let _ = (delimiter, string, limit);
+    todo!()
+}
+
 pub struct FilesystemIterator;
 
 impl FilesystemIterator {
