@@ -812,6 +812,10 @@ pub fn get_current_user() -> String {
 pub const FILE_IGNORE_NEW_LINES: i64 = 2;
 pub const FILTER_VALIDATE_EMAIL: i64 = 274;
 
+pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
+    todo!()
+}
+
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
