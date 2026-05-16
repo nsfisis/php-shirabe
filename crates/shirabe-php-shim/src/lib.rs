@@ -1180,6 +1180,10 @@ pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
 
 pub const PHP_EOL: &str = "\n";
 
+pub const PHP_INT_MAX: i64 = i64::MAX;
+pub const PHP_INT_MIN: i64 = i64::MIN;
+pub const PHP_INT_SIZE: i64 = 8;
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
