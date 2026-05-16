@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::preg_quote;
 use std::sync::Mutex;
 
@@ -88,13 +88,13 @@ impl PhpFileCleaner {
                 }
 
                 if char == '<' && self.peek('<') {
-                    let mut r#match: Vec<String> = vec![];
+                    let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
                     if self.r#match(
                         r#"{<<<[ \t]*+(['\"]?)([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*+)\1(?:\r\n|\n|\r)}A"#,
                         Some(&mut r#match),
                     ) {
-                        self.index += r#match[0].len();
-                        let delimiter = r#match[2].clone();
+                        self.index += r#match.get(&CaptureKey::ByIndex(0)).map(|s| s.len()).unwrap_or(0);
+                        let delimiter = r#match.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                         self.skip_heredoc(&delimiter);
                         clean.push_str("null");
                         continue;
@@ -122,15 +122,21 @@ impl PhpFileCleaner {
                         let end = self.index + entry.length;
                         if end <= self.len && &self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
-                            let mut r#match: Vec<String> = vec![];
-                            if Preg::is_match_at(
+                            let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
+                            if Preg::is_match5(
                                 &entry.pattern,
                                 &self.contents,
-                                &mut r#match,
+                                Some(&mut r#match),
                                 0,
                                 offset,
-                            ) {
-                                return clean + &r#match[0];
+                            )
+                            .unwrap_or(false)
+                            {
+                                return clean
+                                    + r#match
+                                        .get(&CaptureKey::ByIndex(0))
+                                        .map(|s| s.as_str())
+                                        .unwrap_or("");
                             }
                         }
                     }
@@ -139,11 +145,15 @@ impl PhpFileCleaner {
                 self.index += 1;
                 let rest_pattern = REST_PATTERN.lock().unwrap().clone();
                 if let Some(rest_pattern) = rest_pattern {
-                    let mut r#match: Vec<String> = vec![];
+                    let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
                     if self.r#match(&rest_pattern, Some(&mut r#match)) {
+                        let m0 = r#match
+                            .get(&CaptureKey::ByIndex(0))
+                            .cloned()
+                            .unwrap_or_default();
                         clean.push(char);
-                        clean.push_str(&r#match[0]);
-                        self.index += r#match[0].len();
+                        clean.push_str(&m0);
+                        self.index += m0.len();
                     } else {
                         clean.push(char);
                     }
@@ -257,7 +267,8 @@ impl PhpFileCleaner {
         self.index + 1 < self.len && self.contents.as_bytes()[self.index + 1] as char == char
     }
 
-    fn r#match(&self, regex: &str, r#match: Option<&mut Vec<String>>) -> bool {
-        Preg::is_match_strict_groups_at(regex, &self.contents, r#match, 0, self.index)
+    fn r#match(&self, regex: &str, r#match: Option<&mut IndexMap<CaptureKey, String>>) -> bool {
+        Preg::is_match_strict_groups5(regex, &self.contents, r#match, 0, self.index)
+            .unwrap_or(false)
     }
 }

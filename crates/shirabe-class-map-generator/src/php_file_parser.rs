@@ -3,7 +3,7 @@
 use crate::php_file_cleaner::PhpFileCleaner;
 use anyhow::anyhow;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
     file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace, sprintf,
@@ -63,11 +63,10 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let matches_0 = Preg::is_match_all_strict_groups(&pattern, &contents);
-        if matches_0.as_ref().map(|m| m[0].is_empty()).unwrap_or(true) {
+        let max_matches = Preg::match_all_strict_groups(&pattern, &contents)?;
+        if max_matches == 0 {
             return Ok(vec![]);
         }
-        let max_matches = matches_0.as_ref().unwrap()[0].len();
 
         let mut p = PhpFileCleaner::new(contents, max_matches);
         let contents = p.clean();
@@ -81,22 +80,25 @@ impl PhpFileParser {
             )",
             et = extra_types
         );
-        let mut matches: IndexMap<String, Vec<String>> = IndexMap::new();
-        Preg::match_all(&pattern2, &contents, &mut matches);
+        let mut matches: IndexMap<_, _> = IndexMap::new();
+        Preg::match_all3(&pattern2, &contents, Some(&mut matches))?;
 
         let mut classes = vec![];
         let mut namespace = String::new();
 
-        let len = matches.get("type").map(|v| v.len()).unwrap_or(0);
+        let len = matches
+            .get(&CaptureKey::ByName("type".to_owned()))
+            .map(|v| v.len())
+            .unwrap_or(0);
         for i in 0..len {
             let ns = matches
-                .get("ns")
+                .get(&CaptureKey::ByName("ns".to_owned()))
                 .and_then(|v| v.get(i))
                 .map(|s| s.as_str())
                 .unwrap_or("");
             if !ns.is_empty() {
                 let nsname = matches
-                    .get("nsname")
+                    .get(&CaptureKey::ByName("nsname".to_owned()))
                     .and_then(|v| v.get(i))
                     .map(|s| s.as_str())
                     .unwrap_or("");
@@ -112,7 +114,7 @@ impl PhpFileParser {
                 ) + "\\";
             } else {
                 let name = matches
-                    .get("name")
+                    .get(&CaptureKey::ByName("name".to_owned()))
                     .and_then(|v| v.get(i))
                     .map(|s| s.as_str())
                     .unwrap_or("");
@@ -133,7 +135,7 @@ impl PhpFileParser {
                             &name[1..],
                         )
                 } else if matches
-                    .get("type")
+                    .get(&CaptureKey::ByName("type".to_owned()))
                     .and_then(|v| v.get(i))
                     .map(|s| s.to_lowercase())
                     .as_deref()

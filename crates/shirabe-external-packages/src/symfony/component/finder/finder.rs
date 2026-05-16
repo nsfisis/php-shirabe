@@ -28,6 +28,14 @@ impl Finder {
         todo!()
     }
 
+    pub fn follow_links(&mut self) -> &mut Self {
+        todo!()
+    }
+
+    pub fn exclude(&mut self, exclude: &[String]) -> &mut Self {
+        todo!()
+    }
+
     pub fn ignore_vcs(&mut self, ignore_vcs: bool) -> &mut Self {
         todo!()
     }

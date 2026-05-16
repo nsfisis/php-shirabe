@@ -71,10 +71,22 @@ pub struct RuntimeException {
     pub code: i64,
 }
 
+impl std::fmt::Display for RuntimeException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug)]
 pub struct UnexpectedValueException {
     pub message: String,
     pub code: i64,
+}
+
+impl std::fmt::Display for UnexpectedValueException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -83,10 +95,22 @@ pub struct InvalidArgumentException {
     pub code: i64,
 }
 
+impl std::fmt::Display for InvalidArgumentException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug)]
 pub struct LogicException {
     pub message: String,
     pub code: i64,
+}
+
+impl std::fmt::Display for LogicException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -95,10 +119,22 @@ pub struct BadMethodCallException {
     pub code: i64,
 }
 
+impl std::fmt::Display for BadMethodCallException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[derive(Debug)]
 pub struct OutOfBoundsException {
     pub message: String,
     pub code: i64,
+}
+
+impl std::fmt::Display for OutOfBoundsException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -108,6 +144,12 @@ pub struct ErrorException {
     pub severity: i64,
     pub filename: String,
     pub lineno: i64,
+}
+
+impl std::fmt::Display for ErrorException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
 }
 
 pub fn is_bool(value: &PhpMixed) -> bool {

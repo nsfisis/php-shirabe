@@ -2,7 +2,11 @@
 pub struct SplFileInfo;
 
 impl SplFileInfo {
-    pub fn get_path_name(&self) -> String {
+    pub fn new(path: &str) -> Self {
+        todo!()
+    }
+
+    pub fn get_pathname(&self) -> String {
         todo!()
     }
 

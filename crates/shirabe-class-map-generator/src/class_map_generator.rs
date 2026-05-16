@@ -3,7 +3,8 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::indexmap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
 use shirabe_php_shim::{
@@ -149,7 +150,7 @@ impl ClassMapGenerator {
 
         for file in files {
             let mut file_path = file.get_pathname();
-            let ext = pathinfo(&PhpMixed::String(file_path.clone()), PATHINFO_EXTENSION);
+            let ext = pathinfo(PhpMixed::String(file_path.clone()), PATHINFO_EXTENSION);
             if !in_array(
                 ext,
                 &PhpMixed::List(
@@ -327,13 +328,13 @@ impl ClassMapGenerator {
                 ".",
                 &Self::normalize_path(file_path),
             )
-            .unwrap_or_else(|| Self::normalize_path(file_path));
+            .unwrap_or_else(|_| Self::normalize_path(file_path));
             let short_base_path = Preg::replace(
                 &format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(base_path),
             )
-            .unwrap_or_else(|| Self::normalize_path(base_path));
+            .unwrap_or_else(|_| Self::normalize_path(base_path));
 
             for class in rejected_classes {
                 self.class_map.add_psr_violation(
@@ -374,11 +375,18 @@ impl ClassMapGenerator {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        if let Some(m) = Preg::is_match_strict_groups(
+        let mut r#match: indexmap::IndexMap<_, _> = indexmap![];
+        if Preg::is_match_strict_groups3(
             r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
-        ) {
-            prefix = m.get(1).cloned().unwrap_or_default();
+            Some(&mut r#match),
+        )
+        .unwrap_or(false)
+        {
+            prefix = r#match
+                .get(&CaptureKey::ByIndex(1))
+                .cloned()
+                .unwrap_or_default();
             path = substr(&path, strlen(&prefix) as i64, None);
         }
 
@@ -401,7 +409,12 @@ impl ClassMapGenerator {
         // ensure c: is normalized to C:
         let prefix = Preg::replace_callback(
             r"{(?:^|://)[a-z]:$}i",
-            |m| m.get("0").cloned().unwrap_or_default().to_uppercase(),
+            |m| {
+                m.get(&CaptureKey::ByIndex(0))
+                    .cloned()
+                    .unwrap_or_default()
+                    .to_uppercase()
+            },
             &prefix,
         )
         .unwrap_or(prefix);
