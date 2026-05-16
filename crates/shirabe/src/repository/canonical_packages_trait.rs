@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Repository/CanonicalPackagesTrait.php
 
-use indexmap::IndexMap;
 use crate::package::package_interface::PackageInterface;
+use indexmap::IndexMap;
 
 /// Provides get_canonical_packages() to various repository implementations.
 pub trait CanonicalPackagesTrait {

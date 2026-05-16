@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Package/Version/VersionBumper.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::intervals::Intervals;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::version::version_parser::VersionParser;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::intervals::Intervals;
 
 #[derive(Debug)]
 pub struct VersionBumper;
@@ -46,7 +46,8 @@ impl VersionBumper {
         }
 
         let major = Preg::replace(r"{^([1-9][0-9]*|0\.\d+).*}", "$1", version.clone())?;
-        let version_without_suffix = Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", version.clone())?;
+        let version_without_suffix =
+            Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", version.clone())?;
         let new_pretty_constraint = format!("^{}", version_without_suffix);
 
         if !Preg::is_match(r"{^\^\d+(\.\d+)*$}", &new_pretty_constraint)? {
@@ -82,23 +83,27 @@ impl VersionBumper {
                 } else {
                     ""
                 };
-                let replacement = if match_str.starts_with('~') && match_str.matches('.').count() != 1 {
-                    let mut version_bits: Vec<String> =
-                        version_without_suffix.split('.').map(String::from).collect();
-                    let needed_len = match_str.matches('.').count() + 1;
-                    while version_bits.len() < needed_len {
-                        version_bits.push("0".to_string());
-                    }
-                    let dots_in_match = match_str.matches('.').count();
-                    format!("~{}", version_bits[..dots_in_match + 1].join("."))
-                } else if match_str == "*" || match_str.starts_with(">=") {
-                    format!(">={}{}", version_without_suffix, suffix)
-                } else {
-                    format!("{}{}", new_pretty_constraint, suffix)
-                };
+                let replacement =
+                    if match_str.starts_with('~') && match_str.matches('.').count() != 1 {
+                        let mut version_bits: Vec<String> = version_without_suffix
+                            .split('.')
+                            .map(String::from)
+                            .collect();
+                        let needed_len = match_str.matches('.').count() + 1;
+                        while version_bits.len() < needed_len {
+                            version_bits.push("0".to_string());
+                        }
+                        let dots_in_match = match_str.matches('.').count();
+                        format!("~{}", version_bits[..dots_in_match + 1].join("."))
+                    } else if match_str == "*" || match_str.starts_with(">=") {
+                        format!(">={}{}", version_without_suffix, suffix)
+                    } else {
+                        format!("{}{}", new_pretty_constraint, suffix)
+                    };
                 let offset = match_offset as usize;
                 let length = Platform::strlen(match_str) as usize;
-                modified = shirabe_php_shim::substr_replace(&modified, &replacement, offset, length);
+                modified =
+                    shirabe_php_shim::substr_replace(&modified, &replacement, offset, length);
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;

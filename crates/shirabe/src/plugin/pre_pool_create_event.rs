@@ -62,7 +62,9 @@ impl PrePoolCreateEvent {
         &self.stability_flags
     }
 
-    pub fn get_root_aliases(&self) -> &IndexMap<String, IndexMap<String, IndexMap<String, String>>> {
+    pub fn get_root_aliases(
+        &self,
+    ) -> &IndexMap<String, IndexMap<String, IndexMap<String, String>>> {
         &self.root_aliases
     }
 

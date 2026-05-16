@@ -112,7 +112,9 @@ impl Application {
             ini_set("xdebug.scream", "0");
         }
 
-        if function_exists("date_default_timezone_set") && function_exists("date_default_timezone_get") {
+        if function_exists("date_default_timezone_set")
+            && function_exists("date_default_timezone_get")
+        {
             let tz = Silencer::call(|| Ok(date_default_timezone_get())).unwrap_or_default();
             date_default_timezone_set(&tz);
         }
@@ -153,7 +155,11 @@ impl Application {
         }
     }
 
-    pub fn run(&mut self, input: Option<&dyn InputInterface>, output: Option<&dyn OutputInterface>) -> anyhow::Result<i64> {
+    pub fn run(
+        &mut self,
+        input: Option<&dyn InputInterface>,
+        output: Option<&dyn OutputInterface>,
+    ) -> anyhow::Result<i64> {
         let output_owned: Box<dyn OutputInterface>;
         let output_ref: &dyn OutputInterface = if let Some(o) = output {
             o
@@ -165,13 +171,18 @@ impl Application {
         self.inner.run(input, Some(output_ref))
     }
 
-    pub fn do_run(&mut self, input: &mut dyn InputInterface, output: &dyn OutputInterface) -> anyhow::Result<i64> {
+    pub fn do_run(
+        &mut self,
+        input: &mut dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> anyhow::Result<i64> {
         self.disable_plugins_by_default = input.has_parameter_option("--no-plugins", false);
         self.disable_scripts_by_default = input.has_parameter_option("--no-scripts", false);
 
         // PHP: static $stdin = null;
         // We use an Option here to mimic the lazy initialization.
-        static STDIN: std::sync::OnceLock<Option<shirabe_php_shim::PhpResource>> = std::sync::OnceLock::new();
+        static STDIN: std::sync::OnceLock<Option<shirabe_php_shim::PhpResource>> =
+            std::sync::OnceLock::new();
         let stdin = STDIN.get_or_init(|| {
             if defined("STDIN") {
                 Some(shirabe_php_shim::stdin_handle())
@@ -187,7 +198,9 @@ impl Application {
             input.set_interactive(false);
         }
 
-        let mut helpers: Vec<Box<dyn shirabe_external_packages::symfony::component::console::helper::helper::Helper>> = vec![];
+        let mut helpers: Vec<
+            Box<dyn shirabe_external_packages::symfony::component::console::helper::helper::Helper>,
+        > = vec![];
         helpers.push(Box::new(QuestionHelper::new()));
         let console_io = ConsoleIO::new(input, output, HelperSet::new(helpers));
         self.io = Box::new(console_io);
@@ -200,7 +213,11 @@ impl Application {
             io.write_error("Disabling cache usage", true, IOInterface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
-                if Platform::is_windows() { "nul" } else { "/dev/null" },
+                if Platform::is_windows() {
+                    "nul"
+                } else {
+                    "/dev/null"
+                },
             );
         }
 
@@ -213,7 +230,14 @@ impl Application {
             self.initial_working_directory = getcwd();
             let cwd = Platform::get_cwd_real(true);
             io.write_error(
-                &format!("Changed CWD to {}", if !cwd.is_empty() { cwd.clone() } else { nwd.clone() }),
+                &format!(
+                    "Changed CWD to {}",
+                    if !cwd.is_empty() {
+                        cwd.clone()
+                    } else {
+                        nwd.clone()
+                    }
+                ),
                 true,
                 IOInterface::DEBUG,
             );
@@ -237,13 +261,24 @@ impl Application {
 
         // prompt user for dir change if no composer.json is present in current dir
         let no_composer_json_commands = vec![
-            "".to_string(), "list".to_string(), "init".to_string(), "about".to_string(),
-            "help".to_string(), "diagnose".to_string(), "self-update".to_string(),
-            "global".to_string(), "create-project".to_string(), "outdated".to_string(),
+            "".to_string(),
+            "list".to_string(),
+            "init".to_string(),
+            "about".to_string(),
+            "help".to_string(),
+            "diagnose".to_string(),
+            "self-update".to_string(),
+            "global".to_string(),
+            "create-project".to_string(),
+            "outdated".to_string(),
         ];
         let use_parent_dir_if_no_json_available = self.get_use_parent_dir_config_value();
         if new_work_dir.is_none()
-            && !in_array(command_name.as_deref().unwrap_or(""), &no_composer_json_commands, true)
+            && !in_array(
+                command_name.as_deref().unwrap_or(""),
+                &no_composer_json_commands,
+                true,
+            )
             && !file_exists(&Factory::get_composer_file())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
@@ -253,13 +288,17 @@ impl Application {
             && input.has_parameter_option("-h", true) == false
         {
             let mut dir = dirname(&Platform::get_cwd_real(true));
-            let home_value = Platform::get_env("HOME").or_else(|| Platform::get_env("USERPROFILE")).unwrap_or_else(|| "/".to_string());
+            let home_value = Platform::get_env("HOME")
+                .or_else(|| Platform::get_env("USERPROFILE"))
+                .unwrap_or_else(|| "/".to_string());
             let home = realpath(&home_value).unwrap_or_default();
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
                 if file_exists(&format!("{}/{}", dir, Factory::get_composer_file())) {
-                    if use_parent_dir_if_no_json_available.as_bool() != Some(true) && !io.is_interactive() {
+                    if use_parent_dir_if_no_json_available.as_bool() != Some(true)
+                        && !io.is_interactive()
+                    {
                         io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
                         break;
                     }
@@ -292,12 +331,17 @@ impl Application {
             is_non_allowed_root = self.is_running_as_root();
 
             if is_non_allowed_root {
-                let uid: i64 = Platform::get_env("SUDO_UID").map(|v| v.parse().unwrap_or(0)).unwrap_or(0);
+                let uid: i64 = Platform::get_env("SUDO_UID")
+                    .map(|v| v.parse().unwrap_or(0))
+                    .unwrap_or(0);
                 if uid != 0 {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
                     let _ = Silencer::call(|| {
-                        shirabe_php_shim::exec(&format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid));
+                        shirabe_php_shim::exec(&format!(
+                            "sudo -u \\#{} sudo -K > /dev/null 2>&1",
+                            uid
+                        ));
                         Ok(())
                     });
                 }
@@ -312,24 +356,34 @@ impl Application {
 
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
         // if showing the version, we never need plugin commands
-        let may_need_plugin_command = !input.has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], false)
-            && (
-                command_name.is_none()
-                    || in_array(command_name.as_deref().unwrap_or(""), &vec!["".to_string(), "list".to_string(), "help".to_string()], true)
-                    || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root)
-            );
+        let may_need_plugin_command = !input
+            .has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], false)
+            && (command_name.is_none()
+                || in_array(
+                    command_name.as_deref().unwrap_or(""),
+                    &vec!["".to_string(), "list".to_string(), "help".to_string()],
+                    true,
+                )
+                || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
 
         let may_need_script_command = may_need_plugin_command
             || command_name.as_deref() == Some("run-script")
             || raw_command_name != command_name;
 
-        if may_need_plugin_command && !self.disable_plugins_by_default && !self.has_plugin_commands {
+        if may_need_plugin_command && !self.disable_plugins_by_default && !self.has_plugin_commands
+        {
             // at this point plugins are needed, so if we are running as root and it is not allowed we need to prompt
             // if interactive, and abort otherwise
             if is_non_allowed_root {
                 io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                if io.is_interactive() && io.ask_confirmation("<info>Continue as root/super user</info> [<comment>yes</comment>]? ".to_string(), true) {
+                if io.is_interactive()
+                    && io.ask_confirmation(
+                        "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
+                            .to_string(),
+                        true,
+                    )
+                {
                     // avoid a second prompt later
                     is_non_allowed_root = false;
                 } else {
@@ -431,7 +485,9 @@ impl Application {
                 io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
             }
 
-            if XdebugHandler::is_xdebug_active() && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none() {
+            if XdebugHandler::is_xdebug_active()
+                && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
+            {
                 io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
@@ -454,7 +510,11 @@ impl Application {
                     io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
                     if io.is_interactive() {
-                        if !io.ask_confirmation("<info>Continue as root/super user</info> [<comment>yes</comment>]? ".to_string(), true) {
+                        if !io.ask_confirmation(
+                            "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
+                                .to_string(),
+                            true,
+                        ) {
                             return Ok(1);
                         }
                     }
@@ -468,7 +528,12 @@ impl Application {
                 } else {
                     String::new()
                 };
-                let tempfile = format!("{}/temp-{}{}", sys_get_temp_dir(), pid, bin2hex(&random_bytes(5)));
+                let tempfile = format!(
+                    "{}/temp-{}{}",
+                    sys_get_temp_dir(),
+                    pid,
+                    bin2hex(&random_bytes(5))
+                );
                 if !(file_put_contents(&tempfile, file!()) > 0
                     && file_get_contents(&tempfile).as_deref() == Some(file!())
                     && unlink(&tempfile)
@@ -482,31 +547,70 @@ impl Application {
             // add non-standard scripts as own commands
             let file = Factory::get_composer_file();
             if may_need_script_command && is_file(&file) && Filesystem::is_readable(&file) {
-                let composer_json = json_decode(&file_get_contents(&file).unwrap_or_default(), true);
+                let composer_json =
+                    json_decode(&file_get_contents(&file).unwrap_or_default(), true);
                 if let Some(arr) = composer_json.as_array() {
                     if let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array()) {
                         for (script, dummy) in scripts {
-                            let script_event_const = format!("Composer\\Script\\ScriptEvents::{}", str_replace("-", "_", &strtoupper(script)));
+                            let script_event_const = format!(
+                                "Composer\\Script\\ScriptEvents::{}",
+                                str_replace("-", "_", &strtoupper(script))
+                            );
                             if !defined(&script_event_const) {
                                 if self.inner.has(script) {
                                     io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
                                 } else {
-                                    let mut description = format!("Runs the {} script as defined in composer.json", script);
+                                    let mut description = format!(
+                                        "Runs the {} script as defined in composer.json",
+                                        script
+                                    );
 
-                                    if let Some(desc) = arr.get("scripts-descriptions").and_then(|v| v.as_array()).and_then(|a| a.get(script)).and_then(|v| v.as_string()) {
+                                    if let Some(desc) = arr
+                                        .get("scripts-descriptions")
+                                        .and_then(|v| v.as_array())
+                                        .and_then(|a| a.get(script))
+                                        .and_then(|v| v.as_string())
+                                    {
                                         description = desc.to_string();
                                     }
 
-                                    let aliases: Vec<String> = arr.get("scripts-aliases").and_then(|v| v.as_array()).and_then(|a| a.get(script)).and_then(|v| v.as_list()).map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect()).unwrap_or_default();
+                                    let aliases: Vec<String> = arr
+                                        .get("scripts-aliases")
+                                        .and_then(|v| v.as_array())
+                                        .and_then(|a| a.get(script))
+                                        .and_then(|v| v.as_list())
+                                        .map(|l| {
+                                            l.iter()
+                                                .filter_map(|v| {
+                                                    v.as_string().map(|s| s.to_string())
+                                                })
+                                                .collect()
+                                        })
+                                        .unwrap_or_default();
 
                                     if let Some(composer) = self.get_composer(false, None, None)? {
                                         let root_package = composer.get_package();
                                         let generator = composer.get_autoload_generator();
 
-                                        let package_map = generator.build_package_map(composer.get_installation_manager(), &*root_package, vec![])?;
-                                        let map = generator.parse_autoloads(&package_map, &*root_package, PhpMixed::Bool(false));
+                                        let package_map = generator.build_package_map(
+                                            composer.get_installation_manager(),
+                                            &*root_package,
+                                            vec![],
+                                        )?;
+                                        let map = generator.parse_autoloads(
+                                            &package_map,
+                                            &*root_package,
+                                            PhpMixed::Bool(false),
+                                        );
 
-                                        let loader = generator.create_loader(&map, composer.get_config().get("vendor-dir").as_string().map(|s| s.to_string()));
+                                        let loader = generator.create_loader(
+                                            &map,
+                                            composer
+                                                .get_config()
+                                                .get("vendor-dir")
+                                                .as_string()
+                                                .map(|s| s.to_string()),
+                                        );
                                         loader.register(false);
                                     }
 
@@ -514,12 +618,22 @@ impl Application {
                                     let dummy_str = dummy.as_string().unwrap_or("");
                                     let cmd: Box<dyn SymfonyCommand> = if is_string(dummy)
                                         && shirabe_php_shim::class_exists(dummy_str)
-                                        && is_subclass_of(dummy_str, "Symfony\\Component\\Console\\Command\\Command")
-                                    {
-                                        if is_subclass_of(dummy_str, "Symfony\\Component\\Console\\SingleCommandApplication") {
+                                        && is_subclass_of(
+                                            dummy_str,
+                                            "Symfony\\Component\\Console\\Command\\Command",
+                                        ) {
+                                        if is_subclass_of(
+                                            dummy_str,
+                                            "Symfony\\Component\\Console\\SingleCommandApplication",
+                                        ) {
                                             io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
-                                        let mut cmd = shirabe_php_shim::instantiate_class::<Box<dyn SymfonyCommand>>(dummy_str, vec![PhpMixed::String(script.clone())]);
+                                        let mut cmd = shirabe_php_shim::instantiate_class::<
+                                            Box<dyn SymfonyCommand>,
+                                        >(
+                                            dummy_str,
+                                            vec![PhpMixed::String(script.clone())],
+                                        );
                                         let _ = SingleCommandApplication::class_name();
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
@@ -529,13 +643,19 @@ impl Application {
                                             cmd.set_name(script);
                                         }
 
-                                        if cmd.get_description().is_empty() && is_string(&PhpMixed::String(description.clone())) {
+                                        if cmd.get_description().is_empty()
+                                            && is_string(&PhpMixed::String(description.clone()))
+                                        {
                                             cmd.set_description(&description);
                                         }
                                         cmd
                                     } else {
                                         // fallback to usual aliasing behavior
-                                        Box::new(ScriptAliasCommand::new(script.clone(), description.clone(), aliases))
+                                        Box::new(ScriptAliasCommand::new(
+                                            script.clone(),
+                                            description.clone(),
+                                            aliases,
+                                        ))
                                     };
 
                                     // Compatibility layer for symfony/console <7.4
@@ -561,12 +681,16 @@ impl Application {
 
             let result = self.inner.do_run(input, output)?;
 
-            if input.has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], true) {
+            if input
+                .has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], true)
+            {
                 io.write_error(&sprintf(
                     "<info>PHP</info> version <comment>%s</comment> (%s)",
                     &[PHP_VERSION.into(), PHP_BINARY.into()],
                 ));
-                io.write_error("Run the \"diagnose\" command to get more detailed diagnostics output.");
+                io.write_error(
+                    "Run the \"diagnose\" command to get more detailed diagnostics output.",
+                );
             }
 
             Ok(result)
@@ -596,9 +720,16 @@ impl Application {
             Ok(r) => Ok(r),
             Err(e) => {
                 if let Some(see) = e.downcast_ref::<ScriptExecutionException>() {
-                    if self.get_disable_plugins_by_default() && self.is_running_as_root() && !self.io.is_interactive() {
+                    if self.get_disable_plugins_by_default()
+                        && self.is_running_as_root()
+                        && !self.io.is_interactive()
+                    {
                         io.write_error("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, IOInterface::QUIET);
-                        io.write_error("<error>See also https://getcomposer.org/root</error>", true, IOInterface::QUIET);
+                        io.write_error(
+                            "<error>See also https://getcomposer.org/root</error>",
+                            true,
+                            IOInterface::QUIET,
+                        );
                     }
 
                     Ok(see.get_code())
@@ -609,13 +740,18 @@ impl Application {
                     self.hint_common_errors(&e, output);
 
                     if !method_exists(&self.inner, "setCatchErrors") {
-                        if let Some(coi) = output.as_any().downcast_ref::<dyn ConsoleOutputInterface>() {
+                        if let Some(coi) =
+                            output.as_any().downcast_ref::<dyn ConsoleOutputInterface>()
+                        {
                             self.inner.render_throwable(&e, coi.get_error_output());
                         } else {
                             self.inner.render_throwable(&e, output);
                         }
 
-                        let code = e.downcast_ref::<RuntimeException>().map(|r| r.code).unwrap_or(0);
+                        let code = e
+                            .downcast_ref::<RuntimeException>()
+                            .map(|r| r.code)
+                            .unwrap_or(0);
                         return Ok(max_i64(1, code));
                     }
 
@@ -641,13 +777,20 @@ impl Application {
 
     fn get_new_working_dir(&self, input: &dyn InputInterface) -> anyhow::Result<Option<String>> {
         let working_dir = input
-            .get_parameter_option(&vec!["--working-dir".to_string(), "-d".to_string()], None, true)
+            .get_parameter_option(
+                &vec!["--working-dir".to_string(), "-d".to_string()],
+                None,
+                true,
+            )
             .as_string()
             .map(|s| s.to_string());
         if let Some(ref wd) = working_dir {
             if !is_dir(wd) {
                 return Err(RuntimeException {
-                    message: format!("Invalid working directory specified, {} does not exist.", wd),
+                    message: format!(
+                        "Invalid working directory specified, {} does not exist.",
+                        wd
+                    ),
                     code: 0,
                 }
                 .into());
@@ -677,7 +820,11 @@ impl Application {
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
-                    dir = config.get("vendor-dir").as_string().unwrap_or("").to_string();
+                    dir = config
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or("")
+                        .to_string();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
@@ -695,23 +842,48 @@ impl Application {
         Silencer::restore();
 
         let message = exception.to_string();
-        if exception.downcast_ref::<TransportException>().is_some() && str_contains(&message, "Unable to use a proxy") {
-            io.write_error("<error>The following exception indicates your proxy is misconfigured</error>", true, IOInterface::QUIET);
+        if exception.downcast_ref::<TransportException>().is_some()
+            && str_contains(&message, "Unable to use a proxy")
+        {
+            io.write_error(
+                "<error>The following exception indicates your proxy is misconfigured</error>",
+                true,
+                IOInterface::QUIET,
+            );
             io.write_error("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, IOInterface::QUIET);
         }
 
-        if Platform::is_windows() && exception.downcast_ref::<TransportException>().is_some() && str_contains(&message, "unable to get local issuer certificate") {
+        if Platform::is_windows()
+            && exception.downcast_ref::<TransportException>().is_some()
+            && str_contains(&message, "unable to get local issuer certificate")
+        {
             let avast_detect = glob("C:\\Program Files\\Avast*");
-            if is_array(&PhpMixed::List(avast_detect.iter().map(|s| Box::new(PhpMixed::String(s.clone()))).collect())) && count(&avast_detect) != 0 {
+            if is_array(&PhpMixed::List(
+                avast_detect
+                    .iter()
+                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .collect(),
+            )) && count(&avast_detect) != 0
+            {
                 io.write_error("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, IOInterface::QUIET);
-                io.write_error("<error>Check https://getcomposer.org/local-issuer for details</error>", true, IOInterface::QUIET);
+                io.write_error(
+                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
+                    true,
+                    IOInterface::QUIET,
+                );
             } else {
                 io.write_error("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, IOInterface::QUIET);
-                io.write_error("<error>Check https://getcomposer.org/local-issuer for details</error>", true, IOInterface::QUIET);
+                io.write_error(
+                    "<error>Check https://getcomposer.org/local-issuer for details</error>",
+                    true,
+                    IOInterface::QUIET,
+                );
             }
         }
 
-        if Platform::is_windows() && strpos(&message, "The system cannot find the path specified").is_some() {
+        if Platform::is_windows()
+            && strpos(&message, "The system cannot find the path specified").is_some()
+        {
             io.write_error("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, IOInterface::QUIET);
             io.write_error("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, IOInterface::QUIET);
         }
@@ -721,14 +893,28 @@ impl Application {
             io.write_error("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, IOInterface::QUIET);
         }
 
-        if exception.downcast_ref::<ProcessTimedOutException>().is_some() {
-            io.write_error("<error>The following exception is caused by a process timeout</error>", true, IOInterface::QUIET);
+        if exception
+            .downcast_ref::<ProcessTimedOutException>()
+            .is_some()
+        {
+            io.write_error(
+                "<error>The following exception is caused by a process timeout</error>",
+                true,
+                IOInterface::QUIET,
+            );
             io.write_error("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, IOInterface::QUIET);
         }
 
-        if self.get_disable_plugins_by_default() && self.is_running_as_root() && !self.io.is_interactive() {
+        if self.get_disable_plugins_by_default()
+            && self.is_running_as_root()
+            && !self.io.is_interactive()
+        {
             io.write_error("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, IOInterface::QUIET);
-        } else if exception.downcast_ref::<CommandNotFoundException>().is_some() && self.get_disable_plugins_by_default() {
+        } else if exception
+            .downcast_ref::<CommandNotFoundException>()
+            .is_some()
+            && self.get_disable_plugins_by_default()
+        {
             io.write_error("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, IOInterface::QUIET);
         }
 
@@ -851,7 +1037,10 @@ impl Application {
         if !Composer::BRANCH_ALIAS_VERSION.is_empty()
             && Composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
         {
-            branch_alias_string = sprintf(" (%s)", &[Composer::BRANCH_ALIAS_VERSION.to_string().into()]);
+            branch_alias_string = sprintf(
+                " (%s)",
+                &[Composer::BRANCH_ALIAS_VERSION.to_string().into()],
+            );
         }
 
         sprintf(
@@ -867,11 +1056,46 @@ impl Application {
 
     pub(crate) fn get_default_input_definition(&self) -> InputDefinition {
         let mut definition = self.inner.get_default_input_definition();
-        definition.add_option(InputOption::new("--profile", None, Some(InputOption::VALUE_NONE), "Display timing and memory usage information", None, vec![]));
-        definition.add_option(InputOption::new("--no-plugins", None, Some(InputOption::VALUE_NONE), "Whether to disable plugins.", None, vec![]));
-        definition.add_option(InputOption::new("--no-scripts", None, Some(InputOption::VALUE_NONE), "Skips the execution of all scripts defined in composer.json file.", None, vec![]));
-        definition.add_option(InputOption::new("--working-dir", Some("-d"), Some(InputOption::VALUE_REQUIRED), "If specified, use the given directory as working directory.", None, vec![]));
-        definition.add_option(InputOption::new("--no-cache", None, Some(InputOption::VALUE_NONE), "Prevent use of the cache", None, vec![]));
+        definition.add_option(InputOption::new(
+            "--profile",
+            None,
+            Some(InputOption::VALUE_NONE),
+            "Display timing and memory usage information",
+            None,
+            vec![],
+        ));
+        definition.add_option(InputOption::new(
+            "--no-plugins",
+            None,
+            Some(InputOption::VALUE_NONE),
+            "Whether to disable plugins.",
+            None,
+            vec![],
+        ));
+        definition.add_option(InputOption::new(
+            "--no-scripts",
+            None,
+            Some(InputOption::VALUE_NONE),
+            "Skips the execution of all scripts defined in composer.json file.",
+            None,
+            vec![],
+        ));
+        definition.add_option(InputOption::new(
+            "--working-dir",
+            Some("-d"),
+            Some(InputOption::VALUE_REQUIRED),
+            "If specified, use the given directory as working directory.",
+            None,
+            vec![],
+        ));
+        definition.add_option(InputOption::new(
+            "--no-cache",
+            None,
+            Some(InputOption::VALUE_NONE),
+            "Prevent use of the cache",
+            None,
+            vec![],
+        ));
 
         definition
     }
@@ -883,15 +1107,27 @@ impl Application {
         let composer = self.get_composer(false, Some(false), None)?.cloned();
         let composer = match composer {
             Some(c) => Some(c),
-            None => Factory::create_global(&*self.io, self.disable_plugins_by_default, self.disable_scripts_by_default),
+            None => Factory::create_global(
+                &*self.io,
+                self.disable_plugins_by_default,
+                self.disable_scripts_by_default,
+            ),
         };
 
         if let Some(composer) = composer {
             let pm = composer.get_plugin_manager();
             let mut ctor_args: IndexMap<String, PhpMixed> = IndexMap::new();
-            ctor_args.insert("composer".to_string(), PhpMixed::Object(shirabe_php_shim::ArrayObject::new()));
-            ctor_args.insert("io".to_string(), PhpMixed::Object(shirabe_php_shim::ArrayObject::new()));
-            for capability in pm.get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args) {
+            ctor_args.insert(
+                "composer".to_string(),
+                PhpMixed::Object(shirabe_php_shim::ArrayObject::new()),
+            );
+            ctor_args.insert(
+                "io".to_string(),
+                PhpMixed::Object(shirabe_php_shim::ArrayObject::new()),
+            );
+            for capability in pm
+                .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
+            {
                 let new_commands = capability.get_commands();
                 for command in &new_commands {
                     if command.as_any().downcast_ref::<BaseCommand>().is_none() {

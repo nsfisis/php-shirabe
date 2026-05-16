@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::{
-    defined, extension_loaded, implode, in_array, php_to_string, phpversion, sprintf,
-    spl_object_hash, str_replace, str_starts_with, stripos, strpos, strtolower, substr,
-    substr_count, version_compare, LogicException, PhpMixed,
+    LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_to_string,
+    phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
+    strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -134,10 +134,7 @@ impl Problem {
 
     fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> String {
         match rule.get_reason() {
-            Rule::RULE_ROOT_REQUIRE => rule
-                .get_reason_data()
-                .as_array()
-                .unwrap()["packageName"]
+            Rule::RULE_ROOT_REQUIRE => rule.get_reason_data().as_array().unwrap()["packageName"]
                 .as_string()
                 .unwrap()
                 .to_string(),
@@ -302,12 +299,9 @@ impl Problem {
                     };
                     if versions_list.len() > 1 {
                         // remove the s from requires/conflicts to correct grammar
-                        let message_var = Preg::replace(
-                            r"{^(%s%s (?:require|conflict))s}",
-                            "$1",
-                            message,
-                        )
-                        .unwrap_or(message.clone());
+                        let message_var =
+                            Preg::replace(r"{^(%s%s (?:require|conflict))s}", "$1", message)
+                                .unwrap_or(message.clone());
                         result.push(sprintf(
                             &message_var,
                             &[
@@ -331,7 +325,11 @@ impl Problem {
             }
         }
 
-        format!("\n{}- {}", indent, implode(&format!("\n{}- ", indent), &result))
+        format!(
+            "\n{}- {}",
+            indent,
+            implode(&format!("\n{}- ", indent), &result)
+        )
     }
 
     pub fn is_caused_by_lock(
@@ -585,7 +583,13 @@ impl Problem {
                         ),
                         format!(
                             "found {}. The # character in branch names is replaced by a + character. Make sure to require it as \"{}\".",
-                            Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                            Self::get_package_list(
+                                &packages,
+                                is_verbose,
+                                Some(pool),
+                                constraint,
+                                false
+                            ),
                             str_replace("#", "+", &c.get_pretty_string())
                         ),
                     );
@@ -602,8 +606,7 @@ impl Problem {
                 let filtered: Vec<&Box<dyn PackageInterface>> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[package_name]
-                            .matches(&Constraint::new("==", &p.get_version()))
+                        root_reqs[package_name].matches(&Constraint::new("==", &p.get_version()))
                     })
                     .collect();
                 if filtered.len() == 0 {
@@ -615,7 +618,13 @@ impl Problem {
                         ),
                         format!(
                             "found {} but {} with your root composer.json require ({}).",
-                            Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                            Self::get_package_list(
+                                &packages,
+                                is_verbose,
+                                Some(pool),
+                                constraint,
+                                false
+                            ),
                             if Self::has_multiple_names(&packages) {
                                 "these conflict"
                             } else {
@@ -646,7 +655,13 @@ impl Problem {
                             ),
                             format!(
                                 "found {} but {} with your temporary update constraint ({}:{}).",
-                                Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                                Self::get_package_list(
+                                    &packages,
+                                    is_verbose,
+                                    Some(pool),
+                                    constraint,
+                                    false
+                                ),
                                 if Self::has_multiple_names(&packages) {
                                     "these conflict"
                                 } else {
@@ -664,9 +679,7 @@ impl Problem {
                 let fixed_constraint = Constraint::new("==", &lp.get_version());
                 let filtered: Vec<&Box<dyn PackageInterface>> = packages
                     .iter()
-                    .filter(|p| {
-                        fixed_constraint.matches(&Constraint::new("==", &p.get_version()))
-                    })
+                    .filter(|p| fixed_constraint.matches(&Constraint::new("==", &p.get_version())))
                     .collect();
                 if filtered.len() == 0 {
                     return (
@@ -677,7 +690,13 @@ impl Problem {
                         ),
                         format!(
                             "found {} but the package is fixed to {} (lock file version) by a partial update and that version does not match. Make sure you list it as an argument for the update command.",
-                            Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                            Self::get_package_list(
+                                &packages,
+                                is_verbose,
+                                Some(pool),
+                                constraint,
+                                false
+                            ),
                             lp.get_pretty_version()
                         ),
                     );
@@ -698,7 +717,13 @@ impl Problem {
                     ),
                     format!(
                         "found {} in the lock file but not in remote repositories, make sure you avoid updating this package to keep the one from the lock file.",
-                        Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false)
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        )
                     ),
                 );
             }
@@ -712,7 +737,13 @@ impl Problem {
                     ),
                     format!(
                         "found {} but these were not loaded, because they are abandoned and you configured \"block-abandoned\" to true in your \"audit\" config.",
-                        Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false)
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        )
                     ),
                 );
             }
@@ -781,7 +812,13 @@ impl Problem {
                     ),
                     format!(
                         "found {} but these were not loaded, because they are affected by security advisories (\"{}\"). Go to https://packagist.org/security-advisories/ to find advisory details. To ignore the advisories, add them to the audit \"ignore\" config. To turn the feature off entirely, you can set \"block-insecure\" to false in your \"audit\" config.",
-                        Self::get_package_list(&packages, is_verbose, Some(pool), constraint, false),
+                        Self::get_package_list(
+                            &packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        ),
                         implode("\", \"", &advisories_list)
                     ),
                 );
@@ -900,9 +937,8 @@ impl Problem {
             let top_package = all_repos_packages.first();
             if let Some(tp) = top_package {
                 if tp.is_root_package_interface() {
-                    suffix =
-                        " See https://getcomposer.org/dep-on-root for details and assistance."
-                            .to_string();
+                    suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
+                        .to_string();
                 }
             }
 
@@ -1019,7 +1055,9 @@ impl Problem {
         let mut prepared_strings: Vec<String> = Vec::new();
         for (name, mut package) in prepared {
             // remove the implicit default branch alias to avoid cruft in the display
-            if package.versions.contains_key(VersionParser::DEFAULT_BRANCH_ALIAS)
+            if package
+                .versions
+                .contains_key(VersionParser::DEFAULT_BRANCH_ALIAS)
                 && has_default_branch.contains_key(&name)
             {
                 package
@@ -1222,7 +1260,13 @@ impl Problem {
                     ),
                     format!(
                         "satisfiable by {} from {} but {} {} is the root package and cannot be modified. See https://getcomposer.org/dep-on-root for details and assistance.",
-                        Self::get_package_list(&next_repo_packages, is_verbose, Some(pool), constraint, false),
+                        Self::get_package_list(
+                            &next_repo_packages,
+                            is_verbose,
+                            Some(pool),
+                            constraint,
+                            false
+                        ),
                         next_repo.get_repo_name(),
                         top_package.get_pretty_name(),
                         top_package.get_pretty_version()
@@ -1237,7 +1281,13 @@ impl Problem {
             let mut suggestion = format!(
                 "Make sure you either fix the {} or avoid updating this package to keep the one present in the lock file ({}).",
                 reason,
-                Self::get_package_list(&next_repo_packages, is_verbose, Some(pool), constraint, false)
+                Self::get_package_list(
+                    &next_repo_packages,
+                    is_verbose,
+                    Some(pool),
+                    constraint,
+                    false
+                )
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
             if next_repo_packages[0].get_dist_type() == "path" {
@@ -1260,7 +1310,13 @@ impl Problem {
                 ),
                 format!(
                     "found {} but {} not match your {} and {} therefore not installable. {}",
-                    Self::get_package_list(higher_repo_packages, is_verbose, Some(pool), constraint, false),
+                    Self::get_package_list(
+                        higher_repo_packages,
+                        is_verbose,
+                        Some(pool),
+                        constraint,
+                        false
+                    ),
                     if singular { "it does" } else { "these do" },
                     reason,
                     if singular { "is" } else { "are" },
@@ -1277,10 +1333,26 @@ impl Problem {
             ),
             format!(
                 "satisfiable by {} from {} but {} from {} has higher repository priority. The packages from the higher priority repository do not match your {} and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
-                Self::get_package_list(&next_repo_packages, is_verbose, Some(pool), constraint, false),
+                Self::get_package_list(
+                    &next_repo_packages,
+                    is_verbose,
+                    Some(pool),
+                    constraint,
+                    false
+                ),
                 next_repo.get_repo_name(),
-                Self::get_package_list(higher_repo_packages, is_verbose, Some(pool), constraint, false),
-                higher_repo_packages.first().unwrap().get_repository().get_repo_name(),
+                Self::get_package_list(
+                    higher_repo_packages,
+                    is_verbose,
+                    Some(pool),
+                    constraint,
+                    false
+                ),
+                higher_repo_packages
+                    .first()
+                    .unwrap()
+                    .get_repository()
+                    .get_repo_name(),
                 reason
             ),
         )
@@ -1313,7 +1385,10 @@ impl Problem {
                         "{} or {}",
                         implode(
                             ", ",
-                            &versions[..versions.len() - 1].iter().cloned().collect::<Vec<_>>()
+                            &versions[..versions.len() - 1]
+                                .iter()
+                                .cloned()
+                                .collect::<Vec<_>>()
                         ),
                         last
                     )
@@ -1343,7 +1418,11 @@ impl Problem {
         if providers.len() > 0 {
             let provider_count = providers.len() as i64;
             let slice = if provider_count > max_providers + 1 {
-                providers.iter().take(max_providers as usize).cloned().collect::<Vec<_>>()
+                providers
+                    .iter()
+                    .take(max_providers as usize)
+                    .cloned()
+                    .collect::<Vec<_>>()
             } else {
                 providers.clone()
             };

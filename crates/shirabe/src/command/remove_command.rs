@@ -5,7 +5,7 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::exception::invalid_argument_exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{array_map, strtolower, PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower};
 
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
@@ -221,7 +221,11 @@ impl RemoveCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
-        if input.get_argument("packages").as_list().map(|l| l.is_empty()).unwrap_or(true)
+        if input
+            .get_argument("packages")
+            .as_list()
+            .map(|l| l.is_empty())
+            .unwrap_or(true)
             && !input.get_option("unused").as_bool().unwrap_or(false)
         {
             return Err(anyhow::anyhow!(InvalidArgumentException {
@@ -245,7 +249,9 @@ impl RemoveCommand {
             let locker = composer.get_locker();
             if !locker.is_locked() {
                 return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message: "A valid composer.lock file is required to run this command with --unused".to_string(),
+                    message:
+                        "A valid composer.lock file is required to run this command with --unused"
+                            .to_string(),
                     code: 0,
                 }));
             }
@@ -293,7 +299,8 @@ impl RemoveCommand {
             packages.extend(unused);
 
             if packages.is_empty() {
-                self.get_io().write_error("<info>No unused packages to remove</info>");
+                self.get_io()
+                    .write_error("<info>No unused packages to remove</info>");
                 return Ok(0);
             }
         }
@@ -339,10 +346,7 @@ impl RemoveCommand {
                     .filter_map(|(k, v)| v.as_string().map(|_| (k.clone(), k.clone())))
                     .collect();
                 for (name, canonical) in entries {
-                    section.insert(
-                        strtolower(&name),
-                        Box::new(PhpMixed::String(canonical)),
-                    );
+                    section.insert(strtolower(&name), Box::new(PhpMixed::String(canonical)));
                 }
             }
         }
@@ -381,10 +385,13 @@ impl RemoveCommand {
                     canonical_name, r#type, alt_type
                 ));
                 if io.is_interactive() {
-                    if io.ask_confirmation(&format!(
-                        "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                        alt_type
-                    ), true) {
+                    if io.ask_confirmation(
+                        &format!(
+                            "Do you want to remove it from {} [<comment>yes</comment>]? ",
+                            alt_type
+                        ),
+                        true,
+                    ) {
                         if dry_run {
                             to_remove
                                 .entry(alt_type.to_string())
@@ -402,11 +409,9 @@ impl RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_type = Preg::grep(
-                    &BasePackage::package_name_to_regexp(package),
-                    &type_keys,
-                )
-                .unwrap_or_default();
+                let matches_in_type =
+                    Preg::grep(&BasePackage::package_name_to_regexp(package), &type_keys)
+                        .unwrap_or_default();
 
                 let alt_type_keys: Vec<String> = composer_data
                     .as_array()
@@ -438,10 +443,13 @@ impl RemoveCommand {
                             matched_package, r#type, alt_type
                         ));
                         if io.is_interactive() {
-                            if io.ask_confirmation(&format!(
-                                "Do you want to remove it from {} [<comment>yes</comment>]? ",
-                                alt_type
-                            ), true) {
+                            if io.ask_confirmation(
+                                &format!(
+                                    "Do you want to remove it from {} [<comment>yes</comment>]? ",
+                                    alt_type
+                                ),
+                                true,
+                            ) {
                                 if dry_run {
                                     to_remove
                                         .entry(alt_type.to_string())
@@ -470,7 +478,9 @@ impl RemoveCommand {
 
         // TODO(plugin): deactivate installed plugins
         if let Some(composer_opt) = self.try_composer() {
-            composer_opt.get_plugin_manager().deactivate_installed_plugins();
+            composer_opt
+                .get_plugin_manager()
+                .deactivate_installed_plugins();
         }
 
         self.reset_composer();
@@ -507,17 +517,16 @@ impl RemoveCommand {
             .dispatch(command_event.get_name(), command_event);
 
         let allow_plugins = composer.get_config().get("allow-plugins");
-        let removed_plugins: Vec<String> = if let Some(allow_map) =
-            allow_plugins.as_ref().and_then(|v| v.as_array())
-        {
-            packages
-                .iter()
-                .filter(|p| allow_map.contains_key(p.as_str()))
-                .cloned()
-                .collect()
-        } else {
-            vec![]
-        };
+        let removed_plugins: Vec<String> =
+            if let Some(allow_map) = allow_plugins.as_ref().and_then(|v| v.as_array()) {
+                packages
+                    .iter()
+                    .filter(|p| allow_map.contains_key(p.as_str()))
+                    .cloned()
+                    .collect()
+            } else {
+                vec![]
+            };
 
         if !dry_run
             && allow_plugins.as_ref().and_then(|v| v.as_array()).is_some()
@@ -544,26 +553,67 @@ impl RemoveCommand {
         let mut install = Installer::create(io, &composer);
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
-        let optimize = input.get_option("optimize-autoloader").as_bool().unwrap_or(false)
-            || composer.get_config().get("optimize-autoloader").and_then(|v| v.as_bool()).unwrap_or(false);
-        let authoritative = input.get_option("classmap-authoritative").as_bool().unwrap_or(false)
-            || composer.get_config().get("classmap-authoritative").and_then(|v| v.as_bool()).unwrap_or(false);
-        let apcu_prefix = input.get_option("apcu-autoloader-prefix").as_string().map(|s| s.to_string());
+        let optimize = input
+            .get_option("optimize-autoloader")
+            .as_bool()
+            .unwrap_or(false)
+            || composer
+                .get_config()
+                .get("optimize-autoloader")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+        let authoritative = input
+            .get_option("classmap-authoritative")
+            .as_bool()
+            .unwrap_or(false)
+            || composer
+                .get_config()
+                .get("classmap-authoritative")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+        let apcu_prefix = input
+            .get_option("apcu-autoloader-prefix")
+            .as_string()
+            .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
-            || input.get_option("apcu-autoloader").as_bool().unwrap_or(false)
-            || composer.get_config().get("apcu-autoloader").and_then(|v| v.as_bool()).unwrap_or(false);
-        let minimal_changes = input.get_option("minimal-changes").as_bool().unwrap_or(false)
-            || composer.get_config().get("update-with-minimal-changes").and_then(|v| v.as_bool()).unwrap_or(false);
+            || input
+                .get_option("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false)
+            || composer
+                .get_config()
+                .get("apcu-autoloader")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+        let minimal_changes = input
+            .get_option("minimal-changes")
+            .as_bool()
+            .unwrap_or(false)
+            || composer
+                .get_config()
+                .get("update-with-minimal-changes")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
 
         let mut update_allow_transitive_dependencies =
             Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
         let mut flags = String::new();
-        if input.get_option("update-with-all-dependencies").as_bool().unwrap_or(false)
-            || input.get_option("with-all-dependencies").as_bool().unwrap_or(false)
+        if input
+            .get_option("update-with-all-dependencies")
+            .as_bool()
+            .unwrap_or(false)
+            || input
+                .get_option("with-all-dependencies")
+                .as_bool()
+                .unwrap_or(false)
         {
             update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             flags += " --with-all-dependencies";
-        } else if input.get_option("no-update-with-dependencies").as_bool().unwrap_or(false) {
+        } else if input
+            .get_option("no-update-with-dependencies")
+            .as_bool()
+            .unwrap_or(false)
+        {
             update_allow_transitive_dependencies = Request::UPDATE_ONLY_LISTED;
             flags += " --with-dependencies";
         }
@@ -582,9 +632,7 @@ impl RemoveCommand {
         install.set_update(true);
         install.set_install(!input.get_option("no-install").as_bool().unwrap_or(false));
         install.set_update_allow_transitive_dependencies(update_allow_transitive_dependencies);
-        install.set_platform_requirement_filter(
-            self.get_platform_requirement_filter(input),
-        );
+        install.set_platform_requirement_filter(self.get_platform_requirement_filter(input));
         install.set_dry_run(dry_run);
         install.set_audit_config(self.create_audit_config(composer.get_config(), input));
         install.set_minimal_update(minimal_changes);

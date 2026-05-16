@@ -1,19 +1,17 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMapGenerator.php
 
-use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PATHINFO_EXTENSION, PHP_INT_MAX,
-    InvalidArgumentException, LogicException, RuntimeException,
-    explode, getcwd, implode, in_array, is_dir, is_file, is_string,
-    pathinfo, preg_quote, realpath, str_replace, str_starts_with,
-    stream_get_wrappers, strlen, strrpos, strpos, strtr, substr,
-    sprintf, PhpMixed,
-};
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
+    PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,
+    pathinfo, preg_quote, realpath, sprintf, str_replace, str_starts_with, stream_get_wrappers,
+    strlen, strpos, strrpos, strtr, substr,
+};
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -29,10 +27,8 @@ impl ClassMapGenerator {
             .iter()
             .map(|w| preg_quote(w, None))
             .collect();
-        let stream_wrappers_regex = sprintf(
-            "{^(?:%s)://}",
-            &[PhpMixed::String(implode("|", &wrappers))],
-        );
+        let stream_wrappers_regex =
+            sprintf("{^(?:%s)://}", &[PhpMixed::String(implode("|", &wrappers))]);
 
         ClassMapGenerator {
             extensions,
@@ -82,7 +78,8 @@ impl ClassMapGenerator {
             true,
         ) {
             return Err(anyhow::anyhow!(InvalidArgumentException {
-                message: "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\"".to_string(),
+                message: "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\""
+                    .to_string(),
                 code: 0,
             }));
         }
@@ -91,7 +88,9 @@ impl ClassMapGenerator {
         if autoload_type != "classmap" {
             if !is_string(&path) {
                 return Err(anyhow::anyhow!(InvalidArgumentException {
-                    message: "$path must be a string when specifying a psr-0 or psr-4 autoload type".to_string(),
+                    message:
+                        "$path must be a string when specifying a psr-0 or psr-4 autoload type"
+                            .to_string(),
                     code: 0,
                 }));
             }
@@ -115,7 +114,11 @@ impl ClassMapGenerator {
                     "/\\.(?:{})$/",
                     implode(
                         "|",
-                        &self.extensions.iter().map(|e| preg_quote(e, None)).collect::<Vec<_>>(),
+                        &self
+                            .extensions
+                            .iter()
+                            .map(|e| preg_quote(e, None))
+                            .collect::<Vec<_>>(),
                     )
                 );
                 Finder::create()
@@ -137,7 +140,9 @@ impl ClassMapGenerator {
             }
         } else {
             // $path is already an array or Traversable of SplFileInfo
-            todo!("non-string path (Traversable/array of SplFileInfo) is not yet handled in Phase A")
+            todo!(
+                "non-string path (Traversable/array of SplFileInfo) is not yet handled in Phase A"
+            )
         };
 
         let cwd = realpath(&getcwd().unwrap_or_default()).unwrap_or_default();
@@ -164,8 +169,8 @@ impl ClassMapGenerator {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
             } else {
-                file_path = Preg::replace(r"{(?<!:)[\\/]{2,}}", "/", &file_path)
-                    .unwrap_or(file_path);
+                file_path =
+                    Preg::replace(r"{(?<!:)[\\/]{2,}}", "/", &file_path).unwrap_or(file_path);
             }
 
             if file_path.is_empty() {

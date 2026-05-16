@@ -5,11 +5,11 @@ use std::sync::Mutex;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    defined, env_contains_key, env_get, env_set, env_unset, file_exists, file_get_contents,
-    fopen, fstat, function_exists, getcwd, getenv, in_array, ini_get, is_array, is_readable,
-    mb_strlen, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty, putenv, realpath,
-    server_argv, server_contains_key, server_get, server_set, server_unset, stream_isatty,
-    stripos, strlen, strtoupper, substr, usleep, PhpMixed, RuntimeException,
+    PhpMixed, RuntimeException, defined, env_contains_key, env_get, env_set, env_unset,
+    file_exists, file_get_contents, fopen, fstat, function_exists, getcwd, getenv, in_array,
+    ini_get, is_array, is_readable, mb_strlen, posix_geteuid, posix_getpwuid, posix_getuid,
+    posix_isatty, putenv, realpath, server_argv, server_contains_key, server_get, server_set,
+    server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 
 use crate::util::process_executor::ProcessExecutor;
@@ -93,7 +93,11 @@ impl Platform {
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
         if Preg::is_match(r"#^~[\\/]#", path) {
-            return format!("{}{}", Self::get_user_directory().unwrap(), substr(path, 1, None));
+            return format!(
+                "{}{}",
+                Self::get_user_directory().unwrap(),
+                substr(path, 1, None)
+            );
         }
 
         Preg::replace_callback(
@@ -180,7 +184,9 @@ impl Platform {
                 .ok()
                 .flatten()
                 .unwrap_or_default();
-            if !(ini_get("open_basedir").map(|s| !s.is_empty()).unwrap_or(false))
+            if !(ini_get("open_basedir")
+                .map(|s| !s.is_empty())
+                .unwrap_or(false))
                 && is_readable("/proc/version")
                 && stripos(&file_contents, "microsoft").is_some()
                 && !Self::is_docker()
@@ -206,7 +212,10 @@ impl Platform {
         }
 
         // cannot check so assume no
-        if ini_get("open_basedir").map(|s| !s.is_empty()).unwrap_or(false) {
+        if ini_get("open_basedir")
+            .map(|s| !s.is_empty())
+            .unwrap_or(false)
+        {
             *cached = Some(false);
             return false;
         }
@@ -294,9 +303,7 @@ impl Platform {
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
         if in_array(
-            PhpMixed::String(strtoupper(
-                &Self::get_env("MSYSTEM").unwrap_or_default(),
-            )),
+            PhpMixed::String(strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default())),
             &PhpMixed::List(vec![
                 Box::new(PhpMixed::String("MINGW32".to_string())),
                 Box::new(PhpMixed::String("MINGW64".to_string())),

@@ -1,19 +1,26 @@
 //! ref: composer/src/Composer/Downloader/RarDownloader.php
 
-use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_php_shim::{class_exists, implode, RarArchive, RuntimeException, UnexpectedValueException};
 use crate::downloader::archive_downloader::ArchiveDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::ini_helper::IniHelper;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_php_shim::{
+    RarArchive, RuntimeException, UnexpectedValueException, class_exists, implode,
+};
 
 pub struct RarDownloader {
     inner: ArchiveDownloader,
 }
 
 impl RarDownloader {
-    pub(crate) fn extract(&self, _package: &dyn PackageInterface, file: &str, path: &str) -> Result<Box<dyn PromiseInterface>> {
+    pub(crate) fn extract(
+        &self,
+        _package: &dyn PackageInterface,
+        file: &str,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
         let mut process_error: Option<String> = None;
 
         if !Platform::is_windows() {
@@ -39,7 +46,10 @@ impl RarDownloader {
         if !class_exists("RarArchive") {
             let ini_message = IniHelper::get_message();
             let error = if !Platform::is_windows() {
-                format!("Could not decompress the archive, enable the PHP rar extension.\n{}", ini_message)
+                format!(
+                    "Could not decompress the archive, enable the PHP rar extension.\n{}",
+                    ini_message
+                )
             } else {
                 format!(
                     "Could not decompress the archive, enable the PHP rar extension or install unrar.\n{}\n{}",
@@ -47,7 +57,11 @@ impl RarDownloader {
                     process_error.as_deref().unwrap_or(""),
                 )
             };
-            return Err(RuntimeException { message: error, code: 0 }.into());
+            return Err(RuntimeException {
+                message: error,
+                code: 0,
+            }
+            .into());
         }
 
         let rar_archive = RarArchive::open(file);
@@ -55,7 +69,8 @@ impl RarDownloader {
             return Err(UnexpectedValueException {
                 message: format!("Could not open RAR archive: {}", file),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
         let rar_archive = rar_archive.unwrap();
 
@@ -64,7 +79,8 @@ impl RarDownloader {
             return Err(RuntimeException {
                 message: "Could not retrieve RAR archive entries".to_string(),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         for entry in entries.unwrap() {
@@ -72,7 +88,8 @@ impl RarDownloader {
                 return Err(RuntimeException {
                     message: "Could not extract entry".to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
         }
 

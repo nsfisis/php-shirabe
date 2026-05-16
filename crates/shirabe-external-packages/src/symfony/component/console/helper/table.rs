@@ -1,5 +1,5 @@
-use shirabe_php_shim::PhpMixed;
 use crate::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Table;

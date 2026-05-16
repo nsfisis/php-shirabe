@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Util/Silencer.php
 
-use std::sync::Mutex;
 use anyhow::Result;
 use shirabe_php_shim::{
+    E_DEPRECATED, E_NOTICE, E_USER_DEPRECATED, E_USER_NOTICE, E_USER_WARNING, E_WARNING,
     error_reporting,
-    E_WARNING, E_NOTICE, E_USER_WARNING, E_USER_NOTICE, E_DEPRECATED, E_USER_DEPRECATED,
 };
+use std::sync::Mutex;
 
 static STACK: Mutex<Vec<i64>> = Mutex::new(Vec::new());
 
@@ -13,7 +13,14 @@ pub struct Silencer;
 
 impl Silencer {
     pub fn suppress(mask: Option<i64>) -> i64 {
-        let mask = mask.unwrap_or(E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE | E_DEPRECATED | E_USER_DEPRECATED);
+        let mask = mask.unwrap_or(
+            E_WARNING
+                | E_NOTICE
+                | E_USER_WARNING
+                | E_USER_NOTICE
+                | E_DEPRECATED
+                | E_USER_DEPRECATED,
+        );
         let old = error_reporting(None);
         STACK.lock().unwrap().push(old);
         error_reporting(Some(old & !mask));

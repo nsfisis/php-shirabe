@@ -6,9 +6,9 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::process::Process;
 use shirabe_php_shim::{
-    chdir, count, date, explode, fclose, feof, fgets, file_get_contents, fopen, fwrite,
-    gethostname, json_decode, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time,
-    trim, Exception, PhpMixed, PHP_EOL,
+    Exception, PHP_EOL, PhpMixed, chdir, count, date, explode, fclose, feof, fgets,
+    file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
+    strpos, strrpos, substr, time, trim,
 };
 
 use crate::io::io_interface::IOInterface;
@@ -334,11 +334,7 @@ impl Perforce {
     /// @internal
     /// @param non-empty-list<string> $arguments Additional arguments for git rev-list
     /// @return non-empty-list<string>
-    pub fn generate_p4_command(
-        &mut self,
-        arguments: Vec<String>,
-        use_client: bool,
-    ) -> Vec<String> {
+    pub fn generate_p4_command(&mut self, arguments: Vec<String>, use_client: bool) -> Vec<String> {
         let mut p4_command: Vec<String> = vec![Self::get_p4_executable()];
         if self.get_user().is_some() {
             p4_command.push("-u".to_string());
@@ -357,8 +353,7 @@ impl Perforce {
     }
 
     pub fn is_logged_in(&mut self) -> Result<bool> {
-        let command =
-            self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
+        let command = self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
         let exit_code = self.execute_command(PhpMixed::List(
             command
                 .into_iter()
@@ -592,10 +587,7 @@ impl Perforce {
 
                 if !process.is_successful() {
                     return Err(Exception {
-                        message: format!(
-                            "Error logging in:{}",
-                            self.process.get_error_output()
-                        ),
+                        message: format!("Error logging in:{}", self.process.get_error_output()),
                         code: 0,
                     }
                     .into());
@@ -815,10 +807,8 @@ impl Perforce {
     pub(crate) fn get_change_list(&mut self, reference: &str) -> Option<String> {
         let index = strpos(reference, "@")?;
         let label = substr(reference, index as i64, None);
-        let command = self.generate_p4_command(
-            vec!["changes".to_string(), "-m1".to_string(), label],
-            true,
-        );
+        let command =
+            self.generate_p4_command(vec!["changes".to_string(), "-m1".to_string(), label], true);
         self.execute_command(PhpMixed::List(
             command
                 .into_iter()
@@ -835,11 +825,7 @@ impl Perforce {
     }
 
     /// @return mixed|null
-    pub fn get_commit_logs(
-        &mut self,
-        from_reference: &str,
-        to_reference: &str,
-    ) -> Option<String> {
+    pub fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {
         let from_change_list = self.get_change_list(from_reference)?;
         let to_change_list = self.get_change_list(to_reference)?;
         let index = strpos(from_reference, "@").unwrap_or(0);
@@ -879,9 +865,10 @@ impl Perforce {
         P4_EXECUTABLE
             .get_or_init(|| {
                 let finder = ExecutableFinder::new();
-                finder.find("p4", None, vec![]).unwrap_or_else(|| "p4".to_string())
+                finder
+                    .find("p4", None, vec![])
+                    .unwrap_or_else(|| "p4".to_string())
             })
             .clone()
     }
 }
-

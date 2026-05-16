@@ -8,10 +8,10 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_key_exists, array_reverse, array_search, clone, get_class, implode, in_array, is_a,
-    is_array, is_string, ksort, preg_quote, str_replace, strrpos, strtr, substr, trigger_error,
-    trim, var_export, version_compare, E_USER_DEPRECATED, PhpMixed, RuntimeException,
-    UnexpectedValueException,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
+    array_reverse, array_search, clone, get_class, implode, in_array, is_a, is_array, is_string,
+    ksort, preg_quote, str_replace, strrpos, strtr, substr, trigger_error, trim, var_export,
+    version_compare,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 
@@ -108,12 +108,20 @@ impl PluginManager {
     pub fn load_installed_plugins(&mut self) -> anyhow::Result<()> {
         // TODO(plugin): plugin loading is part of the plugin API
         if !self.are_plugins_disabled("local") {
-            let repo = self.composer.get_repository_manager().get_local_repository();
+            let repo = self
+                .composer
+                .get_repository_manager()
+                .get_local_repository();
             self.load_repository(&*repo, false, Some(self.composer.get_package()))?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
-            let repo = self.global_composer.as_ref().unwrap().get_repository_manager().get_local_repository();
+            let repo = self
+                .global_composer
+                .as_ref()
+                .unwrap()
+                .get_repository_manager()
+                .get_local_repository();
             self.load_repository(&*repo, true, None)?;
         }
         Ok(())
@@ -123,12 +131,20 @@ impl PluginManager {
     pub fn deactivate_installed_plugins(&mut self) {
         // TODO(plugin): deactivation is part of the plugin API
         if !self.are_plugins_disabled("local") {
-            let repo = self.composer.get_repository_manager().get_local_repository();
+            let repo = self
+                .composer
+                .get_repository_manager()
+                .get_local_repository();
             self.deactivate_repository(&*repo, false);
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
-            let repo = self.global_composer.as_ref().unwrap().get_repository_manager().get_local_repository();
+            let repo = self
+                .global_composer
+                .as_ref()
+                .unwrap()
+                .get_repository_manager()
+                .get_local_repository();
             self.deactivate_repository(&*repo, true);
         }
     }
@@ -151,16 +167,26 @@ impl PluginManager {
     }
 
     /// Register a plugin package, activate it etc.
-    pub fn register_package(&mut self, package: &dyn PackageInterface, fail_on_missing_classes: bool, is_global_plugin: bool) -> anyhow::Result<()> {
+    pub fn register_package(
+        &mut self,
+        package: &dyn PackageInterface,
+        fail_on_missing_classes: bool,
+        is_global_plugin: bool,
+    ) -> anyhow::Result<()> {
         // TODO(plugin): registerPackage drives the actual plugin loading via eval()
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
-            self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as plugins are disabled.</warning>", package.get_name()));
+            self.io.write_error(&format!(
+                "<warning>The \"{}\" plugin was not loaded as plugins are disabled.</warning>",
+                package.get_name()
+            ));
 
             return Ok(());
         }
 
         if package.get_type() == "composer-plugin" {
-            let mut requires_composer: Option<Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>> = None;
+            let mut requires_composer: Option<
+                Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>,
+            > = None;
             for (_k, link) in &package.get_requires() {
                 if "composer-plugin-api" == link.get_target() {
                     requires_composer = Some(link.get_constraint());
@@ -179,7 +205,11 @@ impl PluginManager {
             };
 
             let current_plugin_api_version = self.get_plugin_api_version();
-            let current_plugin_api_constraint = Constraint::new("==", self.version_parser.normalize(&current_plugin_api_version, None)?);
+            let current_plugin_api_constraint = Constraint::new(
+                "==",
+                self.version_parser
+                    .normalize(&current_plugin_api_version, None)?,
+            );
 
             if requires_composer.get_pretty_string() == self.get_plugin_api_version() {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name(), self.get_plugin_api_version(), self.get_plugin_api_version()));
@@ -205,11 +235,20 @@ impl PluginManager {
             }
         }
 
-        let plugin_optional = package.get_extra().get("plugin-optional").map(|v| v.as_bool() == Some(true)).unwrap_or(false);
+        let plugin_optional = package
+            .get_extra()
+            .get("plugin-optional")
+            .map(|v| v.as_bool() == Some(true))
+            .unwrap_or(false);
         if !self.is_plugin_allowed(package.get_name(), is_global_plugin, plugin_optional, true)? {
-            self.io.write_error(&format!("Skipped loading \"{}\" {}as it is not in config.allow-plugins",
+            self.io.write_error(&format!(
+                "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
                 package.get_name(),
-                if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" }
+                if is_global_plugin || self.running_in_global_dir {
+                    "(installed globally) "
+                } else {
+                    ""
+                }
             ));
             return Ok(());
         }
@@ -232,9 +271,16 @@ impl PluginManager {
             }.into());
         }
         let _classes: Vec<String> = if let Some(arr) = class_value.and_then(|v| v.as_list()) {
-            arr.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect()
+            arr.iter()
+                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .collect()
         } else {
-            vec![class_value.and_then(|v| v.as_string()).unwrap_or("").to_string()]
+            vec![
+                class_value
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+            ]
         };
 
         // TODO(plugin): everything below this point in the original PHP would create runtime instances:
@@ -255,11 +301,16 @@ impl PluginManager {
             return;
         }
 
-        let plugins = self.registered_plugins.shift_remove(package.get_name()).unwrap_or_default();
+        let plugins = self
+            .registered_plugins
+            .shift_remove(package.get_name())
+            .unwrap_or_default();
         for plugin in plugins {
             match plugin {
                 PluginOrInstaller::Installer(inst) => {
-                    self.composer.get_installation_manager().remove_installer(&*inst);
+                    self.composer
+                        .get_installation_manager()
+                        .remove_installer(&*inst);
                 }
                 PluginOrInstaller::Plugin(p) => {
                     self.remove_plugin(&*p);
@@ -275,11 +326,16 @@ impl PluginManager {
             return;
         }
 
-        let plugins = self.registered_plugins.shift_remove(package.get_name()).unwrap_or_default();
+        let plugins = self
+            .registered_plugins
+            .shift_remove(package.get_name())
+            .unwrap_or_default();
         for plugin in plugins {
             match plugin {
                 PluginOrInstaller::Installer(inst) => {
-                    self.composer.get_installation_manager().remove_installer(&*inst);
+                    self.composer
+                        .get_installation_manager()
+                        .remove_installer(&*inst);
                 }
                 PluginOrInstaller::Plugin(p) => {
                     self.remove_plugin(&*p);
@@ -295,22 +351,39 @@ impl PluginManager {
     }
 
     /// Adds a plugin, activates it and registers it with the event dispatcher
-    pub fn add_plugin(&mut self, plugin: Box<dyn PluginInterface>, is_global_plugin: bool, source_package: Option<&dyn PackageInterface>) -> anyhow::Result<()> {
+    pub fn add_plugin(
+        &mut self,
+        plugin: Box<dyn PluginInterface>,
+        is_global_plugin: bool,
+        source_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<()> {
         // TODO(plugin): plugin activation
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
             return Ok(());
         }
 
         if source_package.is_none() {
-            trigger_error("Calling PluginManager::addPlugin without $sourcePackage is deprecated, if you are using this please get in touch with us to explain the use case", E_USER_DEPRECATED);
+            trigger_error(
+                "Calling PluginManager::addPlugin without $sourcePackage is deprecated, if you are using this please get in touch with us to explain the use case",
+                E_USER_DEPRECATED,
+            );
         } else {
             let sp = source_package.unwrap();
-            let plugin_optional = sp.get_extra().get("plugin-optional").map(|v| v.as_bool() == Some(true)).unwrap_or(false);
+            let plugin_optional = sp
+                .get_extra()
+                .get("plugin-optional")
+                .map(|v| v.as_bool() == Some(true))
+                .unwrap_or(false);
             if !self.is_plugin_allowed(sp.get_name(), is_global_plugin, plugin_optional, true)? {
-                self.io.write_error(&format!("Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
+                self.io.write_error(&format!(
+                    "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
                     get_class(&*plugin),
                     sp.get_name(),
-                    if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" }
+                    if is_global_plugin || self.running_in_global_dir {
+                        "(installed globally) "
+                    } else {
+                        ""
+                    }
                 ));
                 return Ok(());
             }
@@ -323,9 +396,14 @@ impl PluginManager {
         if is_global_plugin || self.running_in_global_dir {
             details.push("installed globally".to_string());
         }
-        self.io.write_error(&format!("Loading plugin {}{}",
+        self.io.write_error(&format!(
+            "Loading plugin {}{}",
             get_class(&*plugin),
-            if !details.is_empty() { format!(" ({})", implode(", ", &details)) } else { String::new() }
+            if !details.is_empty() {
+                format!(" ({})", implode(", ", &details))
+            } else {
+                String::new()
+            }
         ));
         plugin.activate(&self.composer, &*self.io);
 
@@ -347,7 +425,8 @@ impl PluginManager {
             None => return,
         };
 
-        self.io.write_error(&format!("Unloading plugin {}", get_class(plugin)));
+        self.io
+            .write_error(&format!("Unloading plugin {}", get_class(plugin)));
         self.plugins.remove(index as usize);
         plugin.deactivate(&self.composer, &*self.io);
 
@@ -357,11 +436,17 @@ impl PluginManager {
     /// Notifies a plugin it is being uninstalled and should clean up
     pub fn uninstall_plugin(&self, plugin: &dyn PluginInterface) {
         // TODO(plugin): plugin uninstall hook
-        self.io.write_error(&format!("Uninstalling plugin {}", get_class(plugin)));
+        self.io
+            .write_error(&format!("Uninstalling plugin {}", get_class(plugin)));
         plugin.uninstall(&self.composer, &*self.io);
     }
 
-    fn load_repository(&mut self, repo: &dyn RepositoryInterface, is_global_repo: bool, root_package: Option<&dyn RootPackageInterface>) -> anyhow::Result<()> {
+    fn load_repository(
+        &mut self,
+        repo: &dyn RepositoryInterface,
+        is_global_repo: bool,
+        root_package: Option<&dyn RootPackageInterface>,
+    ) -> anyhow::Result<()> {
         // TODO(plugin): repository scan for plugin packages
         let packages = repo.get_packages();
 
@@ -370,19 +455,27 @@ impl PluginManager {
             if package.get_type() == "composer-plugin" {
                 let extra = package.get_extra();
                 if package.get_name() == "composer/installers"
-                    || extra.get("plugin-modifies-install-path").map(|v| v.as_bool() == Some(true)).unwrap_or(false)
+                    || extra
+                        .get("plugin-modifies-install-path")
+                        .map(|v| v.as_bool() == Some(true))
+                        .unwrap_or(false)
                 {
                     weights.insert(package.get_name().to_string(), -10000);
                 }
             }
         }
 
-        let sorted_packages = PackageSorter::sort_packages(packages.iter().map(|p| p.clone_box()).collect(), weights);
+        let sorted_packages =
+            PackageSorter::sort_packages(packages.iter().map(|p| p.clone_box()).collect(), weights);
         let required_packages: Vec<Box<dyn PackageInterface>> = if !is_global_repo {
-            RepositoryUtils::filter_required_packages(packages.iter().map(|p| p.as_ref()).collect(), root_package.unwrap(), true)
-                .iter()
-                .map(|p| p.clone_box())
-                .collect()
+            RepositoryUtils::filter_required_packages(
+                packages.iter().map(|p| p.as_ref()).collect(),
+                root_package.unwrap(),
+                true,
+            )
+            .iter()
+            .map(|p| p.clone_box())
+            .collect()
         } else {
             vec![]
         };
@@ -393,12 +486,23 @@ impl PluginManager {
                 None => continue,
             };
 
-            if !in_array(package.get_type(), &vec!["composer-plugin".to_string(), "composer-installer".to_string()], true) {
+            if !in_array(
+                package.get_type(),
+                &vec![
+                    "composer-plugin".to_string(),
+                    "composer-installer".to_string(),
+                ],
+                true,
+            ) {
                 continue;
             }
 
             if !is_global_repo
-                && !in_array(&**package as &dyn PackageInterface, &required_packages.iter().map(|p| &**p).collect::<Vec<_>>(), true)
+                && !in_array(
+                    &**package as &dyn PackageInterface,
+                    &required_packages.iter().map(|p| &**p).collect::<Vec<_>>(),
+                    true,
+                )
                 && !self.is_plugin_allowed(package.get_name(), false, true, false)?
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name()));
@@ -419,7 +523,10 @@ impl PluginManager {
     fn deactivate_repository(&mut self, repo: &dyn RepositoryInterface, _is_global_repo: bool) {
         // TODO(plugin): deactivate plugins from a repository
         let packages = repo.get_packages();
-        let sorted_packages = array_reverse(PackageSorter::sort_packages(packages.iter().map(|p| p.clone_box()).collect(), IndexMap::new()));
+        let sorted_packages = array_reverse(PackageSorter::sort_packages(
+            packages.iter().map(|p| p.clone_box()).collect(),
+            IndexMap::new(),
+        ));
 
         for package in &sorted_packages {
             if package.as_complete_package().is_none() {
@@ -434,13 +541,24 @@ impl PluginManager {
         }
     }
 
-    fn collect_dependencies(&self, installed_repo: &InstalledRepository, mut collected: IndexMap<String, Box<dyn PackageInterface>>, package: &dyn PackageInterface) -> IndexMap<String, Box<dyn PackageInterface>> {
+    fn collect_dependencies(
+        &self,
+        installed_repo: &InstalledRepository,
+        mut collected: IndexMap<String, Box<dyn PackageInterface>>,
+        package: &dyn PackageInterface,
+    ) -> IndexMap<String, Box<dyn PackageInterface>> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in &package.get_requires() {
-            for required_package in installed_repo.find_packages_with_replacers_and_providers(require_link.get_target()) {
+            for required_package in
+                installed_repo.find_packages_with_replacers_and_providers(require_link.get_target())
+            {
                 if !collected.contains_key(required_package.get_name()) {
-                    collected.insert(required_package.get_name().to_string(), required_package.clone_box());
-                    collected = self.collect_dependencies(installed_repo, collected, &*required_package);
+                    collected.insert(
+                        required_package.get_name().to_string(),
+                        required_package.clone_box(),
+                    );
+                    collected =
+                        self.collect_dependencies(installed_repo, collected, &*required_package);
                 }
             }
         }
@@ -451,14 +569,25 @@ impl PluginManager {
     /// Retrieves the path a package is installed to.
     fn get_install_path(&self, package: &dyn PackageInterface, global: bool) -> Option<String> {
         if !global {
-            return self.composer.get_installation_manager().get_install_path(package);
+            return self
+                .composer
+                .get_installation_manager()
+                .get_install_path(package);
         }
 
         // PHP: assert(null !== $this->globalComposer);
-        self.global_composer.as_ref().unwrap().get_installation_manager().get_install_path(package)
+        self.global_composer
+            .as_ref()
+            .unwrap()
+            .get_installation_manager()
+            .get_install_path(package)
     }
 
-    pub(crate) fn get_capability_implementation_class_name(&self, plugin: &dyn PluginInterface, capability: &str) -> anyhow::Result<Option<String>> {
+    pub(crate) fn get_capability_implementation_class_name(
+        &self,
+        plugin: &dyn PluginInterface,
+        capability: &str,
+    ) -> anyhow::Result<Option<String>> {
         // TODO(plugin): capability lookup
         let capable = match plugin.as_capable() {
             Some(c) => c,
@@ -476,37 +605,61 @@ impl PluginManager {
         }
 
         if array_key_exists(capability, &capabilities)
-            && (capabilities.get(capability).map(|v| v.is_empty()).unwrap_or(true)
+            && (capabilities
+                .get(capability)
+                .map(|v| v.is_empty())
+                .unwrap_or(true)
                 || !is_string(capabilities.get(capability).unwrap())
-                || trim(capabilities.get(capability).and_then(|v| v.as_string()).unwrap_or(""), " \t\n\r\0\u{0B}").is_empty())
+                || trim(
+                    capabilities
+                        .get(capability)
+                        .and_then(|v| v.as_string())
+                        .unwrap_or(""),
+                    " \t\n\r\0\u{0B}",
+                )
+                .is_empty())
         {
             return Err(UnexpectedValueException {
-                message: format!("Plugin {} provided invalid capability class name(s), got {}",
+                message: format!(
+                    "Plugin {} provided invalid capability class name(s), got {}",
                     get_class(plugin),
                     var_export(capabilities.get(capability).unwrap(), true)
                 ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         Ok(None)
     }
 
-    pub fn get_plugin_capability(&self, plugin: &dyn PluginInterface, capability_class_name: &str, _ctor_args: IndexMap<String, PhpMixed>) -> anyhow::Result<Option<Box<dyn Capability>>> {
+    pub fn get_plugin_capability(
+        &self,
+        plugin: &dyn PluginInterface,
+        capability_class_name: &str,
+        _ctor_args: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<Option<Box<dyn Capability>>> {
         // TODO(plugin): instantiate plugin capability via runtime class lookup
-        let _capability_class = match self.get_capability_implementation_class_name(plugin, capability_class_name)? {
-            Some(c) => c,
-            None => return Ok(None),
-        };
+        let _capability_class =
+            match self.get_capability_implementation_class_name(plugin, capability_class_name)? {
+                Some(c) => c,
+                None => return Ok(None),
+            };
         // PHP: requires class_exists / new $capabilityClass($ctorArgs); cannot be performed in Rust without a runtime registry.
         Ok(None)
     }
 
-    pub fn get_plugin_capabilities(&self, capability_class_name: &str, ctor_args: IndexMap<String, PhpMixed>) -> Vec<Box<dyn Capability>> {
+    pub fn get_plugin_capabilities(
+        &self,
+        capability_class_name: &str,
+        ctor_args: IndexMap<String, PhpMixed>,
+    ) -> Vec<Box<dyn Capability>> {
         // TODO(plugin): aggregate capabilities across all loaded plugins
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
         for plugin in &self.get_plugins() {
-            if let Ok(Some(capability)) = self.get_plugin_capability(&**plugin, capability_class_name, ctor_args.clone()) {
+            if let Ok(Some(capability)) =
+                self.get_plugin_capability(&**plugin, capability_class_name, ctor_args.clone())
+            {
                 capabilities.push(capability);
             }
         }
@@ -514,7 +667,10 @@ impl PluginManager {
         capabilities
     }
 
-    fn parse_allowed_plugins(allow_plugins_config: PhpMixed, locker: Option<&Locker>) -> Option<IndexMap<String, bool>> {
+    fn parse_allowed_plugins(
+        allow_plugins_config: PhpMixed,
+        locker: Option<&Locker>,
+    ) -> Option<IndexMap<String, bool>> {
         // PHP: [] === $allowPluginsConfig && $locker !== null && $locker->isLocked() && version_compare($locker->getPluginApi(), '2.2.0', '<')
         let is_empty_array = allow_plugins_config
             .as_array()
@@ -543,7 +699,10 @@ impl PluginManager {
         let mut rules: IndexMap<String, bool> = IndexMap::new();
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
-                rules.insert(BasePackage::package_name_to_regexp(pattern), allow.as_bool().unwrap_or(false));
+                rules.insert(
+                    BasePackage::package_name_to_regexp(pattern),
+                    allow.as_bool().unwrap_or(false),
+                );
             }
         }
 
@@ -563,7 +722,13 @@ impl PluginManager {
         self.disable_plugins = DisablePlugins::True;
     }
 
-    pub fn is_plugin_allowed(&mut self, package: &str, is_global_plugin: bool, optional: bool, prompt: bool) -> anyhow::Result<bool> {
+    pub fn is_plugin_allowed(
+        &mut self,
+        package: &str,
+        is_global_plugin: bool,
+        optional: bool,
+        prompt: bool,
+    ) -> anyhow::Result<bool> {
         // TODO(plugin): allow-plugins authorization flow with interactive prompt
         let rules: &mut Option<IndexMap<String, bool>> = if is_global_plugin {
             &mut self.allow_global_plugin_rules
@@ -590,7 +755,12 @@ impl PluginManager {
             *rules = Some(IndexMap::new());
         }
 
-        let rules_snapshot: Vec<(String, bool)> = rules.as_ref().unwrap().iter().map(|(k, v)| (k.clone(), *v)).collect();
+        let rules_snapshot: Vec<(String, bool)> = rules
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
         for (pattern, allow) in &rules_snapshot {
             if Preg::is_match(pattern, package, None).unwrap_or(false) {
                 return Ok(*allow);
@@ -634,21 +804,40 @@ impl PluginManager {
                         let allow = answer_str == "y";
 
                         // persist answer in current rules to avoid prompting again if the package gets reloaded
-                        rules.as_mut().unwrap().insert(BasePackage::package_name_to_regexp(package), allow);
+                        rules
+                            .as_mut()
+                            .unwrap()
+                            .insert(BasePackage::package_name_to_regexp(package), allow);
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == "y" || answer_str == "n" {
-                            let allow_plugins_value = composer_ref.get_config().get("allow-plugins").clone();
+                            let allow_plugins_value =
+                                composer_ref.get_config().get("allow-plugins").clone();
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
-                                allow_plugins.insert(package.to_string(), Box::new(PhpMixed::Bool(allow)));
-                                if composer_ref.get_config().get("sort-packages").as_bool().unwrap_or(false) {
+                                allow_plugins
+                                    .insert(package.to_string(), Box::new(PhpMixed::Bool(allow)));
+                                if composer_ref
+                                    .get_config()
+                                    .get("sort-packages")
+                                    .as_bool()
+                                    .unwrap_or(false)
+                                {
                                     ksort(&mut allow_plugins);
                                 }
-                                composer_ref.get_config().get_config_source().add_config_setting("allow-plugins", PhpMixed::Array(allow_plugins.clone()));
+                                composer_ref
+                                    .get_config()
+                                    .get_config_source()
+                                    .add_config_setting(
+                                        "allow-plugins",
+                                        PhpMixed::Array(allow_plugins.clone()),
+                                    );
                                 let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
                                 let mut inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                                inner.insert("allow-plugins".to_string(), Box::new(PhpMixed::Array(allow_plugins)));
+                                inner.insert(
+                                    "allow-plugins".to_string(),
+                                    Box::new(PhpMixed::Array(allow_plugins)),
+                                );
                                 wrap.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
                                 composer_ref.get_config().merge(PhpMixed::Array(wrap), "");
                             }

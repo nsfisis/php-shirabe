@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
 
+use crate::advisory::security_advisory::SecurityAdvisory;
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -8,7 +9,6 @@ use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::version_parser::VersionParser;
-use crate::advisory::security_advisory::SecurityAdvisory;
 
 fn serialize_constraint<S: serde::Serializer>(
     c: &Box<dyn ConstraintInterface>,
@@ -34,16 +34,18 @@ impl PartialSecurityAdvisory {
     ) -> Result<Box<dyn std::any::Any>> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
-        let constraint: Box<dyn ConstraintInterface> = match parser.parse_constraints(affected_versions_str) {
-            Ok(c) => c,
-            Err(_) => {
-                let affected_version = Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
-                match parser.parse_constraints(&affected_version) {
-                    Ok(c) => c,
-                    Err(_) => Box::new(Constraint::new("==", "0.0.0-invalid-version")),
+        let constraint: Box<dyn ConstraintInterface> =
+            match parser.parse_constraints(affected_versions_str) {
+                Ok(c) => c,
+                Err(_) => {
+                    let affected_version =
+                        Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
+                    match parser.parse_constraints(&affected_version) {
+                        Ok(c) => c,
+                        Err(_) => Box::new(Constraint::new("==", "0.0.0-invalid-version")),
+                    }
                 }
-            }
-        };
+            };
 
         let has_full_data = data.contains_key("title")
             && data.contains_key("sources")
@@ -63,9 +65,15 @@ impl PartialSecurityAdvisory {
                 data["title"].as_string().unwrap_or("").to_string(),
                 data["sources"].clone(),
                 reported_at,
-                data.get("cve").and_then(|v| v.as_string()).map(|s| s.to_string()),
-                data.get("link").and_then(|v| v.as_string()).map(|s| s.to_string()),
-                data.get("severity").and_then(|v| v.as_string()).map(|s| s.to_string()),
+                data.get("cve")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string()),
+                data.get("link")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string()),
+                data.get("severity")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string()),
             );
             return Ok(Box::new(advisory));
         }
@@ -82,6 +90,10 @@ impl PartialSecurityAdvisory {
         advisory_id: String,
         affected_versions: Box<dyn ConstraintInterface>,
     ) -> Self {
-        Self { advisory_id, package_name, affected_versions }
+        Self {
+            advisory_id,
+            package_name,
+            affected_versions,
+        }
     }
 }

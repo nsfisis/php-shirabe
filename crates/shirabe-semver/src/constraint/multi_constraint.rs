@@ -108,7 +108,9 @@ impl MultiConstraint {
         conjunctive: bool,
     ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
         if constraints.is_empty() {
-            return Ok(Box::new(MatchAllConstraint { pretty_string: None }));
+            return Ok(Box::new(MatchAllConstraint {
+                pretty_string: None,
+            }));
         }
 
         if constraints.len() == 1 {
@@ -170,7 +172,8 @@ impl MultiConstraint {
                                         true,
                                     )
                                     .unwrap(),
-                                ) as Box<dyn ConstraintInterface>)
+                                )
+                                    as Box<dyn ConstraintInterface>)
                             } else {
                                 None
                             }
@@ -280,11 +283,7 @@ impl ConstraintInterface for MultiConstraint {
             return s.clone();
         }
 
-        let parts: Vec<String> = self
-            .constraints
-            .iter()
-            .map(|c| c.__to_string())
-            .collect();
+        let parts: Vec<String> = self.constraints.iter().map(|c| c.__to_string()).collect();
         let sep = if self.conjunctive { " " } else { " || " };
         let result = format!("[{}]", parts.join(sep));
 

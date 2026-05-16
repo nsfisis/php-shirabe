@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Json/JsonFormatter.php
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{function_exists, mb_convert_encoding, pack, PhpMixed};
+use shirabe_php_shim::{PhpMixed, function_exists, mb_convert_encoding, pack};
 
 pub struct JsonFormatter;
 

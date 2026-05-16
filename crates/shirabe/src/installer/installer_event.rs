@@ -25,7 +25,14 @@ impl InstallerEvent {
         transaction: Transaction,
     ) -> Self {
         let inner = Event::new(event_name, vec![], vec![]);
-        Self { inner, composer, io, dev_mode, execute_operations, transaction }
+        Self {
+            inner,
+            composer,
+            io,
+            dev_mode,
+            execute_operations,
+            transaction,
+        }
     }
 
     pub fn get_composer(&self) -> &Composer {

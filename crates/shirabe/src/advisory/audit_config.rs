@@ -59,7 +59,10 @@ impl AuditConfig {
     /// Detailed format: ['CVE-123' => ['apply' => 'audit|block|all', 'reason' => '...']]
     fn parse_ignore_with_apply(
         config: &PhpMixed,
-    ) -> anyhow::Result<(IndexMap<String, Option<String>>, IndexMap<String, Option<String>>)> {
+    ) -> anyhow::Result<(
+        IndexMap<String, Option<String>>,
+        IndexMap<String, Option<String>>,
+    )> {
         let mut for_audit: IndexMap<String, Option<String>> = IndexMap::new();
         let mut for_block: IndexMap<String, Option<String>> = IndexMap::new();
 
@@ -83,11 +86,13 @@ impl AuditConfig {
                     (key.clone(), "all".to_string(), Some(reason_str.clone()))
                 }
                 PhpMixed::Array(detail) => {
-                    let apply = detail.get("apply")
+                    let apply = detail
+                        .get("apply")
                         .and_then(|v| v.as_string())
                         .unwrap_or("all")
                         .to_string();
-                    let reason = detail.get("reason")
+                    let reason = detail
+                        .get("reason")
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
 

@@ -29,7 +29,13 @@ impl ClassMapGenerator {
                 .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
                 .collect(),
         );
-        std::fs::write(file, format!("<?php return {};", shirabe_php_shim::var_export(&maps_php, true)))?;
+        std::fs::write(
+            file,
+            format!(
+                "<?php return {};",
+                shirabe_php_shim::var_export(&maps_php, true)
+            ),
+        )?;
         Ok(())
     }
 
@@ -41,12 +47,21 @@ impl ClassMapGenerator {
         autoload_type: Option<String>,
         scanned_files: &mut IndexMap<String, bool>,
     ) -> anyhow::Result<IndexMap<String, String>> {
-        let generator = ExternalClassMapGenerator::new(vec!["php".to_string(), "inc".to_string(), "hh".to_string()]);
+        let generator = ExternalClassMapGenerator::new(vec![
+            "php".to_string(),
+            "inc".to_string(),
+            "hh".to_string(),
+        ]);
         let mut file_list = FileList::new();
         file_list.files = scanned_files.clone();
         generator.avoid_duplicate_scans(&file_list);
 
-        generator.scan_paths(path, excluded.as_deref(), autoload_type.as_deref().unwrap_or("classmap"), namespace.as_deref())?;
+        generator.scan_paths(
+            path,
+            excluded.as_deref(),
+            autoload_type.as_deref().unwrap_or("classmap"),
+            namespace.as_deref(),
+        )?;
 
         let class_map = generator.get_class_map();
 

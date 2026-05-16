@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php
 
-use std::sync::{Mutex, OnceLock};
-use shirabe_php_shim::{
-    debug_backtrace, error_reporting, filter_var, ini_get, is_resource,
-    set_error_handler, E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_WARNING, E_USER_WARNING,
-    FILTER_VALIDATE_BOOLEAN, PHP_EOL, STDERR, PhpMixed, ErrorException,
-};
 use crate::io::io_interface::IOInterface;
+use shirabe_php_shim::{
+    E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException,
+    FILTER_VALIDATE_BOOLEAN, PHP_EOL, PhpMixed, STDERR, debug_backtrace, error_reporting,
+    filter_var, ini_get, is_resource, set_error_handler,
+};
+use std::sync::{Mutex, OnceLock};
 
 static IO: OnceLock<Mutex<Option<Box<dyn IOInterface + Send>>>> = OnceLock::new();
 static HAS_SHOWN_DEPRECATION_NOTICE: Mutex<i64> = Mutex::new(0);
@@ -18,7 +18,12 @@ fn io() -> &'static Mutex<Option<Box<dyn IOInterface + Send>>> {
 pub struct ErrorHandler;
 
 impl ErrorHandler {
-    pub fn handle(level: i64, message: String, file: String, line: i64) -> Result<bool, ErrorException> {
+    pub fn handle(
+        level: i64,
+        message: String,
+        file: String,
+        line: i64,
+    ) -> Result<bool, ErrorException> {
         let is_deprecation_notice = level == E_DEPRECATED || level == E_USER_DEPRECATED;
 
         // error code is not included in error_reporting
@@ -37,10 +42,15 @@ impl ErrorHandler {
             // ignore some newly introduced warnings in new php versions until dependencies
             // can be fixed as we do not want to abort execution for those
             if (level == E_WARNING || level == E_USER_WARNING)
-                && message.contains("should either be used or intentionally ignored by casting it as (void)")
+                && message.contains(
+                    "should either be used or intentionally ignored by casting it as (void)",
+                )
             {
                 Self::output_warning(
-                    &format!("Ignored new PHP warning but it should be reported and fixed: {} in {}:{}", message, file, line),
+                    &format!(
+                        "Ignored new PHP warning but it should be reported and fixed: {} in {}:{}",
+                        message, file, line
+                    ),
                     true,
                 );
                 return Ok(true);
@@ -67,7 +77,10 @@ impl ErrorHandler {
             }
             *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap() = 1;
             drop(io_guard);
-            Self::output_warning(&format!("Deprecation Notice: {} in {}:{}", message, file, line), false);
+            Self::output_warning(
+                &format!("Deprecation Notice: {} in {}:{}", message, file, line),
+                false,
+            );
         }
 
         Ok(true)
@@ -92,7 +105,10 @@ impl ErrorHandler {
                     .skip(2)
                     .filter_map(|frame| {
                         let line = frame.get("line").and_then(|v| v.as_int());
-                        let file = frame.get("file").and_then(|v| v.as_string()).map(|s| s.to_string());
+                        let file = frame
+                            .get("file")
+                            .and_then(|v| v.as_string())
+                            .map(|s| s.to_string());
                         if let (Some(line), Some(file)) = (line, file) {
                             Some(format!("<warning> {}:{}</warning>", file, line))
                         } else {
@@ -110,7 +126,11 @@ impl ErrorHandler {
 
         if output_even_without_io {
             if is_resource(&PhpMixed::Int(STDERR)) {
-                shirabe_php_shim::fwrite(PhpMixed::Int(STDERR), &format!("Warning: {}{}", message, PHP_EOL), -1);
+                shirabe_php_shim::fwrite(
+                    PhpMixed::Int(STDERR),
+                    &format!("Warning: {}{}", message, PHP_EOL),
+                    -1,
+                );
             } else {
                 print!("Warning: {}{}", message, PHP_EOL);
             }

@@ -223,11 +223,7 @@ impl InstalledRepository {
                     for pkg in self.find_packages(link.get_target().to_string(), None) {
                         let version = Constraint::new("=", pkg.get_version());
                         if link.get_constraint().matches(&version) == invert {
-                            results.push(DependentsEntry(
-                                package.clone_box(),
-                                link.clone(),
-                                None,
-                            ));
+                            results.push(DependentsEntry(package.clone_box(), link.clone(), None));
                         }
                     }
                 }
@@ -238,11 +234,7 @@ impl InstalledRepository {
                     for pkg in self.find_packages(link.get_target().to_string(), None) {
                         let version = Constraint::new("=", pkg.get_version());
                         if link.get_constraint().matches(&version) == invert {
-                            results.push(DependentsEntry(
-                                package.clone_box(),
-                                link.clone(),
-                                None,
-                            ));
+                            results.push(DependentsEntry(package.clone_box(), link.clone(), None));
                         }
                     }
                 }
@@ -327,9 +319,7 @@ impl InstalledRepository {
                                 }
                                 for root_req in root_reqs.values() {
                                     if pkg.get_names().contains(&root_req.get_target().to_string())
-                                        && !root_req
-                                            .get_constraint()
-                                            .matches(link.get_constraint())
+                                        && !root_req.get_constraint().matches(link.get_constraint())
                                     {
                                         results.push(DependentsEntry(
                                             package.clone_box(),

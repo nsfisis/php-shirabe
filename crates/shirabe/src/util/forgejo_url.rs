@@ -12,10 +12,16 @@ pub struct ForgejoUrl {
 }
 
 impl ForgejoUrl {
-    pub const URL_REGEX: &'static str = r"^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$";
+    pub const URL_REGEX: &'static str =
+        r"^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$";
 
     fn new(owner: String, repository: String, origin_url: String, api_url: String) -> Self {
-        Self { owner, repository, origin_url, api_url }
+        Self {
+            owner,
+            repository,
+            origin_url,
+            api_url,
+        }
     }
 
     pub fn create(repo_url: &str) -> Result<Self> {
@@ -24,7 +30,8 @@ impl ForgejoUrl {
             None => Err(InvalidArgumentException {
                 message: format!("This is not a valid Forgejo URL: {}", repo_url),
                 code: 0,
-            }.into()),
+            }
+            .into()),
         }
     }
 
@@ -32,7 +39,12 @@ impl ForgejoUrl {
         let repo_url = repo_url?;
         let m = Preg::match_(Self::URL_REGEX, repo_url)?;
 
-        let origin_url = if !m[1].is_empty() { m[1].clone() } else { m[2].clone() }.to_lowercase();
+        let origin_url = if !m[1].is_empty() {
+            m[1].clone()
+        } else {
+            m[2].clone()
+        }
+        .to_lowercase();
         let api_base = format!("{}/api/v1", origin_url);
 
         Some(Self::new(
@@ -44,6 +56,9 @@ impl ForgejoUrl {
     }
 
     pub fn generate_ssh_url(&self) -> String {
-        format!("git@{}:{}/{}.git", self.origin_url, self.owner, self.repository)
+        format!(
+            "git@{}:{}/{}.git",
+            self.origin_url, self.owner, self.repository
+        )
     }
 }

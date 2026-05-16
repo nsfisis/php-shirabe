@@ -11,9 +11,9 @@ use shirabe_external_packages::symfony::component::console::output::output_inter
 use shirabe_external_packages::symfony::component::console::question::choice_question::ChoiceQuestion;
 use shirabe_external_packages::symfony::component::console::question::question::Question;
 use shirabe_php_shim::{
-    array_filter, array_keys, array_search, count, function_exists, implode, in_array, is_array,
-    is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat, strip_tags,
-    strlen, PhpMixed,
+    PhpMixed, array_filter, array_keys, array_search, count, function_exists, implode, in_array,
+    is_array, is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat,
+    strip_tags, strlen,
 };
 
 use crate::io::base_io::BaseIO;
@@ -158,7 +158,12 @@ impl ConsoleIO {
                     )
                 })
                 .collect();
-            PhpMixed::List(mapped.into_iter().map(|s| Box::new(PhpMixed::String(s))).collect())
+            PhpMixed::List(
+                mapped
+                    .into_iter()
+                    .map(|s| Box::new(PhpMixed::String(s)))
+                    .collect(),
+            )
         } else {
             messages
         };
@@ -396,8 +401,8 @@ impl ConsoleIO {
             PhpMixed::List(_) => vec![],
             _ => vec![],
         };
-        let is_assoc = !choice_keys.is_empty()
-            && choice_keys.iter().any(|k| !k.parse::<i64>().is_ok());
+        let is_assoc =
+            !choice_keys.is_empty() && choice_keys.iter().any(|k| !k.parse::<i64>().is_ok());
         if is_assoc {
             return result;
         }
@@ -410,9 +415,7 @@ impl ConsoleIO {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, v)| {
-                        v.as_string().map(|s| (i.to_string(), s.to_string()))
-                    })
+                    .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
                     .collect(),
                 _ => IndexMap::new(),
             };
@@ -431,11 +434,7 @@ impl ConsoleIO {
             _ => vec![],
         };
         for (index, choice) in &choice_list {
-            if in_array(
-                choice.clone(),
-                &PhpMixed::List(result_list.clone()),
-                true,
-            ) {
+            if in_array(choice.clone(), &PhpMixed::List(result_list.clone()), true) {
                 results.push(index.clone());
             }
         }
@@ -455,7 +454,9 @@ impl ConsoleIO {
     fn get_error_output(&self) -> &dyn OutputInterface {
         if self.output.is_console_output_interface() {
             // TODO(phase-b): downcast Box<dyn OutputInterface> to ConsoleOutputInterface
-            return todo!("downcast self.output to ConsoleOutputInterface and call get_error_output()");
+            return todo!(
+                "downcast self.output to ConsoleOutputInterface and call get_error_output()"
+            );
         }
 
         &*self.output
@@ -480,7 +481,10 @@ impl ConsoleIO {
         let escape_pattern =
             r"\x1B\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]|\x1B\].*?(?:\x1B\\|\x07)|\x1B.";
         let pattern = if allow_newlines {
-            format!("{{{}|[\\x01-\\x09\\x0B\\x0C\\x0E-\\x1A]|\\r(?!\\n)}}u", escape_pattern)
+            format!(
+                "{{{}|[\\x01-\\x09\\x0B\\x0C\\x0E-\\x1A]|\\r(?!\\n)}}u",
+                escape_pattern
+            )
         } else {
             format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern)
         };
@@ -495,15 +499,19 @@ impl ConsoleIO {
             PhpMixed::List(l) => {
                 for (key, message) in l.iter().enumerate() {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
-                    sanitized
-                        .insert(key.to_string(), PhpMixed::String(Preg::replace(&pattern, "", &s)));
+                    sanitized.insert(
+                        key.to_string(),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                    );
                 }
             }
             PhpMixed::Array(a) => {
                 for (key, message) in a {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
-                    sanitized
-                        .insert(key.clone(), PhpMixed::String(Preg::replace(&pattern, "", &s)));
+                    sanitized.insert(
+                        key.clone(),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                    );
                 }
             }
             _ => {}
@@ -532,9 +540,8 @@ impl ConsoleIO {
 
         // Fallback to iconv if mbstring unavailable
         if function_exists("iconv") {
-            let cleaned = Silencer::call(|| {
-                Ok(shirabe_php_shim::iconv("UTF-8", "UTF-8//TRANSLIT", string))
-            });
+            let cleaned =
+                Silencer::call(|| Ok(shirabe_php_shim::iconv("UTF-8", "UTF-8//TRANSLIT", string)));
             if let Ok(Some(c)) = cleaned {
                 return c;
             }

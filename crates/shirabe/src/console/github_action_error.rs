@@ -24,10 +24,16 @@ impl GithubActionError {
 
             if file_truthy && line_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io.write(&format!("::error file={},line={}::{}", file, line.unwrap(), message));
+                self.io.write(&format!(
+                    "::error file={},line={}::{}",
+                    file,
+                    line.unwrap(),
+                    message
+                ));
             } else if file_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io.write(&format!("::error file={}::{}", file, message));
+                self.io
+                    .write(&format!("::error file={}::{}", file, message));
             } else {
                 self.io.write(&format!("::error ::{}", message));
             }

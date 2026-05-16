@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Script/Event.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 use crate::composer::Composer;
 use crate::event_dispatcher::event::Event as BaseEvent;
 use crate::io::io_interface::IOInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Event {

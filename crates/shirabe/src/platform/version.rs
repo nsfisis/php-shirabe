@@ -15,7 +15,10 @@ impl Version {
         )?;
 
         let patch = if version_compare(&matches["version"], "3.0.0", "<") {
-            format!(".{}", Self::convert_alpha_version_to_int_version(&matches["patch"]))
+            format!(
+                ".{}",
+                Self::convert_alpha_version_to_int_version(&matches["patch"])
+            )
         } else {
             String::new()
         };
@@ -25,25 +28,33 @@ impl Version {
             .replace("-fips", "")
             .replace("-pre", "-alpha");
 
-        Some(format!("{}{}{}", matches["version"], patch, suffix).trim_end_matches('-').to_string())
+        Some(
+            format!("{}{}{}", matches["version"], patch, suffix)
+                .trim_end_matches('-')
+                .to_string(),
+        )
     }
 
     pub fn parse_libjpeg(libjpeg_version: &str) -> Option<String> {
-        let matches = Preg::match_strict_groups(
-            r"^(?P<major>\d+)(?P<minor>[a-z]*)$",
-            libjpeg_version,
-        )?;
+        let matches =
+            Preg::match_strict_groups(r"^(?P<major>\d+)(?P<minor>[a-z]*)$", libjpeg_version)?;
 
-        Some(format!("{}.{}", matches["major"], Self::convert_alpha_version_to_int_version(&matches["minor"])))
+        Some(format!(
+            "{}.{}",
+            matches["major"],
+            Self::convert_alpha_version_to_int_version(&matches["minor"])
+        ))
     }
 
     pub fn parse_zoneinfo_version(zoneinfo_version: &str) -> Option<String> {
-        let matches = Preg::match_strict_groups(
-            r"^(?P<year>\d{4})(?P<revision>[a-z]*)$",
-            zoneinfo_version,
-        )?;
+        let matches =
+            Preg::match_strict_groups(r"^(?P<year>\d{4})(?P<revision>[a-z]*)$", zoneinfo_version)?;
 
-        Some(format!("{}.{}", matches["year"], Self::convert_alpha_version_to_int_version(&matches["revision"])))
+        Some(format!(
+            "{}.{}",
+            matches["year"],
+            Self::convert_alpha_version_to_int_version(&matches["revision"])
+        ))
     }
 
     fn convert_alpha_version_to_int_version(alpha: &str) -> i64 {

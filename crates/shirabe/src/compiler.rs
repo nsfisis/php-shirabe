@@ -8,9 +8,9 @@ use shirabe_external_packages::seld::phar_utils::timestamps::Timestamps;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
 use shirabe_php_shim::{
-    array_search, file_exists, file_get_contents, strcmp, strtr, strtr_array,
-    token_get_all, PhpMixed, Phar, RuntimeException, UnexpectedValueException,
-    T_COMMENT, T_DOC_COMMENT, T_WHITESPACE,
+    Phar, PhpMixed, RuntimeException, T_COMMENT, T_DOC_COMMENT, T_WHITESPACE,
+    UnexpectedValueException, array_search, file_exists, file_get_contents, strcmp, strtr,
+    strtr_array, token_get_all,
 };
 
 use crate::json::json_file::JsonFile;
@@ -57,7 +57,9 @@ impl Compiler {
                 code: 0,
             }.into());
         }
-        self.version = Git::parse_rev_list_output(&output, &process).trim().to_string();
+        self.version = Git::parse_rev_list_output(&output, &process)
+            .trim()
+            .to_string();
 
         let command = Git::build_rev_list_command(&process, &["-n1", "--format=%ci", "HEAD"]);
         let mut output = String::new();
@@ -69,9 +71,10 @@ impl Compiler {
         }
 
         let version_date_str = Git::parse_rev_list_output(&output, &process);
-        self.version_date = chrono::DateTime::parse_from_str(version_date_str.trim(), "%Y-%m-%d %H:%M:%S %z")
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| chrono::Utc::now());
+        self.version_date =
+            chrono::DateTime::parse_from_str(version_date_str.trim(), "%Y-%m-%d %H:%M:%S %z")
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
 
         let mut git_describe_output = String::new();
         if process.execute(
@@ -118,13 +121,12 @@ impl Compiler {
 
         phar.start_buffering();
 
-        let finder_sort =
-            |a: &SplFileInfo, b: &SplFileInfo| -> i64 {
-                strcmp(
-                    &strtr(a.get_real_path(), "\\", "/"),
-                    &strtr(b.get_real_path(), "\\", "/"),
-                )
-            };
+        let finder_sort = |a: &SplFileInfo, b: &SplFileInfo| -> i64 {
+            strcmp(
+                &strtr(a.get_real_path(), "\\", "/"),
+                &strtr(b.get_real_path(), "\\", "/"),
+            )
+        };
 
         // Add Composer sources
         let mut finder = Finder::new();
@@ -143,7 +145,10 @@ impl Compiler {
         // Add runtime utilities separately to make sure they retain the docblocks as these will get copied into projects
         self.add_file(
             &mut phar,
-            &SplFileInfo::new(&format!("{}/src/Composer/Autoload/ClassLoader.php", repo_root)),
+            &SplFileInfo::new(&format!(
+                "{}/src/Composer/Autoload/ClassLoader.php",
+                repo_root
+            )),
             false,
         )?;
         self.add_file(
@@ -218,14 +223,9 @@ impl Compiler {
         let mut unexpected_files: Vec<String> = vec![];
 
         for file in finder.iter() {
-            if let Some(index) =
-                array_search(file.get_real_path(), &extra_files)
-            {
+            if let Some(index) = array_search(file.get_real_path(), &extra_files) {
                 extra_files.shift_remove(&index);
-            } else if !Preg::is_match(
-                r"{(^LICENSE(?:\.txt)?$|\.php$)}",
-                file.get_filename(),
-            )? {
+            } else if !Preg::is_match(r"{(^LICENSE(?:\.txt)?$|\.php$)}", file.get_filename())? {
                 unexpected_files.push(file.to_string());
             }
 
@@ -314,8 +314,7 @@ impl Compiler {
 
     fn add_file(&self, phar: &mut Phar, file: &SplFileInfo, strip: bool) -> anyhow::Result<()> {
         let path = self.get_relative_file_path(file);
-        let content = file_get_contents(file.get_path())
-            .unwrap_or_default();
+        let content = file_get_contents(file.get_path()).unwrap_or_default();
         let mut content = if strip {
             self.strip_whitespace(&content)
         } else if file.get_filename() == "LICENSE" {
@@ -326,10 +325,7 @@ impl Compiler {
 
         if path == "src/Composer/Composer.php" {
             let mut replacements: IndexMap<String, String> = IndexMap::new();
-            replacements.insert(
-                "@package_version@".to_string(),
-                self.version.clone(),
-            );
+            replacements.insert("@package_version@".to_string(), self.version.clone());
             replacements.insert(
                 "@package_branch_alias_version@".to_string(),
                 self.branch_alias_version.clone(),
@@ -340,8 +336,7 @@ impl Compiler {
             );
             content = strtr_array(&content, &replacements);
             content = Preg::replace(
-                r"{SOURCE_VERSION = '[^']+';}"
-,
+                r"{SOURCE_VERSION = '[^']+';}",
                 "SOURCE_VERSION = '';",
                 &content,
             )?;
@@ -354,8 +349,7 @@ impl Compiler {
 
     fn add_composer_bin(&self, phar: &mut Phar) -> anyhow::Result<()> {
         let repo_root = shirabe_php_shim::dirname_levels(file!(), 2);
-        let content = file_get_contents(&format!("{}/bin/composer", repo_root))
-            .unwrap_or_default();
+        let content = file_get_contents(&format!("{}/bin/composer", repo_root)).unwrap_or_default();
         let content = Preg::replace(r"{^#!/usr/bin/env php\s*}", "", &content)?;
         phar.add_from_string("bin/composer", &content);
         Ok(())
@@ -388,8 +382,8 @@ impl Compiler {
                         let whitespace = Preg::replace(r"{(?:\r\n|\r|\n)}", "\n", &whitespace)
                             .unwrap_or(whitespace);
                         // trim leading spaces
-                        let whitespace = Preg::replace(r"{\n +}", "\n", &whitespace)
-                            .unwrap_or(whitespace);
+                        let whitespace =
+                            Preg::replace(r"{\n +}", "\n", &whitespace).unwrap_or(whitespace);
                         output.push_str(&whitespace);
                     } else {
                         output.push_str(token_value);

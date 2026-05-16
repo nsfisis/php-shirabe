@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::{dirname, extension_loaded, implode, stream_get_contents, RuntimeException, ZipArchive};
+use shirabe_php_shim::{
+    RuntimeException, ZipArchive, dirname, extension_loaded, implode, stream_get_contents,
+};
 
 pub struct Zip;
 
@@ -101,8 +103,9 @@ impl Zip {
         }
 
         Err(RuntimeException {
-            message: "No composer.json found either at the top level or within the topmost directory"
-                .to_string(),
+            message:
+                "No composer.json found either at the top level or within the topmost directory"
+                    .to_string(),
             code: 0,
         }
         .into())

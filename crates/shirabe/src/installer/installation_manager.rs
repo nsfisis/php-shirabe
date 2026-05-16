@@ -6,8 +6,8 @@ use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
 use shirabe_php_shim::{
-    array_search_mixed, array_splice, array_unshift, count, http_build_query, json_encode,
-    str_contains, str_replace, strpos, strtolower, ucfirst, InvalidArgumentException, PhpMixed,
+    InvalidArgumentException, PhpMixed, array_search_mixed, array_splice, array_unshift, count,
+    http_build_query, json_encode, str_contains, str_replace, strpos, strtolower, ucfirst,
 };
 
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
@@ -143,7 +143,9 @@ impl InstallationManager {
                 && self.is_package_installed(repo, alias.get_alias_of())?);
         }
 
-        Ok(self.get_installer(package.get_type())?.is_installed(repo, package))
+        Ok(self
+            .get_installer(package.get_type())?
+            .is_installed(repo, package))
     }
 
     /// Install binary for the given package.
@@ -177,8 +179,10 @@ impl InstallationManager {
         download_only: bool,
     ) -> Result<()> {
         // @var array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
-        let mut cleanup_promises: IndexMap<i64, Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>> =
-            IndexMap::new();
+        let mut cleanup_promises: IndexMap<
+            i64,
+            Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>,
+        > = IndexMap::new();
 
         let signal_handler = SignalHandler::create(
             vec![
@@ -452,13 +456,16 @@ impl InstallationManager {
             };
 
             if run_scripts && self.event_dispatcher.is_some() {
-                self.event_dispatcher.as_mut().unwrap().dispatch_package_event(
-                    event_name,
-                    dev_mode,
-                    repo,
-                    all_operations,
-                    operation.as_ref(),
-                );
+                self.event_dispatcher
+                    .as_mut()
+                    .unwrap()
+                    .dispatch_package_event(
+                        event_name,
+                        dev_mode,
+                        repo,
+                        all_operations,
+                        operation.as_ref(),
+                    );
             }
 
             let _dispatcher = self.event_dispatcher.as_ref();
@@ -524,11 +531,8 @@ impl InstallationManager {
             // progress.clear();
             // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
             if !self.io.is_decorated() {
-                self.io.write_error(
-                    PhpMixed::String(String::new()),
-                    true,
-                    IOInterface::NORMAL,
-                );
+                self.io
+                    .write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
             }
         }
     }
@@ -536,7 +540,10 @@ impl InstallationManager {
     /// Executes download operation.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub fn download(&mut self, package: &dyn PackageInterface) -> Option<Box<dyn PromiseInterface>> {
+    pub fn download(
+        &mut self,
+        package: &dyn PackageInterface,
+    ) -> Option<Box<dyn PromiseInterface>> {
         let installer = self.get_installer(package.get_type()).ok()?;
         let promise = installer.cleanup("install", package, None);
 
@@ -579,7 +586,10 @@ impl InstallationManager {
             self.mark_for_notification(target);
             promise
         } else {
-            let promise = self.get_installer(initial_type).ok()?.uninstall(repo, initial);
+            let promise = self
+                .get_installer(initial_type)
+                .ok()?
+                .uninstall(repo, initial);
             let promise = match promise {
                 Some(p) => p,
                 None => promise::resolve(None),
@@ -667,10 +677,7 @@ impl InstallationManager {
                         let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
                         let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-                        http.insert(
-                            "method".to_string(),
-                            PhpMixed::String("POST".to_string()),
-                        );
+                        http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
                         http.insert(
                             "header".to_string(),
                             PhpMixed::List(vec![Box::new(PhpMixed::String(
@@ -685,15 +692,16 @@ impl InstallationManager {
                         opts.insert(
                             "http".to_string(),
                             PhpMixed::Array(
-                                http.into_iter()
-                                    .map(|(k, v)| (k, Box::new(v)))
-                                    .collect(),
+                                http.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
                             ),
                         );
 
-                        promises.push(self.loop_.get_http_downloader().add(&url, &PhpMixed::Array(
-                            opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                        )));
+                        promises.push(self.loop_.get_http_downloader().add(
+                            &url,
+                            &PhpMixed::Array(
+                                opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                            ),
+                        ));
                     }
 
                     continue;
@@ -715,8 +723,7 @@ impl InstallationManager {
                         if let Some(metadata) =
                             FileDownloader::download_metadata().get(package.get_name())
                         {
-                            package_notification
-                                .insert("downloaded".to_string(), metadata.clone());
+                            package_notification.insert("downloaded".to_string(), metadata.clone());
                         } else {
                             package_notification
                                 .insert("downloaded".to_string(), PhpMixed::Bool(false));
@@ -757,16 +764,13 @@ impl InstallationManager {
                 http.insert("timeout".to_string(), PhpMixed::Int(6));
                 opts.insert(
                     "http".to_string(),
-                    PhpMixed::Array(
-                        http.into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
+                    PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 );
 
-                promises.push(self.loop_.get_http_downloader().add(repo_url, &PhpMixed::Array(
-                    opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                )));
+                promises.push(self.loop_.get_http_downloader().add(
+                    repo_url,
+                    &PhpMixed::Array(opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                ));
             }
 
             self.loop_.wait(promises, None);

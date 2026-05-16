@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/IO/BaseIO.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::psr::log::log_level::LogLevel;
-use shirabe_php_shim::{
-    array_merge, in_array, json_encode_ex, PhpMixed, UnexpectedValueException,
-    JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
-};
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
 use crate::util::process_executor::ProcessExecutor;
 use crate::util::silencer::Silencer;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::psr::log::log_level::LogLevel;
+use shirabe_php_shim::{
+    JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
+    UnexpectedValueException, array_merge, in_array, json_encode_ex,
+};
 
 #[derive(Debug)]
 pub struct BaseIO {
@@ -344,20 +344,15 @@ impl BaseIO {
 
                     let mut ssl_options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
                     if let Some(cert) = local_cert {
-                        ssl_options.insert(
-                            "local_cert".to_string(),
-                            Box::new(PhpMixed::String(cert)),
-                        );
+                        ssl_options
+                            .insert("local_cert".to_string(), Box::new(PhpMixed::String(cert)));
                     }
                     if let Some(pk) = local_pk {
-                        ssl_options
-                            .insert("local_pk".to_string(), Box::new(PhpMixed::String(pk)));
+                        ssl_options.insert("local_pk".to_string(), Box::new(PhpMixed::String(pk)));
                     }
                     if let Some(pass) = passphrase {
-                        ssl_options.insert(
-                            "passphrase".to_string(),
-                            Box::new(PhpMixed::String(pass)),
-                        );
+                        ssl_options
+                            .insert("passphrase".to_string(), Box::new(PhpMixed::String(pass)));
                     }
 
                     if !ssl_options.contains_key("local_cert") {

@@ -5,9 +5,9 @@ use std::sync::Mutex;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    array_flip, array_keys, array_merge, call_user_func_array, implode, is_file, method_exists,
-    php_dir, require_php_file, strtr_array, substr, trigger_error, OutOfBoundsException, PhpMixed,
-    E_USER_DEPRECATED,
+    E_USER_DEPRECATED, OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge,
+    call_user_func_array, implode, is_file, method_exists, php_dir, require_php_file, strtr_array,
+    substr, trigger_error,
 };
 use shirabe_semver::version_parser::VersionParser;
 
@@ -185,7 +185,10 @@ impl InstalledVersions {
             let Some(versions) = installed.get("versions").and_then(|v| v.as_array()) else {
                 continue;
             };
-            let Some(pkg) = versions.get(package_name).and_then(|v| v.as_array()).cloned()
+            let Some(pkg) = versions
+                .get(package_name)
+                .and_then(|v| v.as_array())
+                .cloned()
             else {
                 continue;
             };
@@ -455,14 +458,11 @@ impl InstalledVersions {
     fn get_self_dir() -> String {
         let mut self_dir = SELF_DIR.lock().unwrap();
         if self_dir.is_none() {
-            *self_dir = Some(strtr_array(
-                &php_dir(),
-                &{
-                    let mut m = IndexMap::new();
-                    m.insert("\\".to_string(), "/".to_string());
-                    m
-                },
-            ));
+            *self_dir = Some(strtr_array(&php_dir(), &{
+                let mut m = IndexMap::new();
+                m.insert("\\".to_string(), "/".to_string());
+                m
+            }));
         }
 
         self_dir.clone().unwrap()
@@ -492,14 +492,16 @@ impl InstalledVersions {
                     m.insert("\\".to_string(), "/".to_string());
                     m
                 });
-                let cached = INSTALLED_BY_VENDOR.lock().unwrap().get(&vendor_dir).cloned();
+                let cached = INSTALLED_BY_VENDOR
+                    .lock()
+                    .unwrap()
+                    .get(&vendor_dir)
+                    .cloned();
                 if let Some(cached) = cached {
                     installed.push(cached);
                 } else if is_file(&format!("{}/composer/installed.php", vendor_dir)) {
-                    let required = require_php_file(&format!(
-                        "{}/composer/installed.php",
-                        vendor_dir,
-                    ));
+                    let required =
+                        require_php_file(&format!("{}/composer/installed.php", vendor_dir,));
                     let required_map: IndexMap<String, PhpMixed> = required
                         .as_array()
                         .cloned()

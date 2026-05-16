@@ -3,7 +3,7 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{abs, spl_object_hash, str_pad, Countable, STR_PAD_LEFT};
+use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, spl_object_hash, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -48,10 +48,7 @@ impl Pool {
         unacceptable_fixed_or_locked_packages: Vec<Box<BasePackage>>,
         removed_versions: IndexMap<String, IndexMap<String, String>>,
         removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
-        security_removed_versions: IndexMap<
-            String,
-            IndexMap<String, Vec<PartialSecurityAdvisory>>,
-        >,
+        security_removed_versions: IndexMap<String, IndexMap<String, Vec<PartialSecurityAdvisory>>>,
         abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
     ) -> Self {
         let mut this = Self {
@@ -116,7 +113,10 @@ impl Pool {
         constraint: Option<&dyn ConstraintInterface>,
     ) -> bool {
         let empty = IndexMap::new();
-        let versions = self.security_removed_versions.get(package_name).unwrap_or(&empty);
+        let versions = self
+            .security_removed_versions
+            .get(package_name)
+            .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
             if let Some(c) = constraint {
                 if c.matches(&Constraint::new("==", version)) {
@@ -135,7 +135,10 @@ impl Pool {
         constraint: Option<&dyn ConstraintInterface>,
     ) -> Vec<String> {
         let empty = IndexMap::new();
-        let versions = self.security_removed_versions.get(package_name).unwrap_or(&empty);
+        let versions = self
+            .security_removed_versions
+            .get(package_name)
+            .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
             if let Some(c) = constraint {
                 if c.matches(&Constraint::new("==", version)) {
@@ -156,7 +159,10 @@ impl Pool {
         constraint: Option<&dyn ConstraintInterface>,
     ) -> bool {
         let empty = IndexMap::new();
-        let versions = self.abandoned_removed_versions.get(package_name).unwrap_or(&empty);
+        let versions = self
+            .abandoned_removed_versions
+            .get(package_name)
+            .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
             if let Some(c) = constraint {
                 if c.matches(&Constraint::new("==", version)) {
@@ -280,11 +286,7 @@ impl Pool {
         let package = self.literal_to_package(literal);
 
         let prefix = if installed_map.contains_key(&package.id) {
-            if literal > 0 {
-                "keep"
-            } else {
-                "remove"
-            }
+            if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
                 "install"
@@ -328,8 +330,7 @@ impl Pool {
         if replaces.contains_key("0") || provides.contains_key("0") {
             for link in provides.values() {
                 if link.get_target() == name
-                    && (constraint.is_none()
-                        || constraint.unwrap().matches(link.get_constraint()))
+                    && (constraint.is_none() || constraint.unwrap().matches(link.get_constraint()))
                 {
                     return true;
                 }
@@ -337,8 +338,7 @@ impl Pool {
 
             for link in replaces.values() {
                 if link.get_target() == name
-                    && (constraint.is_none()
-                        || constraint.unwrap().matches(link.get_constraint()))
+                    && (constraint.is_none() || constraint.unwrap().matches(link.get_constraint()))
                 {
                     return true;
                 }

@@ -51,8 +51,12 @@ impl DefaultPolicy {
         ignore_replace: bool,
     ) -> i64 {
         if a.get_name() == b.get_name() {
-            let a_aliased = (a.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some();
-            let b_aliased = (b.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some();
+            let a_aliased = (a.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some();
+            let b_aliased = (b.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some();
             if a_aliased && !b_aliased {
                 return -1;
             }
@@ -108,7 +112,9 @@ impl DefaultPolicy {
                 let best_literals: Vec<i64> = literals
                     .iter()
                     .copied()
-                    .filter(|&literal| pool.literal_to_package(literal).get_version() == preferred_version)
+                    .filter(|&literal| {
+                        pool.literal_to_package(literal).get_version() == preferred_version
+                    })
                     .collect();
                 if !best_literals.is_empty() {
                     return best_literals;
@@ -174,15 +180,28 @@ impl DefaultPolicy {
 }
 
 impl PolicyInterface for DefaultPolicy {
-    fn version_compare(&self, a: &dyn PackageInterface, b: &dyn PackageInterface, operator: &str) -> bool {
+    fn version_compare(
+        &self,
+        a: &dyn PackageInterface,
+        b: &dyn PackageInterface,
+        operator: &str,
+    ) -> bool {
         if self.prefer_stable {
             let stab_a = a.get_stability().to_string();
             let stab_b = b.get_stability().to_string();
             if stab_a != stab_b {
                 let (mut stab_a, mut stab_b) = (stab_a, stab_b);
-                if self.prefer_lowest && self.prefer_dev_over_prerelease && "stable" != stab_a && "stable" != stab_b {
-                    if stab_a == "dev" { stab_a = "stable".to_string(); }
-                    if stab_b == "dev" { stab_b = "stable".to_string(); }
+                if self.prefer_lowest
+                    && self.prefer_dev_over_prerelease
+                    && "stable" != stab_a
+                    && "stable" != stab_b
+                {
+                    if stab_a == "dev" {
+                        stab_a = "stable".to_string();
+                    }
+                    if stab_b == "dev" {
+                        stab_b = "stable".to_string();
+                    }
                 }
                 return STABILITIES.get(stab_a.as_str()).copied().unwrap_or(0)
                     < STABILITIES.get(stab_b.as_str()).copied().unwrap_or(0);
@@ -213,7 +232,11 @@ impl PolicyInterface for DefaultPolicy {
         literals.sort();
         let result_cache_key = format!(
             "{}{}",
-            literals.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(","),
+            literals
+                .iter()
+                .map(|l| l.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
             required_package.as_deref().unwrap_or("")
         );
         let pool_id = pool as *const Pool as i64;
@@ -231,12 +254,8 @@ impl PolicyInterface for DefaultPolicy {
 
         for name_literals in packages.values_mut() {
             name_literals.sort_by(|&a, &b| {
-                let cache_key = format!(
-                    "i{}.{}{}",
-                    a,
-                    b,
-                    required_package.as_deref().unwrap_or("")
-                );
+                let cache_key =
+                    format!("i{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
                 {
                     let cache = self.sorting_cache_per_pool.borrow();
                     if let Some(pool_cache) = cache.get(&pool_id) {
@@ -269,12 +288,7 @@ impl PolicyInterface for DefaultPolicy {
         let mut selected: Vec<i64> = packages.into_values().flatten().collect();
 
         selected.sort_by(|&a, &b| {
-            let cache_key = format!(
-                "{}.{}{}",
-                a,
-                b,
-                required_package.as_deref().unwrap_or("")
-            );
+            let cache_key = format!("{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
             {
                 let cache = self.sorting_cache_per_pool.borrow();
                 if let Some(pool_cache) = cache.get(&pool_id) {

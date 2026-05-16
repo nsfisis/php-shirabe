@@ -1,8 +1,10 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{Countable, InvalidArgumentException, OutOfBoundsException, rtrim, strpos, strtr};
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::{
+    Countable, InvalidArgumentException, OutOfBoundsException, rtrim, strpos, strtr,
+};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -105,20 +107,25 @@ impl ClassMap {
         self.psr_violations
             .entry(path)
             .or_default()
-            .push(PsrViolationEntry { warning, class_name });
+            .push(PsrViolationEntry {
+                warning,
+                class_name,
+            });
     }
 
     pub fn clear_psr_violations_by_path(&mut self, path_prefix: &str) {
         let path_prefix = rtrim(&strtr(path_prefix, "\\", "/"), Some("/"));
 
         self.psr_violations.retain(|path, _| {
-            path != &path_prefix
-                && strpos(path, &format!("{}/", path_prefix)) != Some(0)
+            path != &path_prefix && strpos(path, &format!("{}/", path_prefix)) != Some(0)
         });
     }
 
     pub fn add_ambiguous_class(&mut self, class_name: String, path: String) {
-        self.ambiguous_classes.entry(class_name).or_default().push(path);
+        self.ambiguous_classes
+            .entry(class_name)
+            .or_default()
+            .push(path);
     }
 
     /// Get the raw psr violations

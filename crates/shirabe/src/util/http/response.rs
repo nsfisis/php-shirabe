@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Util/Http/Response.php
 
+use crate::json::json_file::JsonFile;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{LogicException, PhpMixed, preg_quote};
-use crate::json::json_file::JsonFile;
 
 #[derive(Debug)]
 pub struct Response {
@@ -63,7 +63,9 @@ impl Response {
     }
 
     pub fn decode_json(&self) -> anyhow::Result<PhpMixed> {
-        let url = self.request.get("url")
+        let url = self
+            .request
+            .get("url")
             .and_then(|u| u.as_string())
             .unwrap_or("");
         JsonFile::parse_json(self.body.as_deref(), Some(url))

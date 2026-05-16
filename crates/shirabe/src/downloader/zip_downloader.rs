@@ -1,23 +1,22 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
-use std::sync::Mutex;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{
-    bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
-    is_file, json_encode, random_int, version_compare,
-    ErrorException, RuntimeException, UnexpectedValueException, ZipArchive,
-    DIRECTORY_SEPARATOR,
-};
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::process::Process;
-use shirabe_external_packages::composer::pcre::preg::Preg;
 use crate::downloader::archive_downloader::ArchiveDownloader;
 use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::ini_helper::IniHelper;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
+use shirabe_external_packages::symfony::component::process::process::Process;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, ErrorException, RuntimeException, UnexpectedValueException, ZipArchive,
+    bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
+    is_file, json_encode, random_int, version_compare,
+};
+use std::sync::Mutex;
 
 static UNZIP_COMMANDS: Mutex<Option<Vec<Vec<String>>>> = Mutex::new(None);
 static HAS_ZIP_ARCHIVE: Mutex<Option<bool>> = Mutex::new(None);
@@ -46,22 +45,61 @@ impl ZipDownloader {
                 let commands = unzip_commands.as_mut().unwrap();
                 if Platform::is_windows() {
                     if let Some(cmd) = finder.find("7z", None, &[r"C:\Program Files\7-Zip"]) {
-                        commands.push(vec!["7z".to_string(), cmd, "x".to_string(), "-bb0".to_string(), "-y".to_string(), "%file%".to_string(), "-o%path%".to_string()]);
+                        commands.push(vec![
+                            "7z".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
                     }
                 }
                 if let Some(cmd) = finder.find("unzip", None, &[]) {
-                    commands.push(vec!["unzip".to_string(), cmd, "-qq".to_string(), "%file%".to_string(), "-d".to_string(), "%path%".to_string()]);
+                    commands.push(vec![
+                        "unzip".to_string(),
+                        cmd,
+                        "-qq".to_string(),
+                        "%file%".to_string(),
+                        "-d".to_string(),
+                        "%path%".to_string(),
+                    ]);
                 }
                 if !Platform::is_windows() {
                     if let Some(cmd) = finder.find("7z", None, &[]) {
                         // 7z linux/macOS support is only used if unzip is not present
-                        commands.push(vec!["7z".to_string(), cmd, "x".to_string(), "-bb0".to_string(), "-y".to_string(), "%file%".to_string(), "-o%path%".to_string()]);
+                        commands.push(vec![
+                            "7z".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
                     } else if let Some(cmd) = finder.find("7zz", None, &[]) {
                         // 7zz linux/macOS support is only used if unzip is not present
-                        commands.push(vec!["7zz".to_string(), cmd, "x".to_string(), "-bb0".to_string(), "-y".to_string(), "%file%".to_string(), "-o%path%".to_string()]);
+                        commands.push(vec![
+                            "7zz".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
                     } else if let Some(cmd) = finder.find("7za", None, &[]) {
                         // 7za linux/macOS support is only used if unzip is not present
-                        commands.push(vec!["7za".to_string(), cmd, "x".to_string(), "-bb0".to_string(), "-y".to_string(), "%file%".to_string(), "-o%path%".to_string()]);
+                        commands.push(vec![
+                            "7za".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
                     }
                 }
             }
@@ -80,16 +118,30 @@ impl ZipDownloader {
         }
 
         let has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
-        let unzip_commands_empty = UNZIP_COMMANDS.lock().unwrap().as_ref().map_or(true, |v| v.is_empty());
+        let unzip_commands_empty = UNZIP_COMMANDS
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map_or(true, |v| v.is_empty());
 
         if !has_zip_archive && unzip_commands_empty {
             let ini_message = IniHelper::get_message();
             let error = if proc_open_missing {
-                format!("The zip extension is missing and unzip/7z commands cannot be called as proc_open is disabled, skipping.\n{}", ini_message)
+                format!(
+                    "The zip extension is missing and unzip/7z commands cannot be called as proc_open is disabled, skipping.\n{}",
+                    ini_message
+                )
             } else {
-                format!("The zip extension and unzip/7z commands are both missing, skipping.\n{}", ini_message)
+                format!(
+                    "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
+                    ini_message
+                )
             };
-            return Err(RuntimeException { message: error, code: 0 }.into());
+            return Err(RuntimeException {
+                message: error,
+                code: 0,
+            }
+            .into());
         }
 
         {
@@ -111,7 +163,9 @@ impl ZipDownloader {
             }
         }
 
-        self.inner.inner.download(package, path, prev_package, output)
+        self.inner
+            .inner
+            .download(package, path, prev_package, output)
     }
 
     fn extract_with_system_unzip(
@@ -124,7 +178,11 @@ impl ZipDownloader {
 
         let is_last_chance = !HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
 
-        let unzip_commands_empty = UNZIP_COMMANDS.lock().unwrap().as_ref().map_or(true, |v| v.is_empty());
+        let unzip_commands_empty = UNZIP_COMMANDS
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map_or(true, |v| v.is_empty());
         if unzip_commands_empty {
             return self.extract_with_zip_archive(package, file, path);
         }
@@ -136,14 +194,19 @@ impl ZipDownloader {
             // see https://github.com/composer/composer/issues/10058
             ("%file%", file.replace('/', DIRECTORY_SEPARATOR)),
             ("%path%", path.replace('/', DIRECTORY_SEPARATOR)),
-        ].into_iter().collect();
-        let command: Vec<String> = command_spec[1..].iter().map(|value| {
-            let mut v = value.clone();
-            for (from, to) in &map {
-                v = v.replace(from, to.as_str());
-            }
-            v
-        }).collect();
+        ]
+        .into_iter()
+        .collect();
+        let command: Vec<String> = command_spec[1..]
+            .iter()
+            .map(|value| {
+                let mut v = value.clone();
+                for (from, to) in &map {
+                    v = v.replace(from, to.as_str());
+                }
+                v
+            })
+            .collect();
 
         if !*WARNED_7ZIP_LINUX.lock().unwrap()
             && !Platform::is_windows()
@@ -151,8 +214,16 @@ impl ZipDownloader {
         {
             *WARNED_7ZIP_LINUX.lock().unwrap() = true;
             let mut output = String::new();
-            if self.inner.inner.process.execute(&[command_spec[1].as_str()], &mut output) == 0 {
-                if let Some(m) = Preg::is_match_strict_groups(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output) {
+            if self
+                .inner
+                .inner
+                .process
+                .execute(&[command_spec[1].as_str()], &mut output)
+                == 0
+            {
+                if let Some(m) =
+                    Preg::is_match_strict_groups(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output)
+                {
                     if version_compare(&m[1], "21.01", "<") {
                         self.inner.inner.io.write_error(&format!(
                             "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
@@ -180,21 +251,44 @@ impl ZipDownloader {
             } else {
                 io.write_error(&format!("    <warning>{}</warning>", process_error));
                 io.write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-                io.write_error(&format!("    Unzip with {} command failed, falling back to ZipArchive class", executable));
+                io.write_error(&format!(
+                    "    Unzip with {} command failed, falling back to ZipArchive class",
+                    executable
+                ));
 
-                if Platform::get_env("GITHUB_ACTIONS").is_some() && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none() {
+                if Platform::get_env("GITHUB_ACTIONS").is_some()
+                    && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
+                {
                     io.write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
                     io.write_error(&format!("File size: {}", filesize(file).unwrap_or(0)));
-                    io.write_error(&format!("File SHA1: {}", hash_file("sha1", file).unwrap_or_default()));
+                    io.write_error(&format!(
+                        "File SHA1: {}",
+                        hash_file("sha1", file).unwrap_or_default()
+                    ));
                     let content = file_get_contents(file).unwrap_or_default();
                     let bytes = content.as_bytes();
-                    io.write_error(&format!("First 100 bytes (hex): {}", bin2hex(&bytes[..bytes.len().min(100)])));
+                    io.write_error(&format!(
+                        "First 100 bytes (hex): {}",
+                        bin2hex(&bytes[..bytes.len().min(100)])
+                    ));
                     let len = bytes.len();
-                    io.write_error(&format!("Last 100 bytes (hex): {}", bin2hex(&bytes[len.saturating_sub(100)..])));
+                    io.write_error(&format!(
+                        "Last 100 bytes (hex): {}",
+                        bin2hex(&bytes[len.saturating_sub(100)..])
+                    ));
                     if package.get_dist_url().map_or(false, |u| !u.is_empty()) {
-                        io.write_error(&format!("Origin URL: {}", self.inner.inner.process_url(package, &package.get_dist_url().unwrap_or_default())));
+                        io.write_error(&format!(
+                            "Origin URL: {}",
+                            self.inner
+                                .inner
+                                .process_url(package, &package.get_dist_url().unwrap_or_default())
+                        ));
                         let headers = FileDownloader::response_headers.lock().unwrap();
-                        io.write_error(&format!("Response Headers: {}", json_encode(&shirabe_php_shim::PhpMixed::Null).unwrap_or_else(|| "[]".to_string())));
+                        io.write_error(&format!(
+                            "Response Headers: {}",
+                            json_encode(&shirabe_php_shim::PhpMixed::Null)
+                                .unwrap_or_else(|| "[]".to_string())
+                        ));
                     }
                 }
             }
@@ -241,7 +335,10 @@ impl ZipDownloader {
         file: &str,
         path: &str,
     ) -> Result<Box<dyn PromiseInterface>> {
-        let mut zip_archive = self.zip_archive_object.take().unwrap_or_else(ZipArchive::new);
+        let mut zip_archive = self
+            .zip_archive_object
+            .take()
+            .unwrap_or_else(ZipArchive::new);
 
         let result: Result<Box<dyn PromiseInterface>> = (|| {
             let retval = if !file_exists(file) || filesize(file).map_or(true, |s| s == 0) {
@@ -259,10 +356,15 @@ impl ZipDownloader {
                     let mut files_to_inspect = total_files.min(5);
                     let mut i: i64 = 0;
                     while i < files_to_inspect {
-                        let stat_index = if inspect_all { i } else { random_int(0, total_files - 1) };
+                        let stat_index = if inspect_all {
+                            i
+                        } else {
+                            random_int(0, total_files - 1)
+                        };
                         if let Some(stat) = zip_archive.stat_index(stat_index) {
                             let size = stat.get("size").and_then(|v| v.as_int()).unwrap_or(0);
-                            let comp_size = stat.get("comp_size").and_then(|v| v.as_int()).unwrap_or(0);
+                            let comp_size =
+                                stat.get("comp_size").and_then(|v| v.as_int()).unwrap_or(0);
                             total_size += size;
                             if !inspect_all && size > comp_size * 200 {
                                 total_size = 0;
@@ -305,7 +407,8 @@ impl ZipDownloader {
                 return Err(UnexpectedValueException {
                     message: self.get_error_message(code, file).trim_end().to_string(),
                     code,
-                }.into());
+                }
+                .into());
             }
         })();
 
@@ -345,8 +448,14 @@ impl ZipDownloader {
             ZipArchive::ER_OPEN => format!("Can't open zip file: {}", file),
             ZipArchive::ER_READ => format!("Zip read error ({})", file),
             ZipArchive::ER_SEEK => format!("Zip seek error ({})", file),
-            -1 => format!("'{}' is a corrupted zip archive (0 bytes), try again.", file),
-            _ => format!("'{}' is not a valid zip archive, got error code: {}", file, retval),
+            -1 => format!(
+                "'{}' is a corrupted zip archive (0 bytes), try again.",
+                file
+            ),
+            _ => format!(
+                "'{}' is not a valid zip archive, got error code: {}",
+                file, retval
+            ),
         }
     }
 }

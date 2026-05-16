@@ -33,7 +33,10 @@ impl CompleteAliasPackage {
         self.alias_of.get_repositories()
     }
 
-    pub fn set_repositories(&mut self, repositories: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>) {
+    pub fn set_repositories(
+        &mut self,
+        repositories: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>,
+    ) {
         self.alias_of.set_repositories(repositories);
     }
 
@@ -89,7 +92,10 @@ impl CompleteAliasPackage {
         self.alias_of.get_funding()
     }
 
-    pub fn set_funding(&mut self, funding: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>) {
+    pub fn set_funding(
+        &mut self,
+        funding: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>,
+    ) {
         self.alias_of.set_funding(funding);
     }
 

@@ -6,7 +6,7 @@ use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{get_debug_type, LogicException};
+use shirabe_php_shim::{LogicException, get_debug_type};
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
@@ -88,29 +88,59 @@ impl ArchiveCommand {
             None => Factory::create_config(None, None)?,
         };
 
-        let format = input.get_option("format").as_string_opt()
+        let format = input
+            .get_option("format")
+            .as_string_opt()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| config.get("archive-format").as_string().unwrap_or("tar").to_string());
+            .unwrap_or_else(|| {
+                config
+                    .get("archive-format")
+                    .as_string()
+                    .unwrap_or("tar")
+                    .to_string()
+            });
 
-        let dir = input.get_option("dir").as_string_opt()
+        let dir = input
+            .get_option("dir")
+            .as_string_opt()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| config.get("archive-dir").as_string().unwrap_or(".").to_string());
+            .unwrap_or_else(|| {
+                config
+                    .get("archive-dir")
+                    .as_string()
+                    .unwrap_or(".")
+                    .to_string()
+            });
 
         let return_code = self.archive(
             self.inner.get_io(),
             &config,
-            input.get_argument("package").as_string_opt().map(|s| s.to_string()),
-            input.get_argument("version").as_string_opt().map(|s| s.to_string()),
+            input
+                .get_argument("package")
+                .as_string_opt()
+                .map(|s| s.to_string()),
+            input
+                .get_argument("version")
+                .as_string_opt()
+                .map(|s| s.to_string()),
             &format,
             &dir,
-            input.get_option("file").as_string_opt().map(|s| s.to_string()),
-            input.get_option("ignore-filters").as_bool().unwrap_or(false),
+            input
+                .get_option("file")
+                .as_string_opt()
+                .map(|s| s.to_string()),
+            input
+                .get_option("ignore-filters")
+                .as_bool()
+                .unwrap_or(false),
             composer.as_ref(),
         )?;
 
         if return_code == 0 {
             if let Some(ref composer) = composer {
-                composer.get_event_dispatcher().dispatch_script(ScriptEvents::POST_ARCHIVE_CMD, true);
+                composer
+                    .get_event_dispatcher()
+                    .dispatch_script(ScriptEvents::POST_ARCHIVE_CMD, true);
             }
         }
 
@@ -135,7 +165,8 @@ impl ArchiveCommand {
             let factory = Factory::new();
             let process = ProcessExecutor::new_default();
             let http_downloader = Factory::create_http_downloader(io, config)?;
-            let download_manager = factory.create_download_manager(io, config, &http_downloader, &process)?;
+            let download_manager =
+                factory.create_download_manager(io, config, &http_downloader, &process)?;
             let loop_ = Loop::new(http_downloader, process);
             factory.create_archive_manager(config, &download_manager, &loop_)?
         };
@@ -149,13 +180,26 @@ impl ArchiveCommand {
             self.inner.require_composer()?.get_package().clone_box()
         };
 
-        io.write_error(&format!("<info>Creating the archive into \"{}\".</info>", dest));
-        let package_path = archive_manager.archive(package.as_ref(), format, dest, file_name.as_deref(), ignore_filters)?;
+        io.write_error(&format!(
+            "<info>Creating the archive into \"{}\".</info>",
+            dest
+        ));
+        let package_path = archive_manager.archive(
+            package.as_ref(),
+            format,
+            dest,
+            file_name.as_deref(),
+            ignore_filters,
+        )?;
         let fs = Filesystem::new();
         let short_path = fs.find_shortest_path(&Platform::get_cwd(), &package_path, true);
 
         io.write_error_no_newline("Created: ");
-        let display = if short_path.len() < package_path.len() { &short_path } else { &package_path };
+        let display = if short_path.len() < package_path.len() {
+            &short_path
+        } else {
+            &package_path
+        };
         io.write(display);
 
         Ok(0)
@@ -175,20 +219,33 @@ impl ArchiveCommand {
 
         if let Some(composer) = self.inner.try_composer() {
             let local_repo = composer.get_repository_manager().get_local_repository();
-            let mut repos: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> = vec![local_repo.clone_box()];
-            repos.extend(composer.get_repository_manager().get_repositories().iter().map(|r| r.clone_box()));
+            let mut repos: Vec<
+                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+            > = vec![local_repo.clone_box()];
+            repos.extend(
+                composer
+                    .get_repository_manager()
+                    .get_repositories()
+                    .iter()
+                    .map(|r| r.clone_box()),
+            );
             repo = CompositeRepository::new(repos);
             min_stability = composer.get_package().get_minimum_stability().to_string();
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io)?;
             let repo_names: Vec<String> = default_repos.iter().map(|r| r.get_repo_name()).collect();
-            io.write_error(&format!("No composer.json found in the current directory, searching packages from {}", repo_names.join(", ")));
+            io.write_error(&format!(
+                "No composer.json found in the current directory, searching packages from {}",
+                repo_names.join(", ")
+            ));
             repo = CompositeRepository::new(default_repos);
             min_stability = "stable".to_string();
         }
 
         if let Some(version_str) = &version {
-            if let Some(matches) = Preg::match_strict_groups(r"{@(stable|RC|beta|alpha|dev)$}i", version_str) {
+            if let Some(matches) =
+                Preg::match_strict_groups(r"{@(stable|RC|beta|alpha|dev)$}i", version_str)
+            {
                 min_stability = VersionParser::normalize_stability(&matches[1]);
                 let full_match_len = matches[0].len();
                 version = Some(version_str[..version_str.len() - full_match_len].to_string());
@@ -203,33 +260,60 @@ impl ArchiveCommand {
 
         let package = if packages.len() > 1 {
             let version_selector = VersionSelector::new(&repo_set);
-            let best = version_selector.find_best_candidate(&package_name.to_lowercase(), version.as_deref(), &min_stability);
+            let best = version_selector.find_best_candidate(
+                &package_name.to_lowercase(),
+                version.as_deref(),
+                &min_stability,
+            );
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
-            io.write_error(&format!("<info>Found multiple matches, selected {}.</info>", p.get_pretty_string()));
+            io.write_error(&format!(
+                "<info>Found multiple matches, selected {}.</info>",
+                p.get_pretty_string()
+            ));
             // alternatives message omitted for brevity (already logged via p being selected)
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
             let p = packages.into_iter().next().unwrap();
-            io.write_error(&format!("<info>Found an exact match {}.</info>", p.get_pretty_string()));
+            io.write_error(&format!(
+                "<info>Found an exact match {}.</info>",
+                p.get_pretty_string()
+            ));
             p
         } else {
-            io.write_error(&format!("<error>Could not find a package matching {}.</error>", package_name));
+            io.write_error(&format!(
+                "<error>Could not find a package matching {}.</error>",
+                package_name
+            ));
             return Ok(None);
         };
 
-        if (package.as_any() as &dyn Any).downcast_ref::<dyn CompletePackageInterface>().is_none() {
+        if (package.as_any() as &dyn Any)
+            .downcast_ref::<dyn CompletePackageInterface>()
+            .is_none()
+        {
             return Err(LogicException {
-                message: format!("Expected a CompletePackageInterface instance but found {}", get_debug_type(package.as_php_mixed())),
+                message: format!(
+                    "Expected a CompletePackageInterface instance but found {}",
+                    get_debug_type(package.as_php_mixed())
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
-        if (package.as_any() as &dyn Any).downcast_ref::<BasePackage>().is_none() {
+        if (package.as_any() as &dyn Any)
+            .downcast_ref::<BasePackage>()
+            .is_none()
+        {
             return Err(LogicException {
-                message: format!("Expected a BasePackage instance but found {}", get_debug_type(package.as_php_mixed())),
+                message: format!(
+                    "Expected a BasePackage instance but found {}",
+                    get_debug_type(package.as_php_mixed())
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         Ok(Some(package.into_complete()))

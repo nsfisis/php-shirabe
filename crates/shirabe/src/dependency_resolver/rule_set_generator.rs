@@ -12,8 +12,8 @@ use crate::dependency_resolver::policy_interface::PolicyInterface;
 use crate::dependency_resolver::pool::Pool;
 use crate::dependency_resolver::request::Request;
 use crate::dependency_resolver::rule::Rule;
-use crate::dependency_resolver::rule2_literals::Rule2Literals;
 use crate::dependency_resolver::rule_set::RuleSet;
+use crate::dependency_resolver::rule2_literals::Rule2Literals;
 use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
@@ -65,7 +65,11 @@ impl RuleSetGenerator {
             literals.push(provider.get_id());
         }
 
-        Some(GenericRule::new(literals, PhpMixed::Int(reason), reason_data))
+        Some(GenericRule::new(
+            literals,
+            PhpMixed::Int(reason),
+            reason_data,
+        ))
     }
 
     /// Creates a rule to install at least one of a set of packages.
@@ -126,7 +130,9 @@ impl RuleSetGenerator {
                 reason_data,
             ))
         } else {
-            Rule::from(MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap())
+            Rule::from(
+                MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap(),
+            )
         }
     }
 
@@ -202,8 +208,8 @@ impl RuleSetGenerator {
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
                 } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
-                    .downcast_ref::<IgnoreListPlatformRequirementFilter>()
-                {
+                    .downcast_ref::<IgnoreListPlatformRequirementFilter>(
+                ) {
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, true)
                         .unwrap_or(constraint);
@@ -230,11 +236,8 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let packages: Vec<Box<dyn PackageInterface>> = self
-            .added_map
-            .values()
-            .map(|p| p.clone_box())
-            .collect();
+        let packages: Vec<Box<dyn PackageInterface>> =
+            self.added_map.values().map(|p| p.clone_box()).collect();
 
         for package in &packages {
             for link in package.get_conflicts().values() {
@@ -247,8 +250,8 @@ impl RuleSetGenerator {
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
                 } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
-                    .downcast_ref::<IgnoreListPlatformRequirementFilter>()
-                {
+                    .downcast_ref::<IgnoreListPlatformRequirementFilter>(
+                ) {
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, false)
                         .unwrap_or(constraint);
@@ -286,11 +289,8 @@ impl RuleSetGenerator {
         for (name, packages) in names_packages {
             if packages.len() > 1 {
                 let reason = Rule::RULE_PACKAGE_SAME_NAME;
-                let rule = self.create_multi_conflict_rule(
-                    &packages,
-                    reason,
-                    PhpMixed::String(name),
-                );
+                let rule =
+                    self.create_multi_conflict_rule(&packages, reason, PhpMixed::String(name));
                 self.add_rule(RuleSet::TYPE_PACKAGE, Some(rule));
             }
         }
@@ -309,15 +309,13 @@ impl RuleSetGenerator {
                 }
 
                 // otherwise, looks like a bug
-                return Err(anyhow::anyhow!(
-                    shirabe_php_shim::LogicException {
-                        message: format!(
-                            "Fixed package {} was not added to solver pool.",
-                            package.get_pretty_string()
-                        ),
-                        code: 0,
-                    }
-                ));
+                return Err(anyhow::anyhow!(shirabe_php_shim::LogicException {
+                    message: format!(
+                        "Fixed package {} was not added to solver pool.",
+                        package.get_pretty_string()
+                    ),
+                    code: 0,
+                }));
             }
 
             self.add_rules_for_package(package.clone_box(), platform_requirement_filter);
@@ -340,8 +338,8 @@ impl RuleSetGenerator {
             if platform_requirement_filter.is_ignored(package_name) {
                 continue;
             } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
-                .downcast_ref::<IgnoreListPlatformRequirementFilter>()
-            {
+                .downcast_ref::<IgnoreListPlatformRequirementFilter>(
+            ) {
                 constraint = ignore_list_filter
                     .filter_constraint(package_name, constraint, true)
                     .unwrap_or(constraint);
@@ -406,8 +404,8 @@ impl RuleSetGenerator {
         request: &Request,
         platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
     ) -> anyhow::Result<RuleSet> {
-        let platform_requirement_filter =
-            platform_requirement_filter.unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);
+        let platform_requirement_filter = platform_requirement_filter
+            .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);
 
         self.add_rules_for_request(request, &*platform_requirement_filter)?;
 

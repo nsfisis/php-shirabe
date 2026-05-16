@@ -11,8 +11,8 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::console::terminal::Terminal;
 use shirabe_php_shim::{
-    count, explode, in_array, is_string, max, InvalidArgumentException, LogicException, PhpMixed,
-    RuntimeException, UnexpectedValueException,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
+    count, explode, in_array, is_string, max,
 };
 
 use crate::advisory::audit_config::AuditConfig;
@@ -71,7 +71,9 @@ impl BaseCommand {
         disable_scripts: Option<bool>,
     ) -> Result<Option<Composer>> {
         if required {
-            return Ok(Some(self.require_composer(disable_plugins, disable_scripts)?));
+            return Ok(Some(
+                self.require_composer(disable_plugins, disable_scripts)?,
+            ));
         }
 
         Ok(self.try_composer(disable_plugins, disable_scripts))
@@ -267,8 +269,14 @@ impl BaseCommand {
             ("COMPOSER_PREFER_LOWEST", vec!["prefer-lowest"]),
             ("COMPOSER_MINIMAL_CHANGES", vec!["minimal-changes"]),
             ("COMPOSER_WITH_DEPENDENCIES", vec!["with-dependencies"]),
-            ("COMPOSER_WITH_ALL_DEPENDENCIES", vec!["with-all-dependencies"]),
-            ("COMPOSER_NO_SECURITY_BLOCKING", vec!["no-security-blocking"]),
+            (
+                "COMPOSER_WITH_ALL_DEPENDENCIES",
+                vec!["with-all-dependencies"],
+            ),
+            (
+                "COMPOSER_NO_SECURITY_BLOCKING",
+                vec!["no-security-blocking"],
+            ),
         ]
         .into_iter()
         .collect();
@@ -285,7 +293,10 @@ impl BaseCommand {
         }
 
         if true == input.has_option("ignore-platform-reqs") {
-            if !input.get_option("ignore-platform-reqs").as_bool().unwrap_or(false)
+            if !input
+                .get_option("ignore-platform-reqs")
+                .as_bool()
+                .unwrap_or(false)
                 && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
                     .as_bool()
                     .unwrap_or(false)
@@ -304,7 +315,10 @@ impl BaseCommand {
                     .unwrap_or(false))
         {
             let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
-            let ignore_str = ignore_platform_req_env.as_string().unwrap_or("").to_string();
+            let ignore_str = ignore_platform_req_env
+                .as_string()
+                .unwrap_or("")
+                .to_string();
             if 0 == count(&input.get_option("ignore-platform-req"))
                 && is_string(&ignore_platform_req_env)
                 && "" != ignore_str
@@ -385,9 +399,7 @@ impl BaseCommand {
             return Ok((prefer_source, prefer_dist));
         }
 
-        if input.has_option("prefer-install")
-            && is_string(&input.get_option("prefer-install"))
-        {
+        if input.has_option("prefer-install") && is_string(&input.get_option("prefer-install")) {
             if input.get_option("prefer-source").as_bool().unwrap_or(false) {
                 return Err(InvalidArgumentException {
                     message: "--prefer-source can not be used together with --prefer-install"
@@ -450,9 +462,7 @@ impl BaseCommand {
         &self,
         input: &dyn InputInterface,
     ) -> Result<Box<dyn PlatformRequirementFilterInterface>> {
-        if !input.has_option("ignore-platform-reqs")
-            || !input.has_option("ignore-platform-req")
-        {
+        if !input.has_option("ignore-platform-reqs") || !input.has_option("ignore-platform-req") {
             return Err(LogicException {
                 message:
                     "Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
@@ -462,7 +472,12 @@ impl BaseCommand {
             .into());
         }
 
-        if true == input.get_option("ignore-platform-reqs").as_bool().unwrap_or(false) {
+        if true
+            == input
+                .get_option("ignore-platform-reqs")
+                .as_bool()
+                .unwrap_or(false)
+        {
             return Ok(PlatformRequirementFilterFactory::ignore_all());
         }
 
@@ -541,11 +556,7 @@ impl BaseCommand {
     /// @internal
     /// @param 'format'|'audit-format' $optName
     /// @return Auditor::FORMAT_*
-    pub fn get_audit_format(
-        &self,
-        input: &dyn InputInterface,
-        opt_name: &str,
-    ) -> Result<String> {
+    pub fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String> {
         if !input.has_option(opt_name) {
             return Err(LogicException {
                 message: format!(

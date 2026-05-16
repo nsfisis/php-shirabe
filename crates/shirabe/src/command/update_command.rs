@@ -7,8 +7,8 @@ use shirabe_external_packages::symfony::component::console::helper::table::Table
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
-    array_filter, array_intersect, array_keys, array_merge, array_search, count, empty, in_array,
-    sprintf, strtolower, InvalidArgumentException, PhpMixed, RuntimeException,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
+    array_keys, array_merge, array_search, count, empty, in_array, sprintf, strtolower,
 };
 use shirabe_semver::constraint::multi_constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
@@ -20,9 +20,7 @@ use crate::command::completion_trait::CompletionTrait;
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
-use crate::dependency_resolver::request::{
-    self, Request, UpdateAllowTransitiveDeps,
-};
+use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
 use crate::installer::Installer;
 use crate::io::io_interface::IOInterface;
 use crate::package::base_package::BasePackage;
@@ -167,10 +165,10 @@ impl UpdateCommand {
 
         // extract --with shorthands from the allowlist
         if packages.len() > 0 {
-            let allowlist_packages_with_requirements: Vec<String> = array_filter(
-                &packages,
-                |pkg: &String| -> bool { Preg::is_match(r"{\S+[ =:]\S+}", pkg) },
-            );
+            let allowlist_packages_with_requirements: Vec<String> =
+                array_filter(&packages, |pkg: &String| -> bool {
+                    Preg::is_match(r"{\S+[ =:]\S+}", pkg)
+                });
             for (package, constraint) in self
                 .inner
                 .format_requirements(allowlist_packages_with_requirements.clone())
@@ -267,9 +265,15 @@ impl UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser.parse_constraints(&format!("~{}", matches.get(1).cloned().unwrap_or_default()))?;
+                let constraint = parser.parse_constraints(&format!(
+                    "~{}",
+                    matches.get(1).cloned().unwrap_or_default()
+                ))?;
                 if temporary_constraints.contains_key(package.get_name()) {
-                    let existing = temporary_constraints.get(package.get_name()).cloned().unwrap();
+                    let existing = temporary_constraints
+                        .get(package.get_name())
+                        .cloned()
+                        .unwrap();
                     temporary_constraints.insert(
                         package.get_name().to_string(),
                         // TODO(phase-b): MultiConstraint::create signature
@@ -351,22 +355,38 @@ impl UpdateCommand {
         let mut install = Installer::create(io, &composer);
 
         let config = composer.get_config();
-        let (prefer_source, prefer_dist) =
-            self.inner.get_preferred_install_options(config, input, false);
+        let (prefer_source, prefer_dist) = self
+            .inner
+            .get_preferred_install_options(config, input, false);
 
-        let optimize = input.get_option("optimize-autoloader").as_bool().unwrap_or(false)
+        let optimize = input
+            .get_option("optimize-autoloader")
+            .as_bool()
+            .unwrap_or(false)
             || config.get("optimize-autoloader").as_bool().unwrap_or(false);
         let authoritative = input
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
-            || config.get("classmap-authoritative").as_bool().unwrap_or(false);
+            || config
+                .get("classmap-authoritative")
+                .as_bool()
+                .unwrap_or(false);
         let apcu_prefix = input.get_option("apcu-autoloader-prefix");
         let apcu = !matches!(apcu_prefix, PhpMixed::Null)
-            || input.get_option("apcu-autoloader").as_bool().unwrap_or(false)
+            || input
+                .get_option("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false)
             || config.get("apcu-autoloader").as_bool().unwrap_or(false);
-        let minimal_changes = input.get_option("minimal-changes").as_bool().unwrap_or(false)
-            || config.get("update-with-minimal-changes").as_bool().unwrap_or(false);
+        let minimal_changes = input
+            .get_option("minimal-changes")
+            .as_bool()
+            .unwrap_or(false)
+            || config
+                .get("update-with-minimal-changes")
+                .as_bool()
+                .unwrap_or(false);
 
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if input
@@ -404,7 +424,10 @@ impl UpdateCommand {
             .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
             .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
             .set_temporary_constraints(temporary_constraints)
-            .set_audit_config(self.inner.create_audit_config(composer.get_config(), input)?)
+            .set_audit_config(
+                self.inner
+                    .create_audit_config(composer.get_config(), input)?,
+            )
             .set_minimal_update(minimal_changes);
 
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {
@@ -490,9 +513,15 @@ impl UpdateCommand {
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
         let installed_packages = if composer.get_locker().is_locked() {
-            composer.get_locker().get_locked_repository(true)?.get_packages()
+            composer
+                .get_locker()
+                .get_locked_repository(true)?
+                .get_packages()
         } else {
-            composer.get_repository_manager().get_local_repository().get_packages()
+            composer
+                .get_repository_manager()
+                .get_local_repository()
+                .get_packages()
         };
         let version_selector = self.create_version_selector(composer);
         for package in &installed_packages {
@@ -502,7 +531,8 @@ impl UpdateCommand {
                 }
             }
             let current_version = package.get_pretty_version();
-            let constraint = todo!("requires[package.get_name()].get_pretty_constraint() if present");
+            let constraint =
+                todo!("requires[package.get_name()].get_pretty_constraint() if present");
             let stability = todo!(
                 "if stabilityFlags[package_name] use array_search(BasePackage::STABILITIES) else minimum_stability"
             );
@@ -579,18 +609,16 @@ impl UpdateCommand {
 
     fn create_version_selector(&self, composer: &Composer) -> VersionSelector {
         let mut repository_set = RepositorySet::new();
-        repository_set.add_repository(Box::new(CompositeRepository::new(
-            array_filter(
-                &composer.get_repository_manager().get_repositories(),
-                |repository: &Box<dyn RepositoryInterface>| -> bool {
-                    // PHP: !$repository instanceof PlatformRepository
-                    repository
-                        .as_any()
-                        .downcast_ref::<PlatformRepository>()
-                        .is_none()
-                },
-            ),
-        )));
+        repository_set.add_repository(Box::new(CompositeRepository::new(array_filter(
+            &composer.get_repository_manager().get_repositories(),
+            |repository: &Box<dyn RepositoryInterface>| -> bool {
+                // PHP: !$repository instanceof PlatformRepository
+                repository
+                    .as_any()
+                    .downcast_ref::<PlatformRepository>()
+                    .is_none()
+            },
+        ))));
 
         VersionSelector::new(repository_set)
     }

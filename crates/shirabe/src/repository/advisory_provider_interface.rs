@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
 
-use indexmap::IndexMap;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
 use crate::advisory::security_advisory::SecurityAdvisory;
+use indexmap::IndexMap;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 #[derive(Debug)]
 pub enum PartialOrSecurityAdvisory {
@@ -20,5 +20,9 @@ pub struct SecurityAdvisoryResult {
 pub trait AdvisoryProviderInterface {
     fn has_security_advisories(&self) -> bool;
 
-    fn get_security_advisories(&self, package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>, allow_partial_advisories: bool) -> anyhow::Result<SecurityAdvisoryResult>;
+    fn get_security_advisories(
+        &self,
+        package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        allow_partial_advisories: bool,
+    ) -> anyhow::Result<SecurityAdvisoryResult>;
 }

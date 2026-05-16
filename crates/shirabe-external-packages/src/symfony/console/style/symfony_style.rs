@@ -1,6 +1,6 @@
-use shirabe_php_shim::PhpMixed;
-use crate::symfony::console::output::output_interface::OutputInterface;
 use crate::symfony::console::input::input_interface::InputInterface;
+use crate::symfony::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct SymfonyStyle;
@@ -50,11 +50,20 @@ impl SymfonyStyle {
         todo!()
     }
 
-    pub fn ask(&mut self, question: &str, default: Option<&str>, validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>) -> PhpMixed {
+    pub fn ask(
+        &mut self,
+        question: &str,
+        default: Option<&str>,
+        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+    ) -> PhpMixed {
         todo!()
     }
 
-    pub fn ask_hidden(&mut self, question: &str, validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>) -> PhpMixed {
+    pub fn ask_hidden(
+        &mut self,
+        question: &str,
+        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+    ) -> PhpMixed {
         todo!()
     }
 
@@ -62,7 +71,12 @@ impl SymfonyStyle {
         todo!()
     }
 
-    pub fn choice(&mut self, question: &str, choices: Vec<PhpMixed>, default: Option<PhpMixed>) -> PhpMixed {
+    pub fn choice(
+        &mut self,
+        question: &str,
+        choices: Vec<PhpMixed>,
+        default: Option<PhpMixed>,
+    ) -> PhpMixed {
         todo!()
     }
 

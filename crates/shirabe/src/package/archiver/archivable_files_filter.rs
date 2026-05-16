@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFilter.php
 
-use std::path::PathBuf;
 use shirabe_php_shim::PharData;
+use std::path::PathBuf;
 
 pub struct ArchivableFilesFilter {
     inner: Box<dyn Iterator<Item = PathBuf>>,

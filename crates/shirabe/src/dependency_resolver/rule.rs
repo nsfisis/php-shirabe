@@ -5,8 +5,8 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    abs, array_filter, array_keys, array_shift, array_values, implode, is_object, LogicException,
-    PhpMixed,
+    LogicException, PhpMixed, abs, array_filter, array_keys, array_shift, array_values, implode,
+    is_object,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -156,7 +156,9 @@ impl Rule {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
                             }
-                            if !link.get_constraint().matches(&Constraint::new("=", p.get_version()))
+                            if !link
+                                .get_constraint()
+                                .matches(&Constraint::new("=", p.get_version()))
                             {
                                 return true;
                             }
@@ -173,7 +175,11 @@ impl Rule {
         }
 
         if self.get_reason() == Self::RULE_ROOT_REQUIRE {
-            if let ReasonData::RootRequire { package_name, constraint } = self.get_reason_data() {
+            if let ReasonData::RootRequire {
+                package_name,
+                constraint,
+            } = self.get_reason_data()
+            {
                 if PlatformRepository::is_platform_package(package_name) {
                     return false;
                 }
@@ -254,9 +260,10 @@ impl Rule {
                 let reason_data = self.get_reason_data();
                 let (package_name, constraint): (&str, &dyn ConstraintInterface) = match reason_data
                 {
-                    ReasonData::RootRequire { package_name, constraint } => {
-                        (package_name.as_str(), constraint.as_ref())
-                    }
+                    ReasonData::RootRequire {
+                        package_name,
+                        constraint,
+                    } => (package_name.as_str(), constraint.as_ref()),
                     _ => return String::new(),
                 };
 
@@ -273,7 +280,9 @@ impl Rule {
                 let packages_non_alias: Vec<Box<BasePackage>> = packages
                     .iter()
                     .filter(|p| {
-                        (p.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_none()
+                        (p.as_any() as &dyn Any)
+                            .downcast_ref::<AliasPackage>()
+                            .is_none()
                     })
                     .map(|p| p.clone_box())
                     .collect();
@@ -293,7 +302,13 @@ impl Rule {
                     "Root composer.json requires {} {} -> satisfiable by {}.",
                     package_name,
                     constraint.get_pretty_string(),
-                    self.format_packages_unique(pool, packages, is_verbose, Some(constraint), false),
+                    self.format_packages_unique(
+                        pool,
+                        packages,
+                        is_verbose,
+                        Some(constraint),
+                        false
+                    ),
                 )
             }
 
@@ -335,8 +350,11 @@ impl Rule {
                 // swap literals if they are not in the right order with package2 being the conflicter
                 if link.get_source() == package1.get_name() {
                     std::mem::swap(&mut package1, &mut package2);
-                    conflict_target =
-                        format!("{} {}", package1.get_pretty_name(), link.get_pretty_constraint().unwrap_or(""));
+                    conflict_target = format!(
+                        "{} {}",
+                        package1.get_pretty_name(),
+                        link.get_pretty_constraint().unwrap_or("")
+                    );
                 }
 
                 // if the conflict is not directly against the package but something it provides/replaces,
@@ -347,14 +365,16 @@ impl Rule {
                     for provide in package1.get_provides().values() {
                         if provide.get_target() == link.get_target() {
                             provide_type = Some("provides");
-                            provided = Some(provide.get_pretty_constraint().unwrap_or("").to_string());
+                            provided =
+                                Some(provide.get_pretty_constraint().unwrap_or("").to_string());
                             break;
                         }
                     }
                     for replace in package1.get_replaces().values() {
                         if replace.get_target() == link.get_target() {
                             provide_type = Some("replaces");
-                            provided = Some(replace.get_pretty_constraint().unwrap_or("").to_string());
+                            provided =
+                                Some(replace.get_pretty_constraint().unwrap_or("").to_string());
                             break;
                         }
                     }
@@ -371,7 +391,11 @@ impl Rule {
                     }
                 }
 
-                format!("{} conflicts with {}.", package2.get_pretty_string(), conflict_target)
+                format!(
+                    "{} conflicts with {}.",
+                    package2.get_pretty_string(),
+                    conflict_target
+                )
             }
 
             r if r == Self::RULE_PACKAGE_REQUIRES => {
@@ -488,14 +512,18 @@ impl Rule {
 
                     return format!(
                         "Only one of these can be installed: {}. {}",
-                        self.format_packages_unique_from_literals(pool, &literals, is_verbose, None, true),
+                        self.format_packages_unique_from_literals(
+                            pool, &literals, is_verbose, None, true
+                        ),
                         reason,
                     );
                 }
 
                 format!(
                     "You can only install one version of a package, so only one of these can be installed: {}.",
-                    self.format_packages_unique_from_literals(pool, &literals, is_verbose, None, true),
+                    self.format_packages_unique_from_literals(
+                        pool, &literals, is_verbose, None, true
+                    ),
                 )
             }
             r if r == Self::RULE_LEARNED => {
@@ -512,7 +540,11 @@ impl Rule {
                         let group = if installed_map.contains_key(&package.id) {
                             if *literal > 0 { "keep" } else { "remove" }
                         } else {
-                            if *literal > 0 { "install" } else { "don't install" }
+                            if *literal > 0 {
+                                "install"
+                            } else {
+                                "don't install"
+                            }
                         };
 
                         groups
@@ -604,7 +636,13 @@ impl Rule {
             packages.push(package);
         }
 
-        Problem::get_package_list(packages, is_verbose, pool, constraint, use_removed_version_group)
+        Problem::get_package_list(
+            packages,
+            is_verbose,
+            pool,
+            constraint,
+            use_removed_version_group,
+        )
     }
 
     /// Helper for cases where literals come as int IDs (PHP supports both via union).
@@ -620,13 +658,17 @@ impl Rule {
         for literal in literals {
             packages.push(pool.literal_to_package(*literal).clone_box());
         }
-        Problem::get_package_list(packages, is_verbose, pool, constraint, use_removed_version_group)
+        Problem::get_package_list(
+            packages,
+            is_verbose,
+            pool,
+            constraint,
+            use_removed_version_group,
+        )
     }
 
     fn deduplicate_default_branch_alias(&self, package: Box<BasePackage>) -> Box<BasePackage> {
-        if let Some(alias_pkg) =
-            (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-        {
+        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                 return alias_pkg.get_alias_of().clone_box();
             }

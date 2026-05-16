@@ -6,8 +6,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    empty, implode, parse_url, parse_url_all, stripos, strpos, trim, LogicException, PhpMixed,
-    RuntimeException, PHP_URL_HOST,
+    LogicException, PHP_URL_HOST, PhpMixed, RuntimeException, empty, implode, parse_url,
+    parse_url_all, stripos, strpos, trim,
 };
 
 use crate::config::Config;
@@ -148,17 +148,16 @@ impl Svn {
         };
         // TODO(phase-b): pass handler callback to process.execute
         let mut handler_output = String::new();
-        let status = self.process.execute(&command, &mut handler_output, cwd.map(String::from));
+        let status = self
+            .process
+            .execute(&command, &mut handler_output, cwd.map(String::from));
         if 0 == status {
             return Ok(output);
         }
 
         let error_output = self.process.get_error_output();
         let full_output = trim(
-            &implode(
-                "\n",
-                &[output.clone().unwrap_or_default(), error_output],
-            ),
+            &implode("\n", &[output.clone().unwrap_or_default(), error_output]),
             None,
         );
 
@@ -425,10 +424,9 @@ impl Svn {
                 None,
             ) {
                 // TODO(phase-b): Preg::is_match with captures should populate $match
-                if let Ok(Some(matches)) = Preg::is_match_with_indexed_captures(
-                    r"{(\d+(?:\.\d+)+)}",
-                    &output,
-                ) {
+                if let Ok(Some(matches)) =
+                    Preg::is_match_with_indexed_captures(r"{(\d+(?:\.\d+)+)}", &output)
+                {
                     *cached = Some(matches.get(1).cloned().unwrap_or_default());
                 }
             }
@@ -437,4 +435,3 @@ impl Svn {
         cached.clone()
     }
 }
-

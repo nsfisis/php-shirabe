@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::installed_repository::InstalledRepository;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {
@@ -48,7 +48,12 @@ impl SuggestedPackagesReporter {
         self
     }
 
-    pub fn output(&self, mode: i64, installed_repo: Option<&InstalledRepository>, only_dependents_of: Option<&dyn PackageInterface>) {
+    pub fn output(
+        &self,
+        mode: i64,
+        installed_repo: Option<&InstalledRepository>,
+        only_dependents_of: Option<&dyn PackageInterface>,
+    ) {
         let suggested_packages = self.get_filtered_suggestions(installed_repo, only_dependents_of);
 
         let mut suggesters: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
@@ -78,7 +83,8 @@ impl SuggestedPackagesReporter {
         // Grouped by package
         if mode & Self::MODE_BY_PACKAGE != 0 {
             for (suggester, suggestions) in &suggesters {
-                self.io.write(&format!("<comment>{}</comment> suggests:", suggester));
+                self.io
+                    .write(&format!("<comment>{}</comment> suggests:", suggester));
 
                 for (suggestion, reason) in suggestions {
                     self.io.write(&format!(
@@ -102,7 +108,10 @@ impl SuggestedPackagesReporter {
                 self.io.write(&"-".repeat(78));
             }
             for (suggestion, suggesters) in &suggested {
-                self.io.write(&format!("<comment>{}</comment> is suggested by:", suggestion));
+                self.io.write(&format!(
+                    "<comment>{}</comment> is suggested by:",
+                    suggestion
+                ));
 
                 for (suggester, reason) in suggesters {
                     self.io.write(&format!(
@@ -128,7 +137,11 @@ impl SuggestedPackagesReporter {
         }
     }
 
-    pub fn output_minimalistic(&self, installed_repo: Option<&InstalledRepository>, only_dependents_of: Option<&dyn PackageInterface>) {
+    pub fn output_minimalistic(
+        &self,
+        installed_repo: Option<&InstalledRepository>,
+        only_dependents_of: Option<&dyn PackageInterface>,
+    ) {
         let suggested_packages = self.get_filtered_suggestions(installed_repo, only_dependents_of);
         if !suggested_packages.is_empty() {
             self.io.write_error(&format!(
@@ -138,7 +151,11 @@ impl SuggestedPackagesReporter {
         }
     }
 
-    fn get_filtered_suggestions(&self, installed_repo: Option<&InstalledRepository>, only_dependents_of: Option<&dyn PackageInterface>) -> Vec<IndexMap<String, String>> {
+    fn get_filtered_suggestions(
+        &self,
+        installed_repo: Option<&InstalledRepository>,
+        only_dependents_of: Option<&dyn PackageInterface>,
+    ) -> Vec<IndexMap<String, String>> {
         let suggested_packages = self.get_packages();
         let mut installed_names: Vec<String> = Vec::new();
         if installed_repo.is_some() && !suggested_packages.is_empty() {
@@ -149,7 +166,9 @@ impl SuggestedPackagesReporter {
 
         let mut source_filter: Vec<String> = Vec::new();
         if let Some(only_dependents_of) = only_dependents_of {
-            source_filter = only_dependents_of.get_requires().values()
+            source_filter = only_dependents_of
+                .get_requires()
+                .values()
                 .chain(only_dependents_of.get_dev_requires().values())
                 .map(|link| link.get_target().to_string())
                 .collect();
@@ -171,16 +190,10 @@ impl SuggestedPackagesReporter {
     }
 
     fn escape_output(&self, string: &str) -> String {
-        OutputFormatter::escape(
-            &self.remove_control_characters(string)
-        )
+        OutputFormatter::escape(&self.remove_control_characters(string))
     }
 
     fn remove_control_characters(&self, string: &str) -> String {
-        Preg::replace(
-            "/[[:cntrl:]]/",
-            "",
-            &string.replace('\n', " "),
-        )
+        Preg::replace("/[[:cntrl:]]/", "", &string.replace('\n', " "))
     }
 }

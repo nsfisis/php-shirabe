@@ -3,8 +3,8 @@
 use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    base64_decode, openssl_get_publickey, openssl_pkey_get_details, openssl_x509_parse,
-    preg_quote, substr_count, PhpMixed, RuntimeException,
+    PhpMixed, RuntimeException, base64_decode, openssl_get_publickey, openssl_pkey_get_details,
+    openssl_x509_parse, preg_quote, substr_count,
 };
 
 /// @deprecated Use composer/ca-bundle and composer/composer 2.2 if you still need PHP 5 compatibility
@@ -53,14 +53,16 @@ impl TlsHelper {
             }
         };
 
-        let common_name = info.get("subject")
+        let common_name = info
+            .get("subject")
             .and_then(|v| v.as_array())
             .and_then(|subj| subj.get("commonName"))
             .and_then(|cn| cn.as_string())
             .map(|s| s.to_lowercase())?;
 
         let mut subject_alt_names = vec![];
-        if let Some(san_value) = info.get("extensions")
+        if let Some(san_value) = info
+            .get("extensions")
             .and_then(|v| v.as_array())
             .and_then(|ext| ext.get("subjectAltName"))
             .and_then(|v| v.as_string())
@@ -126,7 +128,8 @@ impl TlsHelper {
             message: "Failed to retrieve public key details".to_string(),
             code: 0,
         })?;
-        let pubkeypem = pubkeydetails.get("key")
+        let pubkeypem = pubkeydetails
+            .get("key")
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
@@ -139,7 +142,10 @@ impl TlsHelper {
 
         let der = base64_decode(pemtrim).unwrap_or_default();
 
-        Ok(shirabe_php_shim::hash("sha1", &String::from_utf8_lossy(&der)))
+        Ok(shirabe_php_shim::hash(
+            "sha1",
+            &String::from_utf8_lossy(&der),
+        ))
     }
 
     pub fn is_openssl_parse_safe() -> bool {

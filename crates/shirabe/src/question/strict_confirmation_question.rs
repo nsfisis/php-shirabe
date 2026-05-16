@@ -4,7 +4,7 @@ use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::console::question::question::Question;
-use shirabe_php_shim::{empty, is_bool, PhpMixed};
+use shirabe_php_shim::{PhpMixed, empty, is_bool};
 
 pub struct StrictConfirmationQuestion {
     inner: Question,
@@ -62,7 +62,8 @@ impl StrictConfirmationQuestion {
                 return Err(InvalidArgumentException {
                     message: "Please answer yes, y, no, or n.".to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
             Ok(answer.clone())
         })

@@ -74,8 +74,13 @@ impl InstallCommand {
         }
 
         let args = input.get_argument("packages");
-        let args_vec: Vec<String> = args.as_list()
-            .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+        let args_vec: Vec<String> = args
+            .as_list()
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
         if !args_vec.is_empty() {
             io.write_error(&format!(
@@ -106,23 +111,43 @@ impl InstallCommand {
             vec![],
             vec![],
         );
-        composer.get_event_dispatcher().dispatch(command_event.get_name(), &command_event);
+        composer
+            .get_event_dispatcher()
+            .dispatch(command_event.get_name(), &command_event);
 
         let install = Installer::create(io, &composer);
 
         let config = composer.get_config();
-        let (prefer_source, prefer_dist) = self.inner.get_preferred_install_options(config, input)?;
+        let (prefer_source, prefer_dist) =
+            self.inner.get_preferred_install_options(config, input)?;
 
-        let optimize = input.get_option("optimize-autoloader").as_bool().unwrap_or(false)
+        let optimize = input
+            .get_option("optimize-autoloader")
+            .as_bool()
+            .unwrap_or(false)
             || config.get("optimize-autoloader").as_bool().unwrap_or(false);
-        let authoritative = input.get_option("classmap-authoritative").as_bool().unwrap_or(false)
-            || config.get("classmap-authoritative").as_bool().unwrap_or(false);
-        let apcu_prefix = input.get_option("apcu-autoloader-prefix").as_string_opt().map(|s| s.to_string());
+        let authoritative = input
+            .get_option("classmap-authoritative")
+            .as_bool()
+            .unwrap_or(false)
+            || config
+                .get("classmap-authoritative")
+                .as_bool()
+                .unwrap_or(false);
+        let apcu_prefix = input
+            .get_option("apcu-autoloader-prefix")
+            .as_string_opt()
+            .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
-            || input.get_option("apcu-autoloader").as_bool().unwrap_or(false)
+            || input
+                .get_option("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false)
             || config.get("apcu-autoloader").as_bool().unwrap_or(false);
 
-        composer.get_installation_manager().set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+        composer
+            .get_installation_manager()
+            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
         install
             .set_dry_run(input.get_option("dry-run").as_bool().unwrap_or(false))
@@ -136,7 +161,10 @@ impl InstallCommand {
             .set_class_map_authoritative(authoritative)
             .set_apcu_autoloader(apcu, apcu_prefix.as_deref())
             .set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input)?)
-            .set_audit_config(self.inner.create_audit_config(composer.get_config(), input)?)
+            .set_audit_config(
+                self.inner
+                    .create_audit_config(composer.get_config(), input)?,
+            )
             .set_error_on_audit(input.get_option("audit").as_bool().unwrap_or(false));
 
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {

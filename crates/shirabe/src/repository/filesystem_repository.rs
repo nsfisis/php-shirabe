@@ -6,10 +6,10 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_flip, dirname, file_get_contents, get_class, get_debug_type, in_array, is_array,
-    is_int, is_null, is_string, ksort, php_dir, r#eval, realpath, sort, sort_with_flags,
-    str_repeat, strtr, trim, usort, var_export, InvalidArgumentException, LogicException,
-    PhpMixed, Silencer, UnexpectedValueException, SORT_NATURAL,
+    InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL, Silencer,
+    UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
+    get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir, realpath, sort,
+    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
 };
 
 use crate::installed_versions::InstalledVersions;
@@ -141,12 +141,18 @@ impl FilesystemRepository {
         let mut loader = ArrayLoader::new(None, true);
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
-                let package = loader.load((**package_data).clone(), "Composer\\Package\\CompletePackage")?;
+                let package = loader.load(
+                    (**package_data).clone(),
+                    "Composer\\Package\\CompletePackage",
+                )?;
                 self.inner.add_package(package)?;
             }
         } else if let Some(packages_array) = packages.as_array() {
             for (_, package_data) in packages_array.iter() {
-                let package = loader.load((**package_data).clone(), "Composer\\Package\\CompletePackage")?;
+                let package = loader.load(
+                    (**package_data).clone(),
+                    "Composer\\Package\\CompletePackage",
+                )?;
                 self.inner.add_package(package)?;
             }
         }
@@ -179,9 +185,9 @@ impl FilesystemRepository {
         let repo_dir = dirname(self.file.get_path());
         self.filesystem.ensure_directory_exists(&repo_dir);
 
-        let repo_dir = self.filesystem.normalize_path(
-            &realpath(&repo_dir).unwrap_or_default(),
-        );
+        let repo_dir = self
+            .filesystem
+            .normalize_path(&realpath(&repo_dir).unwrap_or_default());
         let mut install_paths: IndexMap<String, Option<String>> = IndexMap::new();
 
         for package in self.inner.get_canonical_packages() {
@@ -190,13 +196,18 @@ impl FilesystemRepository {
             let mut install_path: Option<String> = None;
             if let Some(path_str) = &path {
                 if !path_str.is_empty() {
-                    let normalized_path = self.filesystem.normalize_path(
-                        &if self.filesystem.is_absolute_path(path_str) {
-                            path_str.clone()
-                        } else {
-                            format!("{}/{}", Platform::get_cwd(false).unwrap_or_default(), path_str)
-                        },
-                    );
+                    let normalized_path = self.filesystem.normalize_path(&if self
+                        .filesystem
+                        .is_absolute_path(path_str)
+                    {
+                        path_str.clone()
+                    } else {
+                        format!(
+                            "{}/{}",
+                            Platform::get_cwd(false).unwrap_or_default(),
+                            path_str
+                        )
+                    });
                     install_path = Some(self.filesystem.find_shortest_path(
                         &repo_dir,
                         &normalized_path,
@@ -215,7 +226,10 @@ impl FilesystemRepository {
             );
             if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
                 list.push(Box::new(PhpMixed::Array(
-                    pkg_array.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                    pkg_array
+                        .into_iter()
+                        .map(|(k, v)| (k, Box::new(v)))
+                        .collect(),
                 )));
             }
 
@@ -273,20 +287,19 @@ impl FilesystemRepository {
         )?;
 
         if self.dump_versions {
-            let versions =
-                self.generate_installed_versions(installation_manager, &install_paths, dev_mode, &repo_dir)?;
+            let versions = self.generate_installed_versions(
+                installation_manager,
+                &install_paths,
+                dev_mode,
+                &repo_dir,
+            )?;
 
             self.filesystem.file_put_contents_if_modified(
                 &format!("{}/installed.php", repo_dir),
-                &format!(
-                    "<?php return {};\n",
-                    self.dump_to_php_code(&versions, 0),
-                ),
+                &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0),),
             );
-            let installed_versions_class = file_get_contents(&format!(
-                "{}/../InstalledVersions.php",
-                php_dir(),
-            ));
+            let installed_versions_class =
+                file_get_contents(&format!("{}/../InstalledVersions.php", php_dir(),));
 
             // this normally should not happen but during upgrades of Composer when it is installed in the project it is a possibility
             if let Some(class_content) = installed_versions_class {
@@ -328,7 +341,7 @@ impl FilesystemRepository {
             let mixed = PhpMixed::String(data.clone());
             if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)) {
                 let replaced = Preg::replace(
-                    r"{=>\s*+__DIR__\s*+\.\s*+(['\"])}",
+                    r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#,
                     &format!(
                         "=> {} . $1",
                         var_export(&PhpMixed::String(dirname(path)), true),
@@ -391,10 +404,7 @@ impl FilesystemRepository {
             } else if key == "install_path" && is_string(value) {
                 let s = value.as_string().unwrap_or("").to_string();
                 if self.filesystem.is_absolute_path(&s) {
-                    lines.push_str(&format!(
-                        "{},\n",
-                        var_export(&PhpMixed::String(s), true),
-                    ));
+                    lines.push_str(&format!("{},\n", var_export(&PhpMixed::String(s), true),));
                 } else {
                     lines.push_str(&format!(
                         "__DIR__ . {},\n",
@@ -447,7 +457,9 @@ impl FilesystemRepository {
         let mut root_package = match &self.root_package {
             None => {
                 return Err(LogicException {
-                    message: "It should not be possible to dump packages if no root package is given".to_string(),
+                    message:
+                        "It should not be possible to dump packages if no root package is given"
+                            .to_string(),
                     code: 0,
                 }
                 .into());
@@ -460,8 +472,11 @@ impl FilesystemRepository {
         let mut current_root: Box<dyn RootPackageInterface> = root_package;
         // packages.push(current_root.clone_box());
 
-        while let Some(_alias) = (current_root.as_any() as &dyn Any).downcast_ref::<RootAliasPackage>() {
-            current_root = todo!("RootAliasPackage::get_alias_of() returning Box<dyn RootPackageInterface>");
+        while let Some(_alias) =
+            (current_root.as_any() as &dyn Any).downcast_ref::<RootAliasPackage>()
+        {
+            current_root =
+                todo!("RootAliasPackage::get_alias_of() returning Box<dyn RootPackageInterface>");
             // packages.push(current_root.clone_box());
         }
         let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -480,18 +495,19 @@ impl FilesystemRepository {
                 .collect(),
             ),
         );
-        versions.insert(
-            "versions".to_string(),
-            PhpMixed::Array(IndexMap::new()),
-        );
+        versions.insert("versions".to_string(), PhpMixed::Array(IndexMap::new()));
 
         // add real installed packages
         for package in &packages {
-            if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some() {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some()
+            {
                 continue;
             }
 
-            let dumped = self.dump_installed_package(&**package, install_paths, repo_dir, &dev_packages);
+            let dumped =
+                self.dump_installed_package(&**package, install_paths, repo_dir, &dev_packages);
             if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
                 versions_map.insert(
                     package.get_name().to_string(),
@@ -552,7 +568,10 @@ impl FilesystemRepository {
             };
             // TODO(phase-b): mutate nested versions['versions'][name]['aliases']
             todo!("append alias->getPrettyVersion() to versions['versions'][name]['aliases']");
-            if (package.as_any() as &dyn Any).downcast_ref::<dyn RootPackageInterface>().is_some() {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<dyn RootPackageInterface>()
+                .is_some()
+            {
                 // TODO(phase-b): same mutation on versions['root']['aliases']
                 todo!("append alias->getPrettyVersion() to versions['root']['aliases']");
             }
@@ -614,17 +633,16 @@ impl FilesystemRepository {
             };
         }
 
-        let install_path = if (package.as_any() as &dyn Any).downcast_ref::<dyn RootPackageInterface>().is_some() {
+        let install_path = if (package.as_any() as &dyn Any)
+            .downcast_ref::<dyn RootPackageInterface>()
+            .is_some()
+        {
             let to = self.filesystem.normalize_path(
-                &realpath(&Platform::get_cwd(false).unwrap_or_default())
-                    .unwrap_or_default(),
+                &realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
             );
             Some(self.filesystem.find_shortest_path(repo_dir, &to, true))
         } else {
-            install_paths
-                .get(package.get_name())
-                .cloned()
-                .flatten()
+            install_paths.get(package.get_name()).cloned().flatten()
         };
 
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -690,7 +708,9 @@ impl FilesystemRepository {
         );
         result.insert(
             "pretty_version".to_string(),
-            data.get("pretty_version").cloned().unwrap_or(PhpMixed::Null),
+            data.get("pretty_version")
+                .cloned()
+                .unwrap_or(PhpMixed::Null),
         );
         result.insert(
             "version".to_string(),
@@ -710,7 +730,9 @@ impl FilesystemRepository {
         );
         result.insert(
             "aliases".to_string(),
-            data.get("aliases").cloned().unwrap_or(PhpMixed::List(vec![])),
+            data.get("aliases")
+                .cloned()
+                .unwrap_or(PhpMixed::List(vec![])),
         );
         result.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
 

@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{dirname, is_dir, is_file, is_writable, PhpMixed, RuntimeException};
+use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -28,15 +28,29 @@ impl FossilDriver {
         self.check_fossil()?;
 
         // Ensure we are allowed to use this URL by config.
-        self.inner.config.prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
+        self.inner
+            .config
+            .prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
 
         // Only if url points to a locally accessible directory, assume it's the checkout directory.
         // Otherwise, it should be something fossil can clone from.
         if Filesystem::is_local_path(&self.inner.url) && is_dir(&self.inner.url) {
             self.checkout_dir = self.inner.url.clone();
         } else {
-            let cache_repo_dir = self.inner.config.get("cache-repo-dir").as_string().unwrap_or("").to_string();
-            let cache_vcs_dir = self.inner.config.get("cache-vcs-dir").as_string().unwrap_or("").to_string();
+            let cache_repo_dir = self
+                .inner
+                .config
+                .get("cache-repo-dir")
+                .as_string()
+                .unwrap_or("")
+                .to_string();
+            let cache_vcs_dir = self
+                .inner
+                .config
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or("")
+                .to_string();
             if !Cache::is_usable(&cache_repo_dir) || !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException {
                     message: "FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),

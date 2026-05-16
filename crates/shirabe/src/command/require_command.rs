@@ -7,10 +7,10 @@ use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
-    array_fill_keys, array_intersect, array_keys, array_map, array_merge, array_merge_recursive,
-    array_unique, count, empty, file_exists, file_get_contents, file_put_contents, filesize,
-    implode, is_writable, sprintf, strtolower, unlink, PhpMixed, RuntimeException,
-    UnexpectedValueException,
+    PhpMixed, RuntimeException, UnexpectedValueException, array_fill_keys, array_intersect,
+    array_keys, array_map, array_merge, array_merge_recursive, array_unique, count, empty,
+    file_exists, file_get_contents, file_put_contents, filesize, implode, is_writable, sprintf,
+    strtolower, unlink,
 };
 
 use crate::advisory::auditor::Auditor;
@@ -21,8 +21,8 @@ use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::dependency_resolver::request::Request;
 use crate::factory::Factory;
-use crate::installer::installer_events::InstallerEvents;
 use crate::installer::Installer;
+use crate::installer::installer_events::InstallerEvents;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::json::json_manipulator::JsonManipulator;
@@ -63,7 +63,8 @@ impl PackageDiscoveryTrait for RequireCommand {}
 
 impl RequireCommand {
     pub fn configure(&mut self) {
-        let suggest_available_package_incl_platform = self.suggest_available_package_incl_platform();
+        let suggest_available_package_incl_platform =
+            self.suggest_available_package_incl_platform();
         let suggest_prefer_install = self.suggest_prefer_install();
         self.inner
             .set_name("require")
@@ -137,7 +138,10 @@ impl RequireCommand {
         self.newly_created = !file_exists(&self.file);
         if self.newly_created && !file_put_contents(&self.file, "{\n}\n") {
             io.write_error(
-                PhpMixed::String(format!("<error>{} could not be created.</error>", self.file)),
+                PhpMixed::String(format!(
+                    "<error>{} could not be created.</error>",
+                    self.file
+                )),
                 true,
                 IOInterface::NORMAL,
             );
@@ -160,8 +164,8 @@ impl RequireCommand {
 
         self.json = Some(JsonFile::new(&self.file, None, None));
         self.lock = Factory::get_lock_file(&self.file);
-        self.composer_backup = file_get_contents(self.json.as_ref().unwrap().get_path())
-            .unwrap_or_default();
+        self.composer_backup =
+            file_get_contents(self.json.as_ref().unwrap().get_path()).unwrap_or_default();
         self.lock_backup = if file_exists(&self.lock) {
             file_get_contents(&self.lock)
         } else {
@@ -220,9 +224,7 @@ impl RequireCommand {
             };
 
             /// @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
-            if package_type != "project"
-                && !input.get_option("dev").as_bool().unwrap_or(false)
-            {
+            if package_type != "project" && !input.get_option("dev").as_bool().unwrap_or(false) {
                 io.write_error(
                     PhpMixed::String(
                         "<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>"
@@ -253,9 +255,9 @@ impl RequireCommand {
         let platform_overrides = composer.get_config().get("platform");
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepository::new(vec![], platform_overrides);
-        let mut combined: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> = vec![
-            Box::new(platform_repo.clone()),
-        ];
+        let mut combined: Vec<
+            Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+        > = vec![Box::new(platform_repo.clone())];
         for repo in repos {
             combined.push(repo);
         }
@@ -273,7 +275,11 @@ impl RequireCommand {
             input
                 .get_argument("packages")
                 .as_list()
-                .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default(),
             &platform_repo,
             &preferred_stability,
@@ -327,10 +333,8 @@ impl RequireCommand {
                 // TODO(phase-b): instanceof CompletePackageInterface downcast
                 let pkg_as_complete: Option<&dyn CompletePackageInterface> = None;
                 if let Some(pkg_complete) = pkg_as_complete {
-                    let lowered: Vec<String> = array_map(
-                        |s: &String| strtolower(s),
-                        &pkg_complete.get_keywords(),
-                    );
+                    let lowered: Vec<String> =
+                        array_map(|s: &String| strtolower(s), &pkg_complete.get_keywords());
                     let pkg_dev_tags: Vec<String> = array_intersect(&dev_tags, &lowered);
                     if (pkg_dev_tags.len() as i64) > 0 {
                         dev_packages.push(pkg_dev_tags);
@@ -340,8 +344,16 @@ impl RequireCommand {
             }
 
             if (dev_packages.len() as i64) == (requirements.len() as i64) {
-                let plural = if (requirements.len() as i64) > 1 { "s" } else { "" };
-                let plural2 = if (requirements.len() as i64) > 1 { "are" } else { "is" };
+                let plural = if (requirements.len() as i64) > 1 {
+                    "s"
+                } else {
+                    ""
+                };
+                let plural2 = if (requirements.len() as i64) > 1 {
+                    "are"
+                } else {
+                    "is"
+                };
                 let plural3 = if (requirements.len() as i64) > 1 {
                     "they are"
                 } else {
@@ -520,7 +532,11 @@ impl RequireCommand {
             PhpMixed::String(format!(
                 "<info>{} has been {}</info>",
                 self.file,
-                if self.newly_created { "created" } else { "updated" }
+                if self.newly_created {
+                    "created"
+                } else {
+                    "updated"
+                }
             )),
             true,
             IOInterface::NORMAL,
@@ -533,24 +549,24 @@ impl RequireCommand {
         composer.get_plugin_manager().deactivate_installed_plugins();
 
         // try/catch/finally
-        let do_update_result = self.do_update(input, output, io, &requirements, require_key, remove_key);
+        let do_update_result =
+            self.do_update(input, output, io, &requirements, require_key, remove_key);
         let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
 
         let result = match do_update_result {
             Ok(result) => {
-                let final_result =
-                    if result == 0 && (requirements_to_guess.len() as i64) > 0 {
-                        self.update_requirements_after_resolution(
-                            &requirements_to_guess,
-                            require_key,
-                            remove_key,
-                            sort_packages,
-                            dry_run,
-                            input.get_option("fixed").as_bool().unwrap_or(false),
-                        )?
-                    } else {
-                        result
-                    };
+                let final_result = if result == 0 && (requirements_to_guess.len() as i64) > 0 {
+                    self.update_requirements_after_resolution(
+                        &requirements_to_guess,
+                        require_key,
+                        remove_key,
+                        sort_packages,
+                        dry_run,
+                        input.get_option("fixed").as_bool().unwrap_or(false),
+                    )?
+                } else {
+                    result
+                };
                 Ok(final_result)
             }
             Err(e) => {
@@ -598,7 +614,10 @@ impl RequireCommand {
         let mut require: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut require_dev: IndexMap<String, PhpMixed> = IndexMap::new();
 
-        if let Some(r) = composer_definition.get("require").and_then(|v| v.as_array()) {
+        if let Some(r) = composer_definition
+            .get("require")
+            .and_then(|v| v.as_array())
+        {
             for (k, v) in r {
                 require.insert(k.clone(), (**v).clone());
             }
@@ -712,7 +731,10 @@ impl RequireCommand {
         }
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
-        let optimize = input.get_option("optimize-autoloader").as_bool().unwrap_or(false)
+        let optimize = input
+            .get_option("optimize-autoloader")
+            .as_bool()
+            .unwrap_or(false)
             || composer
                 .get_config()
                 .get("optimize-autoloader")
@@ -732,13 +754,19 @@ impl RequireCommand {
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
-            || input.get_option("apcu-autoloader").as_bool().unwrap_or(false)
+            || input
+                .get_option("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false)
             || composer
                 .get_config()
                 .get("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false);
-        let minimal_changes = input.get_option("minimal-changes").as_bool().unwrap_or(false)
+        let minimal_changes = input
+            .get_option("minimal-changes")
+            .as_bool()
+            .unwrap_or(false)
             || composer
                 .get_config()
                 .get("update-with-minimal-changes")
@@ -751,7 +779,10 @@ impl RequireCommand {
             .get_option("update-with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
-            || input.get_option("with-all-dependencies").as_bool().unwrap_or(false)
+            || input
+                .get_option("with-all-dependencies")
+                .as_bool()
+                .unwrap_or(false)
         {
             update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             flags += " --with-all-dependencies";
@@ -759,7 +790,10 @@ impl RequireCommand {
             .get_option("update-with-dependencies")
             .as_bool()
             .unwrap_or(false)
-            || input.get_option("with-dependencies").as_bool().unwrap_or(false)
+            || input
+                .get_option("with-dependencies")
+                .as_bool()
+                .unwrap_or(false)
         {
             update_allow_transitive_dependencies =
                 Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
@@ -781,12 +815,7 @@ impl RequireCommand {
             IOInterface::NORMAL,
         );
 
-        let command_event = CommandEvent::new(
-            PluginEvents::COMMAND,
-            "require",
-            input,
-            output,
-        );
+        let command_event = CommandEvent::new(PluginEvents::COMMAND, "require", input, output);
         composer
             .get_event_dispatcher()
             .dispatch(command_event.get_name(), &command_event);
@@ -813,19 +842,22 @@ impl RequireCommand {
             .set_update(true)
             .set_install(!input.get_option("no-install").as_bool().unwrap_or(false))
             .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)
-            .set_platform_requirement_filter(
-                self.inner.get_platform_requirement_filter(input)?,
-            )
+            .set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input)?)
             .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
             .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
-            .set_audit_config(self.inner.create_audit_config(composer.get_config(), input)?)
+            .set_audit_config(
+                self.inner
+                    .create_audit_config(composer.get_config(), input)?,
+            )
             .set_minimal_update(minimal_changes);
 
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
         if !self.first_require && composer.get_locker().is_locked() {
             install.set_update_allow_list(
-                array_keys(requirements).into_iter().collect::<Vec<String>>(),
+                array_keys(requirements)
+                    .into_iter()
+                    .collect::<Vec<String>>(),
             );
         }
 
@@ -887,8 +919,7 @@ impl RequireCommand {
             // TODO(phase-b): `$package instanceof AliasPackage` downcast
             let mut package_as_alias: Option<&AliasPackage> = None;
             while let Some(alias) = package_as_alias {
-                package = Some(Box::new(alias.get_alias_of().clone())
-                    as Box<dyn PackageInterface>);
+                package = Some(Box::new(alias.get_alias_of().clone()) as Box<dyn PackageInterface>);
                 package_as_alias = None;
             }
 
@@ -924,7 +955,10 @@ impl RequireCommand {
 
             if Preg::is_match(
                 r"{^dev-(?!main$|master$|trunk$|latest$)}",
-                requirements.get(package_name).map(|s| s.as_str()).unwrap_or(""),
+                requirements
+                    .get(package_name)
+                    .map(|s| s.as_str())
+                    .unwrap_or(""),
             )
             .unwrap_or(false)
             {
@@ -967,14 +1001,9 @@ impl RequireCommand {
                         for (package_name, flag) in &stability_flags_clone {
                             let entry = lock_data
                                 .entry("stability-flags".to_string())
-                                .or_insert_with(|| {
-                                    PhpMixed::Array(IndexMap::new())
-                                });
+                                .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                             if let PhpMixed::Array(m) = entry {
-                                m.insert(
-                                    package_name.clone(),
-                                    Box::new(PhpMixed::Int(*flag)),
-                                );
+                                m.insert(package_name.clone(), Box::new(PhpMixed::Int(*flag)));
                             }
                         }
 
@@ -1000,12 +1029,7 @@ impl RequireCommand {
             return;
         }
 
-        let mut composer_definition = self
-            .json
-            .as_ref()
-            .unwrap()
-            .read()
-            .unwrap_or_default();
+        let mut composer_definition = self.json.as_ref().unwrap().read().unwrap_or_default();
         for (package, version) in new {
             if let Some(section) = composer_definition
                 .entry(require_key.to_string())
@@ -1029,15 +1053,12 @@ impl RequireCommand {
                 composer_definition.shift_remove(remove_key);
             }
         }
-        self.json
-            .as_ref()
-            .unwrap()
-            .write(&PhpMixed::Array(
-                composer_definition
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ));
+        self.json.as_ref().unwrap().write(&PhpMixed::Array(
+            composer_definition
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v)))
+                .collect(),
+        ));
     }
 
     /// @param array<string, string> $new
@@ -1069,12 +1090,7 @@ impl RequireCommand {
         true
     }
 
-    pub(crate) fn interact(
-        &self,
-        _input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
-    ) {
-    }
+    pub(crate) fn interact(&self, _input: &dyn InputInterface, _output: &dyn OutputInterface) {}
 
     fn revert_composer_file(&mut self) {
         let io = self.inner.get_io();

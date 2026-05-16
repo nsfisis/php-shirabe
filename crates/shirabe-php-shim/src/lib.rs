@@ -194,7 +194,12 @@ pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
     todo!()
 }
 
-pub fn array_splice<T: Clone>(array: &mut Vec<T>, offset: usize, length: usize, replacement: &[T]) -> Vec<T> {
+pub fn array_splice<T: Clone>(
+    array: &mut Vec<T>,
+    offset: usize,
+    length: usize,
+    replacement: &[T],
+) -> Vec<T> {
     todo!()
 }
 
@@ -500,7 +505,11 @@ impl PharData {
         todo!()
     }
 
-    pub fn build_from_iterator(&self, iter: &mut dyn Iterator<Item = std::path::PathBuf>, base: &str) {
+    pub fn build_from_iterator(
+        &self,
+        iter: &mut dyn Iterator<Item = std::path::PathBuf>,
+        base: &str,
+    ) {
         todo!()
     }
 
@@ -687,7 +696,10 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
     todo!()
 }
 
-pub fn openssl_x509_parse(certificate: &str, short_names: bool) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn openssl_x509_parse(
+    certificate: &str,
+    short_names: bool,
+) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
@@ -736,9 +748,7 @@ pub fn spl_autoload_register(
     todo!()
 }
 
-pub fn spl_autoload_unregister(
-    callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>,
-) -> bool {
+pub fn spl_autoload_unregister(callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>) -> bool {
     let _ = callback;
     todo!()
 }
@@ -1129,11 +1139,7 @@ pub fn feof(stream: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn str_replace_array(
-    search: &[String],
-    replace: &[String],
-    subject: &str,
-) -> String {
+pub fn str_replace_array(search: &[String], replace: &[String], subject: &str) -> String {
     todo!()
 }
 
@@ -1160,7 +1166,11 @@ pub fn copy(source: &str, dest: &str) -> bool {
     todo!()
 }
 
-pub fn exec(command: &str, output: Option<&mut Vec<String>>, exit_code: Option<&mut i64>) -> Option<String> {
+pub fn exec(
+    command: &str,
+    output: Option<&mut Vec<String>>,
+    exit_code: Option<&mut i64>,
+) -> Option<String> {
     todo!()
 }
 
@@ -1168,7 +1178,12 @@ pub fn tempnam(dir: &str, prefix: &str) -> Option<String> {
     todo!()
 }
 
-pub fn openssl_verify(data: &str, signature: &[u8], pub_key_id: PhpMixed, algorithm: PhpMixed) -> i64 {
+pub fn openssl_verify(
+    data: &str,
+    signature: &[u8],
+    pub_key_id: PhpMixed,
+    algorithm: PhpMixed,
+) -> i64 {
     todo!()
 }
 
@@ -1219,11 +1234,13 @@ pub fn reset<T: Clone>(array: &[T]) -> Option<T> {
     todo!()
 }
 
-
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
 pub const PHP_VERSION_ID: i64 = 80100;
 
-pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
+pub fn array_intersect_key(
+    array1: &IndexMap<String, Box<PhpMixed>>,
+    array2: &IndexMap<String, Box<PhpMixed>>,
+) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
 
@@ -1239,7 +1256,10 @@ pub fn serialize(value: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn stream_context_create(options: &IndexMap<String, PhpMixed>, params: Option<&IndexMap<String, PhpMixed>>) -> PhpMixed {
+pub fn stream_context_create(
+    options: &IndexMap<String, PhpMixed>,
+    params: Option<&IndexMap<String, PhpMixed>>,
+) -> PhpMixed {
     todo!()
 }
 
@@ -1258,7 +1278,10 @@ where
     todo!()
 }
 
-pub fn array_replace_recursive(base: IndexMap<String, PhpMixed>, replacement: IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed> {
+pub fn array_replace_recursive(
+    base: IndexMap<String, PhpMixed>,
+    replacement: IndexMap<String, PhpMixed>,
+) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 

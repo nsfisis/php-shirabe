@@ -1,11 +1,14 @@
 //! ref: composer/src/Composer/SelfUpdate/Versions.php
 
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException, PHP_EOL, PHP_VERSION, PHP_VERSION_ID};
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
 use crate::util::http_downloader::HttpDownloader;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::{
+    InvalidArgumentException, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
+    UnexpectedValueException,
+};
 
 pub struct Versions {
     pub channels: Vec<String>,
@@ -24,7 +27,8 @@ impl std::fmt::Debug for Versions {
 }
 
 impl Versions {
-    pub const CHANNELS: &'static [&'static str] = &["stable", "preview", "snapshot", "1", "2", "2.2"];
+    pub const CHANNELS: &'static [&'static str] =
+        &["stable", "preview", "snapshot", "1", "2", "2.2"];
 
     pub fn new(config: Config, http_downloader: HttpDownloader) -> Self {
         Self {
@@ -54,7 +58,11 @@ impl Versions {
         Ok("stable".to_string())
     }
 
-    pub fn set_channel(&mut self, channel: String, io: Option<&dyn IOInterface>) -> anyhow::Result<Result<(), InvalidArgumentException>> {
+    pub fn set_channel(
+        &mut self,
+        channel: String,
+        io: Option<&dyn IOInterface>,
+    ) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !Self::CHANNELS.contains(&channel.as_str()) {
             return Ok(Err(InvalidArgumentException {
                 message: format!(
@@ -95,7 +103,10 @@ impl Versions {
         Ok(Ok(()))
     }
 
-    pub fn get_latest(&mut self, channel: Option<&str>) -> anyhow::Result<Result<IndexMap<String, PhpMixed>, UnexpectedValueException>> {
+    pub fn get_latest(
+        &mut self,
+        channel: Option<&str>,
+    ) -> anyhow::Result<Result<IndexMap<String, PhpMixed>, UnexpectedValueException>> {
         let versions = self.get_versions_data()?;
         let effective_channel = match channel {
             Some(c) => c.to_string(),
@@ -107,11 +118,12 @@ impl Versions {
                 if let PhpMixed::List(ref list) = **channel_versions {
                     for version in list {
                         if let PhpMixed::Array(ref v) = **version {
-                            let min_php = v.get("min-php")
-                                .and_then(|p| p.as_int())
-                                .unwrap_or(0);
+                            let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
                             if min_php <= PHP_VERSION_ID {
-                                return Ok(Ok(v.iter().map(|(k, val)| (k.clone(), *val.clone())).collect()));
+                                return Ok(Ok(v
+                                    .iter()
+                                    .map(|(k, val)| (k.clone(), *val.clone()))
+                                    .collect()));
                             }
                         }
                     }
@@ -139,7 +151,7 @@ impl Versions {
             self.versions_data = Some(
                 self.http_downloader
                     .get(&format!("{}://getcomposer.org/versions", protocol))?
-                    .decode_json()?
+                    .decode_json()?,
             );
         }
 

@@ -5,9 +5,9 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_search_mixed, array_shift, ctype_alnum, empty, explode, extension_loaded, implode,
-    in_array, is_array, is_string, ord, sprintf, strpos, strtolower, InvalidArgumentException,
-    LogicException, PhpMixed, RuntimeException,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
+    array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
+    is_string, ord, sprintf, strpos, strtolower,
 };
 
 use crate::cache::Cache;
@@ -76,7 +76,8 @@ impl GitLabDriver {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| match_.get("domain2").cloned().unwrap_or_default());
         let configured_domains = self.inner.config.get("gitlab-domains");
-        let mut url_parts: Vec<String> = explode("/", &match_.get("parts").cloned().unwrap_or_default());
+        let mut url_parts: Vec<String> =
+            explode("/", &match_.get("parts").cloned().unwrap_or_default());
 
         let scheme_match = match_.get("scheme").cloned().unwrap_or_default();
         self.scheme = if in_array(
@@ -122,7 +123,10 @@ impl GitLabDriver {
         self.inner.origin_url = origin;
 
         let protocol_value = self.inner.config.get("gitlab-protocol");
-        if let Some(protocol) = protocol_value.as_string().filter(|_| is_string(&protocol_value)) {
+        if let Some(protocol) = protocol_value
+            .as_string()
+            .filter(|_| is_string(&protocol_value))
+        {
             // https treated as a synonym for http.
             if !in_array(
                 PhpMixed::String(protocol.to_string()),
@@ -250,10 +254,7 @@ impl GitLabDriver {
                 if composer.contains_key("support")
                     && !is_array(composer.get("support").cloned().unwrap_or(PhpMixed::Null))
                 {
-                    composer.insert(
-                        "support".to_string(),
-                        PhpMixed::Array(IndexMap::new()),
-                    );
+                    composer.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
                 }
                 let project = self.project.clone().unwrap_or_default();
                 let has_web_url = project.contains_key("web_url");
@@ -278,7 +279,8 @@ impl GitLabDriver {
                         array_search_mixed(
                             &PhpMixed::String(identifier.to_string()),
                             &PhpMixed::Array(
-                                self.get_branches().unwrap_or_default()
+                                self.get_branches()
+                                    .unwrap_or_default()
                                     .into_iter()
                                     .map(|(k, v)| (k, Box::new(PhpMixed::String(v))))
                                     .collect(),
@@ -294,20 +296,15 @@ impl GitLabDriver {
                         .and_then(|v| v.as_string())
                         .unwrap_or("")
                         .to_string();
-                    if let Some(support) = composer.get_mut("support").and_then(|v| {
-                        match v {
-                            PhpMixed::Array(m) => Some(m),
-                            _ => None,
-                        }
+                    if let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                        PhpMixed::Array(m) => Some(m),
+                        _ => None,
                     }) {
                         support.insert(
                             "source".to_string(),
                             Box::new(PhpMixed::String(sprintf(
                                 "%s/-/tree/%s",
-                                &[
-                                    PhpMixed::String(web_url),
-                                    PhpMixed::String(label_str),
-                                ],
+                                &[PhpMixed::String(web_url), PhpMixed::String(label_str)],
                             ))),
                         );
                     }
@@ -343,12 +340,7 @@ impl GitLabDriver {
                     }
                 }
                 if !composer.contains_key("abandoned")
-                    && !empty(
-                        &project
-                            .get("archived")
-                            .cloned()
-                            .unwrap_or(PhpMixed::Null),
-                    )
+                    && !empty(&project.get("archived").cloned().unwrap_or(PhpMixed::Null))
                 {
                     composer.insert("abandoned".to_string(), PhpMixed::Bool(true));
                 }
@@ -559,12 +551,8 @@ impl GitLabDriver {
                         Box::new(PhpMixed::String("_".to_string())),
                     ]),
                     true,
-                )
-            {
-                format!(
-                    "%{}",
-                    sprintf("%02X", &[PhpMixed::Int(ord(&character))])
-                )
+                ) {
+                format!("%{}", sprintf("%02X", &[PhpMixed::Int(ord(&character))]))
             } else {
                 character
             };
@@ -774,15 +762,13 @@ impl GitLabDriver {
                         // Check both access levels (e.g. project, group)
                         // - value will be null if no access is set
                         // - value will be array with key access_level if set
-                        if let Some(permissions) = json_map
-                            .get("permissions")
-                            .and_then(|v| v.as_array())
+                        if let Some(permissions) =
+                            json_map.get("permissions").and_then(|v| v.as_array())
                         {
                             for (_, permission) in permissions {
                                 if let Some(perm_map) = permission.as_array() {
-                                    if let Some(level) = perm_map
-                                        .get("access_level")
-                                        .and_then(|v| v.as_int())
+                                    if let Some(level) =
+                                        perm_map.get("access_level").and_then(|v| v.as_int())
                                     {
                                         if level >= 20 {
                                             more_than_guest_access = true;
@@ -809,13 +795,15 @@ impl GitLabDriver {
                                 })?;
 
                             let mut req = IndexMap::new();
-                            req.insert(
-                                "url".to_string(),
-                                PhpMixed::String("dummy".to_string()),
-                            );
-                            return Ok(Response::new(req, Some(200), vec![], Some("null".to_string()))
-                                .unwrap()
-                                .unwrap());
+                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
+                            return Ok(Response::new(
+                                req,
+                                Some(200),
+                                vec![],
+                                Some("null".to_string()),
+                            )
+                            .unwrap()
+                            .unwrap());
                         }
                     }
 
@@ -834,9 +822,7 @@ impl GitLabDriver {
                             });
                         }
 
-                        if !empty(
-                            &json_map.get("id").cloned().unwrap_or(PhpMixed::Null),
-                        ) {
+                        if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
                             self.is_private = false;
                         }
 
@@ -885,13 +871,15 @@ impl GitLabDriver {
                                 })?;
 
                             let mut req = IndexMap::new();
-                            req.insert(
-                                "url".to_string(),
-                                PhpMixed::String("dummy".to_string()),
-                            );
-                            return Ok(Response::new(req, Some(200), vec![], Some("null".to_string()))
-                                .unwrap()
-                                .unwrap());
+                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
+                            return Ok(Response::new(
+                                req,
+                                Some(200),
+                                vec![],
+                                Some("null".to_string()),
+                            )
+                            .unwrap()
+                            .unwrap());
                         }
                         self.inner.io.write_error(
                             PhpMixed::String(format!(
@@ -927,13 +915,15 @@ impl GitLabDriver {
                                 })?;
 
                             let mut req = IndexMap::new();
-                            req.insert(
-                                "url".to_string(),
-                                PhpMixed::String("dummy".to_string()),
-                            );
-                            return Ok(Response::new(req, Some(200), vec![], Some("null".to_string()))
-                                .unwrap()
-                                .unwrap());
+                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
+                            return Ok(Response::new(
+                                req,
+                                Some(200),
+                                vec![],
+                                Some("null".to_string()),
+                            )
+                            .unwrap()
+                            .unwrap());
                         }
 
                         Err(e)
@@ -1002,9 +992,7 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(match_) =
-                Preg::is_match_strict_groups(r#"{<(.+?)>; *rel="next"}"#, link)
-            {
+            if let Some(match_) = Preg::is_match_strict_groups(r#"{<(.+?)>; *rel="next"}"#, link) {
                 return Some(match_.get(1).cloned().unwrap_or_default());
             }
         }
@@ -1059,11 +1047,7 @@ impl GitLabDriver {
                 false,
             ) || (port_number.is_some()
                 && in_array(
-                    PhpMixed::String(Preg::replace(
-                        r"{:\d+}",
-                        "",
-                        guessed_domain.clone(),
-                    )),
+                    PhpMixed::String(Preg::replace(r"{:\d+}", "", guessed_domain.clone())),
                     configured_domains,
                     false,
                 ))
@@ -1075,4 +1059,3 @@ impl GitLabDriver {
         None
     }
 }
-

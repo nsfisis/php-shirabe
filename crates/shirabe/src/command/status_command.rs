@@ -49,13 +49,19 @@ impl StatusCommand {
             vec![],
             vec![],
         );
-        composer.get_event_dispatcher().dispatch(command_event.get_name(), &command_event);
+        composer
+            .get_event_dispatcher()
+            .dispatch(command_event.get_name(), &command_event);
 
-        composer.get_event_dispatcher().dispatch_script(ScriptEvents::PRE_STATUS_CMD, true);
+        composer
+            .get_event_dispatcher()
+            .dispatch_script(ScriptEvents::PRE_STATUS_CMD, true);
 
         let exit_code = self.do_execute(input)?;
 
-        composer.get_event_dispatcher().dispatch_script(ScriptEvents::POST_STATUS_CMD, true);
+        composer
+            .get_event_dispatcher()
+            .dispatch_script(ScriptEvents::POST_STATUS_CMD, true);
 
         Ok(exit_code)
     }
@@ -71,10 +77,13 @@ impl StatusCommand {
         let mut errors: IndexMap<String, String> = IndexMap::new();
         let io = self.inner.get_io();
         let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
-        let mut vcs_version_changes: IndexMap<String, IndexMap<String, IndexMap<String, String>>> = IndexMap::new();
+        let mut vcs_version_changes: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
+            IndexMap::new();
 
         let parser = VersionParser::new();
-        let process_executor = composer.get_loop().get_process_executor()
+        let process_executor = composer
+            .get_loop()
+            .get_process_executor()
             .cloned()
             .unwrap_or_else(|| ProcessExecutor::new(io));
         let guesser = VersionGuesser::new(composer.get_config(), &process_executor, &parser, io);
@@ -91,35 +100,57 @@ impl StatusCommand {
             // TODO(phase-b): isinstance checks using ChangeReportInterface/VcsCapableDownloaderInterface/DvcsDownloaderInterface
             if let Some(change_reporter) = downloader.as_change_report_interface() {
                 if std::path::Path::new(&target_dir).is_symlink() {
-                    errors.insert(target_dir.clone(), format!("{} is a symbolic link.", target_dir));
+                    errors.insert(
+                        target_dir.clone(),
+                        format!("{} is a symbolic link.", target_dir),
+                    );
                 }
 
-                if let Some(changes) = change_reporter.get_local_changes(package.as_ref(), target_dir.clone()) {
+                if let Some(changes) =
+                    change_reporter.get_local_changes(package.as_ref(), target_dir.clone())
+                {
                     errors.insert(target_dir.clone(), changes);
                 }
             }
 
             if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface() {
-                if vcs_downloader.get_vcs_reference(package.as_ref(), target_dir.clone()).is_some() {
+                if vcs_downloader
+                    .get_vcs_reference(package.as_ref(), target_dir.clone())
+                    .is_some()
+                {
                     let previous_ref = match package.get_installation_source().as_deref() {
                         Some("source") => package.get_source_reference().map(|s| s.to_string()),
                         Some("dist") => package.get_dist_reference().map(|s| s.to_string()),
                         _ => None,
                     };
 
-                    let current_version = guesser.guess_version(&dumper.dump(package.as_ref()), &target_dir);
+                    let current_version =
+                        guesser.guess_version(&dumper.dump(package.as_ref()), &target_dir);
 
                     if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version) {
                         if cur_version.get("commit").map(|s| s.as_str()) != Some(prev_ref.as_str())
-                            && cur_version.get("pretty_version").map(|s| s.as_str()) != Some(prev_ref.as_str())
+                            && cur_version.get("pretty_version").map(|s| s.as_str())
+                                != Some(prev_ref.as_str())
                         {
                             let mut previous = IndexMap::new();
-                            previous.insert("version".to_string(), package.get_pretty_version().to_string());
+                            previous.insert(
+                                "version".to_string(),
+                                package.get_pretty_version().to_string(),
+                            );
                             previous.insert("ref".to_string(), prev_ref.clone());
 
                             let mut current = IndexMap::new();
-                            current.insert("version".to_string(), cur_version.get("pretty_version").cloned().unwrap_or_default());
-                            current.insert("ref".to_string(), cur_version.get("commit").cloned().unwrap_or_default());
+                            current.insert(
+                                "version".to_string(),
+                                cur_version
+                                    .get("pretty_version")
+                                    .cloned()
+                                    .unwrap_or_default(),
+                            );
+                            current.insert(
+                                "ref".to_string(),
+                                cur_version.get("commit").cloned().unwrap_or_default(),
+                            );
 
                             let mut change = IndexMap::new();
                             change.insert("previous".to_string(), previous);
@@ -132,7 +163,9 @@ impl StatusCommand {
             }
 
             if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface() {
-                if let Some(unpushed) = dvcs_downloader.get_unpushed_changes(package.as_ref(), target_dir.clone()) {
+                if let Some(unpushed) =
+                    dvcs_downloader.get_unpushed_changes(package.as_ref(), target_dir.clone())
+                {
                     unpushed_changes.insert(target_dir, unpushed);
                 }
             }
@@ -148,7 +181,8 @@ impl StatusCommand {
 
             for (path, changes) in &errors {
                 if input.get_option("verbose").as_bool().unwrap_or(false) {
-                    let indented_changes = changes.lines()
+                    let indented_changes = changes
+                        .lines()
                         .map(|line| format!("    {}", line.trim_start()))
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -165,7 +199,8 @@ impl StatusCommand {
 
             for (path, changes) in &unpushed_changes {
                 if input.get_option("verbose").as_bool().unwrap_or(false) {
-                    let indented_changes = changes.lines()
+                    let indented_changes = changes
+                        .lines()
                         .map(|line| format!("    {}", line.trim_start()))
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -178,24 +213,52 @@ impl StatusCommand {
         }
 
         if !vcs_version_changes.is_empty() {
-            io.write_error("<warning>You have version variations in the following dependencies:</warning>");
+            io.write_error(
+                "<warning>You have version variations in the following dependencies:</warning>",
+            );
 
             for (path, changes) in &vcs_version_changes {
                 if input.get_option("verbose").as_bool().unwrap_or(false) {
                     let current_version = {
-                        let v = changes["current"].get("version").map(|s| s.as_str()).unwrap_or("");
-                        let r = changes["current"].get("ref").map(|s| s.as_str()).unwrap_or("");
-                        if v.is_empty() { r.to_string() } else { v.to_string() }
+                        let v = changes["current"]
+                            .get("version")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
+                        let r = changes["current"]
+                            .get("ref")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
+                        if v.is_empty() {
+                            r.to_string()
+                        } else {
+                            v.to_string()
+                        }
                     };
                     let previous_version = {
-                        let v = changes["previous"].get("version").map(|s| s.as_str()).unwrap_or("");
-                        let r = changes["previous"].get("ref").map(|s| s.as_str()).unwrap_or("");
-                        if v.is_empty() { r.to_string() } else { v.to_string() }
+                        let v = changes["previous"]
+                            .get("version")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
+                        let r = changes["previous"]
+                            .get("ref")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
+                        if v.is_empty() {
+                            r.to_string()
+                        } else {
+                            v.to_string()
+                        }
                     };
 
                     let (current_display, previous_display) = if io.is_very_verbose() {
-                        let cur_ref = changes["current"].get("ref").map(|s| s.as_str()).unwrap_or("");
-                        let prev_ref = changes["previous"].get("ref").map(|s| s.as_str()).unwrap_or("");
+                        let cur_ref = changes["current"]
+                            .get("ref")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
+                        let prev_ref = changes["previous"]
+                            .get("ref")
+                            .map(|s| s.as_str())
+                            .unwrap_or("");
                         (
                             format!("{} ({})", current_version, cur_ref),
                             format!("{} ({})", previous_version, prev_ref),
@@ -205,7 +268,10 @@ impl StatusCommand {
                     };
 
                     io.write(&format!("<info>{}</info>:", path));
-                    io.write(&format!("    From <comment>{}</comment> to <comment>{}</comment>", previous_display, current_display));
+                    io.write(&format!(
+                        "    From <comment>{}</comment> to <comment>{}</comment>",
+                        previous_display, current_display
+                    ));
                 } else {
                     io.write(path);
                 }
@@ -218,9 +284,19 @@ impl StatusCommand {
             io.write_error("Use --verbose (-v) to see a list of files");
         }
 
-        let exit_code = (if !errors.is_empty() { Self::EXIT_CODE_ERRORS } else { 0 })
-            + (if !unpushed_changes.is_empty() { Self::EXIT_CODE_UNPUSHED_CHANGES } else { 0 })
-            + (if !vcs_version_changes.is_empty() { Self::EXIT_CODE_VERSION_CHANGES } else { 0 });
+        let exit_code = (if !errors.is_empty() {
+            Self::EXIT_CODE_ERRORS
+        } else {
+            0
+        }) + (if !unpushed_changes.is_empty() {
+            Self::EXIT_CODE_UNPUSHED_CHANGES
+        } else {
+            0
+        }) + (if !vcs_version_changes.is_empty() {
+            Self::EXIT_CODE_VERSION_CHANGES
+        } else {
+            0
+        });
 
         Ok(exit_code)
     }

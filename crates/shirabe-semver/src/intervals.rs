@@ -45,21 +45,29 @@ impl Intervals {
         candidate: &dyn ConstraintInterface,
         constraint: &dyn ConstraintInterface,
     ) -> anyhow::Result<bool> {
-        if constraint.as_any().downcast_ref::<MatchAllConstraint>().is_some() {
+        if constraint
+            .as_any()
+            .downcast_ref::<MatchAllConstraint>()
+            .is_some()
+        {
             return Ok(true);
         }
 
-        if candidate.as_any().downcast_ref::<MatchNoneConstraint>().is_some()
-            || constraint.as_any().downcast_ref::<MatchNoneConstraint>().is_some()
+        if candidate
+            .as_any()
+            .downcast_ref::<MatchNoneConstraint>()
+            .is_some()
+            || constraint
+                .as_any()
+                .downcast_ref::<MatchNoneConstraint>()
+                .is_some()
         {
             return Ok(false);
         }
 
         // Phase B: ConstraintInterface needs clone_box() to create owned copies from references.
-        let multi = MultiConstraint::new(
-            vec![candidate.clone_box(), constraint.clone_box()],
-            true,
-        )?;
+        let multi =
+            MultiConstraint::new(vec![candidate.clone_box(), constraint.clone_box()], true)?;
         let intersection_intervals = Self::get(&multi)?;
         let candidate_intervals = Self::get(candidate)?;
 
@@ -128,7 +136,11 @@ impl Intervals {
     pub fn compact_constraint(
         constraint: &dyn ConstraintInterface,
     ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
-        if constraint.as_any().downcast_ref::<MultiConstraint>().is_none() {
+        if constraint
+            .as_any()
+            .downcast_ref::<MultiConstraint>()
+            .is_none()
+        {
             return Ok(constraint.clone_box());
         }
 
@@ -137,8 +149,7 @@ impl Intervals {
         let mut has_numeric_match_all = false;
 
         if intervals.numeric.len() == 1
-            && intervals.numeric[0].get_start().__to_string()
-                == Interval::from_zero().__to_string()
+            && intervals.numeric[0].get_start().__to_string() == Interval::from_zero().__to_string()
             && intervals.numeric[0].get_end().__to_string()
                 == Interval::until_positive_infinity().__to_string()
         {
@@ -190,10 +201,8 @@ impl Intervals {
 
                     // count is 1 if entire constraint is just one != expression
                     if un_equal_constraints.len() > 1 {
-                        constraints.push(Box::new(MultiConstraint::new(
-                            un_equal_constraints,
-                            true,
-                        )?));
+                        constraints
+                            .push(Box::new(MultiConstraint::new(un_equal_constraints, true)?));
                     } else {
                         constraints.push(un_equal_constraints.into_iter().next().unwrap());
                     }
@@ -240,7 +249,9 @@ impl Intervals {
 
         if intervals.branches.names.is_empty() {
             if intervals.branches.exclude && has_numeric_match_all {
-                return Ok(Box::new(MatchAllConstraint { pretty_string: None }));
+                return Ok(Box::new(MatchAllConstraint {
+                    pretty_string: None,
+                }));
                 // otherwise constraint should contain a != operator and already cover this
             }
         } else {
@@ -262,12 +273,11 @@ impl Intervals {
             // > 2.0 != dev-foo must return a conjunctive constraint
             if intervals.branches.exclude {
                 if constraints.len() > 1 {
-                    let merged: Vec<Box<dyn ConstraintInterface>> = std::iter::once(
-                        Box::new(MultiConstraint::new(constraints, false)?)
-                            as Box<dyn ConstraintInterface>,
-                    )
-                    .chain(dev_constraints)
-                    .collect();
+                    let merged: Vec<Box<dyn ConstraintInterface>> =
+                        std::iter::once(Box::new(MultiConstraint::new(constraints, false)?)
+                            as Box<dyn ConstraintInterface>)
+                        .chain(dev_constraints)
+                        .collect();
                     return Ok(Box::new(MultiConstraint::new(merged, true)?));
                 }
 
@@ -298,7 +308,9 @@ impl Intervals {
             return Ok(constraints.into_iter().next().unwrap());
         }
 
-        Ok(Box::new(MatchNoneConstraint { pretty_string: None }))
+        Ok(Box::new(MatchNoneConstraint {
+            pretty_string: None,
+        }))
     }
 
     pub fn get(constraint: &dyn ConstraintInterface) -> anyhow::Result<IntervalCollection> {
@@ -325,7 +337,11 @@ impl Intervals {
         constraint: &dyn ConstraintInterface,
         stop_on_first_valid_interval: bool,
     ) -> anyhow::Result<IntervalCollection> {
-        if constraint.as_any().downcast_ref::<MatchAllConstraint>().is_some() {
+        if constraint
+            .as_any()
+            .downcast_ref::<MatchAllConstraint>()
+            .is_some()
+        {
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
                     Interval::from_zero().clone(),
@@ -335,7 +351,11 @@ impl Intervals {
             });
         }
 
-        if constraint.as_any().downcast_ref::<MatchNoneConstraint>().is_some() {
+        if constraint
+            .as_any()
+            .downcast_ref::<MatchNoneConstraint>()
+            .is_some()
+        {
             return Ok(IntervalCollection {
                 numeric: vec![],
                 branches: Interval::no_dev(),
@@ -560,7 +580,8 @@ impl Intervals {
             });
         }
 
-        if op.starts_with('>') { // > & >=
+        if op.starts_with('>') {
+            // > & >=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
                     constraint.clone(),
@@ -569,7 +590,8 @@ impl Intervals {
                 branches: Interval::no_dev(),
             });
         }
-        if op.starts_with('<') { // < & <=
+        if op.starts_with('<') {
+            // < & <=
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
                     Interval::from_zero().clone(),

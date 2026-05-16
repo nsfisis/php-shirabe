@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/DependencyResolver/Decisions.php
 
-use std::fmt;
-use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
 use crate::dependency_resolver::pool::Pool;
 use crate::dependency_resolver::rule::Rule;
 use crate::dependency_resolver::solver_bug_exception::SolverBugException;
+use indexmap::IndexMap;
+use shirabe_php_shim::LogicException;
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Decisions {
@@ -43,16 +43,28 @@ impl Decisions {
     pub fn conflict(&self, literal: i64) -> bool {
         let package_id = literal.abs();
 
-        (self.decision_map.contains_key(&package_id) && self.decision_map[&package_id] > 0 && literal < 0)
-            || (self.decision_map.contains_key(&package_id) && self.decision_map[&package_id] < 0 && literal > 0)
+        (self.decision_map.contains_key(&package_id)
+            && self.decision_map[&package_id] > 0
+            && literal < 0)
+            || (self.decision_map.contains_key(&package_id)
+                && self.decision_map[&package_id] < 0
+                && literal > 0)
     }
 
     pub fn decided(&self, literal_or_package_id: i64) -> bool {
-        self.decision_map.get(&literal_or_package_id.abs()).copied().unwrap_or(0) != 0
+        self.decision_map
+            .get(&literal_or_package_id.abs())
+            .copied()
+            .unwrap_or(0)
+            != 0
     }
 
     pub fn undecided(&self, literal_or_package_id: i64) -> bool {
-        self.decision_map.get(&literal_or_package_id.abs()).copied().unwrap_or(0) == 0
+        self.decision_map
+            .get(&literal_or_package_id.abs())
+            .copied()
+            .unwrap_or(0)
+            == 0
     }
 
     pub fn decided_install(&self, literal_or_package_id: i64) -> bool {
@@ -79,10 +91,17 @@ impl Decisions {
             }
         }
 
-        panic!("{}", LogicException {
-            message: format!("Did not find a decision rule using {}", literal_or_package_id),
-            code: 0,
-        }.message);
+        panic!(
+            "{}",
+            LogicException {
+                message: format!(
+                    "Did not find a decision rule using {}",
+                    literal_or_package_id
+                ),
+                code: 0,
+            }
+            .message
+        );
     }
 
     pub fn at_offset(&self, queue_offset: usize) -> &(i64, Rule) {
@@ -133,7 +152,8 @@ impl Decisions {
     }
 
     pub fn current(&self) -> Option<&(i64, Rule)> {
-        self.iterator_cursor.and_then(|cursor| self.decision_queue.get(cursor))
+        self.iterator_cursor
+            .and_then(|cursor| self.decision_queue.get(cursor))
     }
 
     pub fn key(&self) -> Option<usize> {
@@ -141,13 +161,9 @@ impl Decisions {
     }
 
     pub fn next(&mut self) {
-        self.iterator_cursor = self.iterator_cursor.and_then(|cursor| {
-            if cursor > 0 {
-                Some(cursor - 1)
-            } else {
-                None
-            }
-        });
+        self.iterator_cursor = self
+            .iterator_cursor
+            .and_then(|cursor| if cursor > 0 { Some(cursor - 1) } else { None });
     }
 
     pub fn valid(&self) -> bool {
@@ -163,11 +179,19 @@ impl Decisions {
 
         let previous_decision = self.decision_map.get(&package_id).copied().unwrap_or(0);
         if previous_decision != 0 {
-            let literal_string = self.pool.literal_to_pretty_string(literal, &IndexMap::new());
+            let literal_string = self
+                .pool
+                .literal_to_pretty_string(literal, &IndexMap::new());
             let package = self.pool.literal_to_package(literal);
-            panic!("{}", SolverBugException::new(
-                format!("Trying to decide {} on level {}, even though {} was previously decided as {}.", literal_string, level, package, previous_decision)
-            ).0.message);
+            panic!(
+                "{}",
+                SolverBugException::new(format!(
+                    "Trying to decide {} on level {}, even though {} was previously decided as {}.",
+                    literal_string, level, package, previous_decision
+                ))
+                .0
+                .message
+            );
         }
 
         if literal > 0 {

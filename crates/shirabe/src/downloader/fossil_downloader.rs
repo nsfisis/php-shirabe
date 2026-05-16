@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Downloader/FossilDownloader.php
 
+use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::package::package_interface::PackageInterface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::RuntimeException;
-use crate::downloader::vcs_downloader::VcsDownloader;
-use crate::package::package_interface::PackageInterface;
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -29,26 +29,48 @@ impl FossilDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.inner.config.prohibit_url_by_config(&url, &self.inner.io)?;
+        self.inner
+            .config
+            .prohibit_url_by_config(&url, &self.inner.io)?;
 
         let repo_file = format!("{}.fossil", path);
         let real_path = shirabe_php_shim::realpath(&path);
 
-        self.inner.io.write_error(&format!("Cloning {}", package.get_source_reference().unwrap_or_default()));
+        self.inner.io.write_error(&format!(
+            "Cloning {}",
+            package.get_source_reference().unwrap_or_default()
+        ));
 
         let mut output = String::new();
         self.execute(
-            vec!["fossil".to_string(), "clone".to_string(), "--".to_string(), url, repo_file.clone()],
+            vec![
+                "fossil".to_string(),
+                "clone".to_string(),
+                "--".to_string(),
+                url,
+                repo_file.clone(),
+            ],
             None,
             &mut output,
         )?;
         self.execute(
-            vec!["fossil".to_string(), "open".to_string(), "--nested".to_string(), "--".to_string(), repo_file],
+            vec![
+                "fossil".to_string(),
+                "open".to_string(),
+                "--nested".to_string(),
+                "--".to_string(),
+                repo_file,
+            ],
             real_path.clone(),
             &mut output,
         )?;
         self.execute(
-            vec!["fossil".to_string(), "update".to_string(), "--".to_string(), package.get_source_reference().unwrap_or_default()],
+            vec![
+                "fossil".to_string(),
+                "update".to_string(),
+                "--".to_string(),
+                package.get_source_reference().unwrap_or_default(),
+            ],
             real_path,
             &mut output,
         )?;
@@ -63,9 +85,14 @@ impl FossilDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.inner.config.prohibit_url_by_config(&url, &self.inner.io)?;
+        self.inner
+            .config
+            .prohibit_url_by_config(&url, &self.inner.io)?;
 
-        self.inner.io.write_error(&format!(" Updating to {}", target.get_source_reference().unwrap_or_default()));
+        self.inner.io.write_error(&format!(
+            " Updating to {}",
+            target.get_source_reference().unwrap_or_default()
+        ));
 
         if !self.has_metadata_repository(&path) {
             return Err(RuntimeException {
@@ -85,7 +112,12 @@ impl FossilDownloader {
             &mut output,
         )?;
         self.execute(
-            vec!["fossil".to_string(), "up".to_string(), "--".to_string(), target.get_source_reference().unwrap_or_default()],
+            vec![
+                "fossil".to_string(),
+                "up".to_string(),
+                "--".to_string(),
+                target.get_source_reference().unwrap_or_default(),
+            ],
             real_path,
             &mut output,
         )?;
@@ -93,7 +125,11 @@ impl FossilDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn get_local_changes(&self, _package: &dyn PackageInterface, path: String) -> Option<String> {
+    pub fn get_local_changes(
+        &self,
+        _package: &dyn PackageInterface,
+        path: String,
+    ) -> Option<String> {
         if !self.has_metadata_repository(&path) {
             return None;
         }
@@ -119,11 +155,16 @@ impl FossilDownloader {
         let mut output = String::new();
         self.execute(
             vec![
-                "fossil".to_string(), "timeline".to_string(),
-                "-t".to_string(), "ci".to_string(),
-                "-W".to_string(), "0".to_string(),
-                "-n".to_string(), "0".to_string(),
-                "before".to_string(), to_reference.clone(),
+                "fossil".to_string(),
+                "timeline".to_string(),
+                "-t".to_string(),
+                "ci".to_string(),
+                "-W".to_string(),
+                "0".to_string(),
+                "-n".to_string(),
+                "0".to_string(),
+                "before".to_string(),
+                to_reference.clone(),
             ],
             shirabe_php_shim::realpath(&path),
             &mut output,
@@ -149,7 +190,12 @@ impl FossilDownloader {
         Ok(log)
     }
 
-    fn execute(&self, command: Vec<String>, cwd: Option<String>, output: &mut String) -> Result<()> {
+    fn execute(
+        &self,
+        command: Vec<String>,
+        cwd: Option<String>,
+        output: &mut String,
+    ) -> Result<()> {
         if self.inner.process.execute(&command, output, cwd) != 0 {
             return Err(RuntimeException {
                 message: format!(
@@ -158,7 +204,8 @@ impl FossilDownloader {
                     self.inner.process.get_error_output()
                 ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
         Ok(())
     }

@@ -18,7 +18,9 @@ pub struct CompositeRepository {
 
 impl CompositeRepository {
     pub fn new(repositories: Vec<Box<dyn RepositoryInterface>>) -> Self {
-        let mut this = Self { repositories: vec![] };
+        let mut this = Self {
+            repositories: vec![],
+        };
         for repo in repositories {
             this.add_repository(repo);
         }
@@ -37,7 +39,9 @@ impl CompositeRepository {
     }
 
     pub fn add_repository(&mut self, repository: Box<dyn RepositoryInterface>) {
-        if let Some(composite) = (repository.as_any() as &dyn Any).downcast_ref::<CompositeRepository>() {
+        if let Some(composite) =
+            (repository.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
+        {
             for repo in composite.get_repositories() {
                 self.repositories.push(repo.clone_box());
             }
@@ -55,7 +59,11 @@ impl shirabe_php_shim::Countable for CompositeRepository {
 
 impl RepositoryInterface for CompositeRepository {
     fn get_repo_name(&self) -> String {
-        let names: Vec<String> = self.repositories.iter().map(|r| r.get_repo_name()).collect();
+        let names: Vec<String> = self
+            .repositories
+            .iter()
+            .map(|r| r.get_repo_name())
+            .collect();
         format!("composite repo ({})", names.join(", "))
     }
 
@@ -68,7 +76,11 @@ impl RepositoryInterface for CompositeRepository {
         false
     }
 
-    fn find_package(&self, name: String, constraint: FindPackageConstraint) -> Option<Box<BasePackage>> {
+    fn find_package(
+        &self,
+        name: String,
+        constraint: FindPackageConstraint,
+    ) -> Option<Box<BasePackage>> {
         for repository in &self.repositories {
             let package = repository.find_package(name.clone(), constraint.clone());
             if package.is_some() {
@@ -78,7 +90,11 @@ impl RepositoryInterface for CompositeRepository {
         None
     }
 
-    fn find_packages(&self, name: String, constraint: Option<FindPackageConstraint>) -> Vec<Box<BasePackage>> {
+    fn find_packages(
+        &self,
+        name: String,
+        constraint: Option<FindPackageConstraint>,
+    ) -> Vec<Box<BasePackage>> {
         let mut packages = vec![];
         for repository in &self.repositories {
             packages.extend(repository.find_packages(name.clone(), constraint.clone()));

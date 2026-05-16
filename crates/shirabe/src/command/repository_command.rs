@@ -5,8 +5,9 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{parse_url, strtolower, InvalidArgumentException, PhpMixed, RuntimeException,
-    PHP_URL_HOST};
+use shirabe_php_shim::{
+    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
+};
 
 use crate::command::base_config_command::BaseConfigCommand;
 use crate::console::input::input_argument::InputArgument;
@@ -59,15 +60,44 @@ impl RepositoryCommand {
             );
     }
 
-    pub fn execute(&mut self, input: &dyn InputInterface, _output: &dyn OutputInterface) -> anyhow::Result<i64> {
-        let action = strtolower(&input.get_argument("action").as_string().unwrap_or("").to_string());
-        let name = input.get_argument("name").as_string().map(|s| s.to_string());
-        let arg1 = input.get_argument("arg1").as_string().map(|s| s.to_string());
-        let arg2 = input.get_argument("arg2").as_string().map(|s| s.to_string());
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        _output: &dyn OutputInterface,
+    ) -> anyhow::Result<i64> {
+        let action = strtolower(
+            &input
+                .get_argument("action")
+                .as_string()
+                .unwrap_or("")
+                .to_string(),
+        );
+        let name = input
+            .get_argument("name")
+            .as_string()
+            .map(|s| s.to_string());
+        let arg1 = input
+            .get_argument("arg1")
+            .as_string()
+            .map(|s| s.to_string());
+        let arg2 = input
+            .get_argument("arg2")
+            .as_string()
+            .map(|s| s.to_string());
 
         let config_data = self.inner.config_file.as_ref().unwrap().read()?;
-        let config_file_path = self.inner.config_file.as_ref().unwrap().get_path().to_string();
-        self.inner.config.as_mut().unwrap().merge(config_data, &config_file_path);
+        let config_file_path = self
+            .inner
+            .config_file
+            .as_ref()
+            .unwrap()
+            .get_path()
+            .to_string();
+        self.inner
+            .config
+            .as_mut()
+            .unwrap()
+            .merge(config_data, &config_file_path);
         let repos = self.inner.config.as_ref().unwrap().get_repositories();
 
         match action.as_str() {
@@ -89,7 +119,8 @@ impl RepositoryCommand {
                     }));
                 }
                 let arg1_str = arg1.as_deref().unwrap();
-                let repo_config: PhpMixed = if Preg::is_match(r"^\s*\{", arg1_str).unwrap_or(false) {
+                let repo_config: PhpMixed = if Preg::is_match(r"^\s*\{", arg1_str).unwrap_or(false)
+                {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {
@@ -99,12 +130,18 @@ impl RepositoryCommand {
                         }));
                     }
                     let mut m = IndexMap::new();
-                    m.insert("type".to_string(), Box::new(PhpMixed::String(arg1_str.to_string())));
+                    m.insert(
+                        "type".to_string(),
+                        Box::new(PhpMixed::String(arg1_str.to_string())),
+                    );
                     m.insert("url".to_string(), Box::new(PhpMixed::String(arg2.unwrap())));
                     PhpMixed::Array(m)
                 };
 
-                let before = input.get_option("before").as_string().map(|s| s.to_string());
+                let before = input
+                    .get_option("before")
+                    .as_string()
+                    .map(|s| s.to_string());
                 let after = input.get_option("after").as_string().map(|s| s.to_string());
                 if before.is_some() && after.is_some() {
                     return Err(anyhow::anyhow!(RuntimeException {
@@ -116,18 +153,23 @@ impl RepositoryCommand {
                 if before.is_some() || after.is_some() {
                     if matches!(repo_config, PhpMixed::Bool(false)) {
                         return Err(anyhow::anyhow!(RuntimeException {
-                            message: "Cannot use --before/--after with boolean repository values".to_string(),
+                            message: "Cannot use --before/--after with boolean repository values"
+                                .to_string(),
                             code: 0,
                         }));
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
-                    self.inner.config_source.as_mut().unwrap().insert_repository(
-                        name.as_deref().unwrap(),
-                        repo_config,
-                        reference_name,
-                        offset,
-                    );
+                    self.inner
+                        .config_source
+                        .as_mut()
+                        .unwrap()
+                        .insert_repository(
+                            name.as_deref().unwrap(),
+                            repo_config,
+                            reference_name,
+                            offset,
+                        );
                     return Ok(0);
                 }
 
@@ -147,7 +189,11 @@ impl RepositoryCommand {
                     }));
                 }
                 let name_str = name.as_deref().unwrap();
-                self.inner.config_source.as_mut().unwrap().remove_repository(name_str);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_repository(name_str);
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     self.inner.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
@@ -164,10 +210,11 @@ impl RepositoryCommand {
                         code: 0,
                     }));
                 }
-                self.inner.config_source.as_mut().unwrap().set_repository_url(
-                    name.as_deref().unwrap(),
-                    arg1.as_deref().unwrap(),
-                );
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
                 Ok(0)
             }
             "get-url" | "geturl" => {
@@ -201,7 +248,10 @@ impl RepositoryCommand {
                                     return Ok(0);
                                 }
                                 return Err(anyhow::anyhow!(InvalidArgumentException {
-                                    message: format!("The {} repository does not have a URL", name_str),
+                                    message: format!(
+                                        "The {} repository does not have a URL",
+                                        name_str
+                                    ),
                                     code: 0,
                                 }));
                             }
@@ -244,16 +294,24 @@ impl RepositoryCommand {
                 }
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
-                    self.inner.config_source.as_mut().unwrap().remove_repository("packagist.org");
+                    self.inner
+                        .config_source
+                        .as_mut()
+                        .unwrap()
+                        .remove_repository("packagist.org");
                     return Ok(0);
                 }
                 Err(anyhow::anyhow!(RuntimeException {
-                    message: "Only packagist.org can be enabled/disabled using this command.".to_string(),
+                    message: "Only packagist.org can be enabled/disabled using this command."
+                        .to_string(),
                     code: 0,
                 }))
             }
             _ => Err(anyhow::anyhow!(InvalidArgumentException {
-                message: format!("Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable", action),
+                message: format!(
+                    "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
+                    action
+                ),
                 code: 0,
             })),
         }
@@ -265,8 +323,10 @@ impl RepositoryCommand {
         let mut packagist_present = false;
         for (_key, repo) in &repos {
             if let PhpMixed::Array(ref repo_map) = *repo {
-                let has_type_and_url = repo_map.contains_key("type") && repo_map.contains_key("url");
-                let is_composer_type = repo_map.get("type").and_then(|v| v.as_string()) == Some("composer");
+                let has_type_and_url =
+                    repo_map.contains_key("type") && repo_map.contains_key("url");
+                let is_composer_type =
+                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer");
                 let url_host_ends_with_packagist = repo_map
                     .get("url")
                     .and_then(|v| v.as_string())
@@ -346,7 +406,11 @@ impl RepositoryCommand {
 
     fn suggest_repo_names(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
         Box::new(move |input: &CompletionInput| {
-            let action = input.get_argument("action").as_string().unwrap_or("").to_string();
+            let action = input
+                .get_argument("action")
+                .as_string()
+                .unwrap_or("")
+                .to_string();
             if ["enable", "disable"].contains(&action.as_str()) {
                 return vec!["packagist.org".to_string()];
             }

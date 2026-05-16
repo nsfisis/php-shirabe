@@ -87,7 +87,10 @@ impl Link {
     pub fn get_pretty_constraint(&self) -> anyhow::Result<&str> {
         match &self.pretty_constraint {
             None => Err(anyhow::anyhow!(UnexpectedValueException {
-                message: format!("Link {} has been misconfigured and had no prettyConstraint given.", self.to_string()),
+                message: format!(
+                    "Link {} has been misconfigured and had no prettyConstraint given.",
+                    self.to_string()
+                ),
                 code: 0,
             })),
             Some(s) => Ok(s.as_str()),
@@ -95,7 +98,10 @@ impl Link {
     }
 
     pub fn to_string(&self) -> String {
-        format!("{} {} {} ({})", self.source, self.description, self.target, self.constraint)
+        format!(
+            "{} {} {} ({})",
+            self.source, self.description, self.target, self.constraint
+        )
     }
 
     pub fn get_pretty_string(&self, source_package: &dyn PackageInterface) -> String {

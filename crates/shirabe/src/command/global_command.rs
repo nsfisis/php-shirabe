@@ -9,7 +9,7 @@ use shirabe_external_packages::symfony::console::completion::completion_suggesti
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{chdir, LogicException, RuntimeException};
+use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
 use crate::command::base_command::BaseCommand;
 use crate::console::input::input_argument::InputArgument;
@@ -26,7 +26,8 @@ impl GlobalCommand {
     pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
         let application = self.inner.get_application();
         if input.must_suggest_argument_values_for("command-name") {
-            let names: Vec<String> = application.all()
+            let names: Vec<String> = application
+                .all()
                 .into_iter()
                 .filter(|cmd| !cmd.is_hidden())
                 .filter_map(|cmd| cmd.get_name().map(|n| n.to_string()))
@@ -35,7 +36,11 @@ impl GlobalCommand {
             return;
         }
 
-        let command_name = input.get_argument("command-name").as_string().unwrap_or("").to_string();
+        let command_name = input
+            .get_argument("command-name")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
         if application.has(&command_name) {
             let sub_input = self.prepare_subcommand_input(input.as_input_interface(), true);
             let sub_input = CompletionInput::from_string(&sub_input.to_string(), 2);
@@ -51,8 +56,20 @@ impl GlobalCommand {
             .set_name("global")
             .set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)")
             .set_definition(vec![
-                InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None, vec![]),
-                InputArgument::new("args", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "", None, vec![]),
+                InputArgument::new(
+                    "command-name",
+                    Some(InputArgument::REQUIRED),
+                    "",
+                    None,
+                    vec![],
+                ),
+                InputArgument::new(
+                    "args",
+                    Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                    "",
+                    None,
+                    vec![],
+                ),
             ])
             .set_help(
                 "Use this command as a wrapper to run other Composer commands\n\
@@ -65,7 +82,7 @@ impl GlobalCommand {
                 XDG_CONFIG_HOME or default to /home/<user>/.config/composer\n\n\
                 Note: This path may vary depending on customizations to bin-dir in\n\
                 composer.json or the environmental variable COMPOSER_BIN_DIR.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#global"
+                Read more at https://getcomposer.org/doc/03-cli.md#global",
             );
     }
 
@@ -89,7 +106,11 @@ impl GlobalCommand {
         Ok(self.inner.get_application().run(&sub_input, output)?)
     }
 
-    fn prepare_subcommand_input(&self, input: &dyn InputInterface, quiet: bool) -> Result<StringInput> {
+    fn prepare_subcommand_input(
+        &self,
+        input: &dyn InputInterface,
+        quiet: bool,
+    ) -> Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
             Platform::clear_env("COMPOSER");
         }
@@ -104,17 +125,29 @@ impl GlobalCommand {
                 return Err(RuntimeException {
                     message: "Could not create home directory".to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
         }
 
-        chdir(&home).map_err(|e| RuntimeException { message: format!("Could not switch to home directory \"{}\"", home), code: 0 })?;
+        chdir(&home).map_err(|e| RuntimeException {
+            message: format!("Could not switch to home directory \"{}\"", home),
+            code: 0,
+        })?;
 
         if !quiet {
-            self.inner.get_io().write_error(&format!("<info>Changed current directory to {}</info>", home));
+            self.inner.get_io().write_error(&format!(
+                "<info>Changed current directory to {}</info>",
+                home
+            ));
         }
 
-        let new_input_str = Preg::replace(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}", "", &input.to_string(), 1)?;
+        let new_input_str = Preg::replace(
+            r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}",
+            "",
+            &input.to_string(),
+            1,
+        )?;
         self.inner.get_application().reset_composer();
 
         Ok(StringInput::new(new_input_str))

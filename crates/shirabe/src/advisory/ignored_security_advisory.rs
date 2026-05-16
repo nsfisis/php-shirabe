@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Advisory/IgnoredSecurityAdvisory.php
 
+use crate::advisory::security_advisory::SecurityAdvisory;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use crate::advisory::security_advisory::SecurityAdvisory;
 
 #[derive(Debug)]
 pub struct IgnoredSecurityAdvisory {
@@ -25,7 +25,17 @@ impl IgnoredSecurityAdvisory {
         ignore_reason: Option<String>,
         severity: Option<String>,
     ) -> Self {
-        let inner = SecurityAdvisory::new(package_name, advisory_id, affected_versions, title, sources, reported_at, cve, link, severity);
+        let inner = SecurityAdvisory::new(
+            package_name,
+            advisory_id,
+            affected_versions,
+            title,
+            sources,
+            reported_at,
+            cve,
+            link,
+            severity,
+        );
         Self {
             inner,
             ignore_reason,

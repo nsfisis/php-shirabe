@@ -37,7 +37,12 @@ impl IgnoreListPlatformRequirementFilter {
         })
     }
 
-    pub fn filter_constraint(&self, req: &str, constraint: Box<dyn ConstraintInterface>, allow_upper_bound_override: bool) -> anyhow::Result<Box<dyn ConstraintInterface>> {
+    pub fn filter_constraint(
+        &self,
+        req: &str,
+        constraint: Box<dyn ConstraintInterface>,
+        allow_upper_bound_override: bool,
+    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
         if !PlatformRepository::is_platform_package(req) {
             return Ok(constraint);
         }
@@ -55,7 +60,10 @@ impl IgnoreListPlatformRequirementFilter {
         if let Some(last) = last {
             if last.get_end().to_string() != Interval::until_positive_infinity().to_string() {
                 let constraint = Box::new(MultiConstraint::new(
-                    vec![constraint, Box::new(Constraint::new(">=", last.get_end().get_version()))],
+                    vec![
+                        constraint,
+                        Box::new(Constraint::new(">=", last.get_end().get_version())),
+                    ],
                     false,
                 ));
                 return Ok(constraint);

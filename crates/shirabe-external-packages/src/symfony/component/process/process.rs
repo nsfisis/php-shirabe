@@ -1,5 +1,5 @@
-use shirabe_php_shim::PhpMixed;
 use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Process;
@@ -44,7 +44,10 @@ impl Process {
         todo!()
     }
 
-    pub fn must_run(&mut self, callback: Option<Box<dyn FnMut(&str, &str)>>) -> anyhow::Result<&mut Self> {
+    pub fn must_run(
+        &mut self,
+        callback: Option<Box<dyn FnMut(&str, &str)>>,
+    ) -> anyhow::Result<&mut Self> {
         todo!()
     }
 

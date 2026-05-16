@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Command/AboutCommand.php
 
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use crate::command::base_command::BaseCommand;
 use crate::composer::Composer;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct AboutCommand {
     inner: BaseCommand,

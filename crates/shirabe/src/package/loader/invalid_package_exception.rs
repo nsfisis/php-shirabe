@@ -14,7 +14,12 @@ impl InvalidPackageException {
     pub fn new(errors: Vec<String>, warnings: Vec<String>, data: Vec<PhpMixed>) -> Self {
         let message = format!(
             "Invalid package information: \n{}",
-            errors.iter().chain(warnings.iter()).cloned().collect::<Vec<_>>().join("\n")
+            errors
+                .iter()
+                .chain(warnings.iter())
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("\n")
         );
         Self {
             inner: Exception { message, code: 0 },

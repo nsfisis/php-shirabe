@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
+use crate::command::base_command::BaseCommand;
+use crate::command::completion_trait::CompletionTrait;
+use crate::console::input::input_argument::InputArgument;
+use crate::console::input::input_option::InputOption;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
@@ -54,12 +54,20 @@ impl OutdatedCommand {
             );
     }
 
-    pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let mut args: IndexMap<String, PhpMixed> = IndexMap::new();
         args.insert("command".to_string(), PhpMixed::String("show".to_string()));
         args.insert("--latest".to_string(), PhpMixed::Bool(true));
 
-        if input.get_option("no-interaction").as_bool().unwrap_or(false) {
+        if input
+            .get_option("no-interaction")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--no-interaction".to_string(), PhpMixed::Bool(true));
         }
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {
@@ -102,8 +110,15 @@ impl OutdatedCommand {
         if input.get_option("sort-by-age").as_bool().unwrap_or(false) {
             args.insert("--sort-by-age".to_string(), PhpMixed::Bool(true));
         }
-        args.insert("--ignore-platform-req".to_string(), input.get_option("ignore-platform-req"));
-        if input.get_option("ignore-platform-reqs").as_bool().unwrap_or(false) {
+        args.insert(
+            "--ignore-platform-req".to_string(),
+            input.get_option("ignore-platform-req"),
+        );
+        if input
+            .get_option("ignore-platform-reqs")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--ignore-platform-reqs".to_string(), PhpMixed::Bool(true));
         }
         args.insert("--format".to_string(), input.get_option("format"));

@@ -53,7 +53,8 @@ impl RuleSet {
             return Err(OutOfBoundsException {
                 message: format!("Unknown rule type: {}", r#type),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         let hash = rule.get_hash();
@@ -66,13 +67,19 @@ impl RuleSet {
             }
         }
 
-        self.rules.entry(r#type).or_insert_with(Vec::new).push(rule.clone());
+        self.rules
+            .entry(r#type)
+            .or_insert_with(Vec::new)
+            .push(rule.clone());
         rule.set_type(r#type);
         self.rule_by_id.insert(self.next_rule_id, rule.clone());
 
         self.next_rule_id += 1;
 
-        self.rules_by_hash.entry(hash).or_insert_with(Vec::new).push(rule);
+        self.rules_by_hash
+            .entry(hash)
+            .or_insert_with(Vec::new)
+            .push(rule);
 
         Ok(())
     }

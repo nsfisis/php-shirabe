@@ -135,8 +135,11 @@ impl Forgejo {
             },
         );
 
-        self.io
-            .write_error("<info>Token stored successfully.</info>", true, IOInterface::NORMAL);
+        self.io.write_error(
+            "<info>Token stored successfully.</info>",
+            true,
+            IOInterface::NORMAL,
+        );
 
         Ok(Ok(true))
     }

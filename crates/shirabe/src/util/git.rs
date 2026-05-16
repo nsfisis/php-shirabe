@@ -6,10 +6,10 @@ use std::sync::Mutex;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_map, array_merge_recursive, clearstatcache, count, explode, implode, in_array, is_array,
+    InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
+    array_merge_recursive, clearstatcache, count, explode, implode, in_array, is_array,
     is_callable, is_dir, preg_quote, rawurldecode, rawurlencode, str_contains, str_ends_with,
     str_replace, str_replace_array, strlen, strpos, substr, trim, version_compare,
-    InvalidArgumentException, PhpMixed, RuntimeException, PHP_EOL,
 };
 
 use crate::config::Config;
@@ -157,7 +157,11 @@ impl Git {
         let cwd_string = cwd.map(|s| s.to_string());
 
         // PHP closure: $runCommands = function ($url) use (...) { ... };
-        let mut run_commands_inline = |url_arg: &str, this_process: &mut ProcessExecutor, last_cmd: &mut PhpMixed, command_output: Option<&mut PhpMixed>| -> i64 {
+        let mut run_commands_inline = |url_arg: &str,
+                                       this_process: &mut ProcessExecutor,
+                                       last_cmd: &mut PhpMixed,
+                                       command_output: Option<&mut PhpMixed>|
+         -> i64 {
             let collect_outputs = !command_output
                 .as_ref()
                 .map(|v| is_callable(v))
@@ -358,7 +362,9 @@ impl Git {
                         self.io.as_ref(),
                         &self.config,
                         &self.process,
-                        self.http_downloader.as_ref().unwrap_or(&HttpDownloader::default()),
+                        self.http_downloader
+                            .as_ref()
+                            .unwrap_or(&HttpDownloader::default()),
                     );
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
@@ -412,7 +418,9 @@ impl Git {
                     self.io.as_ref(),
                     &self.config,
                     &self.process,
-                    self.http_downloader.as_ref().unwrap_or(&HttpDownloader::default()),
+                    self.http_downloader
+                        .as_ref()
+                        .unwrap_or(&HttpDownloader::default()),
                 );
 
                 let domain = m.get(2).cloned().unwrap_or_default();
@@ -573,9 +581,12 @@ impl Git {
                         self.io.as_ref(),
                         &self.config,
                         &self.process,
-                        self.http_downloader.as_ref().unwrap_or(&HttpDownloader::default()),
+                        self.http_downloader
+                            .as_ref()
+                            .unwrap_or(&HttpDownloader::default()),
                     );
-                    let message = "Cloning failed, enter your GitLab credentials to access private repos";
+                    let message =
+                        "Cloning failed, enter your GitLab credentials to access private repos";
 
                     if !git_lab_util.authorize_oauth(&m2) && self.io.is_interactive() {
                         git_lab_util.authorize_oauth_interactively(&m1, &m2, Some(message));
@@ -671,10 +682,7 @@ impl Git {
                         IOInterface::NORMAL,
                     );
                     self.io.write_error(
-                        PhpMixed::String(format!(
-                            "<warning>{}</warning>",
-                            trim(&error_msg, None)
-                        )),
+                        PhpMixed::String(format!("<warning>{}</warning>", trim(&error_msg, None))),
                         true,
                         IOInterface::VERBOSE,
                     );
@@ -822,11 +830,7 @@ impl Git {
                         "--prune".to_string(),
                         "origin".to_string(),
                     ],
-                    vec![
-                        "git".to_string(),
-                        "gc".to_string(),
-                        "--auto".to_string(),
-                    ],
+                    vec!["git".to_string(), "gc".to_string(), "--auto".to_string()],
                 ];
 
                 self.run_commands(commands, url, Some(dir), false, None)?;
@@ -851,10 +855,7 @@ impl Git {
 
             if let Err(e) = try_result {
                 self.io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>Sync mirror failed: {}</error>",
-                        e
-                    )),
+                    PhpMixed::String(format!("<error>Sync mirror failed: {}</error>", e)),
                     true,
                     IOInterface::DEBUG,
                 );

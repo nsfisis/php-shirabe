@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    array_keys, array_reverse, array_shift, dirname, get_class, implode, in_array, preg_quote,
-    rtrim, sprintf, str_replace, strtolower, usort, InvalidArgumentException, LogicException,
-    PhpMixed, RuntimeException,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
+    array_reverse, array_shift, dirname, get_class, implode, in_array, preg_quote, rtrim, sprintf,
+    str_replace, strtolower, usort,
 };
 
 use crate::downloader::downloader_interface::DownloaderInterface;
@@ -200,7 +200,8 @@ impl DownloadManager {
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Box<dyn PromiseInterface>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        self.filesystem.ensure_directory_exists(&dirname(&target_dir));
+        self.filesystem
+            .ensure_directory_exists(&dirname(&target_dir));
 
         let mut sources = self.get_available_sources(package, prev_package)?;
 
@@ -241,7 +242,8 @@ impl DownloadManager {
                     // PHP closure handleError: rethrow if not RuntimeException or if IrrecoverableDownloadException
                     // TODO(phase-b): downcast for instanceof checks
                     let is_runtime: bool = todo!("e instanceof RuntimeException");
-                    let is_irrecoverable: bool = todo!("e instanceof IrrecoverableDownloadException");
+                    let is_irrecoverable: bool =
+                        todo!("e instanceof IrrecoverableDownloadException");
                     if is_runtime && !is_irrecoverable {
                         if sources.is_empty() {
                             return Err(e);
@@ -268,7 +270,9 @@ impl DownloadManager {
 
             // PHP: $result->then(static fn ($res) => $res, $handleError);
             // TODO(phase-b): chain $handleError as the rejection handler on the promise
-            let res = result.then(Box::new(move |res: PhpMixed| -> Result<PhpMixed> { Ok(res) }));
+            let res = result.then(Box::new(move |res: PhpMixed| -> Result<PhpMixed> {
+                Ok(res)
+            }));
 
             return Ok(res);
         }
@@ -358,10 +362,7 @@ impl DownloadManager {
                         return Err(e);
                     }
                     self.io.write_error(
-                        PhpMixed::String(format!(
-                            "<error>    Update failed ({})</error>",
-                            e,
-                        )),
+                        PhpMixed::String(format!("<error>    Update failed ({})</error>", e,)),
                         true,
                         IOInterface::NORMAL,
                     );
@@ -503,11 +504,7 @@ impl DownloadManager {
             {
                 let prev_source_owned = prev_source.unwrap_or("").to_string();
                 usort(&mut sources, move |a: &String, b: &String| -> i64 {
-                    if *a == prev_source_owned {
-                        -1
-                    } else {
-                        1
-                    }
+                    if *a == prev_source_owned { -1 } else { 1 }
                 });
 
                 return Ok(sources);

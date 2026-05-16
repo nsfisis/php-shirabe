@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/IO/NullIO.php
 
-use shirabe_php_shim::PhpMixed;
 use crate::io::base_io::BaseIO;
 use crate::io::io_interface::IOInterface;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct NullIO {
@@ -30,16 +30,19 @@ impl IOInterface for NullIO {
         false
     }
 
-    fn write(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {
-    }
+    fn write(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
 
-    fn write_error(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {
-    }
+    fn write_error(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
 
-    fn overwrite(&self, _messages: PhpMixed, _newline: bool, _size: Option<i64>, _verbosity: i64) {
-    }
+    fn overwrite(&self, _messages: PhpMixed, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
 
-    fn overwrite_error(&self, _messages: PhpMixed, _newline: bool, _size: Option<i64>, _verbosity: i64) {
+    fn overwrite_error(
+        &self,
+        _messages: PhpMixed,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
     }
 
     fn ask(&self, _question: String, default: PhpMixed) -> PhpMixed {
@@ -50,7 +53,13 @@ impl IOInterface for NullIO {
         default
     }
 
-    fn ask_and_validate(&self, _question: String, _validator: Box<dyn Fn(PhpMixed) -> PhpMixed>, _attempts: Option<i64>, default: PhpMixed) -> PhpMixed {
+    fn ask_and_validate(
+        &self,
+        _question: String,
+        _validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        _attempts: Option<i64>,
+        default: PhpMixed,
+    ) -> PhpMixed {
         default
     }
 
@@ -58,7 +67,15 @@ impl IOInterface for NullIO {
         None
     }
 
-    fn select(&self, _question: String, _choices: Vec<String>, default: PhpMixed, _attempts: PhpMixed, _error_message: String, _multiselect: bool) -> PhpMixed {
+    fn select(
+        &self,
+        _question: String,
+        _choices: Vec<String>,
+        default: PhpMixed,
+        _attempts: PhpMixed,
+        _error_message: String,
+        _multiselect: bool,
+    ) -> PhpMixed {
         default
     }
 }

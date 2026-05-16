@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Repository/RepositoryInterface.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
+use indexmap::IndexMap;
+use shirabe_php_shim::Countable;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 pub enum FindPackageConstraint {
     String(String),
@@ -42,9 +42,17 @@ pub trait RepositoryInterface: Countable {
 
     fn has_package(&self, package: &dyn PackageInterface) -> bool;
 
-    fn find_package(&self, name: String, constraint: FindPackageConstraint) -> Option<Box<BasePackage>>;
+    fn find_package(
+        &self,
+        name: String,
+        constraint: FindPackageConstraint,
+    ) -> Option<Box<BasePackage>>;
 
-    fn find_packages(&self, name: String, constraint: Option<FindPackageConstraint>) -> Vec<Box<BasePackage>>;
+    fn find_packages(
+        &self,
+        name: String,
+        constraint: Option<FindPackageConstraint>,
+    ) -> Vec<Box<BasePackage>>;
 
     fn get_packages(&self) -> Vec<Box<BasePackage>>;
 

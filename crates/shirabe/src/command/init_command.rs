@@ -9,11 +9,11 @@ use shirabe_external_packages::symfony::component::console::input::array_input::
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
-    array_filter, array_flip, array_intersect_key, array_keys, array_map, basename, empty,
-    explode, file, file_exists, file_get_contents, file_put_contents, function_exists,
-    get_current_user, implode, is_dir, is_string, preg_quote, realpath, server_get, sprintf,
-    str_replace, strpos, strtolower, trim, ucwords, FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL,
-    InvalidArgumentException, PhpMixed, PHP_EOL,
+    FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL, InvalidArgumentException, PHP_EOL, PhpMixed,
+    array_filter, array_flip, array_intersect_key, array_keys, array_map, basename, empty, explode,
+    file, file_exists, file_get_contents, file_put_contents, function_exists, get_current_user,
+    implode, is_dir, is_string, preg_quote, realpath, server_get, sprintf, str_replace, strpos,
+    strtolower, trim, ucwords,
 };
 
 use crate::command::base_command::BaseCommand;
@@ -95,13 +95,9 @@ impl InitCommand {
             "autoload".to_string(),
         ];
         let mut options = array_filter(
-            &array_intersect_key(
-                &input.get_options(),
-                &array_flip(&allowlist),
-            ),
+            &array_intersect_key(&input.get_options(), &array_flip(&allowlist)),
             |val: &PhpMixed| {
-                !matches!(val, PhpMixed::Null)
-                    && !matches!(val, PhpMixed::List(l) if l.is_empty())
+                !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
             },
         );
 
@@ -138,9 +134,7 @@ impl InitCommand {
                         .into_iter()
                         .map(|m| {
                             Box::new(PhpMixed::Array(
-                                m.into_iter()
-                                    .map(|(k, v)| (k, Box::new(v)))
-                                    .collect(),
+                                m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
                             ))
                         })
                         .collect(),
@@ -250,10 +244,7 @@ impl InitCommand {
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
             let mut psr4: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            psr4.insert(
-                format!("{}\\", namespace),
-                Box::new(PhpMixed::String(ap)),
-            );
+            psr4.insert(format!("{}\\", namespace), Box::new(PhpMixed::String(ap)));
             let mut autoload_obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             autoload_obj.insert("psr-4".to_string(), Box::new(PhpMixed::Array(psr4)));
             options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
@@ -303,7 +294,9 @@ impl InitCommand {
             // try to downcast to JsonValidationException
             if let Some(json_err) = e.downcast_ref::<JsonValidationException>() {
                 io.write_error(
-                    PhpMixed::String("<error>Schema validation error, aborting</error>".to_string()),
+                    PhpMixed::String(
+                        "<error>Schema validation error, aborting</error>".to_string(),
+                    ),
                     true,
                     IOInterface::NORMAL,
                 );
@@ -312,10 +305,7 @@ impl InitCommand {
                     implode(&format!("{} - ", PHP_EOL), &json_err.get_errors())
                 );
                 io.write_error(
-                    PhpMixed::String(format!(
-                        "{}:{}{}",
-                        json_err.message, PHP_EOL, errors
-                    )),
+                    PhpMixed::String(format!("{}:{}{}", json_err.message, PHP_EOL, errors)),
                     true,
                     IOInterface::NORMAL,
                 );
@@ -356,7 +346,8 @@ impl InitCommand {
             }
         }
 
-        let question = "Would you like to install dependencies now [<comment>yes</comment>]? ".to_string();
+        let question =
+            "Would you like to install dependencies now [<comment>yes</comment>]? ".to_string();
         if input.is_interactive()
             && self.has_dependencies(&options)
             && io.ask_confirmation(question, true)
@@ -395,11 +386,7 @@ impl InitCommand {
         Ok(0)
     }
 
-    pub(crate) fn initialize(
-        &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
-    ) {
+    pub(crate) fn initialize(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) {
         self.inner.initialize(input, output);
 
         if !input.is_interactive() {
@@ -442,16 +429,13 @@ impl InitCommand {
             io.load_configuration(&config);
             let mut repo_manager = RepositoryFactory::manager(io, &config, None, None);
 
-            let mut repos: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> =
-                vec![Box::new(PlatformRepository::new(vec![], PhpMixed::Null))];
+            let mut repos: Vec<
+                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+            > = vec![Box::new(PlatformRepository::new(vec![], PhpMixed::Null))];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
-                let repo_config = RepositoryFactory::config_from_string(
-                    io,
-                    &config,
-                    repo,
-                    Some(true),
-                )?;
+                let repo_config =
+                    RepositoryFactory::config_from_string(io, &config, repo, Some(true))?;
                 let is_packagist_false = repo_config
                     .get("packagist")
                     .map(|v| v.as_bool() == Some(false))
@@ -476,10 +460,7 @@ impl InitCommand {
 
             if create_default_packagist_repo {
                 let mut default_config: IndexMap<String, PhpMixed> = IndexMap::new();
-                default_config.insert(
-                    "type".to_string(),
-                    PhpMixed::String("composer".to_string()),
-                );
+                default_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
                 default_config.insert(
                     "url".to_string(),
                     PhpMixed::String("https://repo.packagist.org".to_string()),
@@ -672,9 +653,7 @@ impl InitCommand {
             ),
             type_val,
         );
-        if type_value.as_string() == Some("")
-            || matches!(type_value, PhpMixed::Bool(false))
-        {
+        if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
             type_value = PhpMixed::Null;
         }
         input.set_option("type", type_value);
@@ -820,7 +799,9 @@ impl InitCommand {
             .as_string()
             .unwrap_or("")
             .to_string();
-        let namespace = self.namespace_from_package_name(&name_str).unwrap_or_default();
+        let namespace = self
+            .namespace_from_package_name(&name_str)
+            .unwrap_or_default();
         let autoload_for_validate = autoload.clone();
         let autoload_default = autoload.clone();
         let autoload_value = io.ask_and_validate(
@@ -869,7 +850,7 @@ impl InitCommand {
     /// @return array{name: string, email: string|null}
     fn parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
         if let Some(m) = Preg::is_match_strict_groups(
-            r"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u",
+            r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
             author,
         ) {
             let email = m.get("email").cloned();
@@ -902,10 +883,7 @@ impl InitCommand {
     }
 
     /// @return array<int, array{name: string, email?: string}>
-    pub(crate) fn format_authors(
-        &self,
-        author: &str,
-    ) -> Result<Vec<IndexMap<String, PhpMixed>>> {
+    pub(crate) fn format_authors(&self, author: &str) -> Result<Vec<IndexMap<String, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
         let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
         let name = parsed.get("name").cloned().unwrap_or(None);
@@ -950,18 +928,13 @@ impl InitCommand {
 
         let mut output = String::new();
         if process.execute(
-            &vec![
-                "git".to_string(),
-                "config".to_string(),
-                "-l".to_string(),
-            ],
+            &vec!["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
             None,
         ) == 0
         {
             self.git_config = Some(IndexMap::new());
-            let matches =
-                Preg::is_match_all_strict_groups(r"{^([^=]+)=(.*)$}m", &output);
+            let matches = Preg::is_match_all_strict_groups(r"{^([^=]+)=(.*)$}m", &output);
             if let Some(m) = matches {
                 let keys: Vec<String> = m.get(1).cloned().unwrap_or_default();
                 let values: Vec<String> = m.get(2).cloned().unwrap_or_default();
@@ -1033,15 +1006,12 @@ impl InitCommand {
 
     fn update_dependencies(&self, output: &dyn OutputInterface) {
         // PHP try/catch: catch \Exception
-        let result = self
-            .inner
-            .get_application()
-            .and_then(|app| {
-                let update_command = app.find("update")?;
-                app.reset_composer()?;
-                update_command.run(ArrayInput::new(IndexMap::new()), output)?;
-                Ok(())
-            });
+        let result = self.inner.get_application().and_then(|app| {
+            let update_command = app.find("update")?;
+            app.reset_composer()?;
+            update_command.run(ArrayInput::new(IndexMap::new()), output)?;
+            Ok(())
+        });
         if let Err(_e) = result {
             self.inner.get_io().write_error(
                 PhpMixed::String(
@@ -1055,15 +1025,12 @@ impl InitCommand {
     }
 
     fn run_dump_autoload_command(&self, output: &dyn OutputInterface) {
-        let result = self
-            .inner
-            .get_application()
-            .and_then(|app| {
-                let command = app.find("dump-autoload")?;
-                app.reset_composer()?;
-                command.run(ArrayInput::new(IndexMap::new()), output)?;
-                Ok(())
-            });
+        let result = self.inner.get_application().and_then(|app| {
+            let command = app.find("dump-autoload")?;
+            app.reset_composer()?;
+            command.run(ArrayInput::new(IndexMap::new()), output)?;
+            Ok(())
+        });
         if let Err(_e) = result {
             self.inner.get_io().write_error(
                 PhpMixed::String("Could not run dump-autoload.".to_string()),

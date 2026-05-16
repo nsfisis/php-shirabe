@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Util/Bitbucket.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{time, LogicException, PhpMixed};
+use shirabe_php_shim::{LogicException, PhpMixed, time};
 
-use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::config::Config;
+use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::downloader::transport_exception::TransportException;
 use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
@@ -102,75 +102,71 @@ impl Bitbucket {
             "retry-auth-failure".to_string(),
             Box::new(PhpMixed::Bool(false)),
         );
-        options.insert(
-            "http".to_string(),
-            Box::new(PhpMixed::Array(http)),
-        );
+        options.insert("http".to_string(), Box::new(PhpMixed::Array(http)));
         let options = PhpMixed::Array(options);
 
-        let response =
-            match self
-                .http_downloader
-                .get(Self::OAUTH2_ACCESS_TOKEN_URL, &options)
-            {
-                Ok(r) => r,
-                Err(te) => {
-                    if te.code == 400 {
-                        self.io.write_error(
-                            PhpMixed::String(
-                                "<error>Invalid OAuth consumer provided.</error>".to_string(),
-                            ),
-                            true,
-                            IOInterface::NORMAL,
-                        );
-                        self.io.write_error(
-                            PhpMixed::String("This can have three reasons:".to_string()),
-                            true,
-                            IOInterface::NORMAL,
-                        );
-                        self.io.write_error(
+        let response = match self
+            .http_downloader
+            .get(Self::OAUTH2_ACCESS_TOKEN_URL, &options)
+        {
+            Ok(r) => r,
+            Err(te) => {
+                if te.code == 400 {
+                    self.io.write_error(
+                        PhpMixed::String(
+                            "<error>Invalid OAuth consumer provided.</error>".to_string(),
+                        ),
+                        true,
+                        IOInterface::NORMAL,
+                    );
+                    self.io.write_error(
+                        PhpMixed::String("This can have three reasons:".to_string()),
+                        true,
+                        IOInterface::NORMAL,
+                    );
+                    self.io.write_error(
                             PhpMixed::String(
                                 "1. You are authenticating with a bitbucket username/password combination".to_string(),
                             ),
                             true,
                             IOInterface::NORMAL,
                         );
-                        self.io.write_error(
+                    self.io.write_error(
                             PhpMixed::String(
                                 "2. You are using an OAuth consumer, but didn't configure a (dummy) callback url".to_string(),
                             ),
                             true,
                             IOInterface::NORMAL,
                         );
-                        self.io.write_error(
+                    self.io.write_error(
                             PhpMixed::String(
                                 "3. You are using an OAuth consumer, but didn't configure it as private consumer".to_string(),
                             ),
                             true,
                             IOInterface::NORMAL,
                         );
-                        return Ok(false);
-                    }
-                    if te.code == 403 || te.code == 401 {
-                        self.io.write_error(
-                            PhpMixed::String(
-                                "<error>Invalid OAuth consumer provided.</error>".to_string(),
-                            ),
-                            true,
-                            IOInterface::NORMAL,
-                        );
-                        self.io.write_error(
+                    return Ok(false);
+                }
+                if te.code == 403 || te.code == 401 {
+                    self.io.write_error(
+                        PhpMixed::String(
+                            "<error>Invalid OAuth consumer provided.</error>".to_string(),
+                        ),
+                        true,
+                        IOInterface::NORMAL,
+                    );
+                    self.io.write_error(
                             PhpMixed::String(
                                 "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"".to_string(),
                             ),
                             true,
                             IOInterface::NORMAL,
                         );
-                        return Ok(false);
-                    }
-                    return Err(te.into());
+                    return Ok(false);
                 }
-            };
+                return Err(te.into());
+            }
+        };
 
         let token = response.decode_json()?;
         let token_map = match token {
@@ -196,12 +192,7 @@ impl Bitbucket {
             }
             .into());
         }
-        self.token = Some(
-            token_map
-                .into_iter()
-                .map(|(k, v)| (k, *v))
-                .collect(),
-        );
+        self.token = Some(token_map.into_iter().map(|(k, v)| (k, *v)).collect());
 
         Ok(true)
     }
@@ -212,11 +203,8 @@ impl Bitbucket {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error(
-                PhpMixed::String(msg.to_string()),
-                true,
-                IOInterface::NORMAL,
-            );
+            self.io
+                .write_error(PhpMixed::String(msg.to_string()), true, IOInterface::NORMAL);
         }
 
         let local_auth_config = self.config.get_local_auth_config_source();
@@ -227,11 +215,8 @@ impl Bitbucket {
             true,
             IOInterface::NORMAL,
         );
-        self.io.write_error(
-            PhpMixed::String(url.to_string()),
-            true,
-            IOInterface::NORMAL,
-        );
+        self.io
+            .write_error(PhpMixed::String(url.to_string()), true, IOInterface::NORMAL);
         let auth_config_source_name = self.config.get_auth_config_source().get_name();
         let local_name_prefix = local_auth_config
             .as_ref()
@@ -271,9 +256,7 @@ impl Bitbucket {
 
         if consumer_key.is_empty() {
             self.io.write_error(
-                PhpMixed::String(
-                    "<warning>No consumer key given, aborting.</warning>".to_string(),
-                ),
+                PhpMixed::String("<warning>No consumer key given, aborting.</warning>".to_string()),
                 true,
                 IOInterface::NORMAL,
             );
@@ -322,7 +305,8 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        let use_local = store_in_local_auth_config && self.config.get_local_auth_config_source().is_some();
+        let use_local =
+            store_in_local_auth_config && self.config.get_local_auth_config_source().is_some();
         if use_local {
             let mut auth_config_source = self.config.get_local_auth_config_source().unwrap();
             self.store_in_auth_config(
@@ -428,9 +412,7 @@ impl Bitbucket {
             .remove_config_setting(&format!("bitbucket-oauth.{}", origin_url))?;
 
         let token = self.token.as_ref().ok_or_else(|| LogicException {
-            message: format!(
-                "Expected a token configured with expires_in present, got null",
-            ),
+            message: format!("Expected a token configured with expires_in present, got null",),
             code: 0,
         })?;
         let expires_in = token
@@ -438,7 +420,10 @@ impl Bitbucket {
             .and_then(|v| v.as_int())
             .ok_or_else(|| {
                 let token_mixed = PhpMixed::Array(
-                    token.iter().map(|(k, v)| (k.clone(), Box::new(v.clone()))).collect(),
+                    token
+                        .iter()
+                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                        .collect(),
                 );
                 LogicException {
                     message: format!(
@@ -461,24 +446,17 @@ impl Bitbucket {
         );
         consumer.insert(
             "access-token".to_string(),
-            Box::new(
-                token
-                    .get("access_token")
-                    .cloned()
-                    .unwrap_or(PhpMixed::Null),
-            ),
+            Box::new(token.get("access_token").cloned().unwrap_or(PhpMixed::Null)),
         );
         consumer.insert(
             "access-token-expiration".to_string(),
             Box::new(PhpMixed::Int(t + expires_in)),
         );
 
-        self.config
-            .get_auth_config_source()
-            .add_config_setting(
-                &format!("bitbucket-oauth.{}", origin_url),
-                PhpMixed::Array(consumer),
-            )?;
+        self.config.get_auth_config_source().add_config_setting(
+            &format!("bitbucket-oauth.{}", origin_url),
+            PhpMixed::Array(consumer),
+        )?;
 
         Ok(())
     }

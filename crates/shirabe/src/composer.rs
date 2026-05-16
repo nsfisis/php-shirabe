@@ -32,7 +32,9 @@ impl Composer {
         if Self::VERSION == "@package_version@" {
             return Self::SOURCE_VERSION.to_string();
         }
-        if Self::BRANCH_ALIAS_VERSION != "" && Preg::is_match("{^[a-f0-9]{40}$}", Self::VERSION).unwrap_or(false) {
+        if Self::BRANCH_ALIAS_VERSION != ""
+            && Preg::is_match("{^[a-f0-9]{40}$}", Self::VERSION).unwrap_or(false)
+        {
             return format!("{}+{}", Self::BRANCH_ALIAS_VERSION, Self::VERSION);
         }
         Self::VERSION.to_string()

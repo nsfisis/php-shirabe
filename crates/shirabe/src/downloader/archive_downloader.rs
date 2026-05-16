@@ -1,14 +1,16 @@
 //! ref: composer/src/Composer/Downloader/ArchiveDownloader.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{bin2hex, file_exists, is_dir, random_bytes, realpath, RuntimeException, DIRECTORY_SEPARATOR};
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
 use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
+};
 
 #[derive(Debug)]
 pub struct ArchiveDownloader {
@@ -17,21 +19,43 @@ pub struct ArchiveDownloader {
 }
 
 impl ArchiveDownloader {
-    pub fn prepare(&mut self, r#type: &str, package: &dyn PackageInterface, path: &str, prev_package: Option<&dyn PackageInterface>) -> Result<Box<dyn PromiseInterface>> {
+    pub fn prepare(
+        &mut self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
         self.cleanup_executed.remove(package.get_name());
 
         self.inner.prepare(r#type, package, path, prev_package)
     }
 
-    pub fn cleanup(&mut self, r#type: &str, package: &dyn PackageInterface, path: &str, prev_package: Option<&dyn PackageInterface>) -> Result<Box<dyn PromiseInterface>> {
-        self.cleanup_executed.insert(package.get_name().to_string(), true);
+    pub fn cleanup(
+        &mut self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.cleanup_executed
+            .insert(package.get_name().to_string(), true);
 
         self.inner.cleanup(r#type, package, path, prev_package)
     }
 
-    pub fn install(&mut self, package: &dyn PackageInterface, path: &str, output: bool) -> Result<Box<dyn PromiseInterface>> {
+    pub fn install(
+        &mut self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
         if output {
-            self.inner.io.write_error(&format!("  - {}{}", InstallOperation::format(package, false), self.get_install_operation_appendix(package, path)));
+            self.inner.io.write_error(&format!(
+                "  - {}{}",
+                InstallOperation::format(package, false),
+                self.get_install_operation_appendix(package, path)
+            ));
         }
 
         let vendor_dir = self.inner.config.get("vendor-dir");
@@ -39,7 +63,12 @@ impl ArchiveDownloader {
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if !self.inner.filesystem.normalize_path(&vendor_dir).contains(&self.inner.filesystem.normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR))) {
+        if !self.inner.filesystem.normalize_path(&vendor_dir).contains(
+            &self
+                .inner
+                .filesystem
+                .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
+        ) {
             self.inner.filesystem.empty_directory(path);
         }
 
@@ -58,7 +87,9 @@ impl ArchiveDownloader {
             self.inner.add_cleanup_path(package, path);
         }
 
-        self.inner.filesystem.ensure_directory_exists(&temporary_dir);
+        self.inner
+            .filesystem
+            .ensure_directory_exists(&temporary_dir);
         let file_name = self.inner.get_file_name(package, path);
 
         let filesystem = &self.inner.filesystem;
@@ -187,11 +218,20 @@ impl ArchiveDownloader {
         ))
     }
 
-    pub fn get_install_operation_appendix(&self, _package: &dyn PackageInterface, _path: &str) -> &str {
+    pub fn get_install_operation_appendix(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+    ) -> &str {
         ": Extracting archive"
     }
 
-    pub(crate) fn extract(&self, _package: &dyn PackageInterface, _file: &str, _path: &str) -> Result<Box<dyn PromiseInterface>> {
+    pub(crate) fn extract(
+        &self,
+        _package: &dyn PackageInterface,
+        _file: &str,
+        _path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
         todo!()
     }
 }

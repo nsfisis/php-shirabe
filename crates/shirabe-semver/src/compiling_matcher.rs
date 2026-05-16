@@ -27,8 +27,8 @@ static TRANS_OP_INT: &[(i64, &str)] = &[
 pub struct CompilingMatcher;
 
 impl CompilingMatcher {
-    fn compiled_checker_cache(
-    ) -> &'static Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>> {
+    fn compiled_checker_cache()
+    -> &'static Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>> {
         COMPILED_CHECKER_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
     }
 
@@ -42,8 +42,7 @@ impl CompilingMatcher {
     }
 
     pub fn r#match(constraint: &dyn ConstraintInterface, operator: i64, version: String) -> bool {
-        let result_cache_key =
-            format!("{}{};{}", operator, constraint.__to_string(), version);
+        let result_cache_key = format!("{}{};{}", operator, constraint.__to_string(), version);
 
         {
             let cache = Self::result_cache().lock().unwrap();
@@ -59,7 +58,10 @@ impl CompilingMatcher {
             .expect("unknown operator");
         let result = constraint.matches(&Constraint::new(trans_op.to_string(), version));
 
-        Self::result_cache().lock().unwrap().insert(result_cache_key, result);
+        Self::result_cache()
+            .lock()
+            .unwrap()
+            .insert(result_cache_key, result);
         result
     }
 }

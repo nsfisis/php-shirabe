@@ -6,10 +6,10 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
 use shirabe_php_shim::{
-    array_intersect, array_keys, array_map, array_merge, call_user_func, file_get_contents,
-    filemtime, function_exists, hash, in_array, is_array, is_int, ksort, realpath, reset_first,
-    sprintf, strcmp, strtolower, touch, trim, usort, LogicException, PhpMixed, RuntimeException,
-    DATE_RFC3339,
+    DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
+    array_map, array_merge, call_user_func, file_get_contents, filemtime, function_exists, hash,
+    in_array, is_array, is_int, ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch,
+    trim, usort,
 };
 
 use crate::installer::installation_manager::InstallationManager;
@@ -104,19 +104,18 @@ impl Locker {
         let mut relevant_content: IndexMap<String, PhpMixed> = IndexMap::new();
 
         let content_keys: Vec<String> = array_keys(&content);
-        let relevant_keys_strings: Vec<String> = relevant_keys.iter().map(|s| s.to_string()).collect();
+        let relevant_keys_strings: Vec<String> =
+            relevant_keys.iter().map(|s| s.to_string()).collect();
         let intersected = array_intersect(&relevant_keys_strings, &content_keys);
         for key in intersected {
             if let Some(value) = content.get(&key) {
                 relevant_content.insert(key, value.clone());
             }
         }
-        let platform_value = content
-            .get("config")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("platform").cloned(),
-                _ => None,
-            });
+        let platform_value = content.get("config").and_then(|v| match v {
+            PhpMixed::Array(m) => m.get("platform").cloned(),
+            _ => None,
+        });
         if let Some(platform) = platform_value {
             let mut config_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             config_map.insert("platform".to_string(), platform);
@@ -174,10 +173,7 @@ impl Locker {
     }
 
     /// Searches and returns an array of locked packages, retrieved from registered repositories.
-    pub fn get_locked_repository(
-        &mut self,
-        with_dev_reqs: bool,
-    ) -> Result<LockArrayRepository> {
+    pub fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepository> {
         let lock_data = self.get_lock_data()?;
         let mut packages = LockArrayRepository::new(vec![])?;
 
@@ -221,8 +217,7 @@ impl Locker {
                             m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
                         let package = self.loader.load(info_map, None)?;
                         packages.add_package(package.clone())?;
-                        package_by_name
-                            .insert(package.get_name().to_string(), package.clone());
+                        package_by_name.insert(package.get_name().to_string(), package.clone());
 
                         // TODO(phase-b): `$package instanceof AliasPackage` downcast
                         let package_as_alias: Option<&AliasPackage> = None;
@@ -245,8 +240,7 @@ impl Locker {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string();
-                            if let Some(base_pkg) = package_by_name.get(&alias_pkg_name).cloned()
-                            {
+                            if let Some(base_pkg) = package_by_name.get(&alias_pkg_name).cloned() {
                                 let mut alias_pkg = CompleteAliasPackage::new(
                                     todo!("phase-b: downcast Box<BasePackage> to CompletePackage"),
                                     m.get("alias_normalized")
@@ -272,8 +266,9 @@ impl Locker {
         }
 
         Err(RuntimeException {
-            message: "Your composer.lock is invalid. Run \"composer update\" to generate a new one."
-                .to_string(),
+            message:
+                "Your composer.lock is invalid. Run \"composer update\" to generate a new one."
+                    .to_string(),
             code: 0,
         }
         .into())
@@ -308,7 +303,9 @@ impl Locker {
                 "1.0.0",
                 Link::TYPE_REQUIRE,
                 match platform_value.unwrap() {
-                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+                    PhpMixed::Array(m) => {
+                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
+                    }
                     _ => IndexMap::new(),
                 },
             )?;
@@ -324,7 +321,9 @@ impl Locker {
                 "1.0.0",
                 Link::TYPE_REQUIRE,
                 match platform_dev_value.unwrap() {
-                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+                    PhpMixed::Array(m) => {
+                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
+                    }
                     _ => IndexMap::new(),
                 },
             )?;
@@ -514,10 +513,7 @@ impl Locker {
             "content-hash".to_string(),
             PhpMixed::String(self.content_hash.clone()),
         );
-        lock.insert(
-            "packages".to_string(),
-            self.lock_packages(&packages)?,
-        );
+        lock.insert("packages".to_string(), self.lock_packages(&packages)?);
         lock.insert("packages-dev".to_string(), PhpMixed::Null);
         lock.insert(
             "aliases".to_string(),
@@ -526,7 +522,9 @@ impl Locker {
                     .iter()
                     .map(|m| {
                         Box::new(PhpMixed::Array(
-                            m.iter().map(|(k, v)| (k.clone(), Box::new(v.clone()))).collect(),
+                            m.iter()
+                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .collect(),
                         ))
                     })
                     .collect(),
@@ -610,11 +608,7 @@ impl Locker {
         if !is_locked || Some(&lock) != current_data.as_ref() {
             if write {
                 self.lock_file.write(
-                    PhpMixed::Array(
-                        lock.into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
+                    PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                     None,
                 )?;
                 self.lock_data_cache = None;
@@ -623,11 +617,7 @@ impl Locker {
                 self.virtual_file_written = true;
                 self.lock_data_cache = Some(JsonFile::parse_json(
                     &JsonFile::encode(
-                        &PhpMixed::Array(
-                            lock.into_iter()
-                                .map(|(k, v)| (k, Box::new(v)))
-                                .collect(),
-                        ),
+                        &PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                         shirabe_php_shim::JSON_UNESCAPED_SLASHES
                             | shirabe_php_shim::JSON_PRETTY_PRINT
                             | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
@@ -886,7 +876,12 @@ impl Locker {
                             r"{^\s*(\d+)\s*}",
                             output.as_string().unwrap_or(""),
                         ) {
-                            let ts = m.get(1).cloned().unwrap_or_default().parse::<i64>().unwrap_or(0);
+                            let ts = m
+                                .get(1)
+                                .cloned()
+                                .unwrap_or_default()
+                                .parse::<i64>()
+                                .unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }
                     }
@@ -941,10 +936,8 @@ impl Locker {
                     )
                     .is_empty()
                 {
-                    let results = installed_repo.find_packages_with_replacers_and_providers(
-                        &link.get_target(),
-                        None,
-                    );
+                    let results = installed_repo
+                        .find_packages_with_replacers_and_providers(&link.get_target(), None);
 
                     if !results.is_empty() {
                         let provider = reset_first(&results).unwrap();

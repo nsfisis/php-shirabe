@@ -1,13 +1,28 @@
 //! ref: composer/src/Composer/Installer.php
 
+pub mod binary_installer;
+pub mod binary_presence_interface;
+pub mod installation_manager;
+pub mod installer_event;
+pub mod installer_events;
+pub mod installer_interface;
+pub mod library_installer;
+pub mod metapackage_installer;
+pub mod noop_installer;
+pub mod package_event;
+pub mod package_events;
+pub mod plugin_installer;
+pub mod project_installer;
+pub mod suggested_packages_reporter;
+
 use indexmap::IndexMap;
 
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
 use shirabe_php_shim::{
-    array_flip, array_map, array_merge, array_unique, array_values, clone, count, defined,
-    gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array, intval, is_dir,
-    is_numeric, is_string, max_i64, sprintf, strcmp, strpos, strtolower, touch, trigger_error,
-    usort, RuntimeException,
+    RuntimeException, array_flip, array_map, array_merge, array_unique, array_values, clone, count,
+    defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array, intval,
+    is_dir, is_numeric, is_string, max_i64, sprintf, strcmp, strpos, strtolower, touch,
+    trigger_error, usort,
 };
 use shirabe_semver;
 
@@ -240,7 +255,8 @@ impl Installer {
             } else {
                 ScriptEvents::PRE_INSTALL_CMD
             };
-            self.event_dispatcher.dispatch_script(event_name, self.dev_mode);
+            self.event_dispatcher
+                .dispatch_script(event_name, self.dev_mode);
         }
 
         self.download_manager.set_prefer_source(self.prefer_source);
@@ -266,7 +282,11 @@ impl Installer {
             Err(e) => {
                 if self.execute_operations
                     && self.install
-                    && self.config.get("notify-on-install").as_bool().unwrap_or(false)
+                    && self
+                        .config
+                        .get("notify-on-install")
+                        .as_bool()
+                        .unwrap_or(false)
                 {
                     self.installation_manager.notify_installs(&*self.io);
                 }
@@ -277,14 +297,20 @@ impl Installer {
 
         if self.execute_operations
             && self.install
-            && self.config.get("notify-on-install").as_bool().unwrap_or(false)
+            && self
+                .config
+                .get("notify-on-install")
+                .as_bool()
+                .unwrap_or(false)
         {
             self.installation_manager.notify_installs(&*self.io);
         }
 
         if self.update {
             let installed_repo = InstalledRepository::new(vec![
-                self.locker.get_locked_repository(self.dev_mode)?.clone_box(),
+                self.locker
+                    .get_locked_repository(self.dev_mode)?
+                    .clone_box(),
                 Box::new(self.create_platform_repo(false)),
                 Box::new(RootPackageRepository::new(clone(&self.package))),
             ]);
@@ -315,19 +341,18 @@ impl Installer {
 
             self.io.write_error(&sprintf(
                 "<warning>Package %s is abandoned, you should avoid using it. %s.</warning>",
-                &[
-                    complete.get_pretty_name().into(),
-                    replacement.into(),
-                ],
+                &[complete.get_pretty_name().into(), replacement.into()],
             ));
         }
 
         if self.dump_autoloader {
             // write autoloader
             if self.optimize_autoloader {
-                self.io.write_error("<info>Generating optimized autoload files</info>");
+                self.io
+                    .write_error("<info>Generating optimized autoload files</info>");
             } else {
-                self.io.write_error("<info>Generating autoload files</info>");
+                self.io
+                    .write_error("<info>Generating autoload files</info>");
             }
 
             self.autoload_generator
@@ -395,7 +420,8 @@ impl Installer {
             } else {
                 ScriptEvents::POST_INSTALL_CMD
             };
-            self.event_dispatcher.dispatch_script(event_name, self.dev_mode);
+            self.event_dispatcher
+                .dispatch_script(event_name, self.dev_mode);
         }
 
         // re-enable GC except on HHVM which triggers a warning here
@@ -447,13 +473,11 @@ impl Installer {
                     }
                     Err(e) => {
                         if let Some(te) = e.downcast_ref::<TransportException>() {
-                            self.io.error(&format!("Failed to audit {} packages.", target));
+                            self.io
+                                .error(&format!("Failed to audit {} packages.", target));
                             if self.io.is_verbose() {
-                                self.io.error(&format!(
-                                    "[{}] {}",
-                                    get_class(te),
-                                    te.get_message()
-                                ));
+                                self.io
+                                    .error(&format!("[{}] {}", get_class(te), te.get_message()));
                             }
                         } else {
                             return Err(e);
@@ -479,19 +503,20 @@ impl Installer {
 
         let mut locked_repository: Option<Box<dyn LockArrayRepository>> = None;
 
-        let try_load_locked = || -> anyhow::Result<Result<Option<Box<dyn LockArrayRepository>>, ParsingException>> {
-            if self.locker.is_locked() {
-                match self.locker.get_locked_repository(true) {
-                    Ok(r) => Ok(Ok(Some(r))),
-                    Err(e) => match e.downcast::<ParsingException>() {
-                        Ok(p) => Ok(Err(p)),
-                        Err(other) => Err(other),
-                    },
+        let try_load_locked =
+            || -> anyhow::Result<Result<Option<Box<dyn LockArrayRepository>>, ParsingException>> {
+                if self.locker.is_locked() {
+                    match self.locker.get_locked_repository(true) {
+                        Ok(r) => Ok(Ok(Some(r))),
+                        Err(e) => match e.downcast::<ParsingException>() {
+                            Ok(p) => Ok(Err(p)),
+                            Err(other) => Err(other),
+                        },
+                    }
+                } else {
+                    Ok(Ok(None))
                 }
-            } else {
-                Ok(Ok(None))
-            }
-        };
+            };
 
         match try_load_locked()? {
             Ok(r) => locked_repository = r,
@@ -505,8 +530,7 @@ impl Installer {
             }
         }
 
-        if (self.update_allow_list.is_some() || self.update_mirrors)
-            && locked_repository.is_none()
+        if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
             self.io.write_error(
                 &format!(
@@ -529,8 +553,7 @@ impl Installer {
 
         // creating repository set
         let policy = self.create_policy(true, locked_repository.as_deref());
-        let mut repository_set =
-            self.create_repository_set(true, &platform_repo, &aliases, None);
+        let mut repository_set = self.create_repository_set(true, &platform_repo, &aliases, None);
         let repositories = self.repository_manager.get_repositories();
         for repository in repositories {
             repository_set.add_repository(repository);
@@ -548,7 +571,10 @@ impl Installer {
 
         // pass the allow list into the request, so the pool builder can apply it
         if let Some(ref allow_list) = self.update_allow_list {
-            request.set_update_allow_list(allow_list.clone(), self.update_allow_transitive_dependencies);
+            request.set_update_allow_list(
+                allow_list.clone(),
+                self.update_allow_transitive_dependencies,
+            );
         }
 
         let mut pool: Option<Pool> = Some(repository_set.create_pool(
@@ -564,7 +590,8 @@ impl Installer {
         self.io.write_error("<info>Updating dependencies</info>");
 
         // solve dependencies
-        let mut solver: Option<Solver> = Some(Solver::new(&policy, pool.as_ref().unwrap(), &*self.io));
+        let mut solver: Option<Solver> =
+            Some(Solver::new(&policy, pool.as_ref().unwrap(), &*self.io));
         let lock_transaction;
         let rule_set_size;
         match solver
@@ -613,7 +640,10 @@ impl Installer {
         let _ = solver;
 
         self.io.write_error(
-            &format!("Analyzed {} packages to resolve dependencies", count(&pool.as_ref().unwrap())),
+            &format!(
+                "Analyzed {} packages to resolve dependencies",
+                count(&pool.as_ref().unwrap())
+            ),
             true,
             IOInterface::VERBOSE,
         );
@@ -629,10 +659,7 @@ impl Installer {
         if lock_transaction.get_operations().is_empty() {
             self.io.write_error("Nothing to modify in lock file");
 
-            if self.minimal_update
-                && self.update_allow_list.is_none()
-                && self.locker.is_fresh()
-            {
+            if self.minimal_update && self.update_allow_list.is_none() && self.locker.is_fresh() {
                 self.io.write_error("<warning>The --minimal-changes option should be used with package arguments or after modifying composer.json requirements, otherwise it will likely not yield any dependency changes.</warning>");
             }
         }
@@ -652,7 +679,8 @@ impl Installer {
 
         // write lock
         let platform_reqs = self.extract_platform_requirements(&self.package.get_requires());
-        let platform_dev_reqs = self.extract_platform_requirements(&self.package.get_dev_requires());
+        let platform_dev_reqs =
+            self.extract_platform_requirements(&self.package.get_dev_requires());
 
         let mut installs_updates: Vec<Box<dyn OperationInterface>> = vec![];
         let mut uninstalls: Vec<Box<dyn OperationInterface>> = vec![];
@@ -673,7 +701,8 @@ impl Installer {
                     // update in the output as it is only an internal lock file metadata update
                     if self.update_mirrors
                         && uo.get_initial_package().get_name() == uo.get_target_package().get_name()
-                        && uo.get_initial_package().get_version() == uo.get_target_package().get_version()
+                        && uo.get_initial_package().get_version()
+                            == uo.get_target_package().get_version()
                     {
                         continue;
                     }
@@ -726,7 +755,9 @@ impl Installer {
             }
         }
 
-        let sort_by_name = |a: &Box<dyn OperationInterface>, b: &Box<dyn OperationInterface>| -> std::cmp::Ordering {
+        let sort_by_name = |a: &Box<dyn OperationInterface>,
+                            b: &Box<dyn OperationInterface>|
+         -> std::cmp::Ordering {
             let a_name: String = if let Some(uo) = a.as_update_operation() {
                 uo.get_target_package().get_name().to_string()
             } else {
@@ -758,16 +789,18 @@ impl Installer {
                 if self.io.is_very_verbose()
                     && strpos(operation.get_operation_type(), "Alias") == false
                 {
-                    let operation_pkg: Box<dyn PackageInterface> = if let Some(uo) = operation.as_update_operation() {
-                        uo.get_target_package().clone_box()
-                    } else {
-                        operation.get_package().clone_box()
-                    };
+                    let operation_pkg: Box<dyn PackageInterface> =
+                        if let Some(uo) = operation.as_update_operation() {
+                            uo.get_target_package().clone_box()
+                        } else {
+                            operation.get_package().clone_box()
+                        };
                     if let Some(repo) = operation_pkg.get_repository() {
                         source_repo = format!(" from {}", repo.get_repo_name());
                     }
                 }
-                self.io.write_error(&format!("  - {}{}", operation.show(true), source_repo));
+                self.io
+                    .write_error(&format!("  - {}{}", operation.show(true), source_repo));
             }
         }
 
@@ -781,7 +814,11 @@ impl Installer {
             self.package.get_stability_flags(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
-            self.config.get("platform").as_array().cloned().unwrap_or_default(),
+            self.config
+                .get("platform")
+                .as_array()
+                .cloned()
+                .unwrap_or_default(),
             self.write_lock && self.execute_operations,
         )?;
         if updated_lock && self.write_lock && self.execute_operations {
@@ -814,7 +851,10 @@ impl Installer {
         let loader = ArrayLoader::new(None, true);
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
-            result_repo.add_package(loader.load(dumper.dump(&*pkg), "Composer\\Package\\CompletePackage".to_string())?);
+            result_repo.add_package(loader.load(
+                dumper.dump(&*pkg),
+                "Composer\\Package\\CompletePackage".to_string(),
+            )?);
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
@@ -880,7 +920,11 @@ impl Installer {
         if self.config.get("lock").as_bool().unwrap_or(false) {
             self.io.write_error(&format!(
                 "<info>Installing dependencies from lock file{}</info>",
-                if self.dev_mode { " (including require-dev)" } else { "" }
+                if self.dev_mode {
+                    " (including require-dev)"
+                } else {
+                    ""
+                }
             ));
         }
 
@@ -889,7 +933,9 @@ impl Installer {
         // verify that the lock file works with the current platform repository
         // we can skip this part if we're doing this as the second step after an update
         if !already_solved {
-            self.io.write_error("<info>Verifying lock file contents can be installed on current platform.</info>");
+            self.io.write_error(
+                "<info>Verifying lock file contents can be installed on current platform.</info>",
+            );
 
             let platform_repo = self.create_platform_repo(false);
             // creating repository set
@@ -918,11 +964,18 @@ impl Installer {
                 );
             }
 
-            let missing_requirement_info = self.locker.get_missing_requirement_info(&*self.package, self.dev_mode);
+            let missing_requirement_info = self
+                .locker
+                .get_missing_requirement_info(&*self.package, self.dev_mode);
             if !missing_requirement_info.is_empty() {
                 self.io.write_error(missing_requirement_info);
 
-                if !self.config.get("allow-missing-requirements").as_bool().unwrap_or(false) {
+                if !self
+                    .config
+                    .get("allow-missing-requirements")
+                    .as_bool()
+                    .unwrap_or(false)
+                {
                     return Ok(Self::ERROR_LOCK_FILE_INVALID);
                 }
             }
@@ -937,13 +990,15 @@ impl Installer {
             }
             for (_key, link) in &root_requires {
                 if PlatformRepository::is_platform_package(link.get_target()) {
-                    request.require_name(link.get_target().to_string(), Some(link.get_constraint()));
+                    request
+                        .require_name(link.get_target().to_string(), Some(link.get_constraint()));
                 }
             }
 
             for link in self.locker.get_platform_requirements(self.dev_mode) {
                 if !root_requires.contains_key(link.get_target()) {
-                    request.require_name(link.get_target().to_string(), Some(link.get_constraint()));
+                    request
+                        .require_name(link.get_target().to_string(), Some(link.get_constraint()));
                 }
             }
             drop(root_requires);
@@ -1087,7 +1142,12 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if count(&local_repo_transaction.get_operations()) > 0 {
-                let vendor_dir = self.config.get("vendor-dir").as_string().unwrap_or("").to_string();
+                let vendor_dir = self
+                    .config
+                    .get("vendor-dir")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string();
                 if is_dir(&vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
                     // see https://github.com/composer/composer/issues/4070#issuecomment-129792748
@@ -1098,7 +1158,8 @@ impl Installer {
             for operation in local_repo_transaction.get_operations() {
                 // output op, but alias op only in debug verbosity
                 if strpos(operation.get_operation_type(), "Alias") == false || self.io.is_debug() {
-                    self.io.write_error(&format!("  - {}", operation.show(false)));
+                    self.io
+                        .write_error(&format!("  - {}", operation.show(false)));
                 }
             }
         }
@@ -1108,7 +1169,11 @@ impl Installer {
 
     pub(crate) fn create_platform_repo(&self, for_update: bool) -> PlatformRepository {
         let platform_overrides = if for_update {
-            self.config.get("platform").as_array().cloned().unwrap_or_default()
+            self.config
+                .get("platform")
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
         } else {
             self.locker.get_platform_overrides()
         };
@@ -1179,7 +1244,8 @@ impl Installer {
 
         stability_flags.insert(
             self.package.get_name().to_string(),
-            base_package::STABILITIES[VersionParser::parse_stability(self.package.get_version()).as_str()],
+            base_package::STABILITIES
+                [VersionParser::parse_stability(self.package.get_version()).as_str()],
         );
 
         let mut repository_set = RepositorySet::new(
@@ -1190,7 +1256,9 @@ impl Installer {
             root_requires,
             self.temporary_constraints.clone(),
         );
-        repository_set.add_repository(Box::new(RootPackageRepository::new(clone(&self.fixed_root_package))));
+        repository_set.add_repository(Box::new(RootPackageRepository::new(clone(
+            &self.fixed_root_package,
+        ))));
         repository_set.add_repository(Box::new(platform_repo.clone()));
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             // allow using installed repos if needed to avoid warnings about installed repositories being used in the RepositorySet
@@ -1209,7 +1277,9 @@ impl Installer {
                     .as_any()
                     .downcast_ref::<InstalledRepository>()
                     .is_some()
-                    || additional_fixed_repository.as_installed_repository_interface().is_some()
+                    || additional_fixed_repository
+                        .as_installed_repository_interface()
+                        .is_some()
                 {
                     repository_set.allow_installed_repositories();
                     break;
@@ -1261,7 +1331,11 @@ impl Installer {
             preferred_versions = Some(versions);
         }
 
-        DefaultPolicy::new(prefer_stable.unwrap(), prefer_lowest.unwrap(), preferred_versions)
+        DefaultPolicy::new(
+            prefer_stable.unwrap(),
+            prefer_lowest.unwrap(),
+            preferred_versions,
+        )
     }
 
     fn create_request(
@@ -1279,7 +1353,8 @@ impl Installer {
 
         let mut fixed_packages = platform_repo.get_packages();
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
-            fixed_packages = array_merge(fixed_packages, additional_fixed_repository.get_packages());
+            fixed_packages =
+                array_merge(fixed_packages, additional_fixed_repository.get_packages());
         }
 
         // fix the version of all platform packages + additionally installed packages
@@ -1332,7 +1407,10 @@ impl Installer {
                 {
                     request.require_name(
                         locked_package.get_name().to_string(),
-                        Some(Box::new(Constraint::new("==", locked_package.get_version().to_string()))),
+                        Some(Box::new(Constraint::new(
+                            "==",
+                            locked_package.get_version().to_string(),
+                        ))),
                     );
                 }
             }
@@ -1357,11 +1435,17 @@ impl Installer {
         aliases
     }
 
-    fn extract_platform_requirements(&self, links: &IndexMap<String, Link>) -> IndexMap<String, String> {
+    fn extract_platform_requirements(
+        &self,
+        links: &IndexMap<String, Link>,
+    ) -> IndexMap<String, String> {
         let mut platform_reqs: IndexMap<String, String> = IndexMap::new();
         for (_key, link) in links {
             if PlatformRepository::is_platform_package(link.get_target()) {
-                platform_reqs.insert(link.get_target().to_string(), link.get_pretty_constraint().to_string());
+                platform_reqs.insert(
+                    link.get_target().to_string(),
+                    link.get_pretty_constraint().to_string(),
+                );
             }
         }
 
@@ -1426,7 +1510,9 @@ impl Installer {
         Ok(self.audit_config.as_ref().unwrap())
     }
 
-    fn create_security_audit_pool_filter(&mut self) -> anyhow::Result<Option<SecurityAdvisoryPoolFilter>> {
+    fn create_security_audit_pool_filter(
+        &mut self,
+    ) -> anyhow::Result<Option<SecurityAdvisoryPoolFilter>> {
         let audit_config = self.get_audit_config()?;
 
         if audit_config.block_insecure && !self.update_mirrors {
@@ -1631,7 +1717,9 @@ impl Installer {
             shirabe_php_shim::E_USER_DEPRECATED,
         );
 
-        self.set_platform_requirement_filter(PlatformRequirementFilterFactory::from_bool_or_list(ignore_platform_reqs))
+        self.set_platform_requirement_filter(PlatformRequirementFilterFactory::from_bool_or_list(
+            ignore_platform_reqs,
+        ))
     }
 
     pub fn set_platform_requirement_filter(

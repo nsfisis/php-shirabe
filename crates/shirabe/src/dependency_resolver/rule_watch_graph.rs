@@ -27,24 +27,38 @@ impl RuleWatchGraph {
             return;
         }
 
-        if (node.get_rule().as_any() as &dyn Any).downcast_ref::<MultiConflictRule>().is_none() {
+        if (node.get_rule().as_any() as &dyn Any)
+            .downcast_ref::<MultiConflictRule>()
+            .is_none()
+        {
             for literal in [node.watch1, node.watch2] {
                 if !self.watch_chains.contains_key(&literal) {
                     self.watch_chains.insert(literal, RuleWatchChain::new());
                 }
-                self.watch_chains.get_mut(&literal).unwrap().unshift(node.clone());
+                self.watch_chains
+                    .get_mut(&literal)
+                    .unwrap()
+                    .unshift(node.clone());
             }
         } else {
             for literal in node.get_rule().get_literals() {
                 if !self.watch_chains.contains_key(&literal) {
                     self.watch_chains.insert(literal, RuleWatchChain::new());
                 }
-                self.watch_chains.get_mut(&literal).unwrap().unshift(node.clone());
+                self.watch_chains
+                    .get_mut(&literal)
+                    .unwrap()
+                    .unshift(node.clone());
             }
         }
     }
 
-    pub fn propagate_literal(&mut self, decided_literal: i64, level: i64, decisions: &mut Decisions) -> Option<Box<dyn Rule>> {
+    pub fn propagate_literal(
+        &mut self,
+        decided_literal: i64,
+        level: i64,
+        decisions: &mut Decisions,
+    ) -> Option<Box<dyn Rule>> {
         let literal = -decided_literal;
 
         if !self.watch_chains.contains_key(&literal) {
@@ -56,13 +70,17 @@ impl RuleWatchGraph {
         chain.rewind();
         while chain.valid() {
             let node = chain.current();
-            if (node.get_rule().as_any() as &dyn Any).downcast_ref::<MultiConflictRule>().is_none() {
+            if (node.get_rule().as_any() as &dyn Any)
+                .downcast_ref::<MultiConflictRule>()
+                .is_none()
+            {
                 let other_watch = node.get_other_watch(literal);
 
                 if !node.get_rule().is_disabled() && !decisions.satisfy(other_watch) {
                     let rule_literals = node.get_rule().get_literals();
 
-                    let alternative_literals: Vec<i64> = rule_literals.into_iter()
+                    let alternative_literals: Vec<i64> = rule_literals
+                        .into_iter()
                         .filter(|&rule_literal| {
                             literal != rule_literal
                                 && other_watch != rule_literal
@@ -107,6 +125,9 @@ impl RuleWatchGraph {
 
         node.move_watch(from_literal, to_literal);
         self.watch_chains.get_mut(&from_literal).unwrap().remove();
-        self.watch_chains.get_mut(&to_literal).unwrap().unshift(node);
+        self.watch_chains
+            .get_mut(&to_literal)
+            .unwrap()
+            .unshift(node);
     }
 }

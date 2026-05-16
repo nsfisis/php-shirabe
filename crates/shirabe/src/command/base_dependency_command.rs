@@ -80,8 +80,9 @@ impl BaseDependencyCommand {
 
             if !locker.is_locked() {
                 return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message: "A valid composer.lock file is required to run this command with --locked"
-                        .to_string(),
+                    message:
+                        "A valid composer.lock file is required to run this command with --locked"
+                            .to_string(),
                     code: 0,
                 }));
             }
@@ -108,7 +109,10 @@ impl BaseDependencyCommand {
             repos.push(Box::new(local_repo));
 
             let platform_overrides = composer.get_config().get("platform").unwrap_or_default();
-            repos.push(Box::new(PlatformRepository::new(vec![], platform_overrides)));
+            repos.push(Box::new(PlatformRepository::new(
+                vec![],
+                platform_overrides,
+            )));
         }
 
         let mut installed_repo = InstalledRepository::new(repos)?;
@@ -158,11 +162,14 @@ impl BaseDependencyCommand {
                 let parser = VersionParser::new();
                 let platform_constraint = parser.parse_constraints(&text_constraint)?;
                 if platform_constraint.get_lower_bound() != Bound::zero() {
-                    let version = platform_constraint.get_lower_bound().get_version().to_string();
+                    let version = platform_constraint
+                        .get_lower_bound()
+                        .get_version()
+                        .to_string();
                     let temp_platform_pkg = Package::new(needle.clone(), version.clone(), version);
-                    installed_repo.add_repository(Box::new(InstalledArrayRepository::new(vec![
-                        Box::new(temp_platform_pkg),
-                    ])))?;
+                    installed_repo.add_repository(Box::new(InstalledArrayRepository::new(
+                        vec![Box::new(temp_platform_pkg)],
+                    )))?;
                 }
             } else {
                 self.inner.get_io().write_error(&format!(
@@ -221,9 +228,15 @@ impl BaseDependencyCommand {
             None
         };
 
-        let render_tree = input.get_option(Self::OPTION_TREE).as_bool().unwrap_or(false);
-        let recursive =
-            render_tree || input.get_option(Self::OPTION_RECURSIVE).as_bool().unwrap_or(false);
+        let render_tree = input
+            .get_option(Self::OPTION_TREE)
+            .as_bool()
+            .unwrap_or(false);
+        let recursive = render_tree
+            || input
+                .get_option(Self::OPTION_RECURSIVE)
+                .as_bool()
+                .unwrap_or(false);
 
         let mut r#return: i64 = if inverted { 1 } else { 0 };
 
@@ -296,11 +309,7 @@ impl BaseDependencyCommand {
         Ok(r#return)
     }
 
-    pub(crate) fn print_table(
-        &self,
-        output: &dyn OutputInterface,
-        results: Vec<DependentsEntry>,
-    ) {
+    pub(crate) fn print_table(&self, output: &dyn OutputInterface, results: Vec<DependentsEntry>) {
         let mut table: Vec<Vec<String>> = vec![];
         let mut doubles: IndexMap<String, bool> = IndexMap::new();
         let mut results = results;
@@ -316,12 +325,12 @@ impl BaseDependencyCommand {
                     continue;
                 }
                 doubles.insert(unique.clone(), true);
-                let version =
-                    if package.get_pretty_version() == RootPackage::DEFAULT_PRETTY_VERSION {
-                        "-".to_string()
-                    } else {
-                        package.get_pretty_version().to_string()
-                    };
+                let version = if package.get_pretty_version() == RootPackage::DEFAULT_PRETTY_VERSION
+                {
+                    "-".to_string()
+                } else {
+                    package.get_pretty_version().to_string()
+                };
                 let package_url = PackageInfo::get_view_source_or_homepage_url(&*package);
                 let name_with_link = match &package_url {
                     Some(url) => format!(

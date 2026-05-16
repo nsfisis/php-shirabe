@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchiveManager.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    bin2hex, file_exists, random_bytes, realpath, sys_get_temp_dir, InvalidArgumentException,
-    RuntimeException,
-};
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::{
+    InvalidArgumentException, RuntimeException, bin2hex, file_exists, random_bytes, realpath,
+    sys_get_temp_dir,
+};
 
 use crate::downloader::download_manager::DownloadManager;
 use crate::json::json_file::JsonFile;
@@ -58,11 +58,7 @@ impl ArchiveManager {
     ) -> IndexMap<String, String> {
         let base_name = match package.get_archive_name() {
             Some(name) => name.to_string(),
-            None => Preg::replace(
-                "#[^a-z0-9-_]#i",
-                "-",
-                package.get_name(),
-            ),
+            None => Preg::replace("#[^a-z0-9-_]#i", "-", package.get_name()),
         };
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
@@ -129,7 +125,10 @@ impl ArchiveManager {
 
         let mut usable_archiver_idx: Option<usize> = None;
         for (i, archiver) in self.archivers.iter().enumerate() {
-            if archiver.supports(format.clone(), package.get_source_type().map(|s| s.to_string())) {
+            if archiver.supports(
+                format.clone(),
+                package.get_source_type().map(|s| s.to_string()),
+            ) {
                 usable_archiver_idx = Some(i);
                 break;
             }

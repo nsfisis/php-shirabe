@@ -21,7 +21,10 @@ pub struct VersionParser {
 impl VersionParser {
     pub const DEFAULT_BRANCH_ALIAS: &'static str = "9999999-dev";
 
-    pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<Arc<dyn ConstraintInterface + Send + Sync>> {
+    pub fn parse_constraints(
+        &self,
+        constraints: &str,
+    ) -> anyhow::Result<Arc<dyn ConstraintInterface + Send + Sync>> {
         let mut cache = CONSTRAINTS.lock().unwrap();
         if !cache.contains_key(constraints) {
             let parsed = self.inner.parse_constraints(constraints)?;
@@ -30,13 +33,20 @@ impl VersionParser {
         Ok(Arc::clone(cache.get(constraints).unwrap()))
     }
 
-    pub fn parse_name_version_pairs(&self, pairs: Vec<String>) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+    pub fn parse_name_version_pairs(
+        &self,
+        pairs: Vec<String>,
+    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let pairs: Vec<String> = pairs;
         let mut result: Vec<IndexMap<String, String>> = Vec::new();
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", pairs[i].trim().to_string())?;
+            let mut pair = Preg::replace(
+                r"{^([^=: ]+)[=: ](.*)$}",
+                "$1 $2",
+                pairs[i].trim().to_string(),
+            )?;
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')

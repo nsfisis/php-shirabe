@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFinder.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
-use shirabe_php_shim::{preg_quote, realpath, RuntimeException};
 use crate::package::archiver::composer_exclude_filter::ComposerExcludeFilter;
 use crate::package::archiver::git_exclude_filter::GitExcludeFilter;
 use crate::util::filesystem::Filesystem;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
+use shirabe_php_shim::{RuntimeException, preg_quote, realpath};
 
 pub struct ArchivableFilesFinder {
     pub(crate) finder: Finder,
@@ -30,7 +30,8 @@ impl ArchivableFilesFinder {
             return Err(RuntimeException {
                 message: format!("Could not realpath() the source directory \"{}\"", sources),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
         let sources = fs.normalize_path(&sources_real_path.unwrap());
 

@@ -4,10 +4,10 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_key_exists, chr, empty, explode, filter_var, filter_var_with_options, floor, inet_pton,
-    ltrim, parse_url, str_pad, str_repeat, stripos, strlen, strpbrk, strpos, substr, substr_count,
-    unpack, PhpMixed, RuntimeException, FILTER_VALIDATE_INT, FILTER_VALIDATE_IP, PHP_URL_HOST,
-    PHP_URL_PORT, PHP_URL_SCHEME,
+    FILTER_VALIDATE_INT, FILTER_VALIDATE_IP, PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed,
+    RuntimeException, array_key_exists, chr, empty, explode, filter_var, filter_var_with_options,
+    floor, inet_pton, ltrim, parse_url, str_pad, str_repeat, stripos, strlen, strpbrk, strpos,
+    substr, substr_count, unpack,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -111,12 +111,7 @@ impl NoProxyPattern {
     }
 
     /// Returns true if the url is matched by a rule
-    pub(crate) fn r#match(
-        &mut self,
-        index: i64,
-        host_name: &str,
-        url: &UrlData,
-    ) -> Result<bool> {
+    pub(crate) fn r#match(&mut self, index: i64, host_name: &str, url: &UrlData) -> Result<bool> {
         let rule = match self.get_rule(index, host_name)? {
             Some(r) => r,
             None => {
@@ -154,10 +149,7 @@ impl NoProxyPattern {
     /// Returns true if the target ip is in the network range
     pub(crate) fn match_range(&self, network: &IpData, target: &IpData) -> Result<bool> {
         let net = unpack("C*", &network.ip);
-        let mask = unpack(
-            "C*",
-            network.netmask.as_deref().unwrap_or_default(),
-        );
+        let mask = unpack("C*", network.netmask.as_deref().unwrap_or_default());
         let ip = unpack("C*", &target.ip);
         let net = match net {
             Some(n) => n,
@@ -209,10 +201,7 @@ impl NoProxyPattern {
                 .get(&i.to_string())
                 .and_then(|v| v.as_int())
                 .unwrap_or(0);
-            let ip_byte = ip
-                .get(&i.to_string())
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
+            let ip_byte = ip.get(&i.to_string()).and_then(|v| v.as_int()).unwrap_or(0);
             if (net_byte & mask_byte) != (ip_byte & mask_byte) {
                 return Ok(false);
             }
@@ -335,7 +324,12 @@ impl NoProxyPattern {
             mask.push_str(&chr(0xff ^ (0xff >> remainder)));
         }
 
-        let mask = str_pad(&mask, size as usize, &chr(0), shirabe_php_shim::STR_PAD_RIGHT);
+        let mask = str_pad(
+            &mask,
+            size as usize,
+            &chr(0),
+            shirabe_php_shim::STR_PAD_RIGHT,
+        );
 
         self.ip_map_to_6(mask.as_bytes(), size)
     }
@@ -387,10 +381,7 @@ impl NoProxyPattern {
         };
 
         for i in 1..17 {
-            let ip_byte = ip
-                .get(&i.to_string())
-                .and_then(|v| v.as_int())
-                .unwrap_or(0);
+            let ip_byte = ip.get(&i.to_string()).and_then(|v| v.as_int()).unwrap_or(0);
             let mask_byte = mask
                 .get(&i.to_string())
                 .and_then(|v| v.as_int())
@@ -468,9 +459,7 @@ impl NoProxyPattern {
             ip6 = substr(&host_name, 1, Some((index as i64) - 1));
             host_name = substr(&host_name, (index as i64) + 1, None);
 
-            if strpbrk(&host_name, "[]").is_some()
-                || substr_count(&host_name, ":") > 1
-            {
+            if strpbrk(&host_name, "[]").is_some() || substr_count(&host_name, ":") > 1 {
                 return Ok(error);
             }
         }
@@ -500,12 +489,7 @@ impl NoProxyPattern {
         inner.insert("max_range".to_string(), PhpMixed::Int(max));
         options.insert(
             "options".to_string(),
-            PhpMixed::Array(
-                inner
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(inner.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
         );
 
         !matches!(

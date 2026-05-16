@@ -3,7 +3,7 @@
 use std::sync::LazyLock;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{preg_quote, LogicException, UnexpectedValueException};
+use shirabe_php_shim::{LogicException, UnexpectedValueException, preg_quote};
 
 use crate::package::link::Link;
 use crate::package::package_interface::PackageInterface;

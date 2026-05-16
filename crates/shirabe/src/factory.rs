@@ -6,11 +6,11 @@ use shirabe_external_packages::symfony::component::console::formatter::output_fo
 use shirabe_external_packages::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle;
 use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
 use shirabe_php_shim::{
-    array_keys, array_replace_recursive, class_exists, dirname, extension_loaded, file_exists,
-    file_get_contents, file_put_contents, implode, in_array, is_array, is_dir, is_file, is_string,
-    json_decode, pathinfo, realpath, str_replace, strpos, strtr, substr, trim, InvalidArgumentException,
-    Phar, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive, PATHINFO_EXTENSION,
-    PHP_EOL,
+    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, Phar, PhpMixed, RuntimeException,
+    UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive, class_exists,
+    dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode,
+    in_array, is_array, is_dir, is_file, is_string, json_decode, pathinfo, realpath, str_replace,
+    strpos, strtr, substr, trim,
 };
 
 use crate::autoload::autoload_generator::AutoloadGenerator;
@@ -46,8 +46,8 @@ use crate::json::json_validation_exception::JsonValidationException;
 use crate::package::archiver::archive_manager::ArchiveManager;
 use crate::package::archiver::phar_archiver::PharArchiver;
 use crate::package::archiver::zip_archiver::ZipArchiver;
-use crate::package::locker::Locker;
 use crate::package::loader::root_package_loader::RootPackageLoader;
+use crate::package::locker::Locker;
 use crate::package::root_package_interface::RootPackageInterface;
 use crate::package::version::version_guesser::VersionGuesser;
 use crate::package::version::version_parser::VersionParser;
@@ -101,7 +101,10 @@ impl Factory {
         }
 
         if Platform::is_windows() {
-            if Platform::get_env("APPDATA").map(|s| s.is_empty()).unwrap_or(true) {
+            if Platform::get_env("APPDATA")
+                .map(|s| s.is_empty())
+                .unwrap_or(true)
+            {
                 return Err(anyhow::anyhow!(RuntimeException {
                     message:
                         "The APPDATA or COMPOSER_HOME environment variable must be set for composer to run correctly"
@@ -135,8 +138,8 @@ impl Factory {
         // select first dir which exists of: $XDG_CONFIG_HOME/composer or ~/.composer
         for dir in &dirs {
             let dir_copy = dir.clone();
-            let exists = Silencer::call(|| Ok::<bool, anyhow::Error>(is_dir(&dir_copy)))
-                .unwrap_or(false);
+            let exists =
+                Silencer::call(|| Ok::<bool, anyhow::Error>(is_dir(&dir_copy))).unwrap_or(false);
             if exists {
                 return Ok(dir.clone());
             }
@@ -176,16 +179,13 @@ impl Factory {
             {
                 let from = format!("{}/cache", home);
                 let to = format!("{}/Library/Caches/composer", user_dir);
-                let _ = Silencer::call(|| {
-                    Ok::<bool, anyhow::Error>(Platform::rename(&from, &to))
-                });
+                let _ = Silencer::call(|| Ok::<bool, anyhow::Error>(Platform::rename(&from, &to)));
             }
 
             return Ok(format!("{}/Library/Caches/composer", user_dir));
         }
 
-        if home == format!("{}/.composer", user_dir).as_str()
-            && is_dir(&format!("{}/cache", home))
+        if home == format!("{}/.composer", user_dir).as_str() && is_dir(&format!("{}/cache", home))
         {
             return Ok(format!("{}/cache", home));
         }
@@ -229,8 +229,13 @@ impl Factory {
         Ok(home.to_string())
     }
 
-    pub fn create_config(io: Option<&dyn IOInterface>, cwd: Option<&str>) -> anyhow::Result<Config> {
-        let cwd = cwd.map(|s| s.to_string()).unwrap_or_else(|| Platform::get_cwd(true));
+    pub fn create_config(
+        io: Option<&dyn IOInterface>,
+        cwd: Option<&str>,
+    ) -> anyhow::Result<Config> {
+        let cwd = cwd
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| Platform::get_cwd(true));
 
         let mut config = Config::new(true, cwd);
 
@@ -263,7 +268,12 @@ impl Factory {
                     <dyn IOInterface>::DEBUG,
                 );
             }
-            Self::validate_json_schema(io, ValidateJsonInput::File(file.clone()), JsonFile::LAX_SCHEMA, None)?;
+            Self::validate_json_schema(
+                io,
+                ValidateJsonInput::File(file.clone()),
+                JsonFile::LAX_SCHEMA,
+                None,
+            )?;
             config.merge(file.read()?, file.get_path().to_string());
         }
         config.set_config_source(JsonConfigSource::new(file.clone(), false));
@@ -298,11 +308,7 @@ impl Factory {
         }
 
         // load global auth file
-        let auth_file = JsonFile::new(
-            format!("{}/auth.json", config.get_str("home")?),
-            None,
-            io,
-        );
+        let auth_file = JsonFile::new(format!("{}/auth.json", config.get_str("home")?), None, io);
         if auth_file.exists() {
             if let Some(io_ref) = io {
                 io_ref.write_error(
@@ -318,8 +324,16 @@ impl Factory {
                 None,
             )?;
             let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
-            wrapped.insert("config".to_string(), PhpMixed::Array(auth_file.read()?
-                .into_iter().map(|(k, v)| (k, Box::new(v))).collect()));
+            wrapped.insert(
+                "config".to_string(),
+                PhpMixed::Array(
+                    auth_file
+                        .read()?
+                        .into_iter()
+                        .map(|(k, v)| (k, Box::new(v)))
+                        .collect(),
+                ),
+            );
             config.merge(wrapped, auth_file.get_path().to_string());
         }
         config.set_auth_config_source(JsonConfigSource::new(auth_file, true));
@@ -352,13 +366,19 @@ impl Factory {
     }
 
     pub fn get_lock_file(composer_file: &str) -> String {
-        let ext = pathinfo(PhpMixed::String(composer_file.to_string()), PATHINFO_EXTENSION);
+        let ext = pathinfo(
+            PhpMixed::String(composer_file.to_string()),
+            PATHINFO_EXTENSION,
+        );
         let is_json = match ext {
             PhpMixed::String(s) => s == "json",
             _ => false,
         };
         if is_json {
-            format!("{}lock", substr(composer_file, 0, Some(composer_file.len() as i64 - 4)))
+            format!(
+                "{}lock",
+                substr(composer_file, 0, Some(composer_file.len() as i64 - 4))
+            )
         } else {
             format!("{}.lock", composer_file)
         }
@@ -372,7 +392,11 @@ impl Factory {
         );
         styles.insert(
             "warning".to_string(),
-            OutputFormatterStyle::new(Some("black".to_string()), Some("yellow".to_string()), Vec::new()),
+            OutputFormatterStyle::new(
+                Some("black".to_string()),
+                Some("yellow".to_string()),
+                Vec::new(),
+            ),
         );
         styles
     }
@@ -438,10 +462,11 @@ impl Factory {
             if !Platform::is_input_completion_process() {
                 if let Err(e) = file.validate_schema(JsonFile::LAX_SCHEMA) {
                     if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
-                        let errors =
-                            format!(" - {}", implode(&format!("{} - ", PHP_EOL), jve.get_errors()));
-                        let message =
-                            format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
+                        let errors = format!(
+                            " - {}",
+                            implode(&format!("{} - ", PHP_EOL), jve.get_errors())
+                        );
+                        let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
                         return Err(anyhow::anyhow!(JsonValidationException::new(
                             message,
                             jve.get_errors().clone(),
@@ -474,7 +499,11 @@ impl Factory {
                 <dyn IOInterface>::DEBUG,
             );
             config.set_config_source(JsonConfigSource::new(
-                JsonFile::new(realpath(composer_file_path).unwrap_or_default(), None, Some(io)),
+                JsonFile::new(
+                    realpath(composer_file_path).unwrap_or_default(),
+                    None,
+                    Some(io),
+                ),
                 false,
             ));
 
@@ -560,37 +589,26 @@ impl Factory {
         composer.set_loop(r#loop.clone());
 
         // initialize event dispatcher
-        let mut dispatcher = EventDispatcher::new(
-            composer.as_partial(),
-            io.clone_box(),
-            Some(process.clone()),
-        );
+        let mut dispatcher =
+            EventDispatcher::new(composer.as_partial(), io.clone_box(), Some(process.clone()));
         dispatcher.set_run_scripts(!disable_scripts);
         composer.set_event_dispatcher(dispatcher.clone());
 
         // initialize repository manager
-        let rm = RepositoryFactory::manager(
-            io,
-            &config,
-            &http_downloader,
-            &dispatcher,
-            &process,
-        )?;
+        let rm = RepositoryFactory::manager(io, &config, &http_downloader, &dispatcher, &process)?;
         composer.set_repository_manager(rm.clone());
 
         // force-set the version of the global package if not defined as
         // guessing it adds no value and only takes time
         if !full_load && !local_config_data.contains_key("version") {
-            local_config_data.insert(
-                "version".to_string(),
-                PhpMixed::String("1.0.0".to_string()),
-            );
+            local_config_data.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
         }
 
         // load package
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(&config, process.clone(), parser.clone());
-        let mut loader = self.load_root_package(rm.clone(), config.clone(), parser, guesser, io.clone_box());
+        let mut loader =
+            self.load_root_package(rm.clone(), config.clone(), parser, guesser, io.clone_box());
         let package = loader.load(
             local_config_data
                 .iter()
@@ -602,15 +620,31 @@ impl Factory {
         composer.set_package(package);
 
         // load local repository
-        self.add_local_repository(io, rm.clone(), &vendor_dir, composer.get_package(), Some(&process));
+        self.add_local_repository(
+            io,
+            rm.clone(),
+            &vendor_dir,
+            composer.get_package(),
+            Some(&process),
+        );
 
         // initialize installation manager
-        let im = self.create_installation_manager(r#loop.clone(), io.clone_box(), Some(dispatcher.clone()));
+        let im = self.create_installation_manager(
+            r#loop.clone(),
+            io.clone_box(),
+            Some(dispatcher.clone()),
+        );
         composer.set_installation_manager(im.clone());
 
         if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
             // initialize download manager
-            let dm = self.create_download_manager(io, &config, &http_downloader, &process, Some(&dispatcher))?;
+            let dm = self.create_download_manager(
+                io,
+                &config,
+                &http_downloader,
+                &process,
+                Some(&dispatcher),
+            )?;
             composer_full.set_download_manager(dm.clone());
 
             // initialize autoload generator
@@ -629,8 +663,7 @@ impl Factory {
         if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
             if let Some(ref composer_file_path) = composer_file {
                 let lock_file = Self::get_lock_file(composer_file_path);
-                let lock_enabled =
-                    config.get("lock").and_then(|v| v.as_bool()).unwrap_or(true);
+                let lock_enabled = config.get("lock").and_then(|v| v.as_bool()).unwrap_or(true);
                 if !lock_enabled && file_exists(&lock_file) {
                     io.write_error(
                         PhpMixed::String(format!(
@@ -687,7 +720,12 @@ impl Factory {
                 );
             }
 
-            let mut pm = self.create_plugin_manager(io, composer_full, global_composer.as_ref(), disable_plugins);
+            let mut pm = self.create_plugin_manager(
+                io,
+                composer_full,
+                global_composer.as_ref(),
+                disable_plugins,
+            );
             composer_full.set_plugin_manager(pm.clone());
 
             if composer_full.is_global() {
@@ -757,7 +795,10 @@ impl Factory {
         full_load: bool,
     ) -> Option<PartialComposer> {
         // make sure if disable plugins was 'local' it is now turned off
-        let disable_plugins = if matches!(disable_plugins, DisablePlugins::Global | DisablePlugins::All) {
+        let disable_plugins = if matches!(
+            disable_plugins,
+            DisablePlugins::Global | DisablePlugins::All
+        ) {
             DisablePlugins::All
         } else {
             DisablePlugins::None
@@ -777,10 +818,7 @@ impl Factory {
             Ok(c) => Some(c.into_partial()),
             Err(e) => {
                 io.write_error(
-                    PhpMixed::String(format!(
-                        "Failed to initialize global composer: {}",
-                        e
-                    )),
+                    PhpMixed::String(format!("Failed to initialize global composer: {}", e)),
                     true,
                     <dyn IOInterface>::DEBUG,
                 );
@@ -851,23 +889,48 @@ impl Factory {
 
         dm.set_downloader(
             "git",
-            Box::new(GitDownloader::new(io.clone_box(), config.clone(), process.clone(), fs.clone())),
+            Box::new(GitDownloader::new(
+                io.clone_box(),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
+            )),
         );
         dm.set_downloader(
             "svn",
-            Box::new(SvnDownloader::new(io.clone_box(), config.clone(), process.clone(), fs.clone())),
+            Box::new(SvnDownloader::new(
+                io.clone_box(),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
+            )),
         );
         dm.set_downloader(
             "fossil",
-            Box::new(FossilDownloader::new(io.clone_box(), config.clone(), process.clone(), fs.clone())),
+            Box::new(FossilDownloader::new(
+                io.clone_box(),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
+            )),
         );
         dm.set_downloader(
             "hg",
-            Box::new(HgDownloader::new(io.clone_box(), config.clone(), process.clone(), fs.clone())),
+            Box::new(HgDownloader::new(
+                io.clone_box(),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
+            )),
         );
         dm.set_downloader(
             "perforce",
-            Box::new(PerforceDownloader::new(io.clone_box(), config.clone(), process.clone(), fs.clone())),
+            Box::new(PerforceDownloader::new(
+                io.clone_box(),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
+            )),
         );
         dm.set_downloader(
             "zip",
@@ -993,7 +1056,12 @@ impl Factory {
         global_composer: Option<&PartialComposer>,
         disable_plugins: DisablePlugins,
     ) -> PluginManager {
-        PluginManager::new(io.clone_box(), composer.clone(), global_composer.cloned(), disable_plugins)
+        PluginManager::new(
+            io.clone_box(),
+            composer.clone(),
+            global_composer.cloned(),
+            disable_plugins,
+        )
     }
 
     pub fn create_installation_manager(
@@ -1014,10 +1082,7 @@ impl Factory {
     ) {
         let fs = Filesystem::new(process.cloned());
         let bin_dir = trim(
-            &composer
-                .get_config()
-                .get_str("bin-dir")
-                .unwrap_or_default(),
+            &composer.get_config().get_str("bin-dir").unwrap_or_default(),
             "/",
         );
         let bin_compat = composer
@@ -1031,13 +1096,8 @@ impl Factory {
                 .unwrap_or_default(),
             "/",
         );
-        let binary_installer = BinaryInstaller::new(
-            io.clone_box(),
-            bin_dir,
-            bin_compat,
-            fs.clone(),
-            vendor_dir,
-        );
+        let binary_installer =
+            BinaryInstaller::new(io.clone_box(), bin_dir, bin_compat, fs.clone(), vendor_dir);
 
         let mut im = im.clone();
         im.add_installer(Box::new(LibraryInstaller::new(
@@ -1056,11 +1116,7 @@ impl Factory {
         im.add_installer(Box::new(MetapackageInstaller::new(io.clone_box())));
     }
 
-    fn purge_packages(
-        &self,
-        repo: &dyn InstalledRepositoryInterface,
-        im: &InstallationManager,
-    ) {
+    fn purge_packages(&self, repo: &dyn InstalledRepositoryInterface, im: &InstallationManager) {
         for package in repo.get_packages() {
             if !im.is_package_installed(repo, package.as_ref()) {
                 // TODO(phase-b): mutable access on repo trait object
@@ -1182,14 +1238,21 @@ impl Factory {
                 let mut ssl_map: IndexMap<String, Box<PhpMixed>> = existing_ssl;
                 ssl_map.insert(
                     "capath".to_string(),
-                    Box::new(PhpMixed::String(config.get_str("capath").unwrap_or_default())),
+                    Box::new(PhpMixed::String(
+                        config.get_str("capath").unwrap_or_default(),
+                    )),
                 );
                 http_downloader_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
             }
             http_downloader_options =
                 array_replace_recursive(http_downloader_options, options.clone());
         }
-        let http_downloader = match HttpDownloader::new_full(io.clone_box(), config.clone(), http_downloader_options, disable_tls) {
+        let http_downloader = match HttpDownloader::new_full(
+            io.clone_box(),
+            config.clone(),
+            http_downloader_options,
+            disable_tls,
+        ) {
             Ok(h) => h,
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
@@ -1333,7 +1396,10 @@ impl Factory {
                         <dyn IOInterface>::NORMAL,
                     );
                 } else {
-                    return Err(anyhow::anyhow!(UnexpectedValueException { message: msg, code: 0 }));
+                    return Err(anyhow::anyhow!(UnexpectedValueException {
+                        message: msg,
+                        code: 0
+                    }));
                 }
             } else {
                 return Err(e);

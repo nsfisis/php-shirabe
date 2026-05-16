@@ -4,7 +4,7 @@ use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{file_get_contents, file_put_contents, is_writable, strtolower, PhpMixed};
+use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
@@ -100,7 +100,10 @@ impl BumpCommand {
 
         if !Filesystem::is_readable(&composer_json_path) {
             io.write_error(
-                PhpMixed::String(format!("<error>{} is not readable.</error>", composer_json_path)),
+                PhpMixed::String(format!(
+                    "<error>{} is not readable.</error>",
+                    composer_json_path
+                )),
                 true,
                 IOInterface::NORMAL,
             );
@@ -215,12 +218,9 @@ impl BumpCommand {
                 .collect::<std::collections::HashSet<_>>()
                 .into_iter()
                 .collect();
-            let pattern =
-                BasePackage::package_names_to_regexp(&unique_lower);
+            let pattern = BasePackage::package_names_to_regexp(&unique_lower);
             for (key, reqs) in tasks.iter_mut() {
-                reqs.retain(|pkg_name, _| {
-                    Preg::is_match(&pattern, pkg_name).unwrap_or(false)
-                });
+                reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name).unwrap_or(false));
             }
             packages_filter
         } else {
@@ -246,8 +246,8 @@ impl BumpCommand {
                     package = alias.get_alias_of();
                 }
 
-                let bumped = bumper
-                    .bump_requirement(link.get_constraint().as_ref(), package.as_ref())?;
+                let bumped =
+                    bumper.bump_requirement(link.get_constraint().as_ref(), package.as_ref())?;
 
                 if bumped == current_constraint {
                     continue;

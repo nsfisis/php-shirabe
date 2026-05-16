@@ -1,8 +1,8 @@
 pub mod promise;
 pub mod promise_interface;
 
-use shirabe_php_shim::PhpMixed;
 use self::promise::Promise;
+use shirabe_php_shim::PhpMixed;
 
 pub fn resolve(value: Option<PhpMixed>) -> Promise {
     todo!()

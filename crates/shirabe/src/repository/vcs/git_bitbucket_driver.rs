@@ -5,9 +5,9 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_key_exists, array_search_mixed, extension_loaded, http_build_query_mixed, implode,
-    in_array, is_array, sprintf, strpos, InvalidArgumentException, LogicException, PhpMixed,
-    RuntimeException,
+    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
+    array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
+    sprintf, strpos,
 };
 
 use crate::cache::Cache;
@@ -94,11 +94,13 @@ impl GitBitbucketDriver {
             ),
             None,
         ));
-        self.inner
-            .cache
-            .as_mut()
-            .unwrap()
-            .set_read_only(self.inner.config.get("cache-read-only").as_bool().unwrap_or(false));
+        self.inner.cache.as_mut().unwrap().set_read_only(
+            self.inner
+                .config
+                .get("cache-read-only")
+                .as_bool()
+                .unwrap_or(false),
+        );
 
         Ok(())
     }
@@ -153,7 +155,11 @@ impl GitBitbucketDriver {
         self.parse_clone_urls(clone_links);
 
         self.has_issues = !shirabe_php_shim::empty(
-            repo_data.get("has_issues").cloned().as_ref().unwrap_or(&PhpMixed::Null),
+            repo_data
+                .get("has_issues")
+                .cloned()
+                .as_ref()
+                .unwrap_or(&PhpMixed::Null),
         );
         self.branches_url = repo_data
             .get("links")
@@ -214,21 +220,19 @@ impl GitBitbucketDriver {
 
         if !self.inner.info_cache.contains_key(identifier) {
             let mut composer: Option<IndexMap<String, PhpMixed>> = None;
-            if self.inner.should_cache(identifier)
-                && {
-                    let res = self
-                        .inner
-                        .cache
-                        .as_ref()
-                        .and_then(|c| c.read(identifier).ok().flatten());
-                    if let Some(res) = res {
-                        composer = Some(JsonFile::parse_json(&res, None)?);
-                        true
-                    } else {
-                        false
-                    }
+            if self.inner.should_cache(identifier) && {
+                let res = self
+                    .inner
+                    .cache
+                    .as_ref()
+                    .and_then(|c| c.read(identifier).ok().flatten());
+                if let Some(res) = res {
+                    composer = Some(JsonFile::parse_json(&res, None)?);
+                    true
+                } else {
+                    false
                 }
-            {
+            } {
                 // composer already set above
             } else {
                 composer = self.inner.get_base_composer_information(identifier)?;
@@ -258,10 +262,7 @@ impl GitBitbucketDriver {
                 if composer_map.contains_key("support")
                     && !is_array(composer_map.get("support").unwrap())
                 {
-                    composer_map.insert(
-                        "support".to_string(),
-                        PhpMixed::Array(IndexMap::new()),
-                    );
+                    composer_map.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
                 }
                 let support_has_source = composer_map
                     .get("support")
@@ -379,18 +380,16 @@ impl GitBitbucketDriver {
                 composer = Some(composer_map);
             }
 
-            self.inner.info_cache.insert(identifier.to_string(), composer);
+            self.inner
+                .info_cache
+                .insert(identifier.to_string(), composer);
         }
 
         Ok(self.inner.info_cache.get(identifier).cloned().flatten())
     }
 
     /// @inheritDoc
-    pub fn get_file_content(
-        &mut self,
-        file: &str,
-        identifier: &str,
-    ) -> Result<Option<String>> {
+    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_file_content(file, identifier);
         }
@@ -446,10 +445,7 @@ impl GitBitbucketDriver {
             .decode_json()?;
 
         // TODO(phase-b): port PHP `new \DateTimeImmutable($commit['date'])`
-        let date_str = commit
-            .get("date")
-            .and_then(|v| v.as_string())
-            .unwrap_or("");
+        let date_str = commit.get("date").and_then(|v| v.as_string()).unwrap_or("");
         let date: DateTime<Utc> = chrono::DateTime::parse_from_rfc3339(date_str)
             .map_err(|e| anyhow::anyhow!(e))?
             .with_timezone(&Utc);
@@ -513,9 +509,7 @@ impl GitBitbucketDriver {
                             m.insert("pagelen".to_string(), PhpMixed::Int(100));
                             m.insert(
                                 "fields".to_string(),
-                                PhpMixed::String(
-                                    "values.name,values.target.hash,next".to_string(),
-                                ),
+                                PhpMixed::String("values.name,values.target.hash,next".to_string()),
                             );
                             m.insert(
                                 "sort".to_string(),
@@ -556,7 +550,11 @@ impl GitBitbucketDriver {
                     }
                 }
                 if shirabe_php_shim::empty(
-                    tags_data.get("next").cloned().as_ref().unwrap_or(&PhpMixed::Null),
+                    tags_data
+                        .get("next")
+                        .cloned()
+                        .as_ref()
+                        .unwrap_or(&PhpMixed::Null),
                 ) {
                     has_next = false;
                 } else {
@@ -593,8 +591,7 @@ impl GitBitbucketDriver {
                             m.insert(
                                 "fields".to_string(),
                                 PhpMixed::String(
-                                    "values.name,values.target.hash,values.heads,next"
-                                        .to_string(),
+                                    "values.name,values.target.hash,values.heads,next".to_string(),
                                 ),
                             );
                             m.insert(
@@ -636,7 +633,11 @@ impl GitBitbucketDriver {
                     }
                 }
                 if shirabe_php_shim::empty(
-                    branch_data.get("next").cloned().as_ref().unwrap_or(&PhpMixed::Null),
+                    branch_data
+                        .get("next")
+                        .cloned()
+                        .as_ref()
+                        .unwrap_or(&PhpMixed::Null),
                 ) {
                     has_next = false;
                 } else {
@@ -684,7 +685,9 @@ impl GitBitbucketDriver {
                         true,
                     );
                     if in_set
-                        || (401 == code && strpos(te.get_message(), "Could not authenticate against") == Some(0))
+                        || (401 == code
+                            && strpos(te.get_message(), "Could not authenticate against")
+                                == Some(0))
                     {
                         if !self.inner.io.has_authentication(&self.inner.origin_url)
                             && bitbucket_util.authorize_oauth(&self.inner.origin_url)
@@ -696,11 +699,14 @@ impl GitBitbucketDriver {
                             self.attempt_clone_fallback()?;
 
                             let mut headers: IndexMap<String, PhpMixed> = IndexMap::new();
-                            headers.insert(
-                                "url".to_string(),
-                                PhpMixed::String("dummy".to_string()),
-                            );
-                            return Ok(Response::new(headers, 200, IndexMap::new(), "null".to_string()));
+                            headers
+                                .insert("url".to_string(), PhpMixed::String("dummy".to_string()));
+                            return Ok(Response::new(
+                                headers,
+                                200,
+                                IndexMap::new(),
+                                "null".to_string(),
+                            ));
                         }
                     }
                 }
@@ -785,9 +791,8 @@ impl GitBitbucketDriver {
             if !self.get_repo_data()? {
                 if self.fallback_driver.is_none() {
                     return Err(LogicException {
-                        message:
-                            "A fallback driver should be setup if getRepoData returns false"
-                                .to_string(),
+                        message: "A fallback driver should be setup if getRepoData returns false"
+                            .to_string(),
                         code: 0,
                     }
                     .into());
@@ -823,12 +828,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn supports(
-        io: &dyn IOInterface,
-        _config: &Config,
-        url: &str,
-        _deep: bool,
-    ) -> bool {
+    pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, _deep: bool) -> bool {
         if !Preg::is_match(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
             url,

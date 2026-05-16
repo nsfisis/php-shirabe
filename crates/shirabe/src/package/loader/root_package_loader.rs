@@ -2,7 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{strtolower, ucfirst, LogicException, RuntimeException, UnexpectedValueException};
+use shirabe_php_shim::{
+    LogicException, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
+};
 
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
@@ -92,12 +94,16 @@ impl RootPackageLoader {
                     Box::new(shirabe_php_shim::PhpMixed::String(version)),
                 );
             } else {
-                let cwd_str = cwd.map(|s| s.to_string()).unwrap_or_else(|| Platform::get_cwd(true));
+                let cwd_str = cwd
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| Platform::get_cwd(true));
                 let version_data = self.version_guesser.guess_version(&config, &cwd_str);
                 if let Some(data) = version_data {
                     config.insert(
                         "version".to_string(),
-                        Box::new(shirabe_php_shim::PhpMixed::String(data.pretty_version.clone())),
+                        Box::new(shirabe_php_shim::PhpMixed::String(
+                            data.pretty_version.clone(),
+                        )),
                     );
                     config.insert(
                         "version_normalized".to_string(),
@@ -110,10 +116,7 @@ impl RootPackageLoader {
             if !config.contains_key("version") {
                 if let Some(ref io) = self.io {
                     let name = config["name"].as_string().unwrap_or("");
-                    let package_type = config
-                        .get("type")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("");
+                    let package_type = config.get("type").and_then(|v| v.as_string()).unwrap_or("");
                     if name != "__root__" && package_type != "project" {
                         io.warning(&format!(
                             "Composer could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
@@ -167,42 +170,43 @@ impl RootPackageLoader {
             }
         }
 
-        let package = self.inner.load(config.clone(), "Composer\\Package\\RootPackage")?;
+        let package = self
+            .inner
+            .load(config.clone(), "Composer\\Package\\RootPackage")?;
 
-        let real_package: &mut RootPackage = if let Some(alias_pkg) =
-            package.as_any_mut().downcast_mut::<RootAliasPackage>()
-        {
-            alias_pkg
-                .get_alias_of_mut()
-                .as_any_mut()
-                .downcast_mut::<RootPackage>()
-                .ok_or_else(|| {
-                    anyhow::anyhow!(LogicException {
-                        message: "Expecting a Composer\\Package\\RootPackage at this point"
-                            .to_string(),
-                        code: 0,
-                    })
-                })?
-        } else if let Some(root_pkg) = package.as_any_mut().downcast_mut::<RootPackage>() {
-            root_pkg
-        } else {
-            return Err(anyhow::anyhow!(LogicException {
-                message: "Expecting a Composer\\Package\\RootPackage at this point".to_string(),
-                code: 0,
-            }));
-        };
+        let real_package: &mut RootPackage =
+            if let Some(alias_pkg) = package.as_any_mut().downcast_mut::<RootAliasPackage>() {
+                alias_pkg
+                    .get_alias_of_mut()
+                    .as_any_mut()
+                    .downcast_mut::<RootPackage>()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(LogicException {
+                            message: "Expecting a Composer\\Package\\RootPackage at this point"
+                                .to_string(),
+                            code: 0,
+                        })
+                    })?
+            } else if let Some(root_pkg) = package.as_any_mut().downcast_mut::<RootPackage>() {
+                root_pkg
+            } else {
+                return Err(anyhow::anyhow!(LogicException {
+                    message: "Expecting a Composer\\Package\\RootPackage at this point".to_string(),
+                    code: 0,
+                }));
+            };
 
         if auto_versioned {
-            real_package
-                .replace_version(real_package.get_version().to_string(), RootPackage::DEFAULT_PRETTY_VERSION.to_string());
+            real_package.replace_version(
+                real_package.get_version().to_string(),
+                RootPackage::DEFAULT_PRETTY_VERSION.to_string(),
+            );
         }
 
-        if let Some(min_stability) = config
-            .get("minimum-stability")
-            .and_then(|v| v.as_string())
-        {
-            real_package
-                .set_minimum_stability(VersionParser::normalize_stability(min_stability).to_string());
+        if let Some(min_stability) = config.get("minimum-stability").and_then(|v| v.as_string()) {
+            real_package.set_minimum_stability(
+                VersionParser::normalize_stability(min_stability).to_string(),
+            );
         }
 
         let mut aliases: Vec<IndexMap<String, String>> = vec![];
@@ -362,16 +366,11 @@ impl RootPackageLoader {
             }
 
             let stability_names: Vec<&str> = stabilities.keys().copied().collect();
-            let pattern = format!(
-                "^[^@]*?@({})$",
-                stability_names.join("|")
-            );
+            let pattern = format!("^[^@]*?@({})$", stability_names.join("|"));
 
             let mut matched = false;
             for constraint in &constraints {
-                if let Some(Some(m)) =
-                    Preg::is_match_strict_groups(&pattern, constraint).ok()
-                {
+                if let Some(Some(m)) = Preg::is_match_strict_groups(&pattern, constraint).ok() {
                     let name = strtolower(req_name);
                     let stability = stabilities[VersionParser::normalize_stability(&m[1])];
 

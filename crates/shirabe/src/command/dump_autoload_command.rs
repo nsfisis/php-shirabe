@@ -3,7 +3,7 @@
 use anyhow::Result;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{file_exists, InvalidArgumentException, PhpMixed};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
 
 use crate::command::base_command::BaseCommand;
 use crate::console::input::input_option::InputOption;
@@ -52,7 +52,9 @@ impl DumpAutoloadCommand {
             vec![],
             vec![],
         );
-        composer.get_event_dispatcher().dispatch(command_event.get_name(), &command_event);
+        composer
+            .get_event_dispatcher()
+            .dispatch(command_event.get_name(), &command_event);
 
         let installation_manager = composer.get_installation_manager();
         let local_repo = composer.get_repository_manager().get_local_repository();
@@ -71,21 +73,37 @@ impl DumpAutoloadCommand {
 
         let optimize = input.get_option("optimize").as_bool().unwrap_or(false)
             || config.get("optimize-autoloader").as_bool().unwrap_or(false);
-        let authoritative = input.get_option("classmap-authoritative").as_bool().unwrap_or(false)
-            || config.get("classmap-authoritative").as_bool().unwrap_or(false);
-        let apcu_prefix = input.get_option("apcu-prefix").as_string_opt().map(|s| s.to_string());
+        let authoritative = input
+            .get_option("classmap-authoritative")
+            .as_bool()
+            .unwrap_or(false)
+            || config
+                .get("classmap-authoritative")
+                .as_bool()
+                .unwrap_or(false);
+        let apcu_prefix = input
+            .get_option("apcu-prefix")
+            .as_string_opt()
+            .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input.get_option("apcu").as_bool().unwrap_or(false)
             || config.get("apcu-autoloader").as_bool().unwrap_or(false);
 
-        if input.get_option("strict-psr").as_bool().unwrap_or(false) && !optimize && !authoritative {
+        if input.get_option("strict-psr").as_bool().unwrap_or(false) && !optimize && !authoritative
+        {
             return Err(InvalidArgumentException {
                 message: "--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string(),
                 code: 0,
             }
             .into());
         }
-        if input.get_option("strict-ambiguous").as_bool().unwrap_or(false) && !optimize && !authoritative {
+        if input
+            .get_option("strict-ambiguous")
+            .as_bool()
+            .unwrap_or(false)
+            && !optimize
+            && !authoritative
+        {
             return Err(InvalidArgumentException {
                 message: "--strict-ambiguous mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string(),
                 code: 0,
@@ -94,11 +112,17 @@ impl DumpAutoloadCommand {
         }
 
         if authoritative {
-            self.inner.get_io().write("<info>Generating optimized autoload files (authoritative)</info>");
+            self.inner
+                .get_io()
+                .write("<info>Generating optimized autoload files (authoritative)</info>");
         } else if optimize {
-            self.inner.get_io().write("<info>Generating optimized autoload files</info>");
+            self.inner
+                .get_io()
+                .write("<info>Generating optimized autoload files</info>");
         } else {
-            self.inner.get_io().write("<info>Generating autoload files</info>");
+            self.inner
+                .get_io()
+                .write("<info>Generating autoload files</info>");
         }
 
         let generator = composer.get_autoload_generator();
@@ -111,7 +135,9 @@ impl DumpAutoloadCommand {
         if input.get_option("dev").as_bool().unwrap_or(false) {
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 return Err(InvalidArgumentException {
-                    message: "You can not use both --no-dev and --dev as they conflict with each other.".to_string(),
+                    message:
+                        "You can not use both --no-dev and --dev as they conflict with each other."
+                            .to_string(),
                     code: 0,
                 }
                 .into());
@@ -121,7 +147,8 @@ impl DumpAutoloadCommand {
         generator.set_class_map_authoritative(authoritative);
         generator.set_run_scripts(true);
         generator.set_apcu(apcu, apcu_prefix.as_deref());
-        generator.set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input)?);
+        generator
+            .set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input)?);
         let class_map = generator.dump(
             config,
             &local_repo,
@@ -131,23 +158,39 @@ impl DumpAutoloadCommand {
             optimize,
             None,
             composer.get_locker(),
-            input.get_option("strict-ambiguous").as_bool().unwrap_or(false),
+            input
+                .get_option("strict-ambiguous")
+                .as_bool()
+                .unwrap_or(false),
         )?;
         let number_of_classes = class_map.len();
 
         if authoritative {
             self.inner.get_io().write(&format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
         } else if optimize {
-            self.inner.get_io().write(&format!("<info>Generated optimized autoload files containing {} classes</info>", number_of_classes));
+            self.inner.get_io().write(&format!(
+                "<info>Generated optimized autoload files containing {} classes</info>",
+                number_of_classes
+            ));
         } else {
-            self.inner.get_io().write("<info>Generated autoload files</info>");
+            self.inner
+                .get_io()
+                .write("<info>Generated autoload files</info>");
         }
 
-        if missing_dependencies || (input.get_option("strict-psr").as_bool().unwrap_or(false) && !class_map.get_psr_violations().is_empty()) {
+        if missing_dependencies
+            || (input.get_option("strict-psr").as_bool().unwrap_or(false)
+                && !class_map.get_psr_violations().is_empty())
+        {
             return Ok(1);
         }
 
-        if input.get_option("strict-ambiguous").as_bool().unwrap_or(false) && !class_map.get_ambiguous_classes(false).is_empty() {
+        if input
+            .get_option("strict-ambiguous")
+            .as_bool()
+            .unwrap_or(false)
+            && !class_map.get_ambiguous_classes(false).is_empty()
+        {
             return Ok(2);
         }
 

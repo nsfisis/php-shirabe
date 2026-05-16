@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::process::process::Process;
 use shirabe_php_shim::{
-    array_keys, array_map, array_merge, empty, function_exists, implode, is_string, json_encode,
-    preg_quote, str_replace, strlen, strnatcasecmp, strpos, substr, trim, usort, PhpMixed,
-    RuntimeException, PHP_INT_MAX,
+    PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
+    function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
+    strnatcasecmp, strpos, substr, trim, usort,
 };
 use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
 
@@ -144,7 +144,12 @@ impl VersionGuesser {
             .map(|fv| !fv.is_empty())
             .unwrap_or(false);
         if feature_non_empty
-            && "-dev" == substr(version_data.feature_version.as_deref().unwrap_or(""), -4, None)
+            && "-dev"
+                == substr(
+                    version_data.feature_version.as_deref().unwrap_or(""),
+                    -4,
+                    None,
+                )
             && Preg::is_match(
                 r"{\.9{7}}",
                 version_data.feature_version.as_deref().unwrap_or(""),
@@ -296,7 +301,11 @@ impl VersionGuesser {
                     &GitUtil::parse_rev_list_output(&command_output, &self.process),
                     None,
                 );
-                commit = if parsed.is_empty() { None } else { Some(parsed) };
+                commit = if parsed.is_empty() {
+                    None
+                } else {
+                    Some(parsed)
+                };
             }
         }
 
@@ -386,10 +395,8 @@ impl VersionGuesser {
                 // TODO(phase-b): clone ProcessExecutor
                 todo!("self.process.clone()"),
             );
-            let branches: Vec<String> = array_map(
-                |k: &String| k.clone(),
-                &array_keys(driver.get_branches()),
-            );
+            let branches: Vec<String> =
+                array_map(|k: &String| k.clone(), &array_keys(driver.get_branches()));
 
             // try to find the best (nearest) version branch to assume this feature's version
             let mut result = self.guess_feature_version(
@@ -597,11 +604,7 @@ impl VersionGuesser {
         // try to fetch current version from fossil tags
         let mut output = String::new();
         if 0 == self.process.execute(
-            &[
-                "fossil".to_string(),
-                "tag".to_string(),
-                "list".to_string(),
-            ],
+            &["fossil".to_string(), "tag".to_string(), "list".to_string()],
             &mut output,
             Some(path.to_string()),
         ) {
@@ -637,11 +640,7 @@ impl VersionGuesser {
         // try to fetch current version from svn
         let mut output = String::new();
         if 0 == self.process.execute(
-            &[
-                "svn".to_string(),
-                "info".to_string(),
-                "--xml".to_string(),
-            ],
+            &["svn".to_string(), "info".to_string(), "--xml".to_string()],
             &mut output,
             Some(path.to_string()),
         ) {
@@ -670,7 +669,8 @@ impl VersionGuesser {
                 let m1 = matches.get(1).cloned().unwrap_or_default();
                 let m2 = matches.get(2).cloned();
                 let m3 = matches.get(3).cloned();
-                if m2.is_some() && m3.is_some()
+                if m2.is_some()
+                    && m3.is_some()
                     && (branches_path == *m2.as_ref().unwrap()
                         || tags_path == *m2.as_ref().unwrap())
                 {

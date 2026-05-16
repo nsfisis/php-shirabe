@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Util/Http/ProxyItem.php
 
+use crate::util::http::request_proxy::RequestProxy;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    base64_encode, parse_url_all, rawurldecode, strpbrk, PhpMixed, RuntimeException,
+    PhpMixed, RuntimeException, base64_encode, parse_url_all, rawurldecode, strpbrk,
 };
-use crate::util::http::request_proxy::RequestProxy;
 
 #[derive(Debug)]
 pub struct ProxyItem {
@@ -20,12 +20,20 @@ impl ProxyItem {
         let syntax_error = format!("unsupported `{}` syntax", env_name);
 
         if strpbrk(&proxy_url, "\r\n\t").is_some() {
-            return Err(RuntimeException { message: syntax_error, code: 0 });
+            return Err(RuntimeException {
+                message: syntax_error,
+                code: 0,
+            });
         }
 
         let proxy_parsed = parse_url_all(&proxy_url);
         let proxy = match proxy_parsed.as_array() {
-            None => return Err(RuntimeException { message: syntax_error, code: 0 }),
+            None => {
+                return Err(RuntimeException {
+                    message: syntax_error,
+                    code: 0,
+                });
+            }
             Some(a) => a.clone(),
         };
 
@@ -37,7 +45,10 @@ impl ProxyItem {
         }
 
         let scheme = if proxy.contains_key("scheme") {
-            format!("{}://", proxy["scheme"].as_string().unwrap_or("").to_lowercase())
+            format!(
+                "{}://",
+                proxy["scheme"].as_string().unwrap_or("").to_lowercase()
+            )
         } else {
             "http://".to_string()
         };
@@ -92,13 +103,13 @@ impl ProxyItem {
                 return Err(RuntimeException {
                     message: format!("unable to find proxy port in {}", env_name),
                     code: 0,
-                })
+                });
             }
             Some(0) => {
                 return Err(RuntimeException {
                     message: format!("port 0 is reserved in {}", env_name),
                     code: 0,
-                })
+                });
             }
             Some(p) => p,
         };

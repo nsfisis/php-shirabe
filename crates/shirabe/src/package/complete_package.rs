@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::package::Package;
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct CompletePackage {

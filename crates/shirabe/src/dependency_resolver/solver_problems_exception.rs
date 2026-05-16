@@ -50,10 +50,18 @@ impl SolverProblemsException {
         for problem in &self.problems {
             problems.push(format!(
                 "{}\n",
-                problem.get_pretty_string(repository_set, request, pool, is_verbose, &installed_map, &self.learned_pool)
+                problem.get_pretty_string(
+                    repository_set,
+                    request,
+                    pool,
+                    is_verbose,
+                    &installed_map,
+                    &self.learned_pool
+                )
             ));
             missing_extensions.extend(self.get_extension_problems(problem.get_reasons()));
-            is_caused_by_lock = is_caused_by_lock || problem.is_caused_by_lock(repository_set, request, pool);
+            is_caused_by_lock =
+                is_caused_by_lock || problem.is_caused_by_lock(repository_set, request, pool);
         }
 
         let mut i = 1;
@@ -66,7 +74,9 @@ impl SolverProblemsException {
         }
 
         let mut hints: Vec<String> = Vec::new();
-        if !is_dev_extraction && (text.contains("could not be found") || text.contains("no matching package found")) {
+        if !is_dev_extraction
+            && (text.contains("could not be found") || text.contains("no matching package found"))
+        {
             hints.push("Potential causes:\n - A typo in the package name\n - The package is not available in a stable-enough version according to your minimum-stability setting\n   see <https://getcomposer.org/doc/04-schema.md#minimum-stability> for more details.\n - It's a private package and you forgot to add a custom repository to find it\n\nRead <https://getcomposer.org/doc/articles/troubleshooting.md> for further common problems.".to_string());
         }
 
@@ -74,11 +84,16 @@ impl SolverProblemsException {
             hints.push(self.create_extension_hint(&missing_extensions));
         }
 
-        if is_caused_by_lock && !is_dev_extraction && !request.get_update_allow_transitive_root_dependencies() {
+        if is_caused_by_lock
+            && !is_dev_extraction
+            && !request.get_update_allow_transitive_root_dependencies()
+        {
             hints.push("Use the option --with-all-dependencies (-W) to allow upgrades, downgrades and removals for packages currently locked to specific versions.".to_string());
         }
 
-        if text.contains("found composer-plugin-api[2.0.0] but it does not match") && text.contains("- ocramius/package-versions") {
+        if text.contains("found composer-plugin-api[2.0.0] but it does not match")
+            && text.contains("- ocramius/package-versions")
+        {
             hints.push("<warning>ocramius/package-versions only provides support for Composer 2 in 1.8+, which requires PHP 7.4.</warning>\nIf you can not upgrade PHP you can require <info>composer/package-versions-deprecated</info> to resolve this with PHP 7.0+.".to_string());
         }
 
@@ -118,7 +133,9 @@ impl SolverProblemsException {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let mut text = "To enable extensions, verify that they are enabled in your .ini files:\n    - ".to_string();
+        let mut text =
+            "To enable extensions, verify that they are enabled in your .ini files:\n    - "
+                .to_string();
         text.push_str(&paths.join("\n    - "));
         text.push_str("\nYou can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.");
         text.push_str(&format!("\nAlternatively, you can run Composer with `{}` to temporarily ignore these required extensions.", ignore_extensions_arguments));

@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Repository/Vcs/HgDriver.php
 
-use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{dirname, is_dir, is_writable, RuntimeException};
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
@@ -11,6 +7,10 @@ use crate::repository::vcs::vcs_driver::VcsDriver;
 use crate::util::filesystem::Filesystem;
 use crate::util::hg::Hg as HgUtils;
 use crate::util::url::Url;
+use chrono::{DateTime, Utc};
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::{RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
 pub struct HgDriver {
@@ -26,7 +26,13 @@ impl HgDriver {
         if Filesystem::is_local_path(&self.inner.url) {
             self.repo_dir = self.inner.url.clone();
         } else {
-            let cache_vcs_dir = self.inner.config.get("cache-vcs-dir").as_string().unwrap_or("").to_string();
+            let cache_vcs_dir = self
+                .inner
+                .config
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or("")
+                .to_string();
             if !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException {
                     message: "HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string(),
@@ -34,7 +40,8 @@ impl HgDriver {
                 }.into());
             }
 
-            let sanitized = Preg::replace(r"{[^a-z0-9]}i", "-", Url::sanitize(self.inner.url.clone()));
+            let sanitized =
+                Preg::replace(r"{[^a-z0-9]}i", "-", Url::sanitize(self.inner.url.clone()));
             self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
 
             let fs = Filesystem::new();
@@ -50,12 +57,25 @@ impl HgDriver {
                 }.into());
             }
 
-            self.inner.config.prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
+            self.inner
+                .config
+                .prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
 
             let hg_utils = HgUtils::new(&*self.inner.io, &self.inner.config, &self.inner.process);
 
-            if is_dir(&self.repo_dir) && self.inner.process.execute(&["hg", "summary"].map(|s| s.to_string()).to_vec(), &mut String::new(), Some(self.repo_dir.clone())) == 0 {
-                if self.inner.process.execute(&["hg", "pull"].map(|s| s.to_string()).to_vec(), &mut String::new(), Some(self.repo_dir.clone())) != 0 {
+            if is_dir(&self.repo_dir)
+                && self.inner.process.execute(
+                    &["hg", "summary"].map(|s| s.to_string()).to_vec(),
+                    &mut String::new(),
+                    Some(self.repo_dir.clone()),
+                ) == 0
+            {
+                if self.inner.process.execute(
+                    &["hg", "pull"].map(|s| s.to_string()).to_vec(),
+                    &mut String::new(),
+                    Some(self.repo_dir.clone()),
+                ) != 0
+                {
                     self.inner.io.write_error(
                         format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.get_error_output()).into(),
                         true,
@@ -68,7 +88,14 @@ impl HgDriver {
 
                 let repo_dir = self.repo_dir.clone();
                 let command = move |url: String| -> Vec<String> {
-                    vec!["hg".to_string(), "clone".to_string(), "--noupdate".to_string(), "--".to_string(), url, repo_dir.clone()]
+                    vec![
+                        "hg".to_string(),
+                        "clone".to_string(),
+                        "--noupdate".to_string(),
+                        "--".to_string(),
+                        url,
+                        repo_dir.clone(),
+                    ]
                 };
 
                 hg_utils.run_command(command, self.inner.url.clone(), None)?;
@@ -85,7 +112,9 @@ impl HgDriver {
         if self.root_identifier.is_none() {
             let mut output = String::new();
             self.inner.process.execute(
-                &["hg", "tip", "--template", "{node}"].map(|s| s.to_string()).to_vec(),
+                &["hg", "tip", "--template", "{node}"]
+                    .map(|s| s.to_string())
+                    .to_vec(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
@@ -115,17 +144,27 @@ impl HgDriver {
     pub fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
         if identifier.starts_with('-') {
             return Err(RuntimeException {
-                message: format!("Invalid hg identifier detected. Identifier must not start with a -, given: {}", identifier),
+                message: format!(
+                    "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+                    identifier
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         let resource = vec![
-            "hg".to_string(), "cat".to_string(), "-r".to_string(), identifier.to_string(),
-            "--".to_string(), file.to_string(),
+            "hg".to_string(),
+            "cat".to_string(),
+            "-r".to_string(),
+            identifier.to_string(),
+            "--".to_string(),
+            file.to_string(),
         ];
         let mut content = String::new();
-        self.inner.process.execute(&resource, &mut content, Some(self.repo_dir.clone()));
+        self.inner
+            .process
+            .execute(&resource, &mut content, Some(self.repo_dir.clone()));
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -137,22 +176,32 @@ impl HgDriver {
     pub fn get_change_date(&self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
         if identifier.starts_with('-') {
             return Err(RuntimeException {
-                message: format!("Invalid hg identifier detected. Identifier must not start with a -, given: {}", identifier),
+                message: format!(
+                    "Invalid hg identifier detected. Identifier must not start with a -, given: {}",
+                    identifier
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         let mut output = String::new();
         self.inner.process.execute(
-            &["hg", "log", "--template", "{date|rfc3339date}", "-r", identifier]
-                .map(|s| s.to_string())
-                .to_vec(),
+            &[
+                "hg",
+                "log",
+                "--template",
+                "{date|rfc3339date}",
+                "-r",
+                identifier,
+            ]
+            .map(|s| s.to_string())
+            .to_vec(),
             &mut output,
             Some(self.repo_dir.clone()),
         );
 
-        let date = DateTime::parse_from_rfc3339(output.trim())
-            .map(|d| d.with_timezone(&Utc))?;
+        let date = DateTime::parse_from_rfc3339(output.trim()).map(|d| d.with_timezone(&Utc))?;
         Ok(Some(date))
     }
 
@@ -231,7 +280,12 @@ impl HgDriver {
     }
 
     pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, deep: bool) -> bool {
-        if Preg::is_match(r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i", url).unwrap_or(false) {
+        if Preg::is_match(
+            r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i",
+            url,
+        )
+        .unwrap_or(false)
+        {
             return true;
         }
 
@@ -243,7 +297,12 @@ impl HgDriver {
 
             let process = crate::util::process_executor::ProcessExecutor::new(io);
             let mut output = String::new();
-            if process.execute(&["hg", "summary"].map(|s| s.to_string()).to_vec(), &mut output, Some(url)) == 0 {
+            if process.execute(
+                &["hg", "summary"].map(|s| s.to_string()).to_vec(),
+                &mut output,
+                Some(url),
+            ) == 0
+            {
                 return true;
             }
         }
@@ -254,7 +313,13 @@ impl HgDriver {
 
         let process = crate::util::process_executor::ProcessExecutor::new(io);
         let mut ignored = String::new();
-        let exit = process.execute(&["hg", "identify", "--", url].map(|s| s.to_string()).to_vec(), &mut ignored, None);
+        let exit = process.execute(
+            &["hg", "identify", "--", url]
+                .map(|s| s.to_string())
+                .to_vec(),
+            &mut ignored,
+            None,
+        );
 
         exit == 0
     }

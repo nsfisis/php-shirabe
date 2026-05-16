@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Repository/RepositoryUtils.php
 
-use std::any::Any;
-use indexmap::IndexMap;
 use crate::package::link::Link;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::filter_repository::FilterRepository;
 use crate::repository::repository_interface::RepositoryInterface;
+use indexmap::IndexMap;
+use std::any::Any;
 
 pub struct RepositoryUtils;
 
@@ -33,7 +33,12 @@ impl RepositoryUtils {
                     });
                     if !already_in_bucket {
                         bucket.push(candidate.clone_box());
-                        bucket = Self::filter_required_packages(packages, candidate.as_ref(), false, bucket);
+                        bucket = Self::filter_required_packages(
+                            packages,
+                            candidate.as_ref(),
+                            false,
+                            bucket,
+                        );
                     }
                     break;
                 }
@@ -48,7 +53,9 @@ impl RepositoryUtils {
         unwrap_filter_repos: bool,
     ) -> Vec<Box<dyn RepositoryInterface>> {
         let repo: Box<dyn RepositoryInterface> = if unwrap_filter_repos {
-            if let Some(filter_repo) = (repo.as_any() as &dyn Any).downcast_ref::<FilterRepository>() {
+            if let Some(filter_repo) =
+                (repo.as_any() as &dyn Any).downcast_ref::<FilterRepository>()
+            {
                 filter_repo.get_repository()
             } else {
                 repo
@@ -57,7 +64,9 @@ impl RepositoryUtils {
             repo
         };
 
-        if let Some(composite_repo) = (repo.as_any() as &dyn Any).downcast_ref::<CompositeRepository>() {
+        if let Some(composite_repo) =
+            (repo.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
+        {
             let mut repos = Vec::new();
             for r in composite_repo.get_repositories() {
                 for r2 in Self::flatten_repositories(r, unwrap_filter_repos) {

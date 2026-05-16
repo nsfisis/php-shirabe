@@ -4,7 +4,11 @@ use shirabe_php_shim::PhpMixed;
 pub struct Promise;
 
 impl Promise {
-    pub fn new(resolver: Box<dyn FnOnce(Box<dyn FnOnce(Option<PhpMixed>)>, Box<dyn FnOnce(Option<PhpMixed>)>)>) -> Self {
+    pub fn new(
+        resolver: Box<
+            dyn FnOnce(Box<dyn FnOnce(Option<PhpMixed>)>, Box<dyn FnOnce(Option<PhpMixed>)>),
+        >,
+    ) -> Self {
         todo!()
     }
 

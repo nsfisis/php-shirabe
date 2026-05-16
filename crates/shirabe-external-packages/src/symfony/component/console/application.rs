@@ -1,6 +1,6 @@
-use shirabe_php_shim::PhpMixed;
 use crate::symfony::component::console::input::input_interface::InputInterface;
 use crate::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Application;
@@ -78,7 +78,11 @@ impl Application {
         todo!()
     }
 
-    pub fn set_default_command(&mut self, command_name: &str, is_single_command: bool) -> &mut Self {
+    pub fn set_default_command(
+        &mut self,
+        command_name: &str,
+        is_single_command: bool,
+    ) -> &mut Self {
         todo!()
     }
 

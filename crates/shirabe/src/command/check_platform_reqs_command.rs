@@ -4,13 +4,13 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{strip_tags, PhpMixed};
+use shirabe_php_shim::{PhpMixed, strip_tags};
 use shirabe_semver::constraint::constraint::Constraint;
 
 use crate::command::base_command::BaseCommand;
+use crate::console::input::input_option::InputOption;
 use crate::json::json_file::JsonFile;
 use crate::package::link::Link;
-use crate::console::input::input_option::InputOption;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::root_package_repository::RootPackageRepository;
@@ -45,7 +45,11 @@ impl CheckPlatformReqsCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, _output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &self,
+        input: &dyn InputInterface,
+        _output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.inner.require_composer()?;
         let io = self.inner.get_io();
 
@@ -82,19 +86,26 @@ impl CheckPlatformReqsCommand {
 
         if !no_dev {
             for (require, link) in composer.get_package().get_dev_requires() {
-                requires.entry(require.to_string()).or_insert_with(Vec::new).push(link.clone());
+                requires
+                    .entry(require.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(link.clone());
             }
         }
 
         let root_pkg_repo = RootPackageRepository::new(composer.get_package().clone_box());
-        let installed_repo = InstalledRepository::new(vec![installed_repo_base, Box::new(root_pkg_repo)]);
+        let installed_repo =
+            InstalledRepository::new(vec![installed_repo_base, Box::new(root_pkg_repo)]);
 
         for package in installed_repo.get_packages() {
             if remove_packages.contains(&package.get_name().to_string()) {
                 continue;
             }
             for (require, link) in package.get_requires() {
-                requires.entry(require.to_string()).or_insert_with(Vec::new).push(link.clone());
+                requires
+                    .entry(require.to_string())
+                    .or_insert_with(Vec::new)
+                    .push(link.clone());
             }
         }
 
@@ -111,7 +122,8 @@ impl CheckPlatformReqsCommand {
 
         'requirements: for (require, links) in &requires_sorted {
             if PlatformRepository::is_platform_package(require) {
-                let candidates = installed_repo_with_platform.find_packages_with_replacers_and_providers(require);
+                let candidates = installed_repo_with_platform
+                    .find_packages_with_replacers_and_providers(require);
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
@@ -121,7 +133,11 @@ impl CheckPlatformReqsCommand {
                             Some(c)
                         } else {
                             let mut found = None;
-                            for link in candidate.get_provides().iter().chain(candidate.get_replaces().iter()) {
+                            for link in candidate
+                                .get_provides()
+                                .iter()
+                                .chain(candidate.get_replaces().iter())
+                            {
                                 if link.get_target() == require {
                                     found = Some(link.get_constraint().clone_box());
                                     break;
@@ -149,7 +165,10 @@ impl CheckPlatformReqsCommand {
                                     provider: if candidate.get_name() == require {
                                         String::new()
                                     } else {
-                                        format!("<comment>provided by {}</comment>", candidate.get_pretty_name())
+                                        format!(
+                                            "<comment>provided by {}</comment>",
+                                            candidate.get_pretty_name()
+                                        )
                                     },
                                 });
                                 continue 'candidates;
@@ -168,7 +187,10 @@ impl CheckPlatformReqsCommand {
                             provider: if candidate.get_name() == require {
                                 String::new()
                             } else {
-                                format!("<comment>provided by {}</comment>", candidate.get_pretty_name())
+                                format!(
+                                    "<comment>provided by {}</comment>",
+                                    candidate.get_pretty_name()
+                                )
                             },
                         });
                         continue 'requirements;
@@ -190,7 +212,11 @@ impl CheckPlatformReqsCommand {
             }
         }
 
-        let format = input.get_option("format").as_string().unwrap_or("text").to_string();
+        let format = input
+            .get_option("format")
+            .as_string()
+            .unwrap_or("text")
+            .to_string();
         self.print_table(_output, &results, &format);
 
         Ok(exit_code)
@@ -200,49 +226,91 @@ impl CheckPlatformReqsCommand {
         let io = self.inner.get_io();
 
         if format == "json" {
-            let rows: Vec<PhpMixed> = results.iter().map(|result| {
-                let mut row = IndexMap::new();
-                row.insert("name".to_string(), Box::new(PhpMixed::String(result.platform_package.clone())));
-                row.insert("version".to_string(), Box::new(PhpMixed::String(result.version.clone())));
-                row.insert("status".to_string(), Box::new(PhpMixed::String(strip_tags(&result.status))));
-                if let Some(link) = &result.link {
-                    let mut failed_req = IndexMap::new();
-                    failed_req.insert("source".to_string(), Box::new(PhpMixed::String(link.get_source().to_string())));
-                    failed_req.insert("type".to_string(), Box::new(PhpMixed::String(link.get_description().to_string())));
-                    failed_req.insert("target".to_string(), Box::new(PhpMixed::String(link.get_target().to_string())));
-                    failed_req.insert("constraint".to_string(), Box::new(PhpMixed::String(link.get_pretty_constraint().unwrap_or("").to_string())));
-                    row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Array(failed_req)));
-                } else {
-                    row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Null));
-                }
-                let provider_str = strip_tags(&result.provider);
-                row.insert("provider".to_string(), Box::new(if provider_str.is_empty() {
-                    PhpMixed::Null
-                } else {
-                    PhpMixed::String(provider_str)
-                }));
-                PhpMixed::Array(row)
-            }).collect();
-
-            io.write(&JsonFile::encode(&PhpMixed::List(rows.into_iter().map(Box::new).collect())));
-        } else {
-            let rows: Vec<Vec<PhpMixed>> = results.iter().map(|result| {
-                vec![
-                    PhpMixed::String(result.platform_package.clone()),
-                    PhpMixed::String(result.version.clone()),
+            let rows: Vec<PhpMixed> = results
+                .iter()
+                .map(|result| {
+                    let mut row = IndexMap::new();
+                    row.insert(
+                        "name".to_string(),
+                        Box::new(PhpMixed::String(result.platform_package.clone())),
+                    );
+                    row.insert(
+                        "version".to_string(),
+                        Box::new(PhpMixed::String(result.version.clone())),
+                    );
+                    row.insert(
+                        "status".to_string(),
+                        Box::new(PhpMixed::String(strip_tags(&result.status))),
+                    );
                     if let Some(link) = &result.link {
-                        PhpMixed::String(format!("{} {} {} ({})",
-                            link.get_source(),
-                            link.get_description(),
-                            link.get_target(),
-                            link.get_pretty_constraint().unwrap_or(""),
-                        ))
+                        let mut failed_req = IndexMap::new();
+                        failed_req.insert(
+                            "source".to_string(),
+                            Box::new(PhpMixed::String(link.get_source().to_string())),
+                        );
+                        failed_req.insert(
+                            "type".to_string(),
+                            Box::new(PhpMixed::String(link.get_description().to_string())),
+                        );
+                        failed_req.insert(
+                            "target".to_string(),
+                            Box::new(PhpMixed::String(link.get_target().to_string())),
+                        );
+                        failed_req.insert(
+                            "constraint".to_string(),
+                            Box::new(PhpMixed::String(
+                                link.get_pretty_constraint().unwrap_or("").to_string(),
+                            )),
+                        );
+                        row.insert(
+                            "failed_requirement".to_string(),
+                            Box::new(PhpMixed::Array(failed_req)),
+                        );
                     } else {
-                        PhpMixed::String(String::new())
-                    },
-                    PhpMixed::String(format!("{} {}", result.status, result.provider).trim_end().to_string()),
-                ]
-            }).collect();
+                        row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Null));
+                    }
+                    let provider_str = strip_tags(&result.provider);
+                    row.insert(
+                        "provider".to_string(),
+                        Box::new(if provider_str.is_empty() {
+                            PhpMixed::Null
+                        } else {
+                            PhpMixed::String(provider_str)
+                        }),
+                    );
+                    PhpMixed::Array(row)
+                })
+                .collect();
+
+            io.write(&JsonFile::encode(&PhpMixed::List(
+                rows.into_iter().map(Box::new).collect(),
+            )));
+        } else {
+            let rows: Vec<Vec<PhpMixed>> = results
+                .iter()
+                .map(|result| {
+                    vec![
+                        PhpMixed::String(result.platform_package.clone()),
+                        PhpMixed::String(result.version.clone()),
+                        if let Some(link) = &result.link {
+                            PhpMixed::String(format!(
+                                "{} {} {} ({})",
+                                link.get_source(),
+                                link.get_description(),
+                                link.get_target(),
+                                link.get_pretty_constraint().unwrap_or(""),
+                            ))
+                        } else {
+                            PhpMixed::String(String::new())
+                        },
+                        PhpMixed::String(
+                            format!("{} {}", result.status, result.provider)
+                                .trim_end()
+                                .to_string(),
+                        ),
+                    ]
+                })
+                .collect();
 
             self.inner.render_table(rows, output);
         }

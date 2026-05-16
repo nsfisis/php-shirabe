@@ -4,9 +4,20 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 pub trait ConfigSourceInterface {
-    fn add_repository(&mut self, name: &str, config: Option<IndexMap<String, PhpMixed>>, append: bool) -> anyhow::Result<()>;
+    fn add_repository(
+        &mut self,
+        name: &str,
+        config: Option<IndexMap<String, PhpMixed>>,
+        append: bool,
+    ) -> anyhow::Result<()>;
 
-    fn insert_repository(&mut self, name: &str, config: Option<IndexMap<String, PhpMixed>>, reference_name: &str, offset: i64) -> anyhow::Result<()>;
+    fn insert_repository(
+        &mut self,
+        name: &str,
+        config: Option<IndexMap<String, PhpMixed>>,
+        reference_name: &str,
+        offset: i64,
+    ) -> anyhow::Result<()>;
 
     fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()>;
 

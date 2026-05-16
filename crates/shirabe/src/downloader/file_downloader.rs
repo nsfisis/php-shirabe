@@ -7,11 +7,11 @@ use std::sync::{LazyLock, Mutex};
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_external_packages::react::promise::resolve as react_promise_resolve;
 use shirabe_php_shim::{
-    array_search, array_shift, file_exists, filesize, get_class, hash, hash_file, in_array,
-    is_dir, is_executable, parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos,
-    strtr, trim, umask, usleep, InvalidArgumentException, PhpMixed, RuntimeException, Silencer,
-    UnexpectedValueException, DIRECTORY_SEPARATOR, PATHINFO_BASENAME, PATHINFO_EXTENSION,
-    PHP_URL_PATH,
+    DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
+    PHP_URL_PATH, PhpMixed, RuntimeException, Silencer, UnexpectedValueException, array_search,
+    array_shift, file_exists, filesize, get_class, hash, hash_file, in_array, is_dir,
+    is_executable, parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr,
+    trim, umask, usleep,
 };
 
 use crate::cache::Cache;
@@ -106,10 +106,7 @@ impl FileDownloader {
             this.io.write_error("Running cache garbage collection");
             this.cache.as_mut().unwrap().gc(
                 this.config.get("cache-files-ttl").as_int().unwrap_or(0),
-                this.config
-                    .get("cache-files-maxsize")
-                    .as_int()
-                    .unwrap_or(0),
+                this.config.get("cache-files-maxsize").as_int().unwrap_or(0),
             );
         }
 
@@ -180,13 +177,15 @@ impl DownloaderInterface for FileDownloader {
         let _ = PluginEvents::PRE_FILE_DOWNLOAD;
         let _ = PluginEvents::POST_FILE_DOWNLOAD;
 
-        todo!("phase-b: orchestrate download/accept/reject closures and call download() returning a PromiseInterface")
+        todo!(
+            "phase-b: orchestrate download/accept/reject closures and call download() returning a PromiseInterface"
+        )
     }
 
     /// @inheritDoc
     fn prepare(
         &mut self,
-        _r#type: &str,
+        _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
@@ -197,7 +196,7 @@ impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
     fn cleanup(
         &mut self,
-        _r#type: &str,
+        _type: &str,
         package: &dyn PackageInterface,
         path: &str,
         _prev_package: Option<&dyn PackageInterface>,
@@ -226,7 +225,11 @@ impl DownloaderInterface for FileDownloader {
             vendor_dir.clone(),
         ];
 
-        if let Some(paths) = self.additional_cleanup_paths.get(package.get_name()).cloned() {
+        if let Some(paths) = self
+            .additional_cleanup_paths
+            .get(package.get_name())
+            .cloned()
+        {
             for path_to_clean in &paths {
                 self.filesystem.remove(path_to_clean)?;
             }
@@ -337,9 +340,7 @@ impl DownloaderInterface for FileDownloader {
 
         // TODO(phase-b): chain `.then(|result| if !result { throw RuntimeException })`
         let _ = path;
-        todo!(
-            "phase-b: chain promise.then(|result| {{ if !result {{ throw RuntimeException }} }})"
-        )
+        todo!("phase-b: chain promise.then(|result| {{ if !result {{ throw RuntimeException }} }})")
     }
 }
 
@@ -365,7 +366,8 @@ impl ChangeReportInterface for FileDownloader {
                     .remove_directory(&format!("{}_compare", target_dir), false)?;
             }
 
-            let promise = self.download(package, &format!("{}_compare", target_dir), None, false)?;
+            let promise =
+                self.download(package, &format!("{}_compare", target_dir), None, false)?;
             promise.then_with(
                 None,
                 Some(Box::new(|ex: PhpMixed| {
@@ -419,7 +421,11 @@ impl ChangeReportInterface for FileDownloader {
 
         let output = trim(&output, None);
 
-        Ok(if strlen(&output) > 0 { Some(output) } else { None })
+        Ok(if strlen(&output) > 0 {
+            Some(output)
+        } else {
+            None
+        })
     }
 }
 

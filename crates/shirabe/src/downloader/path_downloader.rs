@@ -6,8 +6,8 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 use shirabe_external_packages::symfony::component::filesystem::exception::io_exception::IOException;
 use shirabe_external_packages::symfony::component::filesystem::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_php_shim::{
-    file_exists, function_exists, is_dir, realpath, PhpMixed, RuntimeException,
-    DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR,
+    DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed,
+    RuntimeException, file_exists, function_exists, is_dir, realpath,
 };
 
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
@@ -68,8 +68,12 @@ impl PathDownloader {
             return Ok(shirabe_external_packages::react::promise::resolve(None));
         }
 
-        if format!("{}{}", realpath(&path).unwrap_or_default(), DIRECTORY_SEPARATOR)
-            .starts_with(&format!("{}{}", real_url, DIRECTORY_SEPARATOR))
+        if format!(
+            "{}{}",
+            realpath(&path).unwrap_or_default(),
+            DIRECTORY_SEPARATOR
+        )
+        .starts_with(&format!("{}{}", real_url, DIRECTORY_SEPARATOR))
         {
             // IMPORTANT NOTICE: If you wish to change this, don't. You are wasting your time and ours.
             //
@@ -140,7 +144,10 @@ impl PathDownloader {
 
         if output {
             self.inner.io.write_error(
-                PhpMixed::String(format!("  - {}: ", InstallOperation::format(package, false))),
+                PhpMixed::String(format!(
+                    "  - {}: ",
+                    InstallOperation::format(package, false)
+                )),
                 false,
                 IOInterface::NORMAL,
             );
@@ -251,11 +258,9 @@ impl PathDownloader {
         }
 
         if output {
-            self.inner.io.write_error(
-                PhpMixed::String("".to_string()),
-                true,
-                IOInterface::NORMAL,
-            );
+            self.inner
+                .io
+                .write_error(PhpMixed::String("".to_string()), true, IOInterface::NORMAL);
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -352,11 +357,7 @@ impl PathDownloader {
         self.inner.remove(package, &path, output)
     }
 
-    pub fn get_vcs_reference(
-        &self,
-        package: &dyn PackageInterface,
-        path: &str,
-    ) -> Option<String> {
+    pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(

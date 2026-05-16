@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    dirname, is_dir, is_writable, realpath, sys_get_temp_dir, InvalidArgumentException,
-    RuntimeException,
+    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
+    sys_get_temp_dir,
 };
 
 use crate::cache::Cache;
@@ -31,8 +31,7 @@ impl GitDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url =
-                Preg::replace(r"{[\\/]\.git/?$}", "", self.inner.url.clone())?;
+            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", self.inner.url.clone())?;
             if !is_dir(&self.inner.url) {
                 return Err(RuntimeException {
                     message: format!(
@@ -64,11 +63,7 @@ impl GitDriver {
             self.repo_dir = format!(
                 "{}/{}/",
                 cache_vcs_dir,
-                Preg::replace(
-                    r"{[^a-z0-9.]}i",
-                    "-",
-                    Url::sanitize(self.inner.url.clone())
-                )?
+                Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.inner.url.clone()))?
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -88,9 +83,7 @@ impl GitDriver {
                 .into());
             }
 
-            if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", &self.inner.url)
-                .unwrap_or(false)
-            {
+            if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", &self.inner.url).unwrap_or(false) {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
@@ -173,11 +166,8 @@ impl GitDriver {
                 &Filesystem::new(),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
-                let default_branch = git_util.get_mirror_default_branch(
-                    &self.inner.url,
-                    &self.repo_dir,
-                    false,
-                )?;
+                let default_branch =
+                    git_util.get_mirror_default_branch(&self.inner.url, &self.repo_dir, false)?;
                 if let Some(branch) = default_branch {
                     self.root_identifier = Some(branch.clone());
                     return Ok(branch);
@@ -198,9 +188,7 @@ impl GitDriver {
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
                     if !branch.is_empty() {
-                        if let Some(caps) =
-                            Preg::match_strict_groups(r"{^\* +(\S+)}", branch)
-                        {
+                        if let Some(caps) = Preg::match_strict_groups(r"{^\* +(\S+)}", branch) {
                             if let Some(name) = caps.get("1") {
                                 self.root_identifier = Some(name.clone());
                                 break;
@@ -264,10 +252,7 @@ impl GitDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(
-        &mut self,
-        identifier: &str,
-    ) -> anyhow::Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
         if identifier.starts_with('-') {
             return Err(RuntimeException {
                 message: format!(
@@ -292,8 +277,7 @@ impl GitDriver {
             .process
             .execute(&command, &mut output, Some(self.repo_dir.clone()));
 
-        let timestamp_str =
-            GitUtil::parse_rev_list_output(&output, &self.inner.process);
+        let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process);
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
         Ok(Some(Utc.timestamp_opt(timestamp, 0).unwrap()))
     }
@@ -319,9 +303,7 @@ impl GitDriver {
                         r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
                         &tag,
                     ) {
-                        if let (Some(hash), Some(name)) =
-                            (caps.get("1"), caps.get("2"))
-                        {
+                        if let (Some(hash), Some(name)) = (caps.get("1"), caps.get("2")) {
                             self.tags
                                 .as_mut()
                                 .unwrap()
@@ -359,8 +341,7 @@ impl GitDriver {
                         r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
                         &branch,
                     ) {
-                        if let (Some(name), Some(hash)) = (caps.get("1"), caps.get("2"))
-                        {
+                        if let (Some(name), Some(hash)) = (caps.get("1"), caps.get("2")) {
                             if !name.starts_with('-') {
                                 branches.insert(name.clone(), hash.clone());
                             }

@@ -39,9 +39,8 @@ impl LockTransaction {
         };
         this.set_result_packages(pool, decisions);
         let all = this.result_packages.get("all").cloned().unwrap_or_default();
-        let present: Vec<Box<dyn PackageInterface>> = this.present_map.values()
-            .map(|p| p.clone_box())
-            .collect();
+        let present: Vec<Box<dyn PackageInterface>> =
+            this.present_map.values().map(|p| p.clone_box()).collect();
         this.inner = Transaction::new(present, all);
         this
     }
@@ -58,9 +57,15 @@ impl LockTransaction {
             if literal > 0 {
                 let package = pool.literal_to_package(literal);
 
-                result_packages.get_mut("all").unwrap().push(package.clone_box());
+                result_packages
+                    .get_mut("all")
+                    .unwrap()
+                    .push(package.clone_box());
                 if !self.unlockable_map.contains_key(&package.get_id()) {
-                    result_packages.get_mut("non-dev").unwrap().push(package.clone_box());
+                    result_packages
+                        .get_mut("non-dev")
+                        .unwrap()
+                        .push(package.clone_box());
                 }
             }
         }
@@ -81,22 +86,37 @@ impl LockTransaction {
             while i < remaining_dev.len() {
                 if package.get_name() == remaining_dev[i].get_name() {
                     let result_package = remaining_dev.remove(i);
-                    self.result_packages.get_mut("non-dev").unwrap().push(result_package);
+                    self.result_packages
+                        .get_mut("non-dev")
+                        .unwrap()
+                        .push(result_package);
                 } else {
                     i += 1;
                 }
             }
         }
-        self.result_packages.insert("dev".to_string(), remaining_dev);
+        self.result_packages
+            .insert("dev".to_string(), remaining_dev);
     }
 
-    pub fn get_new_lock_packages(&self, dev_mode: bool, update_mirrors: bool) -> Vec<Box<dyn PackageInterface>> {
+    pub fn get_new_lock_packages(
+        &self,
+        dev_mode: bool,
+        update_mirrors: bool,
+    ) -> Vec<Box<dyn PackageInterface>> {
         let key = if dev_mode { "dev" } else { "non-dev" };
         let mut packages = vec![];
 
-        let source = self.result_packages.get(key).map(|v| v.as_slice()).unwrap_or_default();
+        let source = self
+            .result_packages
+            .get(key)
+            .map(|v| v.as_slice())
+            .unwrap_or_default();
         for package in source {
-            if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some() {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some()
+            {
                 continue;
             }
 
@@ -129,7 +149,9 @@ impl LockTransaction {
                 continue;
             }
 
-            if let Some(concrete_pkg) = (present_package.as_any() as &dyn Any).downcast_ref::<Package>() {
+            if let Some(concrete_pkg) =
+                (present_package.as_any() as &dyn Any).downcast_ref::<Package>()
+            {
                 concrete_pkg.set_source_url(package.get_source_url());
                 concrete_pkg.set_source_mirrors(package.get_source_mirrors());
             }
@@ -167,10 +189,15 @@ impl LockTransaction {
 
         if let Some(all_packages) = self.result_packages.get("all") {
             for package in all_packages {
-                if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some() {
+                if (package.as_any() as &dyn Any)
+                    .downcast_ref::<AliasPackage>()
+                    .is_some()
+                {
                     let mut i = 0;
                     while i < remaining_aliases.len() {
-                        if remaining_aliases[i].get("package").map(|s| s.as_str()) == Some(package.get_name()) {
+                        if remaining_aliases[i].get("package").map(|s| s.as_str())
+                            == Some(package.get_name())
+                        {
                             used_aliases.push(remaining_aliases.remove(i));
                         } else {
                             i += 1;
@@ -189,7 +216,10 @@ impl LockTransaction {
         used_aliases
     }
 
-    pub fn get_operations(&self) -> &Vec<Box<dyn crate::dependency_resolver::operation::operation_interface::OperationInterface>> {
+    pub fn get_operations(
+        &self,
+    ) -> &Vec<Box<dyn crate::dependency_resolver::operation::operation_interface::OperationInterface>>
+    {
         self.inner.get_operations()
     }
 }

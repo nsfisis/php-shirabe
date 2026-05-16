@@ -53,7 +53,10 @@ impl BaseExcludeFilter {
     }
 
     pub fn generate_patterns(&self, rules: Vec<String>) -> Vec<(String, bool, bool)> {
-        rules.into_iter().map(|rule| self.generate_pattern(&rule)).collect()
+        rules
+            .into_iter()
+            .map(|rule| self.generate_pattern(&rule))
+            .collect()
     }
 
     pub fn generate_pattern(&self, rule: &str) -> (String, bool, bool) {

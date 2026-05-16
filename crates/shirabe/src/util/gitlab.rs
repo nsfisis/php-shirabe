@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{http_build_query, json_decode, time, PhpMixed, RuntimeException};
+use shirabe_php_shim::{PhpMixed, RuntimeException, http_build_query, json_decode, time};
 
 use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
@@ -41,8 +41,8 @@ impl GitLab {
 
     pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
         // before composer 1.9, origin URLs had no port number in them
-        let bc_origin_url = Preg::replace("{:\\d+}", "", origin_url)
-            .unwrap_or_else(|_| origin_url.to_string());
+        let bc_origin_url =
+            Preg::replace("{:\\d+}", "", origin_url).unwrap_or_else(|_| origin_url.to_string());
 
         let gitlab_domains = self.config.get("gitlab-domains");
         let domains = match gitlab_domains.as_array() {
@@ -50,7 +50,9 @@ impl GitLab {
             None => return false,
         };
         let origin_in_domains = domains.values().any(|v| v.as_string() == Some(origin_url));
-        let bc_in_domains = domains.values().any(|v| v.as_string() == Some(bc_origin_url.as_str()));
+        let bc_in_domains = domains
+            .values()
+            .any(|v| v.as_string() == Some(bc_origin_url.as_str()));
         if !origin_in_domains && !bc_in_domains {
             return false;
         }
@@ -246,9 +248,8 @@ impl GitLab {
                     match e.downcast::<TransportException>() {
                         Ok(te) if te.code == 403 || te.code == 401 => {
                             if te.code == 401 {
-                                let response = te
-                                    .get_response()
-                                    .and_then(|r| json_decode(r, true).ok());
+                                let response =
+                                    te.get_response().and_then(|r| json_decode(r, true).ok());
                                 let is_invalid_grant = response
                                     .as_ref()
                                     .and_then(|r| r.as_array())
@@ -371,10 +372,7 @@ impl GitLab {
             Err(e) => match e.downcast::<TransportException>() {
                 Ok(te) => {
                     self.io.write_error(
-                        PhpMixed::String(format!(
-                            "Couldn't refresh access token: {}",
-                            te.message
-                        )),
+                        PhpMixed::String(format!("Couldn't refresh access token: {}", te.message)),
                         true,
                         IOInterface::NORMAL,
                     );
@@ -398,21 +396,15 @@ impl GitLab {
         );
 
         // store value in user config in auth file
-        self.config
-            .get_auth_config_source()
-            .add_config_setting(
-                &format!("gitlab-oauth.{}", origin_url),
-                Self::build_oauth_config(&response, &access_token),
-            )?;
+        self.config.get_auth_config_source().add_config_setting(
+            &format!("gitlab-oauth.{}", origin_url),
+            Self::build_oauth_config(&response, &access_token),
+        )?;
 
         Ok(true)
     }
 
-    fn create_token(
-        &mut self,
-        scheme: &str,
-        origin_url: &str,
-    ) -> anyhow::Result<PhpMixed> {
+    fn create_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
         let username = match self.io.ask("Username: ".to_string(), PhpMixed::Null) {
             PhpMixed::String(s) => s,
             _ => String::new(),
@@ -448,10 +440,7 @@ impl GitLab {
                     .collect(),
             )),
         );
-        http_inner.insert(
-            "content".to_string(),
-            Box::new(PhpMixed::String(data)),
-        );
+        http_inner.insert("content".to_string(), Box::new(PhpMixed::String(data)));
         let mut options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         options.insert(
             "retry-auth-failure".to_string(),
@@ -495,11 +484,7 @@ impl GitLab {
         false
     }
 
-    fn refresh_token(
-        &mut self,
-        scheme: &str,
-        origin_url: &str,
-    ) -> anyhow::Result<PhpMixed> {
+    fn refresh_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
         let auth_tokens = self.config.get("gitlab-oauth");
         let refresh_token = auth_tokens
             .as_array()
@@ -513,13 +498,10 @@ impl GitLab {
             Some(t) => t,
             None => {
                 return Err(RuntimeException {
-                    message: format!(
-                        "No GitLab refresh token present for {}.",
-                        origin_url
-                    ),
+                    message: format!("No GitLab refresh token present for {}.", origin_url),
                     code: 0,
                 }
-                .into())
+                .into());
             }
         };
 
@@ -547,10 +529,7 @@ impl GitLab {
                     .collect(),
             )),
         );
-        http_inner.insert(
-            "content".to_string(),
-            Box::new(PhpMixed::String(data)),
-        );
+        http_inner.insert("content".to_string(), Box::new(PhpMixed::String(data)));
         let mut options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         options.insert(
             "retry-auth-failure".to_string(),

@@ -3,7 +3,9 @@
 use std::path::Path;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{extension_loaded, hash_file, PhpMixed, RuntimeException, UnexpectedValueException};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
+};
 
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
@@ -34,7 +36,10 @@ impl std::fmt::Debug for ArtifactRepository {
 }
 
 impl ArtifactRepository {
-    pub fn new(repo_config: IndexMap<String, PhpMixed>, io: Box<dyn IOInterface>) -> anyhow::Result<Self> {
+    pub fn new(
+        repo_config: IndexMap<String, PhpMixed>,
+        io: Box<dyn IOInterface>,
+    ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
             return Err(RuntimeException {
                 message: "The artifact repository requires PHP's zip extension".to_string(),
@@ -101,7 +106,10 @@ impl ArtifactRepository {
             match package {
                 None => {
                     self.io.write_error(
-                        &format!("File <comment>{}</comment> doesn't seem to hold a package", basename),
+                        &format!(
+                            "File <comment>{}</comment> doesn't seem to hold a package",
+                            basename
+                        ),
                         true,
                         IOInterface::VERBOSE,
                     );
@@ -169,7 +177,8 @@ impl ArtifactRepository {
             return Ok(None);
         }
 
-        let mut package = JsonFile::parse_json(&json.unwrap(), &format!("{}#composer.json", pathname))?;
+        let mut package =
+            JsonFile::parse_json(&json.unwrap(), &format!("{}#composer.json", pathname))?;
         let url_normalized = pathname.replace('\\', '/');
         let real_path = file
             .canonicalize()
@@ -179,8 +188,14 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".to_string(), Box::new(PhpMixed::String(file_type.to_string())));
-        dist.insert("url".to_string(), Box::new(PhpMixed::String(url_normalized)));
+        dist.insert(
+            "type".to_string(),
+            Box::new(PhpMixed::String(file_type.to_string())),
+        );
+        dist.insert(
+            "url".to_string(),
+            Box::new(PhpMixed::String(url_normalized)),
+        );
         dist.insert("shasum".to_string(), Box::new(PhpMixed::String(shasum)));
         package.insert("dist".to_string(), Box::new(PhpMixed::Array(dist)));
 

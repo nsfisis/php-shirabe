@@ -3,8 +3,8 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    array_unshift, call_user_func_array, chmod, explode, file_get_contents, file_put_contents,
-    implode, is_writable, sprintf, PhpMixed, RuntimeException, Silencer, PHP_EOL,
+    PHP_EOL, PhpMixed, RuntimeException, Silencer, array_unshift, call_user_func_array, chmod,
+    explode, file_get_contents, file_put_contents, implode, is_writable, sprintf,
 };
 
 use crate::config::config_source_interface::ConfigSourceInterface;
@@ -198,9 +198,12 @@ impl JsonConfigSource {
                     }
                 }
             }
-            self.file.write(config, shirabe_php_shim::JSON_UNESCAPED_SLASHES
-                | shirabe_php_shim::JSON_PRETTY_PRINT
-                | shirabe_php_shim::JSON_UNESCAPED_UNICODE)?;
+            self.file.write(
+                config,
+                shirabe_php_shim::JSON_UNESCAPED_SLASHES
+                    | shirabe_php_shim::JSON_PRETTY_PRINT
+                    | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
+            )?;
         }
 
         // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
@@ -320,7 +323,10 @@ impl ConfigSourceInterface for JsonConfigSource {
                 let _ = (cfg, args);
                 todo!("setRepositoryUrl fallback closure body");
             }),
-            vec![PhpMixed::String(name.to_string()), PhpMixed::String(url.to_string())],
+            vec![
+                PhpMixed::String(name.to_string()),
+                PhpMixed::String(url.to_string()),
+            ],
         )
     }
 

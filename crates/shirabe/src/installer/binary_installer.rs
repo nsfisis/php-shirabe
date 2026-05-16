@@ -2,9 +2,9 @@
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists, file_get_contents,
-    file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir, substr, trim, umask,
-    PhpMixed,
+    PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
+    file_get_contents, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir, substr,
+    trim, umask,
 };
 
 use crate::io::io_interface::IOInterface;
@@ -166,10 +166,9 @@ impl BinaryInstaller {
         let handle = fopen(bin, "r");
         let line = fgets(handle.clone()).unwrap_or_default();
         fclose(handle);
-        if let Some(m) = Preg::is_match_strict_groups(
-            r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",
-            &line,
-        ) {
+        if let Some(m) =
+            Preg::is_match_strict_groups(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m", &line)
+        {
             return trim(m.get(1).map(|s| s.as_str()).unwrap_or(""), None);
         }
 
@@ -246,7 +245,10 @@ impl BinaryInstaller {
                  SET BIN_TARGET=%~dp0/{}\r\n\
                  SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
                  {} \"%BIN_TARGET%\" %*\r\n",
-                trim(&ProcessExecutor::escape(&basename_with_suffix(link, ".bat")), Some("\"'")),
+                trim(
+                    &ProcessExecutor::escape(&basename_with_suffix(link, ".bat")),
+                    Some("\"'")
+                ),
                 caller,
             );
         }
@@ -273,12 +275,10 @@ impl BinaryInstaller {
         let bin_contents = file_get_contents(bin).unwrap_or_default();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
-        if let Some(m) = Preg::is_match_with_indexed_captures(
-            r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}",
-            &bin_contents,
-        )
-        .ok()
-        .flatten()
+        if let Some(m) =
+            Preg::is_match_with_indexed_captures(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}", &bin_contents)
+                .ok()
+                .flatten()
         {
             // carry over the existing shebang if present, otherwise add our own
             let proxy_code = if m.get(1).is_none() {
@@ -291,9 +291,7 @@ impl BinaryInstaller {
                 .find_shortest_path_code(link, bin, false, true);
             let mut stream_proxy_code = String::new();
             let mut stream_hint = String::new();
-            let mut globals_code = format!(
-                "$GLOBALS['_composer_bin_dir'] = __DIR__;\n",
-            );
+            let mut globals_code = format!("$GLOBALS['_composer_bin_dir'] = __DIR__;\n",);
             let mut phpunit_hack1 = String::new();
             let mut phpunit_hack2 = String::new();
             // Don't expose autoload path when vendor dir was not set in custom installers
@@ -326,11 +324,14 @@ impl BinaryInstaller {
                     phpunit_hack1 = "'phpvfscomposer://'.".to_string();
                     phpunit_hack2 = "
                 $data = str_replace('__DIR__', var_export(dirname($this->realpath), true), $data);
-                $data = str_replace('__FILE__', var_export($this->realpath, true), $data);".to_string();
+                $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
+                        .to_string();
                 }
             }
             if trim(m.get(0).map(|s| s.as_str()).unwrap_or(""), None) != "<?php" {
-                stream_hint = format!(" using a stream wrapper to prevent the shebang from being output on PHP<8\n *");
+                stream_hint = format!(
+                    " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
+                );
                 stream_proxy_code = format!(
                     "if (PHP_VERSION_ID < 80000) {{\n    if (!class_exists('Composer\\BinProxyWrapper')) {{\n        /**\n         * @internal\n         */\n        final class BinProxyWrapper\n        {{\n            private $handle;\n            private $position;\n            private $realpath;\n\n            public function stream_open($path, $mode, $options, &$opened_path)\n            {{\n                // get rid of phpvfscomposer:// prefix for __FILE__ & __DIR__ resolution\n                $opened_path = substr($path, 17);\n                $this->realpath = realpath($opened_path) ?: $opened_path;\n                $opened_path = {phpunit_hack1}$this->realpath;\n                $this->handle = fopen($this->realpath, $mode);\n                $this->position = 0;\n\n                return (bool) $this->handle;\n            }}\n\n            public function stream_read($count)\n            {{\n                $data = fread($this->handle, $count);\n\n                if ($this->position === 0) {{\n                    $data = preg_replace('{{^#!.*\\r?\\n}}', '', $data);\n                }}{phpunit_hack2}\n\n                $this->position += strlen($data);\n\n                return $data;\n            }}\n\n            public function stream_cast($castAs)\n            {{\n                return $this->handle;\n            }}\n\n            public function stream_close()\n            {{\n                fclose($this->handle);\n            }}\n\n            public function stream_lock($operation)\n            {{\n                return $operation ? flock($this->handle, $operation) : true;\n            }}\n\n            public function stream_seek($offset, $whence)\n            {{\n                if (0 === fseek($this->handle, $offset, $whence)) {{\n                    $this->position = ftell($this->handle);\n                    return true;\n                }}\n\n                return false;\n            }}\n\n            public function stream_tell()\n            {{\n                return $this->position;\n            }}\n\n            public function stream_eof()\n            {{\n                return feof($this->handle);\n            }}\n\n            public function stream_stat()\n            {{\n                return array();\n            }}\n\n            public function stream_set_option($option, $arg1, $arg2)\n            {{\n                return true;\n            }}\n\n            public function url_stat($path, $flags)\n            {{\n                $path = substr($path, 17);\n                if (file_exists($path)) {{\n                    return stat($path);\n                }}\n\n                return false;\n            }}\n        }}\n    }}\n\n    if (\n        (function_exists('stream_get_wrappers') && in_array('phpvfscomposer', stream_get_wrappers(), true))\n        || (function_exists('stream_wrapper_register') && stream_wrapper_register('phpvfscomposer', 'Composer\\BinProxyWrapper'))\n    ) {{\n        return include(\"phpvfscomposer://\" . {bin_path_exported});\n    }}\n}}\n",
                     phpunit_hack1 = phpunit_hack1,

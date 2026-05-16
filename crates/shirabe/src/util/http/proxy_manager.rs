@@ -45,9 +45,15 @@ impl ProxyManager {
         self.http_proxy.is_some() || self.https_proxy.is_some()
     }
 
-    pub fn get_proxy_for_request(&self, request_url: &str) -> Result<RequestProxy, TransportException> {
+    pub fn get_proxy_for_request(
+        &self,
+        request_url: &str,
+    ) -> Result<RequestProxy, TransportException> {
         if let Some(ref error) = self.error {
-            return Err(TransportException::new(format!("Unable to use a proxy: {}", error)));
+            return Err(TransportException::new(format!(
+                "Unable to use a proxy: {}",
+                error
+            )));
         }
 
         let scheme = request_url.split("://").next().unwrap_or("").to_string();

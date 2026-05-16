@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php
 
 // TODO(plugin): this event is part of the plugin API and is dispatched before a command runs
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use crate::event_dispatcher::event::Event;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 
 pub struct PreCommandRunEvent {
     inner: Event,

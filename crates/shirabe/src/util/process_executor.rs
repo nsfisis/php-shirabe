@@ -13,10 +13,10 @@ use shirabe_external_packages::symfony::component::process::exception::runtime_e
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::process::Process;
 use shirabe_php_shim::{
-    array_intersect, array_map, call_user_func, defined, escapeshellarg, explode, implode,
-    in_array, is_array, is_callable, is_dir, is_numeric, is_string, max, min, rtrim, sprintf,
-    str_replace, strcspn, strlen, strpbrk, strtolower, strtr, substr_replace, trim, usleep,
-    LogicException, PhpMixed, RuntimeException,
+    LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
+    defined, escapeshellarg, explode, implode, in_array, is_array, is_callable, is_dir, is_numeric,
+    is_string, max, min, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr,
+    substr_replace, trim, usleep,
 };
 
 use crate::io::io_interface::IOInterface;
@@ -71,17 +71,12 @@ impl ProcessExecutor {
         "echo", "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md",
         "mkdir", "mklink", "move", "path", "pause", "popd", "prompt", "pushd", "rd", "rem", "ren",
         "rename", "rmdir", "set", "setlocal", "shift", "start", "time", "title", "type", "ver",
-        "vol",
-        // unused slots to make 47 above explicit
+        "vol", // unused slots to make 47 above explicit
         "", "", "",
     ];
 
-    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] = &[
-        &["show"],
-        &["log"],
-        &["branch"],
-        &["remote", "set-url"],
-    ];
+    const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
+        &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
 
     pub fn new(io: Option<Box<dyn IOInterface>>, _: Option<()>) -> Self {
         let mut this = Self {
@@ -170,8 +165,7 @@ impl ProcessExecutor {
                 .iter()
                 .map(|v| v.as_string().unwrap_or("").to_string())
                 .collect();
-            if Platform::is_windows()
-                && strlen(&cmd_vec[0]) == strcspn(&cmd_vec[0], ":/\\") as i64
+            if Platform::is_windows() && strlen(&cmd_vec[0]) == strcspn(&cmd_vec[0], ":/\\") as i64
             {
                 cmd_vec[0] = Self::get_executable(&cmd_vec[0]);
             }
@@ -206,7 +200,11 @@ impl ProcessExecutor {
 
         let io_for_signal = self.io.as_ref().map(|b| &**b as *const dyn IOInterface);
         let signal_handler = SignalHandler::create(
-            vec![SignalHandler::SIGINT, SignalHandler::SIGTERM, SignalHandler::SIGHUP],
+            vec![
+                SignalHandler::SIGINT,
+                SignalHandler::SIGTERM,
+                SignalHandler::SIGHUP,
+            ],
             Box::new(move |signal: String, _h: &SignalHandler| {
                 if let Some(io_ptr) = io_for_signal {
                     let io = unsafe { &*io_ptr };
@@ -335,10 +333,7 @@ impl ProcessExecutor {
         });
         let _ = (resolver, canceler);
 
-        let promise = Promise::new(
-            Box::new(|_resolve, _reject| {}),
-            Box::new(|| {}),
-        );
+        let promise = Promise::new(Box::new(|_resolve, _reject| {}), Box::new(|| {}));
         // TODO(phase-b): wire promise.then() side-effects: mark job done & update status
         let promise: Box<dyn PromiseInterface> = Box::new(promise);
 
@@ -601,10 +596,16 @@ impl ProcessExecutor {
             r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i",
             |m: &IndexMap<String, String>| -> String {
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, m.get("user").cloned().unwrap_or_default().as_str()) {
+                if Preg::is_match(
+                    GitHub::GITHUB_TOKEN_REGEX,
+                    m.get("user").cloned().unwrap_or_default().as_str(),
+                ) {
                     return "://***:***@".to_string();
                 }
-                if Preg::is_match(r"{^[a-f0-9]{12,}$}", m.get("user").cloned().unwrap_or_default().as_str()) {
+                if Preg::is_match(
+                    r"{^[a-f0-9]{12,}$}",
+                    m.get("user").cloned().unwrap_or_default().as_str(),
+                ) {
                     return "://***:***@".to_string();
                 }
 
@@ -664,13 +665,8 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: i64 = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = Preg::replace_with_count(
-            r#"/(\\*)"/"#,
-            r#"$1$1\""#,
-            &argument,
-            -1,
-            &mut dquotes,
-        );
+        argument =
+            Preg::replace_with_count(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes);
         let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument);
 
         if !meta && !quote {
@@ -695,8 +691,14 @@ impl ProcessExecutor {
             explode(" ", command.as_string().unwrap_or(""))
         } else {
             match command {
-                PhpMixed::List(l) => l.iter().map(|v| v.as_string().unwrap_or("").to_string()).collect(),
-                PhpMixed::Array(m) => m.values().map(|v| v.as_string().unwrap_or("").to_string()).collect(),
+                PhpMixed::List(l) => l
+                    .iter()
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
+                PhpMixed::Array(m) => m
+                    .values()
+                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .collect(),
                 _ => vec![],
             }
         };
@@ -738,7 +740,10 @@ impl ProcessExecutor {
             }
         }
 
-        executables.get(name).cloned().unwrap_or_else(|| name.to_string())
+        executables
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| name.to_string())
     }
 }
 

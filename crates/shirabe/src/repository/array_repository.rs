@@ -7,8 +7,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    implode, preg_quote, spl_object_hash, strtolower, Countable, InvalidArgumentException,
-    LogicException,
+    Countable, InvalidArgumentException, LogicException, implode, preg_quote, spl_object_hash,
+    strtolower,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -53,7 +53,10 @@ impl ArrayRepository {
     /// Adds a new package to the repository
     pub fn add_package(&self, package: Box<dyn PackageInterface>) -> Result<()> {
         // PHP: if (!$package instanceof BasePackage) throw new \InvalidArgumentException(...)
-        if (package.as_any() as &dyn Any).downcast_ref::<BasePackage>().is_none() {
+        if (package.as_any() as &dyn Any)
+            .downcast_ref::<BasePackage>()
+            .is_none()
+        {
             return Err(InvalidArgumentException {
                 message: "Only subclasses of BasePackage are supported".to_string(),
                 code: 0,
@@ -61,7 +64,8 @@ impl ArrayRepository {
             .into());
         }
         // TODO(phase-b): convert Box<dyn PackageInterface> to Box<BasePackage>
-        let mut package: Box<BasePackage> = todo!("downcast Box<dyn PackageInterface> to Box<BasePackage>");
+        let mut package: Box<BasePackage> =
+            todo!("downcast Box<dyn PackageInterface> to Box<BasePackage>");
 
         if self.packages.borrow().is_none() {
             self.initialize();
@@ -101,7 +105,10 @@ impl ArrayRepository {
             package = alias_pkg.get_alias_of().clone_box();
         }
 
-        if (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>().is_some() {
+        if (package.as_any() as &dyn Any)
+            .downcast_ref::<CompletePackage>()
+            .is_some()
+        {
             // TODO(phase-b): construct CompleteAliasPackage/AliasPackage and return as Box<BasePackage>
             return todo!("new CompleteAliasPackage(package, alias, pretty_alias)");
         }
@@ -291,10 +298,7 @@ impl RepositoryInterface for ArrayRepository {
             )
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
-            format!(
-                "{{(?:{})}}i",
-                implode("|", &Preg::split("{\\s+}", &query))
-            )
+            format!("{{(?:{})}}i", implode("|", &Preg::split("{\\s+}", &query)))
         };
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
@@ -314,8 +318,7 @@ impl RepositoryInterface for ArrayRepository {
                 }
             }
 
-            let complete =
-                (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
+            let complete = (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
 
             let fulltext_match = mode == Self::SEARCH_FULLTEXT
                 && complete.is_some()
@@ -397,8 +400,8 @@ impl RepositoryInterface for ArrayRepository {
             }
             for link in candidate.get_provides().values() {
                 if package_name == link.get_target() {
-                    let complete = (candidate.as_any() as &dyn Any)
-                        .downcast_ref::<CompletePackage>();
+                    let complete =
+                        (candidate.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
                     let description = complete.and_then(|c| c.get_description().map(String::from));
                     result.insert(
                         candidate.get_name().to_string(),

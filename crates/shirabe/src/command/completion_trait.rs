@@ -1,8 +1,5 @@
 //! ref: composer/src/Composer/Command/CompletionTrait.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
-use shirabe_php_shim::preg_quote;
 use crate::composer::Composer;
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
@@ -11,9 +8,16 @@ use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::root_package_repository::RootPackageRepository;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
+use shirabe_php_shim::preg_quote;
 
 pub trait CompletionTrait {
-    fn require_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Composer;
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer;
 
     fn suggest_prefer_install(&self) -> Vec<String> {
         vec!["dist".to_string(), "source".to_string(), "auto".to_string()]
@@ -23,26 +27,46 @@ pub trait CompletionTrait {
         Box::new(move |_input: &CompletionInput| -> Vec<String> {
             let composer = self.require_composer(None, None);
 
-            let requires: Vec<String> = composer.get_package().get_requires().keys().cloned().collect();
-            let dev_requires: Vec<String> = composer.get_package().get_dev_requires().keys().cloned().collect();
+            let requires: Vec<String> = composer
+                .get_package()
+                .get_requires()
+                .keys()
+                .cloned()
+                .collect();
+            let dev_requires: Vec<String> = composer
+                .get_package()
+                .get_dev_requires()
+                .keys()
+                .cloned()
+                .collect();
             [requires, dev_requires].concat()
         })
     }
 
-    fn suggest_installed_package(&self, include_root_package: bool, include_platform_packages: bool) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
+    fn suggest_installed_package(
+        &self,
+        include_root_package: bool,
+        include_platform_packages: bool,
+    ) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
         Box::new(move |input: &CompletionInput| -> Vec<String> {
             let composer = self.require_composer(None, None);
-            let mut installed_repos: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> = Vec::new();
+            let mut installed_repos: Vec<
+                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+            > = Vec::new();
 
             if include_root_package {
-                installed_repos.push(Box::new(RootPackageRepository::new(composer.get_package().clone())));
+                installed_repos.push(Box::new(RootPackageRepository::new(
+                    composer.get_package().clone(),
+                )));
             }
 
             let locker = composer.get_locker();
             if locker.is_locked() {
                 installed_repos.push(Box::new(locker.get_locked_repository(true)));
             } else {
-                installed_repos.push(Box::new(composer.get_repository_manager().get_local_repository()));
+                installed_repos.push(Box::new(
+                    composer.get_repository_manager().get_local_repository(),
+                ));
             }
 
             let mut platform_hint: Vec<String> = Vec::new();
@@ -54,7 +78,8 @@ pub trait CompletionTrait {
                 };
                 if input.get_completion_value() == "" {
                     // to reduce noise, when no text is yet entered we list only two entries for ext- and lib- prefixes
-                    let mut hints_to_find: indexmap::IndexMap<String, i64> = indexmap::IndexMap::new();
+                    let mut hints_to_find: indexmap::IndexMap<String, i64> =
+                        indexmap::IndexMap::new();
                     hints_to_find.insert("ext-".to_string(), 0);
                     hints_to_find.insert("lib-".to_string(), 0);
                     hints_to_find.insert("php".to_string(), 99);
@@ -70,7 +95,11 @@ pub trait CompletionTrait {
                                     hints_to_find.remove(hint_prefix);
                                     platform_hint.push(format!(
                                         "{}...",
-                                        &pkg.get_name()[..pkg.get_name().len().saturating_sub(3).max(hint_prefix.len() + 1)]
+                                        &pkg.get_name()[..pkg
+                                            .get_name()
+                                            .len()
+                                            .saturating_sub(3)
+                                            .max(hint_prefix.len() + 1)]
                                     ));
                                 }
                                 continue 'pkg_loop;
@@ -84,7 +113,9 @@ pub trait CompletionTrait {
 
             let installed_repo = InstalledRepository::new(installed_repos);
 
-            let mut result: Vec<String> = installed_repo.get_packages().iter()
+            let mut result: Vec<String> = installed_repo
+                .get_packages()
+                .iter()
                 .map(|package| package.get_name().to_string())
                 .collect();
             result.extend(platform_hint);
@@ -92,25 +123,36 @@ pub trait CompletionTrait {
         })
     }
 
-    fn suggest_installed_package_types(&self, include_root_package: bool) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
+    fn suggest_installed_package_types(
+        &self,
+        include_root_package: bool,
+    ) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
         Box::new(move |_input: &CompletionInput| -> Vec<String> {
             let composer = self.require_composer(None, None);
-            let mut installed_repos: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> = Vec::new();
+            let mut installed_repos: Vec<
+                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+            > = Vec::new();
 
             if include_root_package {
-                installed_repos.push(Box::new(RootPackageRepository::new(composer.get_package().clone())));
+                installed_repos.push(Box::new(RootPackageRepository::new(
+                    composer.get_package().clone(),
+                )));
             }
 
             let locker = composer.get_locker();
             if locker.is_locked() {
                 installed_repos.push(Box::new(locker.get_locked_repository(true)));
             } else {
-                installed_repos.push(Box::new(composer.get_repository_manager().get_local_repository()));
+                installed_repos.push(Box::new(
+                    composer.get_repository_manager().get_local_repository(),
+                ));
             }
 
             let installed_repo = InstalledRepository::new(installed_repos);
 
-            let mut types: Vec<String> = installed_repo.get_packages().iter()
+            let mut types: Vec<String> = installed_repo
+                .get_packages()
+                .iter()
                 .map(|package| package.get_type().to_string())
                 .collect();
             types.sort();
@@ -119,14 +161,18 @@ pub trait CompletionTrait {
         })
     }
 
-    fn suggest_available_package(&self, max: i64) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
+    fn suggest_available_package(
+        &self,
+        max: i64,
+    ) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
         Box::new(move |input: &CompletionInput| -> Vec<String> {
             if max < 1 {
                 return Vec::new();
             }
 
             let composer = self.require_composer(None, None);
-            let repos = CompositeRepository::new(composer.get_repository_manager().get_repositories());
+            let repos =
+                CompositeRepository::new(composer.get_repository_manager().get_repositories());
 
             let mut results: Vec<String>;
             let mut show_vendors = false;
@@ -154,7 +200,8 @@ pub trait CompletionTrait {
             }
 
             if show_vendors {
-                let mut results: Vec<String> = results.into_iter()
+                let mut results: Vec<String> = results
+                    .into_iter()
                     .map(|name| format!("{}/", name))
                     .collect();
 
@@ -188,13 +235,16 @@ pub trait CompletionTrait {
         })
     }
 
-    fn suggest_available_package_incl_platform(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
+    fn suggest_available_package_incl_platform(
+        &self,
+    ) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
         Box::new(move |input: &CompletionInput| -> Vec<String> {
-            let matches = if Preg::is_match(r"{^(ext|lib|php)(-|$)|^com}", input.get_completion_value()) {
-                self.suggest_platform_package()(input)
-            } else {
-                Vec::new()
-            };
+            let matches =
+                if Preg::is_match(r"{^(ext|lib|php)(-|$)|^com}", input.get_completion_value()) {
+                    self.suggest_platform_package()(input)
+                } else {
+                    Vec::new()
+                };
 
             let max = 99i64 - matches.len() as i64;
             let mut result = matches;
@@ -207,12 +257,17 @@ pub trait CompletionTrait {
         Box::new(move |input: &CompletionInput| -> Vec<String> {
             let repos = PlatformRepository::new(
                 vec![],
-                self.require_composer(None, None).get_config().get("platform"),
+                self.require_composer(None, None)
+                    .get_config()
+                    .get("platform"),
             );
 
-            let pattern = BasePackage::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
+            let pattern =
+                BasePackage::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
 
-            repos.get_packages().iter()
+            repos
+                .get_packages()
+                .iter()
                 .map(|package| package.get_name().to_string())
                 .filter(|name| Preg::is_match(&pattern, name))
                 .collect()

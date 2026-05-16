@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/GitHub.php
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{date, stripos, strtolower, PhpMixed};
+use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
 use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
@@ -47,9 +47,7 @@ impl GitHub {
             Some(arr) => arr.clone(),
             None => return false,
         };
-        let origin_in_domains = domains
-            .values()
-            .any(|v| v.as_string() == Some(origin_url));
+        let origin_in_domains = domains.values().any(|v| v.as_string() == Some(origin_url));
         if !origin_in_domains {
             return false;
         }
@@ -82,11 +80,8 @@ impl GitHub {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error(
-                PhpMixed::String(msg.to_string()),
-                true,
-                IOInterface::NORMAL,
-            );
+            self.io
+                .write_error(PhpMixed::String(msg.to_string()), true, IOInterface::NORMAL);
         }
 
         let mut note = "Composer".to_string();
@@ -286,7 +281,8 @@ impl GitHub {
             }
         }
 
-        let use_local = store_in_local_auth_config && self.config.get_local_auth_config_source().is_some();
+        let use_local =
+            store_in_local_auth_config && self.config.get_local_auth_config_source().is_some();
         let auth_config_source_name;
         if use_local {
             let mut auth_config_source = self.config.get_local_auth_config_source().unwrap();
@@ -367,9 +363,7 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-ratelimit-remaining: *0$}i", header.trim())
-                .unwrap_or(false)
-            {
+            if Preg::is_match(r"{^x-ratelimit-remaining: *0$}i", header.trim()).unwrap_or(false) {
                 return true;
             }
         }
@@ -379,9 +373,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-github-sso: required}i", header.trim())
-                .unwrap_or(false)
-            {
+            if Preg::is_match(r"{^x-github-sso: required}i", header.trim()).unwrap_or(false) {
                 return true;
             }
         }

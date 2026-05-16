@@ -37,10 +37,7 @@ impl Preg {
     }
 
     /// Returns captures as a flat Vec indexed by group number (index 0 = full match).
-    pub fn is_match_strict_groups(
-        pattern: &str,
-        subject: &str,
-    ) -> Option<Vec<String>> {
+    pub fn is_match_strict_groups(pattern: &str, subject: &str) -> Option<Vec<String>> {
         todo!()
     }
 
@@ -54,10 +51,7 @@ impl Preg {
     }
 
     /// Returns all matches; outer Vec indexed by group number, inner Vec by match occurrence.
-    pub fn is_match_all_strict_groups(
-        pattern: &str,
-        subject: &str,
-    ) -> Option<Vec<Vec<String>>> {
+    pub fn is_match_all_strict_groups(pattern: &str, subject: &str) -> Option<Vec<Vec<String>>> {
         todo!()
     }
 
@@ -79,10 +73,7 @@ impl Preg {
     }
 
     /// Like is_match_strict_groups but returns named captures as IndexMap.
-    pub fn match_strict_groups(
-        pattern: &str,
-        subject: &str,
-    ) -> Option<IndexMap<String, String>> {
+    pub fn match_strict_groups(pattern: &str, subject: &str) -> Option<IndexMap<String, String>> {
         todo!()
     }
 }

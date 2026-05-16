@@ -1,8 +1,5 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php
 
-use anyhow::Result;
-use shirabe_php_shim::{empty, LogicException, PhpMixed, UnexpectedValueException};
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use crate::installer::binary_installer::BinaryInstaller;
 use crate::installer::installer_interface::InstallerInterface;
 use crate::installer::library_installer::LibraryInstaller;
@@ -13,6 +10,9 @@ use crate::plugin::plugin_manager::PluginManager;
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
 use crate::util::filesystem::Filesystem;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_php_shim::{LogicException, PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -27,7 +27,13 @@ impl PluginInstaller {
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
         Self {
-            inner: LibraryInstaller::new(io, composer, Some("composer-plugin".to_string()), fs, binary_installer),
+            inner: LibraryInstaller::new(
+                io,
+                composer,
+                Some("composer-plugin".to_string()),
+                fs,
+                binary_installer,
+            ),
         }
     }
 
@@ -36,8 +42,16 @@ impl PluginInstaller {
         self.get_plugin_manager().disable_plugins();
     }
 
-    fn rollback_install(&self, e: anyhow::Error, repo: &mut dyn InstalledRepositoryInterface, package: &dyn PackageInterface) -> Result<()> {
-        self.inner.io.write_error(&format!("Plugin initialization failed ({}), uninstalling plugin", e));
+    fn rollback_install(
+        &self,
+        e: anyhow::Error,
+        repo: &mut dyn InstalledRepositoryInterface,
+        package: &dyn PackageInterface,
+    ) -> Result<()> {
+        self.inner.io.write_error(&format!(
+            "Plugin initialization failed ({}), uninstalling plugin",
+            e
+        ));
         self.inner.uninstall(repo, package)?;
         Err(e)
     }
@@ -48,7 +62,9 @@ impl PluginInstaller {
             self.inner.composer.is_full_composer(),
             "{}",
             LogicException {
-                message: "PluginInstaller should be initialized with a fully loaded Composer instance.".to_string(),
+                message:
+                    "PluginInstaller should be initialized with a fully loaded Composer instance."
+                        .to_string(),
                 code: 0,
             }
         );
@@ -62,24 +78,41 @@ impl InstallerInterface for PluginInstaller {
         package_type == "composer-plugin" || package_type == "composer-installer"
     }
 
-    fn is_installed(&self, repo: &dyn InstalledRepositoryInterface, package: &dyn PackageInterface) -> bool {
+    fn is_installed(
+        &self,
+        repo: &dyn InstalledRepositoryInterface,
+        package: &dyn PackageInterface,
+    ) -> bool {
         self.inner.is_installed(repo, package)
     }
 
-    fn prepare(&self, r#type: &str, package: &dyn PackageInterface, prev_package: Option<&dyn PackageInterface>) -> Result<Option<Box<dyn PromiseInterface>>> {
-        if (r#type == "install" || r#type == "update") && !self.get_plugin_manager().are_plugins_disabled("local") {
-            let plugin_optional = package.get_extra()
+    fn prepare(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+        if (r#type == "install" || r#type == "update")
+            && !self.get_plugin_manager().are_plugins_disabled("local")
+        {
+            let plugin_optional = package
+                .get_extra()
                 .get("plugin-optional")
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             // TODO(plugin): check if plugin is allowed
-            self.get_plugin_manager().is_plugin_allowed(package.get_name(), false, plugin_optional);
+            self.get_plugin_manager()
+                .is_plugin_allowed(package.get_name(), false, plugin_optional);
         }
 
         self.inner.prepare(r#type, package, prev_package)
     }
 
-    fn download(&self, package: &dyn PackageInterface, prev_package: Option<&dyn PackageInterface>) -> Result<Option<Box<dyn PromiseInterface>>> {
+    fn download(
+        &self,
+        package: &dyn PackageInterface,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let extra = package.get_extra();
         let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
@@ -95,7 +128,11 @@ impl InstallerInterface for PluginInstaller {
         self.inner.download(package, prev_package)
     }
 
-    fn install(&self, repo: &mut dyn InstalledRepositoryInterface, package: &dyn PackageInterface) -> Result<Option<Box<dyn PromiseInterface>>> {
+    fn install(
+        &self,
+        repo: &mut dyn InstalledRepositoryInterface,
+        package: &dyn PackageInterface,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let promise = self.inner.install(repo, package)?;
         let promise = match promise {
             Some(p) => p,
@@ -111,7 +148,12 @@ impl InstallerInterface for PluginInstaller {
         }))))
     }
 
-    fn update(&self, repo: &mut dyn InstalledRepositoryInterface, initial: &dyn PackageInterface, target: &dyn PackageInterface) -> Result<Option<Box<dyn PromiseInterface>>> {
+    fn update(
+        &self,
+        repo: &mut dyn InstalledRepositoryInterface,
+        initial: &dyn PackageInterface,
+        target: &dyn PackageInterface,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let promise = self.inner.update(repo, initial, target)?;
         let promise = match promise {
             Some(p) => p,
@@ -128,14 +170,23 @@ impl InstallerInterface for PluginInstaller {
         }))))
     }
 
-    fn uninstall(&self, repo: &mut dyn InstalledRepositoryInterface, package: &dyn PackageInterface) -> Result<Option<Box<dyn PromiseInterface>>> {
+    fn uninstall(
+        &self,
+        repo: &mut dyn InstalledRepositoryInterface,
+        package: &dyn PackageInterface,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
         // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager().uninstall_package(package);
 
         self.inner.uninstall(repo, package)
     }
 
-    fn cleanup(&self, r#type: &str, package: &dyn PackageInterface, prev_package: Option<&dyn PackageInterface>) -> Result<Option<Box<dyn PromiseInterface>>> {
+    fn cleanup(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Option<Box<dyn PromiseInterface>>> {
         self.inner.cleanup(r#type, package, prev_package)
     }
 

@@ -10,13 +10,13 @@ use shirabe_external_packages::symfony::component::console::output::console_outp
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::php_executable_finder::PhpExecutableFinder;
 use shirabe_php_shim::{
-    array_pop, array_push, array_search_in_vec, array_splice, class_exists, count_mixed,
-    defined, file_exists, get_class, hash, implode, ini_get, is_a, is_array, is_callable,
-    is_object, is_string, krsort, max_i64, method_exists, preg_quote, realpath, spl_autoload_functions,
-    spl_autoload_register, spl_autoload_unregister, spl_object_hash, sprintf, str_contains,
-    str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper, substr, trim,
-    Exception, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, PATH_SEPARATOR,
-    PHP_VERSION_ID,
+    Exception, InvalidArgumentException, LogicException, PATH_SEPARATOR, PHP_VERSION_ID, PhpMixed,
+    RuntimeException, array_pop, array_push, array_search_in_vec, array_splice, class_exists,
+    count_mixed, defined, file_exists, get_class, hash, implode, ini_get, is_a, is_array,
+    is_callable, is_object, is_string, krsort, max_i64, method_exists, preg_quote, realpath,
+    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
+    sprintf, str_contains, str_ends_with, str_replace, str_starts_with, strlen, strpos, strtoupper,
+    substr, trim,
 };
 
 use crate::autoload::class_loader::ClassLoader;
@@ -257,11 +257,7 @@ impl EventDispatcher {
         result
     }
 
-    fn do_dispatch_body(
-        &mut self,
-        event: &Event,
-        listeners: Vec<Callable>,
-    ) -> anyhow::Result<i64> {
+    fn do_dispatch_body(&mut self, event: &Event, listeners: Vec<Callable>) -> anyhow::Result<i64> {
         let mut return_max = 0_i64;
         for callable in listeners {
             let mut r#return: i64 = 0;
@@ -271,8 +267,8 @@ impl EventDispatcher {
             let mut callable = callable;
             if let Callable::String(ref s) = callable {
                 if str_contains(s, "@no_additional_args") {
-                    let replaced =
-                        Preg::replace("{ ?@no_additional_args}", "", s).unwrap_or_else(|_| s.clone());
+                    let replaced = Preg::replace("{ ?@no_additional_args}", "", s)
+                        .unwrap_or_else(|_| s.clone());
                     callable = Callable::String(replaced);
                     additional_args = Vec::new();
                 }
@@ -337,65 +333,66 @@ impl EventDispatcher {
                 }
                 // TODO(plugin): actually invoke callable with $event and inspect result
                 r#return = 0;
-            } else { match callable {
-                Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
-                    self.io.write_error(
-                        PhpMixed::String(sprintf(
-                            "> %s: %s",
-                            &[
-                                PhpMixed::String(formatted_event_name_with_args.clone()),
-                                PhpMixed::String(callable_str.clone()),
-                            ],
-                        )),
-                        true,
-                        <dyn IOInterface>::VERBOSE,
-                    );
-
-                    let mut script: Vec<String> = substr(callable_str, 1, None)
-                        .split(' ')
-                        .map(|s| s.to_string())
-                        .collect();
-                    let script_name = script[0].clone();
-                    script.remove(0);
-
-                    let args: Vec<String>;
-                    if let Some(index) = array_search_in_vec("@additional_args", &script) {
-                        let _ = array_splice::<String>(&mut script, index, 0, &additional_args);
-                        args = script.clone();
-                    } else {
-                        let mut merged = script.clone();
-                        merged.extend(additional_args.clone());
-                        args = merged;
-                    }
-                    let mut flags = event.get_flags().clone();
-                    if flags.contains_key("script-alias-input") {
-                        let args_string = script
-                            .iter()
-                            .map(|arg| ProcessExecutor::escape(arg))
-                            .collect::<Vec<_>>()
-                            .join(" ");
-                        let existing = flags
-                            .get("script-alias-input")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
-                            .to_string();
-                        flags.insert(
-                            "script-alias-input".to_string(),
-                            PhpMixed::String(format!("{} {}", args_string, existing)),
+            } else {
+                match callable {
+                    Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
+                        self.io.write_error(
+                            PhpMixed::String(sprintf(
+                                "> %s: %s",
+                                &[
+                                    PhpMixed::String(formatted_event_name_with_args.clone()),
+                                    PhpMixed::String(callable_str.clone()),
+                                ],
+                            )),
+                            true,
+                            <dyn IOInterface>::VERBOSE,
                         );
-                    }
-                    if strpos(callable_str, "@composer ") == Some(0) {
-                        let exec = format!(
-                            "{} {} {}",
-                            self.get_php_exec_command()?,
-                            ProcessExecutor::escape(
-                                &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                            ),
-                            args.join(" ")
-                        );
-                        let exit_code = self.execute_tty(&exec)?;
-                        if exit_code != 0 {
-                            self.io.write_error(
+
+                        let mut script: Vec<String> = substr(callable_str, 1, None)
+                            .split(' ')
+                            .map(|s| s.to_string())
+                            .collect();
+                        let script_name = script[0].clone();
+                        script.remove(0);
+
+                        let args: Vec<String>;
+                        if let Some(index) = array_search_in_vec("@additional_args", &script) {
+                            let _ = array_splice::<String>(&mut script, index, 0, &additional_args);
+                            args = script.clone();
+                        } else {
+                            let mut merged = script.clone();
+                            merged.extend(additional_args.clone());
+                            args = merged;
+                        }
+                        let mut flags = event.get_flags().clone();
+                        if flags.contains_key("script-alias-input") {
+                            let args_string = script
+                                .iter()
+                                .map(|arg| ProcessExecutor::escape(arg))
+                                .collect::<Vec<_>>()
+                                .join(" ");
+                            let existing = flags
+                                .get("script-alias-input")
+                                .and_then(|v| v.as_string())
+                                .unwrap_or("")
+                                .to_string();
+                            flags.insert(
+                                "script-alias-input".to_string(),
+                                PhpMixed::String(format!("{} {}", args_string, existing)),
+                            );
+                        }
+                        if strpos(callable_str, "@composer ") == Some(0) {
+                            let exec = format!(
+                                "{} {} {}",
+                                self.get_php_exec_command()?,
+                                ProcessExecutor::escape(
+                                    &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
+                                ),
+                                args.join(" ")
+                            );
+                            let exit_code = self.execute_tty(&exec)?;
+                            if exit_code != 0 {
+                                self.io.write_error(
                                 PhpMixed::String(sprintf(
                                     &format!(
                                         "<error>Script %s handling the %s event returned with error code {}</error>",
@@ -410,26 +407,26 @@ impl EventDispatcher {
                                 <dyn IOInterface>::QUIET,
                             );
 
-                            return Err(anyhow::anyhow!(ScriptExecutionException(
-                                RuntimeException {
-                                    message: format!(
-                                        "Error Output: {}",
-                                        self.process.get_error_output()
-                                    ),
-                                    code: exit_code,
-                                }
-                            )));
-                        }
-                    } else {
-                        if self
-                            .get_listeners(&Event::new(
-                                script_name.clone(),
-                                Vec::new(),
-                                IndexMap::new(),
-                            ))
-                            .is_empty()
-                        {
-                            self.io.write_error(
+                                return Err(anyhow::anyhow!(ScriptExecutionException(
+                                    RuntimeException {
+                                        message: format!(
+                                            "Error Output: {}",
+                                            self.process.get_error_output()
+                                        ),
+                                        code: exit_code,
+                                    }
+                                )));
+                            }
+                        } else {
+                            if self
+                                .get_listeners(&Event::new(
+                                    script_name.clone(),
+                                    Vec::new(),
+                                    IndexMap::new(),
+                                ))
+                                .is_empty()
+                            {
+                                self.io.write_error(
                                 PhpMixed::String(sprintf(
                                     "<warning>You made a reference to a non-existent script %s</warning>",
                                     &[PhpMixed::String(callable_str.clone())],
@@ -437,53 +434,56 @@ impl EventDispatcher {
                                 true,
                                 <dyn IOInterface>::QUIET,
                             );
-                        }
+                            }
 
-                        let composer_full = self.composer_as_full_or_panic();
-                        let mut script_event = ScriptEvent::new(
-                            script_name.clone(),
-                            composer_full,
-                            self.io_clone(),
-                            // event.isDevMode() is only on InstallerEvent/ScriptEvent/PackageEvent
-                            // TODO(plugin): proper dev_mode propagation when polymorphic event is supported
-                            false,
-                            args,
-                            flags,
-                        );
-                        // TODO(plugin): script_event.set_originating_event(event.clone())
-                        match self.dispatch(Some(&script_name), Some(Event::new(
-                            script_name.clone(),
-                            script_event.inner_args_for_dispatch(),
-                            script_event.inner_flags_for_dispatch(),
-                        ))) {
-                            Ok(v) => r#return = v,
-                            Err(e) => {
-                                if e.downcast_ref::<ScriptExecutionException>().is_some() {
-                                    self.io.write_error(
-                                        PhpMixed::String(sprintf(
-                                            "<error>Script %s was called via %s</error>",
-                                            &[
-                                                PhpMixed::String(callable_str.clone()),
-                                                PhpMixed::String(event.get_name().to_string()),
-                                            ],
-                                        )),
-                                        true,
-                                        <dyn IOInterface>::QUIET,
-                                    );
+                            let composer_full = self.composer_as_full_or_panic();
+                            let mut script_event = ScriptEvent::new(
+                                script_name.clone(),
+                                composer_full,
+                                self.io_clone(),
+                                // event.isDevMode() is only on InstallerEvent/ScriptEvent/PackageEvent
+                                // TODO(plugin): proper dev_mode propagation when polymorphic event is supported
+                                false,
+                                args,
+                                flags,
+                            );
+                            // TODO(plugin): script_event.set_originating_event(event.clone())
+                            match self.dispatch(
+                                Some(&script_name),
+                                Some(Event::new(
+                                    script_name.clone(),
+                                    script_event.inner_args_for_dispatch(),
+                                    script_event.inner_flags_for_dispatch(),
+                                )),
+                            ) {
+                                Ok(v) => r#return = v,
+                                Err(e) => {
+                                    if e.downcast_ref::<ScriptExecutionException>().is_some() {
+                                        self.io.write_error(
+                                            PhpMixed::String(sprintf(
+                                                "<error>Script %s was called via %s</error>",
+                                                &[
+                                                    PhpMixed::String(callable_str.clone()),
+                                                    PhpMixed::String(event.get_name().to_string()),
+                                                ],
+                                            )),
+                                            true,
+                                            <dyn IOInterface>::QUIET,
+                                        );
+                                    }
+                                    return Err(e);
                                 }
-                                return Err(e);
                             }
                         }
                     }
-                }
-                Callable::String(ref callable_str) if self.is_php_script(callable_str) => {
-                    let pos = strpos(callable_str, "::").unwrap_or(0) as i64;
-                    let class_name = substr(callable_str, 0, Some(pos));
-                    let method_name = substr(callable_str, pos + 2, None);
+                    Callable::String(ref callable_str) if self.is_php_script(callable_str) => {
+                        let pos = strpos(callable_str, "::").unwrap_or(0) as i64;
+                        let class_name = substr(callable_str, 0, Some(pos));
+                        let method_name = substr(callable_str, pos + 2, None);
 
-                    self.make_autoloader(event, &Callable::String(callable_str.clone()));
-                    if !class_exists(&class_name) {
-                        self.io.write_error(
+                        self.make_autoloader(event, &Callable::String(callable_str.clone()));
+                        if !class_exists(&class_name) {
+                            self.io.write_error(
                             PhpMixed::String(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
@@ -492,10 +492,10 @@ impl EventDispatcher {
                             true,
                             <dyn IOInterface>::QUIET,
                         );
-                        continue;
-                    }
-                    if !is_callable(&PhpMixed::String(callable_str.clone())) {
-                        self.io.write_error(
+                            continue;
+                        }
+                        if !is_callable(&PhpMixed::String(callable_str.clone())) {
+                            self.io.write_error(
                             PhpMixed::String(format!(
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
                                 callable_str,
@@ -504,46 +504,46 @@ impl EventDispatcher {
                             true,
                             <dyn IOInterface>::QUIET,
                         );
-                        continue;
-                    }
-
-                    match self.execute_event_php_script(&class_name, &method_name, event) {
-                        Ok(v) => {
-                            r#return = if let PhpMixed::Bool(false) = v { 1 } else { 0 };
+                            continue;
                         }
-                        Err(e) => {
-                            let message =
-                                "Script %s handling the %s event terminated with an exception";
+
+                        match self.execute_event_php_script(&class_name, &method_name, event) {
+                            Ok(v) => {
+                                r#return = if let PhpMixed::Bool(false) = v { 1 } else { 0 };
+                            }
+                            Err(e) => {
+                                let message =
+                                    "Script %s handling the %s event terminated with an exception";
+                                self.io.write_error(
+                                    PhpMixed::String(format!(
+                                        "<error>{}</error>",
+                                        sprintf(
+                                            message,
+                                            &[
+                                                PhpMixed::String(callable_str.clone()),
+                                                PhpMixed::String(event.get_name().to_string()),
+                                            ],
+                                        )
+                                    )),
+                                    true,
+                                    <dyn IOInterface>::QUIET,
+                                );
+                                return Err(e);
+                            }
+                        }
+                    }
+                    Callable::String(ref callable_str) if self.is_command_class(callable_str) => {
+                        let class_name = callable_str.clone();
+
+                        self.make_autoloader(
+                            event,
+                            &Callable::ArrayCallable(
+                                Box::new(PhpMixed::String(callable_str.clone())),
+                                "run".to_string(),
+                            ),
+                        );
+                        if !class_exists(&class_name) {
                             self.io.write_error(
-                                PhpMixed::String(format!(
-                                    "<error>{}</error>",
-                                    sprintf(
-                                        message,
-                                        &[
-                                            PhpMixed::String(callable_str.clone()),
-                                            PhpMixed::String(event.get_name().to_string()),
-                                        ],
-                                    )
-                                )),
-                                true,
-                                <dyn IOInterface>::QUIET,
-                            );
-                            return Err(e);
-                        }
-                    }
-                }
-                Callable::String(ref callable_str) if self.is_command_class(callable_str) => {
-                    let class_name = callable_str.clone();
-
-                    self.make_autoloader(
-                        event,
-                        &Callable::ArrayCallable(
-                            Box::new(PhpMixed::String(callable_str.clone())),
-                            "run".to_string(),
-                        ),
-                    );
-                    if !class_exists(&class_name) {
-                        self.io.write_error(
                             PhpMixed::String(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
@@ -552,14 +552,14 @@ impl EventDispatcher {
                             true,
                             <dyn IOInterface>::QUIET,
                         );
-                        continue;
-                    }
-                    if !is_a(
-                        &PhpMixed::String(class_name.clone()),
-                        "Symfony\\Component\\Console\\Command\\Command",
-                        true,
-                    ) {
-                        self.io.write_error(
+                            continue;
+                        }
+                        if !is_a(
+                            &PhpMixed::String(class_name.clone()),
+                            "Symfony\\Component\\Console\\Command\\Command",
+                            true,
+                        ) {
+                            self.io.write_error(
                             PhpMixed::String(format!(
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
                                 class_name,
@@ -568,13 +568,13 @@ impl EventDispatcher {
                             true,
                             <dyn IOInterface>::QUIET,
                         );
-                        continue;
-                    }
-                    if defined(&format!(
-                        "Composer\\Script\\ScriptEvents::{}",
-                        str_replace("-", "_", &strtoupper(event.get_name()))
-                    )) {
-                        self.io.write_error(
+                            continue;
+                        }
+                        if defined(&format!(
+                            "Composer\\Script\\ScriptEvents::{}",
+                            str_replace("-", "_", &strtoupper(event.get_name()))
+                        )) {
+                            self.io.write_error(
                             PhpMixed::String(format!(
                                 "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
                                 event.get_name()
@@ -582,239 +582,241 @@ impl EventDispatcher {
                             true,
                             <dyn IOInterface>::QUIET,
                         );
-                        continue;
-                    }
+                            continue;
+                        }
 
-                    let mut app = Application::new();
-                    app.set_catch_exceptions(false);
-                    if method_exists(
-                        &PhpMixed::String("Application".to_string()),
-                        "setCatchErrors",
-                    ) {
-                        app.set_catch_errors(false);
+                        let mut app = Application::new();
+                        app.set_catch_exceptions(false);
+                        if method_exists(
+                            &PhpMixed::String("Application".to_string()),
+                            "setCatchErrors",
+                        ) {
+                            app.set_catch_errors(false);
+                        }
+                        app.set_auto_exit(false);
+                        // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
+                        let cmd = Command::new(event.get_name().to_string());
+                        if method_exists(&PhpMixed::String("Application".to_string()), "addCommand")
+                        {
+                            app.add_command(cmd.clone());
+                        } else {
+                            // Compatibility layer for symfony/console <7.4
+                            app.add(cmd.clone());
+                        }
+                        app.set_default_command(cmd.get_name().to_string(), true);
+                        let result = (|| -> anyhow::Result<i64> {
+                            let args = additional_args
+                                .iter()
+                                .map(|arg| ProcessExecutor::escape(arg))
+                                .collect::<Vec<_>>()
+                                .join(" ");
+                            // reusing the output from $this->io is mostly needed for tests, but generally speaking
+                            // it does not hurt to keep the same stream as the current Application
+                            let output = if let Some(_console_io) =
+                                self.io.as_any().downcast_ref::<ConsoleIO>()
+                            {
+                                // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
+                                // is required by the original PHP — needs user-decided porting strategy.
+                                let _refl_php_version_gate = PHP_VERSION_ID < 80100;
+                                todo!("\\ReflectionProperty on ConsoleIO::$output")
+                            } else {
+                                ConsoleOutput::new()
+                            };
+                            let input_str = event
+                                .get_flags()
+                                .get("script-alias-input")
+                                .and_then(|v| v.as_string())
+                                .unwrap_or(&args)
+                                .to_string();
+                            Ok(app.run(StringInput::new(input_str), output))
+                        })();
+                        match result {
+                            Ok(v) => r#return = v,
+                            Err(e) => {
+                                let message =
+                                    "Script %s handling the %s event terminated with an exception";
+                                self.io.write_error(
+                                    PhpMixed::String(format!(
+                                        "<error>{}</error>",
+                                        sprintf(
+                                            message,
+                                            &[
+                                                PhpMixed::String(callable_str.clone()),
+                                                PhpMixed::String(event.get_name().to_string()),
+                                            ],
+                                        )
+                                    )),
+                                    true,
+                                    <dyn IOInterface>::QUIET,
+                                );
+                                return Err(e);
+                            }
+                        }
                     }
-                    app.set_auto_exit(false);
-                    // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
-                    let cmd = Command::new(event.get_name().to_string());
-                    if method_exists(&PhpMixed::String("Application".to_string()), "addCommand") {
-                        app.add_command(cmd.clone());
-                    } else {
-                        // Compatibility layer for symfony/console <7.4
-                        app.add(cmd.clone());
-                    }
-                    app.set_default_command(cmd.get_name().to_string(), true);
-                    let result = (|| -> anyhow::Result<i64> {
+                    Callable::String(callable_str) => {
                         let args = additional_args
                             .iter()
                             .map(|arg| ProcessExecutor::escape(arg))
                             .collect::<Vec<_>>()
                             .join(" ");
-                        // reusing the output from $this->io is mostly needed for tests, but generally speaking
-                        // it does not hurt to keep the same stream as the current Application
-                        let output = if let Some(_console_io) =
-                            self.io.as_any().downcast_ref::<ConsoleIO>()
-                        {
-                            // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
-                            // is required by the original PHP — needs user-decided porting strategy.
-                            let _refl_php_version_gate = PHP_VERSION_ID < 80100;
-                            todo!("\\ReflectionProperty on ConsoleIO::$output")
+
+                        // @putenv does not receive arguments
+                        let mut exec = if strpos(&callable_str, "@putenv ") == Some(0) {
+                            callable_str.clone()
+                        } else if str_contains(&callable_str, "@additional_args") {
+                            str_replace("@additional_args", &args, &callable_str)
                         } else {
-                            ConsoleOutput::new()
+                            format!(
+                                "{}{}",
+                                callable_str,
+                                if args == "" {
+                                    "".to_string()
+                                } else {
+                                    format!(" {}", args)
+                                }
+                            )
                         };
-                        let input_str = event
-                            .get_flags()
-                            .get("script-alias-input")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or(&args)
-                            .to_string();
-                        Ok(app.run(StringInput::new(input_str), output))
-                    })();
-                    match result {
-                        Ok(v) => r#return = v,
-                        Err(e) => {
-                            let message =
-                                "Script %s handling the %s event terminated with an exception";
+
+                        if self.io.is_verbose() {
                             self.io.write_error(
-                                PhpMixed::String(format!(
-                                    "<error>{}</error>",
-                                    sprintf(
-                                        message,
-                                        &[
-                                            PhpMixed::String(callable_str.clone()),
-                                            PhpMixed::String(event.get_name().to_string()),
-                                        ],
-                                    )
+                                PhpMixed::String(sprintf(
+                                    "> %s: %s",
+                                    &[
+                                        PhpMixed::String(event.get_name().to_string()),
+                                        PhpMixed::String(exec.clone()),
+                                    ],
                                 )),
                                 true,
-                                <dyn IOInterface>::QUIET,
+                                <dyn IOInterface>::NORMAL,
                             );
-                            return Err(e);
+                        } else if self.event_needs_to_output(event) {
+                            self.io.write_error(
+                                PhpMixed::String(sprintf(
+                                    "> %s",
+                                    &[PhpMixed::String(exec.clone())],
+                                )),
+                                true,
+                                <dyn IOInterface>::NORMAL,
+                            );
                         }
-                    }
-                }
-                Callable::String(callable_str) => {
-                    let args = additional_args
-                        .iter()
-                        .map(|arg| ProcessExecutor::escape(arg))
-                        .collect::<Vec<_>>()
-                        .join(" ");
 
-                    // @putenv does not receive arguments
-                    let mut exec = if strpos(&callable_str, "@putenv ") == Some(0) {
-                        callable_str.clone()
-                    } else if str_contains(&callable_str, "@additional_args") {
-                        str_replace("@additional_args", &args, &callable_str)
-                    } else {
-                        format!(
-                            "{}{}",
-                            callable_str,
-                            if args == "" {
-                                "".to_string()
-                            } else {
-                                format!(" {}", args)
-                            }
-                        )
-                    };
-
-                    if self.io.is_verbose() {
-                        self.io.write_error(
-                            PhpMixed::String(sprintf(
-                                "> %s: %s",
-                                &[
-                                    PhpMixed::String(event.get_name().to_string()),
-                                    PhpMixed::String(exec.clone()),
-                                ],
-                            )),
-                            true,
-                            <dyn IOInterface>::NORMAL,
-                        );
-                    } else if self.event_needs_to_output(event) {
-                        self.io.write_error(
-                            PhpMixed::String(sprintf(
-                                "> %s",
-                                &[PhpMixed::String(exec.clone())],
-                            )),
-                            true,
-                            <dyn IOInterface>::NORMAL,
-                        );
-                    }
-
-                    let possible_local_binaries =
-                        self.composer.get_package().get_binaries();
-                    if !possible_local_binaries.is_empty() {
-                        for local_exec in &possible_local_binaries {
-                            if Preg::is_match(
-                                &format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
-                                local_exec,
-                            )
-                            .unwrap_or(false)
-                            {
-                                let caller = BinaryInstaller::determine_binary_caller(local_exec);
-                                exec = Preg::replace(
-                                    &format!("{{^{}}}", preg_quote(&callable_str, None)),
-                                    &format!("{} {}", caller, local_exec),
-                                    &exec,
+                        let possible_local_binaries = self.composer.get_package().get_binaries();
+                        if !possible_local_binaries.is_empty() {
+                            for local_exec in &possible_local_binaries {
+                                if Preg::is_match(
+                                    &format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
+                                    local_exec,
                                 )
-                                .unwrap_or(exec);
-                                break;
-                            }
-                        }
-                    }
-
-                    if strpos(&exec, "@putenv ") == Some(0) {
-                        if strpos(&exec, "=").is_none() {
-                            Platform::clear_env(&substr(&exec, 8, None));
-                        } else {
-                            let parts: Vec<&str> =
-                                substr(&exec, 8, None).splitn(2, '=').collect::<Vec<_>>()
-                                    .iter()
-                                    .map(|s| *s)
-                                    .collect();
-                            let var = parts[0].to_string();
-                            let value = parts[1].to_string();
-                            Platform::put_env(&var, &value);
-                        }
-
-                        continue;
-                    }
-                    if strpos(&exec, "@php ") == Some(0) {
-                        let mut path_and_args = substr(&exec, 5, None);
-                        if Platform::is_windows() {
-                            path_and_args = Preg::replace_callback(
-                                "{^\\S+}",
-                                |m| str_replace("/", "\\", &m[0]),
-                                &path_and_args,
-                            )
-                            .unwrap_or(path_and_args);
-                        }
-                        // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
-                        // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
-                        let mat = Preg::is_match_strict_groups(
-                            "{^[^\\'\"\\s/\\\\]+}",
-                            &path_and_args,
-                        )
-                        .ok()
-                        .flatten();
-                        if let Some(m) = mat {
-                            if !file_exists(&m[0]) {
-                                let finder = ExecutableFinder::new();
-                                if let Some(path_to_exec) = finder.find(&m[0]) {
-                                    let mut path_to_exec = path_to_exec;
-                                    if Platform::is_windows() {
-                                        let exec_without_ext = Preg::replace(
-                                            "{\\.(exe|bat|cmd|com)$}i",
-                                            "",
-                                            &path_to_exec,
-                                        )
-                                        .unwrap_or(path_to_exec.clone());
-                                        // prefer non-extension file if it exists when executing with PHP
-                                        if file_exists(&exec_without_ext) {
-                                            path_to_exec = exec_without_ext;
-                                        }
-                                    }
-                                    path_and_args = format!(
-                                        "{}{}",
-                                        path_to_exec,
-                                        substr(&path_and_args, strlen(&m[0]), None)
-                                    );
+                                .unwrap_or(false)
+                                {
+                                    let caller =
+                                        BinaryInstaller::determine_binary_caller(local_exec);
+                                    exec = Preg::replace(
+                                        &format!("{{^{}}}", preg_quote(&callable_str, None)),
+                                        &format!("{} {}", caller, local_exec),
+                                        &exec,
+                                    )
+                                    .unwrap_or(exec);
+                                    break;
                                 }
                             }
                         }
-                        exec = format!("{} {}", self.get_php_exec_command()?, path_and_args);
-                    } else {
-                        let finder = PhpExecutableFinder::new();
-                        let php_path = finder.find(false);
-                        if let Some(ref pp) = php_path {
-                            Platform::put_env("PHP_BINARY", pp);
-                        }
 
-                        if Platform::is_windows() {
-                            exec = Preg::replace_callback(
-                                "{^\\S+}",
-                                |m| str_replace("/", "\\", &m[0]),
-                                &exec,
+                        if strpos(&exec, "@putenv ") == Some(0) {
+                            if strpos(&exec, "=").is_none() {
+                                Platform::clear_env(&substr(&exec, 8, None));
+                            } else {
+                                let parts: Vec<&str> = substr(&exec, 8, None)
+                                    .splitn(2, '=')
+                                    .collect::<Vec<_>>()
+                                    .iter()
+                                    .map(|s| *s)
+                                    .collect();
+                                let var = parts[0].to_string();
+                                let value = parts[1].to_string();
+                                Platform::put_env(&var, &value);
+                            }
+
+                            continue;
+                        }
+                        if strpos(&exec, "@php ") == Some(0) {
+                            let mut path_and_args = substr(&exec, 5, None);
+                            if Platform::is_windows() {
+                                path_and_args = Preg::replace_callback(
+                                    "{^\\S+}",
+                                    |m| str_replace("/", "\\", &m[0]),
+                                    &path_and_args,
+                                )
+                                .unwrap_or(path_and_args);
+                            }
+                            // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
+                            // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
+                            let mat = Preg::is_match_strict_groups(
+                                "{^[^\\'\"\\s/\\\\]+}",
+                                &path_and_args,
                             )
-                            .unwrap_or(exec);
+                            .ok()
+                            .flatten();
+                            if let Some(m) = mat {
+                                if !file_exists(&m[0]) {
+                                    let finder = ExecutableFinder::new();
+                                    if let Some(path_to_exec) = finder.find(&m[0]) {
+                                        let mut path_to_exec = path_to_exec;
+                                        if Platform::is_windows() {
+                                            let exec_without_ext = Preg::replace(
+                                                "{\\.(exe|bat|cmd|com)$}i",
+                                                "",
+                                                &path_to_exec,
+                                            )
+                                            .unwrap_or(path_to_exec.clone());
+                                            // prefer non-extension file if it exists when executing with PHP
+                                            if file_exists(&exec_without_ext) {
+                                                path_to_exec = exec_without_ext;
+                                            }
+                                        }
+                                        path_and_args = format!(
+                                            "{}{}",
+                                            path_to_exec,
+                                            substr(&path_and_args, strlen(&m[0]), None)
+                                        );
+                                    }
+                                }
+                            }
+                            exec = format!("{} {}", self.get_php_exec_command()?, path_and_args);
+                        } else {
+                            let finder = PhpExecutableFinder::new();
+                            let php_path = finder.find(false);
+                            if let Some(ref pp) = php_path {
+                                Platform::put_env("PHP_BINARY", pp);
+                            }
+
+                            if Platform::is_windows() {
+                                exec = Preg::replace_callback(
+                                    "{^\\S+}",
+                                    |m| str_replace("/", "\\", &m[0]),
+                                    &exec,
+                                )
+                                .unwrap_or(exec);
+                            }
                         }
-                    }
 
-                    // if composer is being executed, make sure it runs the expected composer from current path
-                    // resolution, even if bin-dir contains composer too because the project requires composer/composer
-                    // see https://github.com/composer/composer/issues/8748
-                    if strpos(&exec, "composer ") == Some(0) {
-                        exec = format!(
-                            "{} {}{}",
-                            self.get_php_exec_command()?,
-                            ProcessExecutor::escape(
-                                &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                            ),
-                            substr(&exec, 8, None)
-                        );
-                    }
+                        // if composer is being executed, make sure it runs the expected composer from current path
+                        // resolution, even if bin-dir contains composer too because the project requires composer/composer
+                        // see https://github.com/composer/composer/issues/8748
+                        if strpos(&exec, "composer ") == Some(0) {
+                            exec = format!(
+                                "{} {}{}",
+                                self.get_php_exec_command()?,
+                                ProcessExecutor::escape(
+                                    &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
+                                ),
+                                substr(&exec, 8, None)
+                            );
+                        }
 
-                    let exit_code = self.execute_tty(&exec)?;
-                    if exit_code != 0 {
-                        self.io.write_error(
+                        let exit_code = self.execute_tty(&exec)?;
+                        if exit_code != 0 {
+                            self.io.write_error(
                             PhpMixed::String(sprintf(
                                 &format!(
                                     "<error>Script %s handling the %s event returned with error code {}</error>",
@@ -829,21 +831,22 @@ impl EventDispatcher {
                             <dyn IOInterface>::QUIET,
                         );
 
-                        return Err(anyhow::anyhow!(ScriptExecutionException(
-                            RuntimeException {
-                                message: format!(
-                                    "Error Output: {}",
-                                    self.process.get_error_output()
-                                ),
-                                code: exit_code,
-                            }
-                        )));
+                            return Err(anyhow::anyhow!(ScriptExecutionException(
+                                RuntimeException {
+                                    message: format!(
+                                        "Error Output: {}",
+                                        self.process.get_error_output()
+                                    ),
+                                    code: exit_code,
+                                }
+                            )));
+                        }
+                    }
+                    _ => {
+                        // unreachable in practice — the first match arm guard handles non-string callables.
                     }
                 }
-                _ => {
-                    // unreachable in practice — the first match arm guard handles non-string callables.
-                }
-            } }
+            }
 
             return_max = max_i64(return_max, r#return);
 
@@ -866,11 +869,7 @@ impl EventDispatcher {
 
     fn do_dispatch_package(&mut self, event: PackageEvent) -> anyhow::Result<i64> {
         // TODO(plugin): preserve PackageEvent identity for `instanceof` checks above.
-        let base = Event::new(
-            event.get_name().to_string(),
-            Vec::new(),
-            IndexMap::new(),
-        );
+        let base = Event::new(event.get_name().to_string(), Vec::new(), IndexMap::new());
         self.do_dispatch(base)
     }
 
@@ -1088,11 +1087,7 @@ impl EventDispatcher {
             _ => return Vec::new(),
         };
 
-        if self
-            .skip_scripts
-            .iter()
-            .any(|s| s == event.get_name())
-        {
+        if self.skip_scripts.iter().any(|s| s == event.get_name()) {
             self.io.write_error(
                 PhpMixed::String(format!(
                     "Skipped script listeners for <info>{}</info> because of COMPOSER_SKIP_SCRIPTS",
@@ -1290,11 +1285,8 @@ impl EventDispatcher {
 
         self.previous_hash = Some(hash_value);
 
-        let package_map = generator.build_package_map(
-            composer.get_installation_manager(),
-            package,
-            &packages,
-        );
+        let package_map =
+            generator.build_package_map(composer.get_installation_manager(), package, &packages);
         let map = generator.parse_autoloads(&package_map, package);
 
         if self.loader.is_some() {

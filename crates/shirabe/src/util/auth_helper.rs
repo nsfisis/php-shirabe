@@ -4,9 +4,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    base64_encode, explode, in_array, is_array, is_string, json_decode, parse_url, sprintf,
-    str_replace, strpos, strtolower, substr, trigger_error, trim, PhpMixed, E_USER_DEPRECATED,
-    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME,
+    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, base64_encode,
+    explode, in_array, is_array, is_string, json_decode, parse_url, sprintf, str_replace, strpos,
+    strtolower, substr, trigger_error, trim,
 };
 
 use crate::config::Config;
@@ -208,8 +208,7 @@ impl AuthHelper {
                         if let Some(arr) = decoded.as_array() {
                             if let Some(msg) = arr.get("message") {
                                 if is_string(msg) {
-                                    git_hub_api_message =
-                                        msg.as_string().map(|s| s.to_string());
+                                    git_hub_api_message = msg.as_string().map(|s| s.to_string());
                                 }
                             }
                         }
@@ -452,9 +451,7 @@ impl AuthHelper {
                 IOInterface::NORMAL,
             );
             let username = self.io.ask("      Username: ".to_string(), PhpMixed::Null);
-            let password = self
-                .io
-                .ask_and_hide_answer("      Password: ".to_string());
+            let password = self.io.ask_and_hide_answer("      Password: ".to_string());
             self.io.set_authentication(
                 origin.to_string(),
                 username.as_string().unwrap_or("").to_string(),
@@ -538,10 +535,7 @@ impl AuthHelper {
             };
             if !http_has_header {
                 if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                    http.insert(
-                        "header".to_string(),
-                        Box::new(PhpMixed::List(vec![])),
-                    );
+                    http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
                 }
             }
         }
@@ -691,20 +685,14 @@ impl AuthHelper {
             ]),
             true,
         ) {
-            return self.add_authentication_options(
-                options,
-                &str_replace("api.", "", origin),
-                url,
-            );
+            return self.add_authentication_options(options, &str_replace("api.", "", origin), url);
         }
 
         // write headers back into options['http']['header']
         if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
             http.insert(
                 "header".to_string(),
-                Box::new(PhpMixed::List(
-                    headers.into_iter().map(Box::new).collect(),
-                )),
+                Box::new(PhpMixed::List(headers.into_iter().map(Box::new).collect())),
             );
         }
 

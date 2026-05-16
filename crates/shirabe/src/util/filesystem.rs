@@ -5,14 +5,14 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 use shirabe_external_packages::symfony::component::filesystem::exception::io_exception::IOException;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_php_shim::{
-    array_pop, basename, chdir, clearstatcache, copy, count, dirname, end, error_get_last,
-    explode, fclose, feof, file_exists, file_get_contents, file_put_contents, filemtime, fileatime,
-    filesize, fopen, fread, function_exists, fwrite, implode, is_array, is_dir, is_file, is_link,
-    is_readable, lstat, mkdir, react_promise_resolve, rename, rmdir, rtrim, sprintf,
-    str_contains, str_repeat, str_replace, str_starts_with, strlen, strpos, strtolower,
-    strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
     DIRECTORY_SEPARATOR, ErrorException, InvalidArgumentException, LogicException, PhpMixed,
-    RuntimeException, UnexpectedValueException,
+    RuntimeException, UnexpectedValueException, array_pop, basename, chdir, clearstatcache, copy,
+    count, dirname, end, error_get_last, explode, fclose, feof, file_exists, file_get_contents,
+    file_put_contents, fileatime, filemtime, filesize, fopen, fread, function_exists, fwrite,
+    implode, is_array, is_dir, is_file, is_link, is_readable, lstat, mkdir, react_promise_resolve,
+    rename, rmdir, rtrim, sprintf, str_contains, str_repeat, str_replace, str_starts_with, strlen,
+    strpos, strtolower, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
+    var_export,
 };
 
 use crate::util::platform::Platform;
@@ -54,7 +54,11 @@ impl Filesystem {
         count(&finder) == 0
     }
 
-    pub fn empty_directory(&mut self, dir: &str, ensure_directory_exists: bool) -> anyhow::Result<()> {
+    pub fn empty_directory(
+        &mut self,
+        dir: &str,
+        ensure_directory_exists: bool,
+    ) -> anyhow::Result<()> {
         if is_link(dir) && file_exists(dir) {
             self.unlink(dir)?;
         }
@@ -115,7 +119,10 @@ impl Filesystem {
     ///
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
-    pub fn remove_directory_async(&mut self, directory: &str) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    pub fn remove_directory_async(
+        &mut self,
+        directory: &str,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
             return Ok(react_promise_resolve(PhpMixed::Bool(r)));
@@ -136,25 +143,38 @@ impl Filesystem {
 
         let directory_owned = directory.to_string();
         // TODO(plugin): closure capture of $this in PHP — port wires the same logic via a callback handle.
-        Ok(promise.then(Box::new(move |process: PhpMixed| -> Box<dyn PromiseInterface> {
-            // clear stat cache because external processes aren't tracked by the php stat cache
-            clearstatcache(false, "");
+        Ok(promise.then(Box::new(
+            move |process: PhpMixed| -> Box<dyn PromiseInterface> {
+                // clear stat cache because external processes aren't tracked by the php stat cache
+                clearstatcache(false, "");
 
-            let is_successful = process.as_object().map(|o| o.call_method("isSuccessful", &[]).as_bool().unwrap_or(false)).unwrap_or(false);
-            if is_successful && !is_dir(&directory_owned) {
-                return react_promise_resolve(PhpMixed::Bool(true));
-            }
+                let is_successful = process
+                    .as_object()
+                    .map(|o| {
+                        o.call_method("isSuccessful", &[])
+                            .as_bool()
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
+                if is_successful && !is_dir(&directory_owned) {
+                    return react_promise_resolve(PhpMixed::Bool(true));
+                }
 
-            // PHP: \React\Promise\resolve($this->removeDirectoryPhp($directory))
-            // The recursive PHP call doesn't have a clean async equivalent; we resort to a sync call.
-            let mut fs = Filesystem::new(None);
-            let res = fs.remove_directory_php(&directory_owned).unwrap_or(false);
-            react_promise_resolve(PhpMixed::Bool(res))
-        })))
+                // PHP: \React\Promise\resolve($this->removeDirectoryPhp($directory))
+                // The recursive PHP call doesn't have a clean async equivalent; we resort to a sync call.
+                let mut fs = Filesystem::new(None);
+                let res = fs.remove_directory_php(&directory_owned).unwrap_or(false);
+                react_promise_resolve(PhpMixed::Bool(res))
+            },
+        )))
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful
-    fn remove_edge_cases(&mut self, directory: &str, fallback_to_php: bool) -> anyhow::Result<Option<bool>> {
+    fn remove_edge_cases(
+        &mut self,
+        directory: &str,
+        fallback_to_php: bool,
+    ) -> anyhow::Result<Option<bool>> {
         if self.is_symlinked_directory(directory) {
             return Ok(Some(self.unlink_symlinked_directory(directory)?));
         }
@@ -198,7 +218,8 @@ impl Filesystem {
         }
 
         // PHP: $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
-        let mut it_result = shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS);
+        let mut it_result =
+            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS);
         if let Err(e) = &it_result {
             if e.downcast_ref::<UnexpectedValueException>().is_some() {
                 // re-try once after clearing the stat cache if it failed as it
@@ -208,7 +229,10 @@ impl Filesystem {
                 if !is_dir(directory) {
                     return Ok(true);
                 }
-                it_result = shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS);
+                it_result = shirabe_php_shim::recursive_directory_iterator(
+                    directory,
+                    shirabe_php_shim::SKIP_DOTS,
+                );
             }
         }
         let it = it_result?;
@@ -243,7 +267,10 @@ impl Filesystem {
                     message: format!(
                         "Could not delete symbolic link {}: {}",
                         directory,
-                        error_get_last().get("message").and_then(|v| v.as_string()).unwrap_or("")
+                        error_get_last()
+                            .get("message")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
                     ),
                     code: 0,
                 }
@@ -255,7 +282,10 @@ impl Filesystem {
                     message: format!(
                         "{} does not exist and could not be created: {}",
                         directory,
-                        error_get_last().get("message").and_then(|v| v.as_string()).unwrap_or("")
+                        error_get_last()
+                            .get("message")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
                     ),
                     code: 0,
                 };
@@ -293,7 +323,10 @@ impl Filesystem {
                 let mut message = format!(
                     "Could not delete {}: {}",
                     path,
-                    error.get("message").and_then(|v| v.as_string()).unwrap_or("")
+                    error
+                        .get("message")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
                 );
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
@@ -321,7 +354,10 @@ impl Filesystem {
                 let mut message = format!(
                     "Could not delete {}: {}",
                     path,
-                    error.get("message").and_then(|v| v.as_string()).unwrap_or("")
+                    error
+                        .get("message")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
                 );
                 if Platform::is_windows() {
                     message.push_str("\nThis can be due to an antivirus or the Windows Search Indexer locking the file while they are analyzed");
@@ -356,7 +392,8 @@ impl Filesystem {
         let target = self.normalize_path(target);
 
         if !is_dir(source) {
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| copy(source, &target)));
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| copy(source, &target)));
             match result {
                 Ok(b) => return Ok(b),
                 Err(payload) => {
@@ -390,7 +427,8 @@ impl Filesystem {
             }
         }
 
-        let it = shirabe_php_shim::recursive_directory_iterator(source, shirabe_php_shim::SKIP_DOTS)?;
+        let it =
+            shirabe_php_shim::recursive_directory_iterator(source, shirabe_php_shim::SKIP_DOTS)?;
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::SELF_FIRST);
         self.ensure_directory_exists(&target)?;
 
@@ -461,7 +499,13 @@ impl Filesystem {
     }
 
     /// Returns the shortest path from $from to $to
-    pub fn find_shortest_path(&self, from: &str, to: &str, directories: bool, prefer_relative: bool) -> String {
+    pub fn find_shortest_path(
+        &self,
+        from: &str,
+        to: &str,
+        directories: bool,
+        prefer_relative: bool,
+    ) -> String {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             // PHP throws InvalidArgumentException
             // Returning early-formatted Result is not possible without changing signature; panic to surface in tests.
@@ -499,7 +543,8 @@ impl Filesystem {
         }
 
         common_path = format!("{}/", rtrim(&common_path, "/"));
-        let source_path_depth = substr_count(&substr(&from, strlen(&common_path) as isize, None), "/");
+        let source_path_depth =
+            substr_count(&substr(&from, strlen(&common_path) as isize, None), "/");
         let common_path_code = str_repeat("../", source_path_depth);
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
@@ -507,7 +552,11 @@ impl Filesystem {
             return to;
         }
 
-        let result = format!("{}{}", common_path_code, substr(&to, strlen(&common_path) as isize, None));
+        let result = format!(
+            "{}{}",
+            common_path_code,
+            substr(&to, strlen(&common_path) as isize, None)
+        );
         if strlen(&result) == 0 {
             return "./".to_string();
         }
@@ -516,7 +565,14 @@ impl Filesystem {
     }
 
     /// Returns PHP code that, when executed in $from, will return the path to $to
-    pub fn find_shortest_path_code(&self, from: &str, to: &str, directories: bool, static_code: bool, prefer_relative: bool) -> String {
+    pub fn find_shortest_path_code(
+        &self,
+        from: &str,
+        to: &str,
+        directories: bool,
+        static_code: bool,
+        prefer_relative: bool,
+    ) -> String {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             panic!(
                 "{}",
@@ -552,11 +608,15 @@ impl Filesystem {
         if str_starts_with(&to, &format!("{}/", from)) {
             return format!(
                 "__DIR__ . {}",
-                var_export(&PhpMixed::String(substr(&to, strlen(&from) as isize, None)), true)
+                var_export(
+                    &PhpMixed::String(substr(&to, strlen(&from) as isize, None)),
+                    true
+                )
             );
         }
-        let source_path_depth = (substr_count(&substr(&from, strlen(&common_path) as isize, None), "/") as i64)
-            + (if directories { 1 } else { 0 });
+        let source_path_depth =
+            (substr_count(&substr(&from, strlen(&common_path) as isize, None), "/") as i64)
+                + (if directories { 1 } else { 0 });
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
@@ -564,7 +624,10 @@ impl Filesystem {
         }
 
         let common_path_code = if static_code {
-            format!("__DIR__ . '{}'", str_repeat("/..", source_path_depth as usize))
+            format!(
+                "__DIR__ . '{}'",
+                str_repeat("/..", source_path_depth as usize)
+            )
         } else {
             format!(
                 "{}{}{}",
@@ -683,10 +746,20 @@ impl Filesystem {
         // on windows, \\foo indicates network paths so we exclude those from local paths, however it is unsafe
         // on linux as file:////foo (which would be a network path \\foo on windows) will resolve to /foo which could be a local path
         if Platform::is_windows() {
-            return Preg::is_match("{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i", path, None).unwrap_or(false);
+            return Preg::is_match(
+                "{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i",
+                path,
+                None,
+            )
+            .unwrap_or(false);
         }
 
-        Preg::is_match("{^(file://|/|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i", path, None).unwrap_or(false)
+        Preg::is_match(
+            "{^(file://|/|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i",
+            path,
+            None,
+        )
+        .unwrap_or(false)
     }
 
     pub fn get_platform_path(path: &str) -> String {
@@ -708,15 +781,12 @@ impl Filesystem {
         }
 
         if is_file(path) {
-            return Silencer::call(|| {
-                Ok(file_get_contents(path).is_some())
-            }).unwrap_or(false);
+            return Silencer::call(|| Ok(file_get_contents(path).is_some())).unwrap_or(false);
         }
 
         if is_dir(path) {
-            return Silencer::call(|| {
-                Ok(shirabe_php_shim::opendir(path).is_some())
-            }).unwrap_or(false);
+            return Silencer::call(|| Ok(shirabe_php_shim::opendir(path).is_some()))
+                .unwrap_or(false);
         }
 
         // assume false otherwise
@@ -724,7 +794,9 @@ impl Filesystem {
     }
 
     pub(crate) fn directory_size(&self, directory: &str) -> i64 {
-        let it = shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS).unwrap();
+        let it =
+            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS)
+                .unwrap();
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
 
         let mut size: i64 = 0;
@@ -809,14 +881,20 @@ impl Filesystem {
     pub fn junction(&mut self, target: &str, junction: &str) -> anyhow::Result<()> {
         if !Platform::is_windows() {
             return Err(LogicException {
-                message: format!("Function {} is not available on non-Windows platform", "Composer\\Util\\Filesystem"),
+                message: format!(
+                    "Function {} is not available on non-Windows platform",
+                    "Composer\\Util\\Filesystem"
+                ),
                 code: 0,
             }
             .into());
         }
         if !is_dir(target) {
             return Err(IOException::new(
-                format!("Cannot junction to \"{}\" as it is not a directory.", target),
+                format!(
+                    "Cannot junction to \"{}\" as it is not a directory.",
+                    target
+                ),
                 0,
                 None,
                 Some(target.to_string()),
@@ -838,7 +916,10 @@ impl Filesystem {
         let mut output = String::new();
         if self.get_process().execute(&cmd, &mut output) != 0 {
             return Err(IOException::new(
-                format!("Failed to create junction to \"{}\" at \"{}\".", target, junction),
+                format!(
+                    "Failed to create junction to \"{}\" at \"{}\".",
+                    target, junction
+                ),
                 0,
                 None,
                 Some(target.to_string()),
@@ -891,10 +972,16 @@ impl Filesystem {
         if !Platform::is_windows() {
             return Ok(false);
         }
-        let junction = rtrim(&str_replace("/", DIRECTORY_SEPARATOR, junction), DIRECTORY_SEPARATOR);
+        let junction = rtrim(
+            &str_replace("/", DIRECTORY_SEPARATOR, junction),
+            DIRECTORY_SEPARATOR,
+        );
         if !self.is_junction(&junction) {
             return Err(IOException::new(
-                format!("{} is not a junction and thus cannot be removed as one", junction),
+                format!(
+                    "{} is not a junction and thus cannot be removed as one",
+                    junction
+                ),
                 0,
                 None,
                 None,
@@ -906,7 +993,8 @@ impl Filesystem {
     }
 
     pub fn file_put_contents_if_modified(&self, path: &str, content: &str) -> anyhow::Result<i64> {
-        let current_content = Silencer::call(|| Ok(file_get_contents(path).unwrap_or_default())).unwrap_or_default();
+        let current_content =
+            Silencer::call(|| Ok(file_get_contents(path).unwrap_or_default())).unwrap_or_default();
         if current_content.is_empty() || current_content != content {
             return Ok(file_put_contents(path, content) as i64);
         }
@@ -917,8 +1005,10 @@ impl Filesystem {
     /// Copy file using stream_copy_to_stream to work around https://bugs.php.net/bug.php?id=6463
     pub fn safe_copy(&self, source: &str, target: &str) -> anyhow::Result<()> {
         if !file_exists(target) || !file_exists(source) || !self.files_are_equal(source, target) {
-            let source_handle = fopen(source, "r").ok_or_else(|| anyhow::anyhow!("Could not open \"{}\" for reading.", source))?;
-            let target_handle = fopen(target, "w+").ok_or_else(|| anyhow::anyhow!("Could not open \"{}\" for writing.", target))?;
+            let source_handle = fopen(source, "r")
+                .ok_or_else(|| anyhow::anyhow!("Could not open \"{}\" for reading.", source))?;
+            let target_handle = fopen(target, "w+")
+                .ok_or_else(|| anyhow::anyhow!("Could not open \"{}\" for writing.", target))?;
 
             shirabe_php_shim::stream_copy_to_stream(&source_handle, &target_handle);
             fclose(&source_handle);

@@ -4,7 +4,7 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::{implode, ksort, spl_object_hash, LogicException, PhpMixed};
+use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort, spl_object_hash};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -28,7 +28,8 @@ pub struct PoolOptimizer {
     irremovable_packages: IndexMap<i64, bool>,
 
     /// @var array<string, array<string, ConstraintInterface>>
-    require_constraints_per_package: IndexMap<String, IndexMap<String, Box<dyn ConstraintInterface>>>,
+    require_constraints_per_package:
+        IndexMap<String, IndexMap<String, Box<dyn ConstraintInterface>>>,
 
     /// @var array<string, array<string, ConstraintInterface>>
     conflict_constraints_per_package:
@@ -104,10 +105,7 @@ impl PoolOptimizer {
         // Extract requested package requirements
         for (require, constraint) in request.get_requires() {
             // TODO(phase-b): clone Box<dyn ConstraintInterface>
-            self.extract_require_constraints_per_package(
-                require,
-                todo!("constraint.clone_box()"),
-            );
+            self.extract_require_constraints_per_package(require, todo!("constraint.clone_box()"));
         }
 
         // First pass over all packages to extract information and mark package constraints irremovable
@@ -131,9 +129,7 @@ impl PoolOptimizer {
 
             // Keep track of alias packages for every package so if either the alias or aliased is kept
             // we keep the others as they are a unit of packages really
-            if let Some(alias_pkg) =
-                (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-            {
+            if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
                 self.aliases_per_package
                     .entry(alias_pkg.get_alias_of().id)
                     .or_insert_with(Vec::new)
@@ -162,7 +158,9 @@ impl PoolOptimizer {
                 continue;
             }
 
-            let constraint = irremovable_package_constraints.get(package.get_name()).unwrap();
+            let constraint = irremovable_package_constraints
+                .get(package.get_name())
+                .unwrap();
             if CompilingMatcher::r#match(
                 constraint.as_ref(),
                 Constraint::OP_EQ,
@@ -175,9 +173,7 @@ impl PoolOptimizer {
 
     fn mark_package_irremovable(&mut self, package: &BasePackage) {
         self.irremovable_packages.insert(package.id, true);
-        if let Some(alias_pkg) =
-            (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-        {
+        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked as irremovable as well
             self.mark_package_irremovable(alias_pkg.get_alias_of());
@@ -279,8 +275,7 @@ impl PoolOptimizer {
                                 package.get_version(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
-                                group_hash_parts
-                                    .push(format!("require:{}", link.get_constraint()));
+                                group_hash_parts.push(format!("require:{}", link.get_constraint()));
                             }
                         }
                     }
@@ -294,8 +289,7 @@ impl PoolOptimizer {
                                 Constraint::OP_EQ,
                                 package.get_version(),
                             ) {
-                                group_hash_parts
-                                    .push(format!("conflict:{}", conflict_constraint));
+                                group_hash_parts.push(format!("conflict:{}", conflict_constraint));
                             }
                         }
                     }
@@ -350,7 +344,10 @@ impl PoolOptimizer {
                         literals.push(package.id);
                     }
 
-                    for preferred_literal in self.policy.select_preferred_packages(pool, literals.clone()) {
+                    for preferred_literal in self
+                        .policy
+                        .select_preferred_packages(pool, literals.clone())
+                    {
                         self.keep_package(
                             &pool.literal_to_package(preferred_literal),
                             &identical_definitions_per_package,
@@ -392,7 +389,10 @@ impl PoolOptimizer {
                 // However, the majority of projects are going to specify their constraints already pretty
                 // much in the best variant possible. In other words, we'd be wasting time here and it would actually hurt
                 // performance more than the additional few packages that could be filtered out would benefit the process.
-                subhash.insert(link.get_target().to_string(), link.get_constraint().to_string());
+                subhash.insert(
+                    link.get_target().to_string(),
+                    link.get_constraint().to_string(),
+                );
             }
 
             // Sort for best result
@@ -442,9 +442,7 @@ impl PoolOptimizer {
 
         self.packages_to_remove.shift_remove(&package.id);
 
-        if let Some(alias_pkg) =
-            (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-        {
+        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked to be kept as well
             self.keep_package(
@@ -467,7 +465,9 @@ impl PoolOptimizer {
                             let pkg = if let Some(alias_pkg) =
                                 (pkg.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
                             {
-                                if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
+                                if alias_pkg.get_pretty_version()
+                                    == VersionParser::DEFAULT_BRANCH_ALIAS
+                                {
                                     alias_pkg.get_alias_of().clone_box()
                                 } else {
                                     pkg.clone_box()
@@ -498,9 +498,7 @@ impl PoolOptimizer {
 
             // record all the versions of the package group so we can list them later in Problem output
             for name in alias_package.get_names(false) {
-                if let Some(per_name) =
-                    package_identical_definition_lookup.get(&alias_package.id)
-                {
+                if let Some(per_name) = package_identical_definition_lookup.get(&alias_package.id) {
                     if let Some(package_group_pointers) = per_name.get(&name) {
                         let package_group = identical_definitions_per_package
                             .get(&name)

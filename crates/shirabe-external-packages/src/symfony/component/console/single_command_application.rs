@@ -16,7 +16,10 @@ impl SingleCommandApplication {
         todo!()
     }
 
-    pub fn set_code(&mut self, code: Box<dyn Fn(&dyn std::any::Any, &dyn std::any::Any) -> i64>) -> &mut Self {
+    pub fn set_code(
+        &mut self,
+        code: Box<dyn Fn(&dyn std::any::Any, &dyn std::any::Any) -> i64>,
+    ) -> &mut Self {
         todo!()
     }
 

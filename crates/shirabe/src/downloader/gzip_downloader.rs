@@ -1,25 +1,31 @@
 //! ref: composer/src/Composer/Downloader/GzipDownloader.php
 
-use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_php_shim::{
-    RuntimeException,
-    extension_loaded, fclose, fopen, fwrite, gzclose, gzopen, gzread,
-    implode, parse_url, pathinfo, strtr,
-    DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH,
-};
 use crate::downloader::archive_downloader::ArchiveDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::platform::Platform;
+use anyhow::Result;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_php_shim::{
+    DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, RuntimeException, extension_loaded,
+    fclose, fopen, fwrite, gzclose, gzopen, gzread, implode, parse_url, pathinfo, strtr,
+};
 
 pub struct GzipDownloader {
     inner: ArchiveDownloader,
 }
 
 impl GzipDownloader {
-    pub(crate) fn extract(&self, package: &dyn PackageInterface, file: &str, path: &str) -> Result<Box<dyn PromiseInterface>> {
+    pub(crate) fn extract(
+        &self,
+        package: &dyn PackageInterface,
+        file: &str,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
         let filename = pathinfo(
-            parse_url(&strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"), PHP_URL_PATH),
+            parse_url(
+                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
+                PHP_URL_PATH,
+            ),
             PATHINFO_FILENAME,
         );
         let target_filepath = format!("{}{}{}", path, DIRECTORY_SEPARATOR, filename);
@@ -47,7 +53,10 @@ impl GzipDownloader {
                 implode(" ", &command),
                 self.inner.process.get_error_output(),
             );
-            return Err(anyhow::anyhow!(RuntimeException { message: process_error, code: 0 }));
+            return Err(anyhow::anyhow!(RuntimeException {
+                message: process_error,
+                code: 0
+            }));
         }
 
         self.extract_using_ext(file, &target_filepath);

@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    defined, file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
-    PhpMixed, RuntimeException, DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR,
+    DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
+    file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
 };
 
 use crate::config::Config;
@@ -65,8 +65,7 @@ impl PathRepository {
             .to_string();
         let url = Platform::expand_path(&url_str);
         let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
-        let version_guesser =
-            VersionGuesser::new(&config, &process, VersionParser::new(), &*io);
+        let version_guesser = VersionGuesser::new(&config, &process, VersionParser::new(), &*io);
         let mut options = repo_config
             .get("options")
             .and_then(|v| v.as_array())
@@ -133,10 +132,7 @@ impl PathRepository {
         }
 
         for url in url_matches {
-            let path = format!(
-                "{}/",
-                realpath(&url).unwrap_or_default()
-            );
+            let path = format!("{}/", realpath(&url).unwrap_or_default());
             let composer_file_path = format!("{}composer.json", path);
 
             if !file_exists(&composer_file_path) {
@@ -144,11 +140,14 @@ impl PathRepository {
             }
 
             let json = file_get_contents(&composer_file_path).unwrap_or_default();
-            let mut package = JsonFile::parse_json(&json, Some(&composer_file_path))?
-                .unwrap_or_default();
+            let mut package =
+                JsonFile::parse_json(&json, Some(&composer_file_path))?.unwrap_or_default();
             let dist = {
                 let mut dist = IndexMap::new();
-                dist.insert("type".to_string(), Box::new(PhpMixed::String("path".to_string())));
+                dist.insert(
+                    "type".to_string(),
+                    Box::new(PhpMixed::String("path".to_string())),
+                );
                 dist.insert("url".to_string(), Box::new(PhpMixed::String(url.clone())));
                 dist
             };
@@ -193,7 +192,11 @@ impl PathRepository {
             );
 
             // use the version provided as option if available
-            if let Some(name) = package.get("name").and_then(|v| v.as_string()).map(|s| s.to_string()) {
+            if let Some(name) = package
+                .get("name")
+                .and_then(|v| v.as_string())
+                .map(|s| s.to_string())
+            {
                 if let Some(version) = self
                     .options
                     .get("versions")
@@ -226,9 +229,7 @@ impl PathRepository {
                         {
                             package.insert(
                                 "version".to_string(),
-                                PhpMixed::String(
-                                    self.version_guesser.get_root_version_from_env(),
-                                ),
+                                PhpMixed::String(self.version_guesser.get_root_version_from_env()),
                             );
                         }
                     }
@@ -236,20 +237,25 @@ impl PathRepository {
             }
 
             let mut output = String::new();
-            let command = GitUtil::build_rev_list_command(
-                &self.process,
-                {
-                    let mut args = vec!["-n1".to_string(), "--format=%H".to_string(), "HEAD".to_string()];
-                    args.extend(GitUtil::get_no_show_signature_flags(&self.process));
-                    args
-                },
-            );
+            let command = GitUtil::build_rev_list_command(&self.process, {
+                let mut args = vec![
+                    "-n1".to_string(),
+                    "--format=%H".to_string(),
+                    "HEAD".to_string(),
+                ];
+                args.extend(GitUtil::get_no_show_signature_flags(&self.process));
+                args
+            });
             if reference == "auto"
                 && shirabe_php_shim::is_dir(&format!("{}/.git", path.trim_end_matches('/')))
-                && self.process.execute(&command, &mut output, Some(path.clone())) == 0
+                && self
+                    .process
+                    .execute(&command, &mut output, Some(path.clone()))
+                    == 0
             {
-                let ref_val =
-                    GitUtil::parse_rev_list_output(&output, &self.process).trim().to_string();
+                let ref_val = GitUtil::parse_rev_list_output(&output, &self.process)
+                    .trim()
+                    .to_string();
                 if let Some(PhpMixed::Array(ref mut dist)) = package.get_mut("dist") {
                     dist.insert("reference".to_string(), Box::new(PhpMixed::String(ref_val)));
                 }
@@ -294,12 +300,17 @@ impl PathRepository {
             }
 
             self.inner
-                .add_package(self.loader.load(package.clone()).map_err(|e| {
-                    RuntimeException {
-                        message: format!("Failed loading the package in {}", composer_file_path),
-                        code: 0,
-                    }
-                })?);
+                .add_package(
+                    self.loader
+                        .load(package.clone())
+                        .map_err(|e| RuntimeException {
+                            message: format!(
+                                "Failed loading the package in {}",
+                                composer_file_path
+                            ),
+                            code: 0,
+                        })?,
+                );
         }
 
         Ok(())
@@ -324,7 +335,11 @@ impl PathRepository {
         // Ensure environment-specific path separators are normalized to URL separators
         Ok(glob_with_flags(&self.url, flags)
             .into_iter()
-            .map(|val| val.replace(DIRECTORY_SEPARATOR, "/").trim_end_matches('/').to_string())
+            .map(|val| {
+                val.replace(DIRECTORY_SEPARATOR, "/")
+                    .trim_end_matches('/')
+                    .to_string()
+            })
             .collect())
     }
 }

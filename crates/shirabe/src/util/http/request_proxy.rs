@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    curl_version, PhpMixed, CURLAUTH_BASIC, CURL_VERSION_HTTPS_PROXY, CURLOPT_NOPROXY,
-    CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH, CURLOPT_PROXYAUTH,
-    CURLOPT_PROXYUSERPWD, InvalidArgumentException,
+    CURL_VERSION_HTTPS_PROXY, CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO,
+    CURLOPT_PROXY_CAPATH, CURLOPT_PROXYAUTH, CURLOPT_PROXYUSERPWD, InvalidArgumentException,
+    PhpMixed, curl_version,
 };
 
 use crate::downloader::transport_exception::TransportException;
@@ -21,8 +21,18 @@ pub struct RequestProxy {
 }
 
 impl RequestProxy {
-    pub fn new(url: Option<String>, auth: Option<String>, context_options: Option<ContextOptions>, status: Option<String>) -> Self {
-        Self { url, auth, context_options, status }
+    pub fn new(
+        url: Option<String>,
+        auth: Option<String>,
+        context_options: Option<ContextOptions>,
+        status: Option<String>,
+    ) -> Self {
+        Self {
+            url,
+            auth,
+            context_options,
+            status,
+        }
     }
 
     pub fn none() -> Self {
@@ -37,13 +47,22 @@ impl RequestProxy {
         self.context_options.as_ref()
     }
 
-    pub fn get_curl_options(&self, ssl_options: &IndexMap<String, PhpMixed>) -> Result<IndexMap<i64, PhpMixed>, TransportException> {
+    pub fn get_curl_options(
+        &self,
+        ssl_options: &IndexMap<String, PhpMixed>,
+    ) -> Result<IndexMap<i64, PhpMixed>, TransportException> {
         if self.is_secure() && !self.supports_secure_proxy() {
-            return Err(TransportException::new("Cannot use an HTTPS proxy. PHP >= 7.3 and cUrl >= 7.52.0 are required.".to_string()));
+            return Err(TransportException::new(
+                "Cannot use an HTTPS proxy. PHP >= 7.3 and cUrl >= 7.52.0 are required."
+                    .to_string(),
+            ));
         }
 
         let mut options: IndexMap<i64, PhpMixed> = IndexMap::new();
-        options.insert(CURLOPT_PROXY, PhpMixed::String(self.url.as_deref().unwrap_or("").to_string()));
+        options.insert(
+            CURLOPT_PROXY,
+            PhpMixed::String(self.url.as_deref().unwrap_or("").to_string()),
+        );
 
         if self.url.is_some() {
             options.insert(CURLOPT_NOPROXY, PhpMixed::String(String::new()));
@@ -100,7 +119,10 @@ impl RequestProxy {
             return false;
         }
 
-        let features = version.get("features").and_then(|v| v.as_int()).unwrap_or(0);
+        let features = version
+            .get("features")
+            .and_then(|v| v.as_int())
+            .unwrap_or(0);
         (features & CURL_VERSION_HTTPS_PROXY) != 0
     }
 }

@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Downloader/PerforceDownloader.php
 
-use std::any::Any;
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_php_shim::PhpMixed;
 use crate::downloader::vcs_downloader::VcsDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::vcs_repository::VcsRepository;
 use crate::util::perforce::Perforce;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_php_shim::PhpMixed;
+use std::any::Any;
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
@@ -36,13 +36,22 @@ impl PerforceDownloader {
         let source_ref = package.get_source_reference();
         let label = self.get_label_from_source_reference(source_ref.clone().unwrap_or_default());
 
-        self.inner.io.write_error(&format!("Cloning {}", source_ref.clone().unwrap_or_default()));
+        self.inner.io.write_error(&format!(
+            "Cloning {}",
+            source_ref.clone().unwrap_or_default()
+        ));
         self.init_perforce(package, path.clone(), url);
-        self.perforce.as_mut().unwrap().set_stream(source_ref.clone().unwrap_or_default());
+        self.perforce
+            .as_mut()
+            .unwrap()
+            .set_stream(source_ref.clone().unwrap_or_default());
         self.perforce.as_mut().unwrap().p4_login();
         self.perforce.as_mut().unwrap().write_p4_client_spec();
         self.perforce.as_mut().unwrap().connect_client();
-        self.perforce.as_mut().unwrap().sync_code_base(label.as_deref());
+        self.perforce
+            .as_mut()
+            .unwrap()
+            .sync_code_base(label.as_deref());
         self.perforce.as_mut().unwrap().cleanup_client_spec();
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -73,7 +82,13 @@ impl PerforceDownloader {
         } else {
             None
         };
-        self.perforce = Some(Perforce::create(repo_config, url, path, &self.inner.process, &self.inner.io));
+        self.perforce = Some(Perforce::create(
+            repo_config,
+            url,
+            path,
+            &self.inner.process,
+            &self.inner.io,
+        ));
     }
 
     fn get_repo_config(&self, repository: &VcsRepository) -> IndexMap<String, PhpMixed> {
@@ -90,8 +105,14 @@ impl PerforceDownloader {
         self.do_install(target, path, url)
     }
 
-    pub fn get_local_changes(&self, _package: &dyn PackageInterface, _path: String) -> Option<String> {
-        self.inner.io.write_error("Perforce driver does not check for local changes before overriding");
+    pub fn get_local_changes(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: String,
+    ) -> Option<String> {
+        self.inner
+            .io
+            .write_error("Perforce driver does not check for local changes before overriding");
 
         None
     }
@@ -102,7 +123,11 @@ impl PerforceDownloader {
         to_reference: String,
         _path: String,
     ) -> Result<String> {
-        Ok(self.perforce.as_ref().unwrap().get_commit_logs(from_reference, to_reference))
+        Ok(self
+            .perforce
+            .as_ref()
+            .unwrap()
+            .get_commit_logs(from_reference, to_reference))
     }
 
     pub fn set_perforce(&mut self, perforce: Perforce) {

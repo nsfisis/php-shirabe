@@ -4,7 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    base64_decode, extension_loaded, explode, urlencode, PhpMixed, RuntimeException,
+    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
 };
 
 use crate::cache::Cache;
@@ -215,8 +215,7 @@ impl ForgejoDriver {
         if self.branches.is_none() {
             let mut branches = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> =
-                Some(format!("{}/branches?per_page=100", api_url));
+            let mut resource: Option<String> = Some(format!("{}/branches?per_page=100", api_url));
 
             while let Some(url) = resource {
                 let response = self
@@ -259,8 +258,7 @@ impl ForgejoDriver {
         if self.tags.is_none() {
             let mut tags = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> =
-                Some(format!("{}/tags?per_page=100", api_url));
+            let mut resource: Option<String> = Some(format!("{}/tags?per_page=100", api_url));
 
             while let Some(url) = resource {
                 let response = self
@@ -330,7 +328,10 @@ impl ForgejoDriver {
                                 shirabe_php_shim::JSON_UNESCAPED_UNICODE
                                     | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
                             );
-                            self.inner.cache.as_ref().map(|c| c.write(identifier, &encoded));
+                            self.inner
+                                .cache
+                                .as_ref()
+                                .map(|c| c.write(identifier, &encoded));
                         }
                     }
                     c
@@ -347,8 +348,7 @@ impl ForgejoDriver {
                     .get("support")
                     .map_or(false, |v| v.as_array().is_none());
                 if support_not_array {
-                    composer_map
-                        .insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
+                    composer_map.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
                 }
 
                 let has_source = composer_map
@@ -366,28 +366,26 @@ impl ForgejoDriver {
                     let tags = self.get_tags()?;
                     let branches = self.get_branches()?;
 
-                    let source_url = if let Some(label) =
-                        tags.into_iter().find(|(_, v)| v == identifier).map(|(k, _)| k)
+                    let source_url = if let Some(label) = tags
+                        .into_iter()
+                        .find(|(_, v)| v == identifier)
+                        .map(|(k, _)| k)
                     {
                         format!("{}/tag/{}", html_url, label)
-                    } else if let Some(label) =
-                        branches
-                            .into_iter()
-                            .find(|(_, v)| v == identifier)
-                            .map(|(k, _)| k)
+                    } else if let Some(label) = branches
+                        .into_iter()
+                        .find(|(_, v)| v == identifier)
+                        .map(|(k, _)| k)
                     {
                         format!("{}/branch/{}", html_url, label)
                     } else {
                         format!("{}/commit/{}", html_url, identifier)
                     };
 
-                    if let Some(PhpMixed::Array(ref mut support)) =
-                        composer_map.get_mut("support")
+                    if let Some(PhpMixed::Array(ref mut support)) = composer_map.get_mut("support")
                     {
-                        support.insert(
-                            "source".to_string(),
-                            Box::new(PhpMixed::String(source_url)),
-                        );
+                        support
+                            .insert("source".to_string(), Box::new(PhpMixed::String(source_url)));
                     }
                 }
 
@@ -409,13 +407,10 @@ impl ForgejoDriver {
                             .map(|r| r.html_url.clone())
                             .unwrap_or_default()
                     );
-                    if let Some(PhpMixed::Array(ref mut support)) =
-                        composer_map.get_mut("support")
+                    if let Some(PhpMixed::Array(ref mut support)) = composer_map.get_mut("support")
                     {
-                        support.insert(
-                            "issues".to_string(),
-                            Box::new(PhpMixed::String(issues_url)),
-                        );
+                        support
+                            .insert("issues".to_string(), Box::new(PhpMixed::String(issues_url)));
                     }
                 }
 
@@ -429,10 +424,16 @@ impl ForgejoDriver {
                 }
             }
 
-            self.inner.info_cache.insert(identifier.to_string(), composer);
+            self.inner
+                .info_cache
+                .insert(identifier.to_string(), composer);
         }
 
-        Ok(self.inner.info_cache.get(identifier).and_then(|v| v.clone()))
+        Ok(self
+            .inner
+            .info_cache
+            .get(identifier)
+            .and_then(|v| v.clone()))
     }
 
     pub fn get_source(&mut self, identifier: &str) -> IndexMap<String, String> {
@@ -470,8 +471,9 @@ impl ForgejoDriver {
         let forgejo_domains = config.get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
-                d.as_string()
-                    .map_or(false, |s| s.to_lowercase() == forgejo_url.origin_url.to_lowercase())
+                d.as_string().map_or(false, |s| {
+                    s.to_lowercase() == forgejo_url.origin_url.to_lowercase()
+                })
             })
         } else {
             false
@@ -570,82 +572,73 @@ impl ForgejoDriver {
     ) -> anyhow::Result<Response, TransportException> {
         match self.inner.get_contents(url) {
             Ok(response) => Ok(response),
-            Err(e) => {
-                match e.get_code() {
-                    401 | 403 | 404 | 429 => {
-                        if !fetching_repo_data {
-                            return Err(e);
-                        }
-
-                        if !self.inner.io.is_interactive() {
-                            self.attempt_clone_fallback()
-                                .map_err(|inner_e| TransportException {
-                                    message: inner_e.to_string(),
-                                    code: 0,
-                                    headers: None,
-                                    response: None,
-                                    status_code: None,
-                                    response_info: vec![],
-                                })?;
-
-                            return Ok(Response::new(
-                                {
-                                    let mut m = IndexMap::new();
-                                    m.insert(
-                                        "url".to_string(),
-                                        PhpMixed::String("dummy".to_string()),
-                                    );
-                                    m
-                                },
-                                Some(200),
-                                vec![],
-                                Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
-                        }
-
-                        if !self.inner.io.has_authentication(&self.inner.origin_url) {
-                            let origin_url =
-                                self.forgejo_url.as_ref().unwrap().origin_url.clone();
-                            let message = if e.get_code() == 429 {
-                                Some(format!(
-                                    "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
-                                    self.inner.url
-                                ))
-                            } else {
-                                None
-                            };
-
-                            let mut forgejo = Forgejo::new(
-                                todo!("clone io for Forgejo OAuth"),
-                                self.inner.config.clone(),
-                                self.inner.http_downloader.clone(),
-                            );
-                            let auth_result = forgejo
-                                .authorize_o_auth_interactively(
-                                    &origin_url,
-                                    message.as_deref(),
-                                )
-                                .map_err(|inner_e| TransportException {
-                                    message: inner_e.to_string(),
-                                    code: 0,
-                                    headers: None,
-                                    response: None,
-                                    status_code: None,
-                                    response_info: vec![],
-                                })?;
-
-                            if let Ok(true) = auth_result {
-                                return self.inner.get_contents(url);
-                            }
-                        }
-
-                        Err(e)
+            Err(e) => match e.get_code() {
+                401 | 403 | 404 | 429 => {
+                    if !fetching_repo_data {
+                        return Err(e);
                     }
-                    _ => Err(e),
+
+                    if !self.inner.io.is_interactive() {
+                        self.attempt_clone_fallback()
+                            .map_err(|inner_e| TransportException {
+                                message: inner_e.to_string(),
+                                code: 0,
+                                headers: None,
+                                response: None,
+                                status_code: None,
+                                response_info: vec![],
+                            })?;
+
+                        return Ok(Response::new(
+                            {
+                                let mut m = IndexMap::new();
+                                m.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
+                                m
+                            },
+                            Some(200),
+                            vec![],
+                            Some("null".to_string()),
+                        )
+                        .unwrap()
+                        .unwrap());
+                    }
+
+                    if !self.inner.io.has_authentication(&self.inner.origin_url) {
+                        let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
+                        let message = if e.get_code() == 429 {
+                            Some(format!(
+                                "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
+                                self.inner.url
+                            ))
+                        } else {
+                            None
+                        };
+
+                        let mut forgejo = Forgejo::new(
+                            todo!("clone io for Forgejo OAuth"),
+                            self.inner.config.clone(),
+                            self.inner.http_downloader.clone(),
+                        );
+                        let auth_result = forgejo
+                            .authorize_o_auth_interactively(&origin_url, message.as_deref())
+                            .map_err(|inner_e| TransportException {
+                                message: inner_e.to_string(),
+                                code: 0,
+                                headers: None,
+                                response: None,
+                                status_code: None,
+                                response_info: vec![],
+                            })?;
+
+                        if let Ok(true) = auth_result {
+                            return self.inner.get_contents(url);
+                        }
+                    }
+
+                    Err(e)
                 }
-            }
+                _ => Err(e),
+            },
         }
     }
 

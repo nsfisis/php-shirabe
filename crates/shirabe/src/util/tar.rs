@@ -31,7 +31,11 @@ impl Tar {
                     return Err(anyhow::anyhow!(RuntimeException {
                         message: format!(
                             "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                            top_level_paths.keys().cloned().collect::<Vec<_>>().join(",")
+                            top_level_paths
+                                .keys()
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join(",")
                         ),
                         code: 0,
                     }));
@@ -50,7 +54,9 @@ impl Tar {
         }
 
         Err(anyhow::anyhow!(RuntimeException {
-            message: "No composer.json found either at the top level or within the topmost directory".to_string(),
+            message:
+                "No composer.json found either at the top level or within the topmost directory"
+                    .to_string(),
             code: 0,
         }))
     }

@@ -131,26 +131,17 @@ impl Constraint {
         if self.version.starts_with("dev-") {
             if Self::OP_EQ == self.operator {
                 if Self::OP_EQ == other_operator {
-                    return format!(
-                        "$b && $v === {}",
-                        php::var_export_str(&self.version, true)
-                    );
+                    return format!("$b && $v === {}", php::var_export_str(&self.version, true));
                 }
                 if Self::OP_NE == other_operator {
-                    return format!(
-                        "!$b || $v !== {}",
-                        php::var_export_str(&self.version, true)
-                    );
+                    return format!("!$b || $v !== {}", php::var_export_str(&self.version, true));
                 }
                 return "false".to_string();
             }
 
             if Self::OP_NE == self.operator {
                 if Self::OP_EQ == other_operator {
-                    return format!(
-                        "!$b || $v !== {}",
-                        php::var_export_str(&self.version, true)
-                    );
+                    return format!("!$b || $v !== {}", php::var_export_str(&self.version, true));
                 }
                 if Self::OP_NE == other_operator {
                     return "true".to_string();
@@ -276,7 +267,12 @@ impl Constraint {
         };
 
         if self
-            .version_compare(version1, version2, Self::trans_op_int(operator), compare_branches)
+            .version_compare(
+                version1,
+                version2,
+                Self::trans_op_int(operator),
+                compare_branches,
+            )
             .expect("valid operator")
         {
             return !(Self::trans_op_int(provider.operator) == provider_no_equal_op

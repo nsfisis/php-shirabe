@@ -1,17 +1,15 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
-use std::sync::OnceLock;
+use crate::php_file_cleaner::PhpFileCleaner;
 use anyhow::anyhow;
 use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    PHP_EOL, PHP_VERSION_ID, HHVM_VERSION,
-    RuntimeException,
-    error_get_last, file_exists, file_get_contents, function_exists,
-    is_file, is_readable, ltrim, php_strip_whitespace, sprintf,
+    HHVM_VERSION, PHP_EOL, PHP_VERSION_ID, RuntimeException, error_get_last, file_exists,
+    file_get_contents, function_exists, is_file, is_readable, ltrim, php_strip_whitespace, sprintf,
     str_replace_array, strrpos, substr, trim, version_compare,
 };
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use crate::php_file_cleaner::PhpFileCleaner;
+use std::sync::OnceLock;
 
 pub struct PhpFileParser;
 
@@ -38,11 +36,15 @@ impl PhpFileParser {
                 // The input file was really empty and thus contains no classes
                 return Ok(vec![]);
             } else {
-                message = "File at \"%s\" could not be parsed as PHP, it may be binary or corrupted";
+                message =
+                    "File at \"%s\" could not be parsed as PHP, it may be binary or corrupted";
             }
 
             let error = error_get_last();
-            let mut message = sprintf(message, &[shirabe_php_shim::PhpMixed::String(path.to_string())]);
+            let mut message = sprintf(
+                message,
+                &[shirabe_php_shim::PhpMixed::String(path.to_string())],
+            );
             if let Some(error) = error {
                 if let Some(err_msg) = error.get("message") {
                     message = format!(
@@ -87,16 +89,33 @@ impl PhpFileParser {
 
         let len = matches.get("type").map(|v| v.len()).unwrap_or(0);
         for i in 0..len {
-            let ns = matches.get("ns").and_then(|v| v.get(i)).map(|s| s.as_str()).unwrap_or("");
+            let ns = matches
+                .get("ns")
+                .and_then(|v| v.get(i))
+                .map(|s| s.as_str())
+                .unwrap_or("");
             if !ns.is_empty() {
-                let nsname = matches.get("nsname").and_then(|v| v.get(i)).map(|s| s.as_str()).unwrap_or("");
+                let nsname = matches
+                    .get("nsname")
+                    .and_then(|v| v.get(i))
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
                 namespace = str_replace_array(
-                    &[" ".to_string(), "\t".to_string(), "\r".to_string(), "\n".to_string()],
+                    &[
+                        " ".to_string(),
+                        "\t".to_string(),
+                        "\r".to_string(),
+                        "\n".to_string(),
+                    ],
                     &["".to_string()],
                     nsname,
                 ) + "\\";
             } else {
-                let name = matches.get("name").and_then(|v| v.get(i)).map(|s| s.as_str()).unwrap_or("");
+                let name = matches
+                    .get("name")
+                    .and_then(|v| v.get(i))
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
                 // skip anon classes extending/implementing
                 if name == "extends" {
                     continue;
@@ -151,8 +170,7 @@ impl PhpFileParser {
             let mut extra_types = String::new();
             let mut extra_types_array: Vec<String> = vec![];
             if PHP_VERSION_ID >= 80100
-                || (HHVM_VERSION.is_some()
-                    && version_compare(HHVM_VERSION.unwrap(), "3.3", ">="))
+                || (HHVM_VERSION.is_some() && version_compare(HHVM_VERSION.unwrap(), "3.3", ">="))
             {
                 extra_types += "|enum";
                 extra_types_array = vec!["enum".to_string()];

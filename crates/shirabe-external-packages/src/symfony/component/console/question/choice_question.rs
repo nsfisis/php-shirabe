@@ -1,5 +1,5 @@
-use shirabe_php_shim::PhpMixed;
 use crate::symfony::component::console::question::question::Question;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct ChoiceQuestion(pub Question);

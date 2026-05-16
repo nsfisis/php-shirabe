@@ -6,8 +6,8 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    array_map, basename, dirname, implode, in_array, is_dir, preg_quote, realpath, rtrim, sprintf,
-    strlen, strpos, substr, trim, version_compare, PhpMixed, RuntimeException,
+    PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
+    preg_quote, realpath, rtrim, sprintf, strlen, strpos, substr, trim, version_compare,
 };
 
 use crate::cache::Cache;
@@ -42,12 +42,7 @@ impl GitDownloader {
         fs: Option<Filesystem>,
     ) -> Self {
         let inner = VcsDownloader::new(io, config, process, fs);
-        let git_util = GitUtil::new(
-            &*inner.io,
-            &inner.config,
-            &inner.process,
-            &inner.filesystem,
-        );
+        let git_util = GitUtil::new(&*inner.io, &inner.config, &inner.process, &inner.filesystem);
         Self {
             inner,
             has_stashed_changes: IndexMap::new(),
@@ -73,7 +68,11 @@ impl GitDownloader {
 
         let cache_path = format!(
             "{}/{}/",
-            self.inner.config.get("cache-vcs-dir").as_string().unwrap_or(""),
+            self.inner
+                .config
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
             Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let git_version = GitUtil::get_version(&self.inner.process);
@@ -134,7 +133,11 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let cache_path = format!(
             "{}/{}/",
-            self.inner.config.get("cache-vcs-dir").as_string().unwrap_or(""),
+            self.inner
+                .config
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
             Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let r#ref = package.get_source_reference().unwrap_or("").to_string();
@@ -157,10 +160,7 @@ impl GitDownloader {
             ];
             let transport_options = package.get_transport_options();
             if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array()) {
-                if let Some(single) = git_opts
-                    .get("single_use_clone")
-                    .and_then(|v| v.as_bool())
-                {
+                if let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool()) {
                     if single {
                         clone_flags = vec![];
                     }
@@ -298,7 +298,11 @@ impl GitDownloader {
 
         let cache_path = format!(
             "{}/{}/",
-            self.inner.config.get("cache-vcs-dir").as_string().unwrap_or(""),
+            self.inner
+                .config
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
             Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let r#ref = target.get_source_reference().unwrap_or("").to_string();
@@ -401,7 +405,8 @@ impl GitDownloader {
         ) == 0
         {
             let origin_match = Preg::is_match_strict_groups(r"{^origin\s+(?P<url>\S+)}m", &output);
-            let composer_match = Preg::is_match_strict_groups(r"{^composer\s+(?P<url>\S+)}m", &output);
+            let composer_match =
+                Preg::is_match_strict_groups(r"{^composer\s+(?P<url>\S+)}m", &output);
             if let (Some(origin_match), Some(composer_match)) = (origin_match, composer_match) {
                 let origin_url = origin_match.get("url").cloned().unwrap_or_default();
                 let composer_url = composer_match.get("url").cloned().unwrap_or_default();
@@ -560,11 +565,11 @@ impl GitDownloader {
                         "--".to_string(),
                     ];
                     let mut output = String::new();
-                    if self.inner.process.execute(
-                        &command,
-                        &mut output,
-                        Some(path.clone()),
-                    ) != 0
+                    if self
+                        .inner
+                        .process
+                        .execute(&command, &mut output, Some(path.clone()))
+                        != 0
                     {
                         // TODO(phase-b): bubble error via Result later
                         panic!(
@@ -580,8 +585,7 @@ impl GitDownloader {
                     let output = trim(&output, None);
                     // keep the shortest diff from all remote branches we compare against
                     if unpushed_changes.is_none()
-                        || strlen(&output)
-                            < strlen(unpushed_changes.as_deref().unwrap_or(""))
+                        || strlen(&output) < strlen(unpushed_changes.as_deref().unwrap_or(""))
                     {
                         unpushed_changes = Some(output);
                     }
@@ -593,11 +597,7 @@ impl GitDownloader {
             if unpushed_changes.is_some() && i == 0 {
                 let mut output = String::new();
                 self.inner.process.execute(
-                    &vec![
-                        "git".to_string(),
-                        "fetch".to_string(),
-                        "--all".to_string(),
-                    ],
+                    &vec!["git".to_string(), "fetch".to_string(), "--all".to_string()],
                     &mut output,
                     Some(path.clone()),
                 );
@@ -786,9 +786,7 @@ impl GitDownloader {
                             "    n - abort the {} and let you manually clean things up",
                             if update { "update" } else { "uninstall" }
                         ))),
-                        Box::new(PhpMixed::String(
-                            "    v - view modified files".to_string(),
-                        )),
+                        Box::new(PhpMixed::String("    v - view modified files".to_string())),
                         Box::new(PhpMixed::String(
                             "    d - view local modifications (diff)".to_string(),
                         )),
@@ -833,11 +831,7 @@ impl GitDownloader {
             );
             let mut output = String::new();
             if self.inner.process.execute(
-                &vec![
-                    "git".to_string(),
-                    "stash".to_string(),
-                    "pop".to_string(),
-                ],
+                &vec!["git".to_string(), "stash".to_string(), "pop".to_string()],
                 &mut output,
                 Some(path.clone()),
             ) != 0
@@ -886,8 +880,11 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch =
-            Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", pretty_version.to_string());
+        let mut branch = Preg::replace(
+            r"{(?:^dev-|(?:\.x)?-dev$)}i",
+            "",
+            pretty_version.to_string(),
+        );
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -910,10 +907,7 @@ impl GitDownloader {
         if !Preg::is_match(r"{^[a-f0-9]{40}$}", reference).unwrap_or(false)
             && branches.is_some()
             && Preg::is_match(
-                &format!(
-                    "{{^\\s+composer/{}$}}m",
-                    preg_quote(reference, None)
-                ),
+                &format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().unwrap_or(""),
             )
             .unwrap_or(false)
@@ -935,18 +929,17 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok1 = self.inner.process.execute(
-                &command1,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok1 = self
+                .inner
+                .process
+                .execute(&command1, &mut output, Some(path.to_string()))
+                == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner.process.execute(
-                    &command2,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .execute(&command2, &mut output, Some(path.to_string()))
+                    == 0
             } else {
                 false
             };
@@ -960,18 +953,12 @@ impl GitDownloader {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
                 && !Preg::is_match(
-                    &format!(
-                        "{{^\\s+composer/{}$}}m",
-                        preg_quote(&branch, None)
-                    ),
+                    &format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
                 .unwrap_or(false)
                 && Preg::is_match(
-                    &format!(
-                        "{{^\\s+composer/v{}$}}m",
-                        preg_quote(&branch, None)
-                    ),
+                    &format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
                 .unwrap_or(false)
@@ -985,8 +972,7 @@ impl GitDownloader {
                 branch.clone(),
                 "--".to_string(),
             ];
-            let mut fallback_command: Vec<String> =
-                vec!["git".to_string(), "checkout".to_string()];
+            let mut fallback_command: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
             fallback_command.extend(force.clone());
             fallback_command.extend(vec![
                 "-B".to_string(),
@@ -1003,28 +989,26 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok_command = self.inner.process.execute(
-                &command,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok_command =
+                self.inner
+                    .process
+                    .execute(&command, &mut output, Some(path.to_string()))
+                    == 0;
             let ok_fallback = if !ok_command {
                 let mut output = String::new();
-                self.inner.process.execute(
-                    &fallback_command,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .execute(&fallback_command, &mut output, Some(path.to_string()))
+                    == 0
             } else {
                 false
             };
             let ok_reset = if ok_command || ok_fallback {
                 let mut output = String::new();
-                self.inner.process.execute(
-                    &reset_command,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .execute(&reset_command, &mut output, Some(path.to_string()))
+                    == 0
             } else {
                 false
             };
@@ -1045,18 +1029,17 @@ impl GitDownloader {
         ];
         {
             let mut output = String::new();
-            let ok1 = self.inner.process.execute(
-                &command1,
-                &mut output,
-                Some(path.to_string()),
-            ) == 0;
+            let ok1 = self
+                .inner
+                .process
+                .execute(&command1, &mut output, Some(path.to_string()))
+                == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner.process.execute(
-                    &command2,
-                    &mut output,
-                    Some(path.to_string()),
-                ) == 0
+                self.inner
+                    .process
+                    .execute(&command2, &mut output, Some(path.to_string()))
+                    == 0
             } else {
                 false
             };
@@ -1193,11 +1176,7 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.execute(
-            &vec![
-                "git".to_string(),
-                "clean".to_string(),
-                "-df".to_string(),
-            ],
+            &vec!["git".to_string(), "clean".to_string(), "-df".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -1210,11 +1189,7 @@ impl GitDownloader {
         }
         let mut output = String::new();
         if self.inner.process.execute(
-            &vec![
-                "git".to_string(),
-                "reset".to_string(),
-                "--hard".to_string(),
-            ],
+            &vec!["git".to_string(), "reset".to_string(), "--hard".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -1263,11 +1238,7 @@ impl GitDownloader {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.execute(
-            &vec![
-                "git".to_string(),
-                "diff".to_string(),
-                "HEAD".to_string(),
-            ],
+            &vec!["git".to_string(), "diff".to_string(), "HEAD".to_string()],
             &mut output,
             Some(path.clone()),
         ) != 0
@@ -1333,4 +1304,3 @@ impl DvcsDownloaderInterface for GitDownloader {
         GitDownloader::get_unpushed_changes(self, package, &path)
     }
 }
-

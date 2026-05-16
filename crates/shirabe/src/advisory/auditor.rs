@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::{
-    array_all, array_any, array_key_exists, array_keys, array_reduce, get_class, is_string,
-    sprintf, str_starts_with, InvalidArgumentException, PhpMixed, DATE_ATOM,
+    DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
+    array_keys, array_reduce, get_class, is_string, sprintf, str_starts_with,
 };
 
 use crate::advisory::ignored_security_advisory::IgnoredSecurityAdvisory;
@@ -96,16 +96,12 @@ impl Auditor {
             && self.needs_complete_advisory_load(&all_advisories, &ignore_list)
         {
             // TODO(phase-b): $packages reused here; see note above
-            let result = repo_set.get_matching_security_advisories(
-                vec![],
-                false,
-                ignore_unreachable,
-            )?;
+            let result =
+                repo_set.get_matching_security_advisories(vec![], false, ignore_unreachable)?;
             all_advisories = result.advisories;
             unreachable_repos.extend(result.unreachable_repos);
         }
-        let processed =
-            self.process_advisories(all_advisories, &ignore_list, &ignored_severities);
+        let processed = self.process_advisories(all_advisories, &ignore_list, &ignored_severities);
         let advisories = processed.advisories;
         let ignored_advisories = processed.ignored_advisories;
 
@@ -175,9 +171,7 @@ impl Auditor {
 
             io.write(
                 PhpMixed::String(JsonFile::encode(
-                    &PhpMixed::Array(
-                        json.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    ),
+                    &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                     shirabe_php_shim::JSON_UNESCAPED_SLASHES
                         | shirabe_php_shim::JSON_PRETTY_PRINT
                         | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
@@ -210,10 +204,13 @@ impl Auditor {
                 ),
             ];
             for (advisories_to_output, message) in passes {
-                let (pkg_count, total_advisory_count) =
-                    self.count_advisories(advisories_to_output);
+                let (pkg_count, total_advisory_count) = self.count_advisories(advisories_to_output);
                 if pkg_count > 0 {
-                    let plurality = if total_advisory_count == 1 { "y" } else { "ies" };
+                    let plurality = if total_advisory_count == 1 {
+                        "y"
+                    } else {
+                        "ies"
+                    };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
                     io.write_error(
@@ -290,8 +287,7 @@ impl Auditor {
         }
 
         // no partial advisories present
-        let advisories_values: Vec<&Vec<PartialSecurityAdvisory>> =
-            advisories.values().collect();
+        let advisories_values: Vec<&Vec<PartialSecurityAdvisory>> = advisories.values().collect();
         if array_all(
             &advisories_values,
             |pkg_advisories: &&Vec<PartialSecurityAdvisory>| {
@@ -382,12 +378,12 @@ impl Auditor {
                 // only holds PartialSecurityAdvisory
                 let advisory_as_full: Option<&SecurityAdvisory> = None;
                 if let Some(full) = advisory_as_full {
-                    if is_string(&PhpMixed::String(
-                        full.severity.clone().unwrap_or_default(),
-                    )) && array_key_exists(
-                        full.severity.as_deref().unwrap_or(""),
-                        ignored_severities,
-                    ) {
+                    if is_string(&PhpMixed::String(full.severity.clone().unwrap_or_default()))
+                        && array_key_exists(
+                            full.severity.as_deref().unwrap_or(""),
+                            ignored_severities,
+                        )
+                    {
                         is_active = false;
                         let sev = full.severity.as_deref().unwrap_or("");
                         ignore_reason = ignored_severities
@@ -397,10 +393,7 @@ impl Auditor {
                     }
 
                     if is_string(&PhpMixed::String(full.cve.clone().unwrap_or_default()))
-                        && array_key_exists(
-                            full.cve.as_deref().unwrap_or(""),
-                            ignore_list,
-                        )
+                        && array_key_exists(full.cve.as_deref().unwrap_or(""), ignore_list)
                     {
                         is_active = false;
                         ignore_reason = ignore_list
@@ -413,8 +406,7 @@ impl Auditor {
                         let remote_id = source.get("remoteId").cloned().unwrap_or_default();
                         if array_key_exists(&remote_id, ignore_list) {
                             is_active = false;
-                            ignore_reason =
-                                ignore_list.get(&remote_id).cloned().unwrap_or(None);
+                            ignore_reason = ignore_list.get(&remote_id).cloned().unwrap_or(None);
                             break;
                         }
                     }
@@ -584,7 +576,9 @@ impl Auditor {
                 error.push(format!("URL: {}", /* self.get_url(advisory) */ ""));
                 error.push(format!(
                     "Affected versions: {}",
-                    OutputFormatter::escape(/* advisory.affectedVersions.getPrettyString() */ "")
+                    OutputFormatter::escape(
+                        /* advisory.affectedVersions.getPrettyString() */ ""
+                    )
                 ));
                 error.push(format!(
                     "Reported at: {}",

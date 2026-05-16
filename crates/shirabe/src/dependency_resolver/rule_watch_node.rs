@@ -25,7 +25,11 @@ impl RuleWatchNode {
         let watch1 = if literal_count > 0 { literals[0] } else { 0 };
         let watch2 = if literal_count > 1 { literals[1] } else { 0 };
 
-        Self { watch1, watch2, rule }
+        Self {
+            watch1,
+            watch2,
+            rule,
+        }
     }
 
     pub fn watch2_on_highest(&mut self, decisions: &Decisions) {

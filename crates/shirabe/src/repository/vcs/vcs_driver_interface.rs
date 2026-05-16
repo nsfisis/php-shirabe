@@ -1,15 +1,18 @@
 //! ref: composer/src/Composer/Repository/Vcs/VcsDriverInterface.php
 
+use crate::config::Config;
+use crate::io::io_interface::IOInterface;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use crate::config::Config;
-use crate::io::io_interface::IOInterface;
 
 pub trait VcsDriverInterface {
     fn initialize(&mut self) -> anyhow::Result<()>;
 
-    fn get_composer_information(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+    fn get_composer_information(
+        &self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
 
     fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>>;
 

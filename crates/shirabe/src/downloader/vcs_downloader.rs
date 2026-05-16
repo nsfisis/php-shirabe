@@ -4,9 +4,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    array_map, array_shift, count, explode, get_class, implode, rawurldecode, realpath,
-    str_replace, strlen, strpos, substr, trim, InvalidArgumentException, PhpMixed,
-    RuntimeException,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, count, explode,
+    get_class, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
 
 use crate::config::Config;
@@ -91,11 +90,7 @@ impl VcsDownloader {
                     }
                     if self.io.is_debug() {
                         self.io.write_error(
-                            PhpMixed::String(format!(
-                                "Failed: [{}] {}",
-                                get_class(&e),
-                                e,
-                            )),
+                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
                         );
@@ -183,7 +178,10 @@ impl VcsDownloader {
         }
 
         self.io.write_error(
-            PhpMixed::String(format!("  - {}: ", InstallOperation::format(package, false))),
+            PhpMixed::String(format!(
+                "  - {}: ",
+                InstallOperation::format(package, false)
+            )),
             false,
             IOInterface::NORMAL,
         );
@@ -203,11 +201,7 @@ impl VcsDownloader {
                     }
                     if self.io.is_debug() {
                         self.io.write_error(
-                            PhpMixed::String(format!(
-                                "Failed: [{}] {}",
-                                get_class(&e),
-                                e,
-                            )),
+                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
                         );
@@ -285,11 +279,7 @@ impl VcsDownloader {
                     }
                     if self.io.is_debug() {
                         self.io.write_error(
-                            PhpMixed::String(format!(
-                                "Failed: [{}] {}",
-                                get_class(&e),
-                                e,
-                            )),
+                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
                         );
@@ -364,7 +354,10 @@ impl VcsDownloader {
         path: &str,
     ) -> Result<Box<dyn PromiseInterface>> {
         self.io.write_error(
-            PhpMixed::String(format!("  - {}", UninstallOperation::format(package, false))),
+            PhpMixed::String(format!(
+                "  - {}",
+                UninstallOperation::format(package, false)
+            )),
             true,
             IOInterface::NORMAL,
         );
@@ -372,24 +365,22 @@ impl VcsDownloader {
         let promise = self.filesystem.remove_directory_async(path);
 
         let path = path.to_string();
-        Ok(promise.then(Box::new(move |result: PhpMixed| -> Result<()> {
-            let result_bool = result.as_bool().unwrap_or(false);
-            if !result_bool {
-                return Err(RuntimeException {
-                    message: format!("Could not completely delete {}, aborting.", path),
-                    code: 0,
+        Ok(
+            promise.then(Box::new(move |result: PhpMixed| -> Result<()> {
+                let result_bool = result.as_bool().unwrap_or(false);
+                if !result_bool {
+                    return Err(RuntimeException {
+                        message: format!("Could not completely delete {}, aborting.", path),
+                        code: 0,
+                    }
+                    .into());
                 }
-                .into());
-            }
-            Ok(())
-        })))
+                Ok(())
+            })),
+        )
     }
 
-    pub fn get_vcs_reference(
-        &self,
-        package: &dyn PackageInterface,
-        path: &str,
-    ) -> Option<String> {
+    pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(&self.config, &self.process, &parser, &*self.io);
         let dumper = ArrayDumper::new();

@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Util/SyncHelper.php
 
-use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use crate::downloader::download_manager::DownloadManager;
 use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::util::r#loop::Loop;
+use anyhow::Result;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a dyn DownloaderInterface),
@@ -13,14 +13,25 @@ pub enum DownloaderOrManager<'a> {
 }
 
 impl<'a> DownloaderOrManager<'a> {
-    fn download(&self, package: &dyn PackageInterface, path: &str, prev_package: Option<&dyn PackageInterface>) -> Box<dyn PromiseInterface> {
+    fn download(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.download(package, path, prev_package),
             Self::Manager(d) => d.download(package, path, prev_package),
         }
     }
 
-    fn prepare(&self, r#type: &str, package: &dyn PackageInterface, path: &str, prev_package: Option<&dyn PackageInterface>) -> Box<dyn PromiseInterface> {
+    fn prepare(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.prepare(r#type, package, path, prev_package),
             Self::Manager(d) => d.prepare(r#type, package, path, prev_package),
@@ -34,14 +45,25 @@ impl<'a> DownloaderOrManager<'a> {
         }
     }
 
-    fn update(&self, package: &dyn PackageInterface, prev_package: &dyn PackageInterface, path: &str) -> Box<dyn PromiseInterface> {
+    fn update(
+        &self,
+        package: &dyn PackageInterface,
+        prev_package: &dyn PackageInterface,
+        path: &str,
+    ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.update(package, prev_package, path),
             Self::Manager(d) => d.update(package, prev_package, path),
         }
     }
 
-    fn cleanup(&self, r#type: &str, package: &dyn PackageInterface, path: &str, prev_package: Option<&dyn PackageInterface>) -> Box<dyn PromiseInterface> {
+    fn cleanup(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.cleanup(r#type, package, path, prev_package),
             Self::Manager(d) => d.cleanup(r#type, package, path, prev_package),
@@ -59,11 +81,21 @@ impl SyncHelper {
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<()> {
-        let r#type = if prev_package.is_some() { "update" } else { "install" };
+        let r#type = if prev_package.is_some() {
+            "update"
+        } else {
+            "install"
+        };
 
         let result: Result<()> = (|| {
-            Self::r#await(r#loop, Some(downloader.download(package, &path, prev_package)))?;
-            Self::r#await(r#loop, Some(downloader.prepare(r#type, package, &path, prev_package)))?;
+            Self::r#await(
+                r#loop,
+                Some(downloader.download(package, &path, prev_package)),
+            )?;
+            Self::r#await(
+                r#loop,
+                Some(downloader.prepare(r#type, package, &path, prev_package)),
+            )?;
             if r#type == "update" {
                 if let Some(prev) = prev_package {
                     Self::r#await(r#loop, Some(downloader.update(package, prev, &path)))?;
@@ -75,11 +107,17 @@ impl SyncHelper {
         })();
 
         if result.is_err() {
-            Self::r#await(r#loop, Some(downloader.cleanup(r#type, package, &path, prev_package)))?;
+            Self::r#await(
+                r#loop,
+                Some(downloader.cleanup(r#type, package, &path, prev_package)),
+            )?;
             return result;
         }
 
-        Self::r#await(r#loop, Some(downloader.cleanup(r#type, package, &path, prev_package)))?;
+        Self::r#await(
+            r#loop,
+            Some(downloader.cleanup(r#type, package, &path, prev_package)),
+        )?;
         Ok(())
     }
 

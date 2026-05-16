@@ -4,10 +4,10 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use shirabe_php_shim::{
-    apcu_add, apcu_fetch, array_merge, array_values, call_user_func_array, defined, file_exists,
-    filter_var, function_exists, include_file, ini_get, spl_autoload_register,
-    spl_autoload_unregister, stream_resolve_include_path, strlen, strpos, strrpos, strtr, substr,
-    InvalidArgumentException, PhpMixed, DIRECTORY_SEPARATOR, FILTER_VALIDATE_BOOLEAN,
+    DIRECTORY_SEPARATOR, FILTER_VALIDATE_BOOLEAN, InvalidArgumentException, PhpMixed, apcu_add,
+    apcu_fetch, array_merge, array_values, call_user_func_array, defined, file_exists, filter_var,
+    function_exists, include_file, ini_get, spl_autoload_register, spl_autoload_unregister,
+    stream_resolve_include_path, strlen, strpos, strrpos, strtr, substr,
 };
 
 /// @var array<string, self>
@@ -314,8 +314,7 @@ impl ClassLoader {
             && filter_var(
                 &ini_get("apc.enabled").unwrap_or_default(),
                 FILTER_VALIDATE_BOOLEAN,
-            )
-        {
+            ) {
             apcu_prefix
         } else {
             None
@@ -344,8 +343,7 @@ impl ClassLoader {
         if prepend {
             let mut new_map: IndexMap<String, ClassLoader> = IndexMap::new();
             new_map.insert(self.vendor_dir.clone().unwrap(), self.clone());
-            let old_map: IndexMap<String, ClassLoader> =
-                std::mem::take(&mut *registered);
+            let old_map: IndexMap<String, ClassLoader> = std::mem::take(&mut *registered);
             for (k, v) in old_map {
                 if !new_map.contains_key(&k) {
                     new_map.insert(k, v);

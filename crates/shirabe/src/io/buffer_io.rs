@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
+use crate::io::console_io::ConsoleIO;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
@@ -8,8 +9,10 @@ use shirabe_external_packages::symfony::console::helper::question_helper::Questi
 use shirabe_external_packages::symfony::console::input::streamable_input_interface::StreamableInputInterface;
 use shirabe_external_packages::symfony::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
-use shirabe_php_shim::{fopen, fseek, fwrite, rewind, stream_get_contents, strip_tags, PhpMixed, RuntimeException, PHP_EOL};
-use crate::io::console_io::ConsoleIO;
+use shirabe_php_shim::{
+    PHP_EOL, PhpMixed, RuntimeException, fopen, fseek, fwrite, rewind, stream_get_contents,
+    strip_tags,
+};
 
 #[derive(Debug)]
 pub struct BufferIO {
@@ -17,7 +20,11 @@ pub struct BufferIO {
 }
 
 impl BufferIO {
-    pub fn new(input: String, verbosity: i64, formatter: Option<Box<dyn OutputFormatterInterface>>) -> Result<Self> {
+    pub fn new(
+        input: String,
+        verbosity: i64,
+        formatter: Option<Box<dyn OutputFormatterInterface>>,
+    ) -> Result<Self> {
         let mut input_obj = StringInput::new(input);
         input_obj.set_interactive(false);
 
@@ -66,7 +73,13 @@ impl BufferIO {
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {
-        if self.inner.input.as_any().downcast_ref::<dyn StreamableInputInterface>().is_none() {
+        if self
+            .inner
+            .input
+            .as_any()
+            .downcast_ref::<dyn StreamableInputInterface>()
+            .is_none()
+        {
             return Err(RuntimeException {
                 message: "Setting the user inputs requires at least the version 3.2 of the symfony/console component.".to_string(),
                 code: 0,

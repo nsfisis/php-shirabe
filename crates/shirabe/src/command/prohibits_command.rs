@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Command/ProhibitsCommand.php
 
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use crate::command::base_dependency_command::BaseDependencyCommand;
 use crate::command::completion_trait::CompletionTrait;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct ProhibitsCommand {
     inner: BaseDependencyCommand,
@@ -57,7 +57,7 @@ impl ProhibitsCommand {
             .set_help(
                 "Displays detailed information about why a package cannot be installed.\n\n\
                 <info>php composer.phar prohibits composer/composer</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not"
+                Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not",
             );
     }
 

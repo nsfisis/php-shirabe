@@ -13,7 +13,10 @@ pub struct UpdateOperation {
 
 impl UpdateOperation {
     pub fn new(initial: Box<dyn PackageInterface>, target: Box<dyn PackageInterface>) -> Self {
-        Self { initial_package: initial, target_package: target }
+        Self {
+            initial_package: initial,
+            target_package: target,
+        }
     }
 
     pub fn get_initial_package(&self) -> &dyn PackageInterface {
@@ -24,19 +27,36 @@ impl UpdateOperation {
         self.target_package.as_ref()
     }
 
-    pub fn format(initial_package: &dyn PackageInterface, target_package: &dyn PackageInterface, lock: bool) -> String {
-        let mut from_version = initial_package.get_full_pretty_version(false, PackageInterface::DISPLAY_SOURCE_REF);
-        let mut to_version = target_package.get_full_pretty_version(false, PackageInterface::DISPLAY_SOURCE_REF);
+    pub fn format(
+        initial_package: &dyn PackageInterface,
+        target_package: &dyn PackageInterface,
+        lock: bool,
+    ) -> String {
+        let mut from_version =
+            initial_package.get_full_pretty_version(false, PackageInterface::DISPLAY_SOURCE_REF);
+        let mut to_version =
+            target_package.get_full_pretty_version(false, PackageInterface::DISPLAY_SOURCE_REF);
 
-        if from_version == to_version && initial_package.get_source_reference() != target_package.get_source_reference() {
-            from_version = initial_package.get_full_pretty_version(true, PackageInterface::DISPLAY_SOURCE_REF);
-            to_version = target_package.get_full_pretty_version(true, PackageInterface::DISPLAY_SOURCE_REF);
-        } else if from_version == to_version && initial_package.get_dist_reference() != target_package.get_dist_reference() {
-            from_version = initial_package.get_full_pretty_version(true, PackageInterface::DISPLAY_DIST_REF);
-            to_version = target_package.get_full_pretty_version(true, PackageInterface::DISPLAY_DIST_REF);
+        if from_version == to_version
+            && initial_package.get_source_reference() != target_package.get_source_reference()
+        {
+            from_version =
+                initial_package.get_full_pretty_version(true, PackageInterface::DISPLAY_SOURCE_REF);
+            to_version =
+                target_package.get_full_pretty_version(true, PackageInterface::DISPLAY_SOURCE_REF);
+        } else if from_version == to_version
+            && initial_package.get_dist_reference() != target_package.get_dist_reference()
+        {
+            from_version =
+                initial_package.get_full_pretty_version(true, PackageInterface::DISPLAY_DIST_REF);
+            to_version =
+                target_package.get_full_pretty_version(true, PackageInterface::DISPLAY_DIST_REF);
         }
 
-        let action_name = if VersionParser::is_upgrade(&initial_package.get_version(), &target_package.get_version()) {
+        let action_name = if VersionParser::is_upgrade(
+            &initial_package.get_version(),
+            &target_package.get_version(),
+        ) {
             "Upgrading"
         } else {
             "Downgrading"
@@ -62,7 +82,11 @@ impl OperationInterface for UpdateOperation {
     }
 
     fn show(&self, lock: bool) -> String {
-        Self::format(self.initial_package.as_ref(), self.target_package.as_ref(), lock)
+        Self::format(
+            self.initial_package.as_ref(),
+            self.target_package.as_ref(),
+            lock,
+        )
     }
 
     fn to_string(&self) -> String {

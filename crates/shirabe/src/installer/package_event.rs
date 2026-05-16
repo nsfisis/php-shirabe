@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Installer/PackageEvent.php
 
-use indexmap::IndexMap;
 use crate::composer::Composer;
 use crate::dependency_resolver::operation::operation_interface::OperationInterface;
 use crate::event_dispatcher::event::Event;
 use crate::io::io_interface::IOInterface;
 use crate::repository::repository_interface::RepositoryInterface;
+use indexmap::IndexMap;
 
 #[derive(Debug)]
 pub struct PackageEvent {

@@ -7,17 +7,17 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_php_shim::{
-    array_pop, chdir, explode_with_limit, file_exists, getcwd, implode, is_dir, is_file,
-    mkdir, realpath, rtrim, strtolower, unlink, InvalidArgumentException, PhpMixed,
-    RuntimeException, UnexpectedValueException, DIRECTORY_SEPARATOR,
+    DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
+    UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,
+    is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
 
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
 use crate::composer::Composer;
-use crate::config::json_config_source::JsonConfigSource;
 use crate::config::Config;
+use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
@@ -25,9 +25,9 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
+use crate::installer::Installer;
 use crate::installer::project_installer::ProjectInstaller;
 use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
-use crate::installer::Installer;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::package::alias_package::AliasPackage;
@@ -116,13 +116,18 @@ impl CreateProjectCommand {
         let config = Factory::create_config(None, None)?;
         let io = self.inner.get_io();
 
-        let (prefer_source, prefer_dist) =
-            self.inner.get_preferred_install_options(&config, input, true)?;
+        let (prefer_source, prefer_dist) = self
+            .inner
+            .get_preferred_install_options(&config, input, true)?;
 
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
         }
-        if input.get_option("no-custom-installers").as_bool().unwrap_or(false) {
+        if input
+            .get_option("no-custom-installers")
+            .as_bool()
+            .unwrap_or(false)
+        {
             io.write_error("<warning>You are using the deprecated option \"no-custom-installers\". Use \"no-plugins\" instead.</warning>");
             input.set_option("no-plugins", PhpMixed::Bool(true));
         }
@@ -136,11 +141,8 @@ impl CreateProjectCommand {
                 }
                 .into());
             }
-            let mut parts = explode_with_limit(
-                "/",
-                &strtolower(package.as_string().unwrap_or("")),
-                2,
-            );
+            let mut parts =
+                explode_with_limit("/", &strtolower(package.as_string().unwrap_or("")), 2);
             let prompt = format!(
                 "New project directory [<comment>{}</comment>]: ",
                 array_pop(&mut parts).unwrap_or_default()
@@ -150,7 +152,11 @@ impl CreateProjectCommand {
 
         let repository_opt = input.get_option("repository");
         let repository_url_opt = input.get_option("repository-url");
-        let repositories = if repository_opt.as_list().map(|l| l.len() > 0).unwrap_or(false) {
+        let repositories = if repository_opt
+            .as_list()
+            .map(|l| l.len() > 0)
+            .unwrap_or(false)
+        {
             Some(repository_opt)
         } else {
             Some(repository_url_opt)
@@ -160,10 +166,22 @@ impl CreateProjectCommand {
             io,
             config,
             input,
-            input.get_argument("package").as_string().map(|s| s.to_string()),
-            input.get_argument("directory").as_string().map(|s| s.to_string()),
-            input.get_argument("version").as_string().map(|s| s.to_string()),
-            input.get_option("stability").as_string().map(|s| s.to_string()),
+            input
+                .get_argument("package")
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .get_argument("directory")
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .get_argument("version")
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .get_option("stability")
+                .as_string()
+                .map(|s| s.to_string()),
             prefer_source,
             prefer_dist,
             !input.get_option("no-dev").as_bool().unwrap_or(false),
@@ -173,8 +191,14 @@ impl CreateProjectCommand {
             input.get_option("no-progress").as_bool().unwrap_or(false),
             input.get_option("no-install").as_bool().unwrap_or(false),
             Some(self.inner.get_platform_requirement_filter(input)?),
-            !input.get_option("no-secure-http").as_bool().unwrap_or(false),
-            input.get_option("add-repository").as_bool().unwrap_or(false),
+            !input
+                .get_option("no-secure-http")
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .get_option("add-repository")
+                .as_bool()
+                .unwrap_or(false),
         )
     }
 
@@ -255,13 +279,8 @@ impl CreateProjectCommand {
             unlink("composer.lock");
         }
 
-        let mut composer = self.create_composer_instance(
-            input,
-            io,
-            None,
-            disable_plugins,
-            Some(disable_scripts),
-        )?;
+        let mut composer =
+            self.create_composer_instance(input, io, None, disable_plugins, Some(disable_scripts))?;
 
         // add the repository to the composer.json and use it for the install run later
         if let Some(repos) = repositories.as_ref() {
@@ -288,20 +307,13 @@ impl CreateProjectCommand {
 
                     let is_packagist_disabled = (repo_config.contains_key("packagist")
                         && repo_config.len() == 1
-                        && repo_config.get("packagist").and_then(|v| v.as_bool())
-                            == Some(false))
+                        && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
                         || (repo_config.contains_key("packagist.org")
                             && repo_config.len() == 1
-                            && repo_config
-                                .get("packagist.org")
-                                .and_then(|v| v.as_bool())
+                            && repo_config.get("packagist.org").and_then(|v| v.as_bool())
                                 == Some(false));
                     if is_packagist_disabled {
-                        config_source.add_repository(
-                            "packagist.org",
-                            PhpMixed::Bool(false),
-                            false,
-                        );
+                        config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
                     } else {
                         config_source.add_repository(
                             &name,
@@ -315,8 +327,8 @@ impl CreateProjectCommand {
                         );
                     }
 
-                    composer = self
-                        .create_composer_instance(input, io, None, disable_plugins, None)?;
+                    composer =
+                        self.create_composer_instance(input, io, None, disable_plugins, None)?;
                 }
             }
         }
@@ -332,8 +344,9 @@ impl CreateProjectCommand {
 
         // use the new config including the newly installed project
         let config = composer.get_config();
-        let (ps, pd) =
-            self.inner.get_preferred_install_options(config, input, false)?;
+        let (ps, pd) = self
+            .inner
+            .get_preferred_install_options(config, input, false)?;
         prefer_source = ps;
         prefer_dist = pd;
 
@@ -356,7 +369,10 @@ impl CreateProjectCommand {
                     config.get("optimize-autoloader").as_bool().unwrap_or(false),
                 )
                 .set_class_map_authoritative(
-                    config.get("classmap-authoritative").as_bool().unwrap_or(false),
+                    config
+                        .get("classmap-authoritative")
+                        .as_bool()
+                        .unwrap_or(false),
                 )
                 .set_apcu_autoloader(
                     config.get("apcu-autoloader").as_bool().unwrap_or(false),
@@ -456,11 +472,8 @@ impl CreateProjectCommand {
         // rewriting self.version dependencies with explicit version numbers if the package's vcs metadata is gone
         if !has_vcs {
             let package = composer.get_package();
-            let config_source = JsonConfigSource::new(JsonFile::new(
-                "composer.json".to_string(),
-                None,
-                None,
-            ));
+            let config_source =
+                JsonConfigSource::new(JsonFile::new("composer.json".to_string(), None, None));
             for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
                 // PHP: $package->{'get'.$meta['method']}() — dynamic getter dispatch
                 // TODO(phase-b): dynamic getter dispatch by name
@@ -479,10 +492,9 @@ impl CreateProjectCommand {
         }
 
         // dispatch event
-        composer.get_event_dispatcher().dispatch_script(
-            ScriptEvents::POST_CREATE_PROJECT_CMD,
-            install_dev_packages,
-        );
+        composer
+            .get_event_dispatcher()
+            .dispatch_script(ScriptEvents::POST_CREATE_PROJECT_CMD, install_dev_packages);
 
         chdir(&old_cwd);
 
@@ -515,8 +527,12 @@ impl CreateProjectCommand {
         // TODO(phase-b): VersionParser has no public `new` yet
         let parser: VersionParser = todo!("VersionParser::new()");
         let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
-        let name =
-            strtolower(requirements[0].get("name").map(|s| s.as_str()).unwrap_or(""));
+        let name = strtolower(
+            requirements[0]
+                .get("name")
+                .map(|s| s.as_str())
+                .unwrap_or(""),
+        );
         if package_version.is_none() && requirements[0].contains_key("version") {
             package_version = requirements[0].get("version").cloned();
         }
@@ -606,7 +622,10 @@ impl CreateProjectCommand {
                     "{{^[^,\\s]*?@({})$}}i",
                     implode(
                         "|",
-                        &STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()
+                        &STABILITIES
+                            .keys()
+                            .map(|k| k.to_string())
+                            .collect::<Vec<_>>()
                     )
                 ),
                 package_version.as_deref().unwrap_or(""),
@@ -619,8 +638,7 @@ impl CreateProjectCommand {
             }
         }
 
-        let stability =
-            VersionParser::normalize_stability(stability.as_deref().unwrap_or(""));
+        let stability = VersionParser::normalize_stability(stability.as_deref().unwrap_or(""));
 
         if !STABILITIES.contains_key(stability.as_str()) {
             return Err(InvalidArgumentException {
@@ -629,7 +647,10 @@ impl CreateProjectCommand {
                     stability,
                     implode(
                         ", ",
-                        &STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()
+                        &STABILITIES
+                            .keys()
+                            .map(|k| k.to_string())
+                            .collect::<Vec<_>>()
                     )
                 ),
                 code: 0,
@@ -660,13 +681,10 @@ impl CreateProjectCommand {
                     RepositoryFactory::config_from_string(io, config, repo, true)?;
                 let is_packagist_disabled = (repo_config.contains_key("packagist")
                     && repo_config.len() == 1
-                    && repo_config.get("packagist").and_then(|v| v.as_bool())
-                        == Some(false))
+                    && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
                     || (repo_config.contains_key("packagist.org")
                         && repo_config.len() == 1
-                        && repo_config
-                            .get("packagist.org")
-                            .and_then(|v| v.as_bool())
+                        && repo_config.get("packagist.org").and_then(|v| v.as_bool())
                             == Some(false));
                 if is_packagist_disabled {
                     continue;
@@ -687,10 +705,7 @@ impl CreateProjectCommand {
                         .entry("options".to_string())
                         .or_insert(PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(options_map) = options_entry {
-                        options_map.insert(
-                            "symlink".to_string(),
-                            Box::new(PhpMixed::Bool(false)),
-                        );
+                        options_map.insert("symlink".to_string(), Box::new(PhpMixed::Bool(false)));
                     }
                 }
 
@@ -774,7 +789,11 @@ impl CreateProjectCommand {
         if let Some(real_dir) = realpath(&directory) {
             let real_dir_clone = real_dir.clone();
             signal_handler = Some(SignalHandler::create(
-                vec![SignalHandler::SIGINT, SignalHandler::SIGTERM, SignalHandler::SIGHUP],
+                vec![
+                    SignalHandler::SIGINT,
+                    SignalHandler::SIGTERM,
+                    SignalHandler::SIGHUP,
+                ],
                 Box::new(move |signal: String, handler: &SignalHandler| {
                     // TODO(phase-b): self.get_io().write_error(...) inside the closure
                     let _ = &signal;

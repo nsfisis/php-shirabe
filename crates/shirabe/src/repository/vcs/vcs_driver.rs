@@ -2,7 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{extension_loaded, PhpMixed, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE};
+use shirabe_php_shim::{
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, extension_loaded,
+};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -42,7 +44,11 @@ impl VcsDriver {
             }
         }
 
-        let url = repo_config.get("url").and_then(|v| v.as_string()).unwrap_or("").to_string();
+        let url = repo_config
+            .get("url")
+            .and_then(|v| v.as_string())
+            .unwrap_or("")
+            .to_string();
 
         Self {
             origin_url: url.clone(),
@@ -61,7 +67,10 @@ impl VcsDriver {
         self.cache.is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier).unwrap_or(false)
     }
 
-    pub fn get_composer_information(&mut self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    pub fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if !self.info_cache.contains_key(identifier) {
             if self.should_cache(identifier) {
                 if let Some(res) = self.cache.as_ref().and_then(|c| c.read(identifier)) {
@@ -75,7 +84,10 @@ impl VcsDriver {
 
             if self.should_cache(identifier) {
                 if let Some(ref composer_map) = composer {
-                    let encoded = JsonFile::encode_with_options(composer_map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    let encoded = JsonFile::encode_with_options(
+                        composer_map,
+                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                    );
                     self.cache.as_ref().map(|c| c.write(identifier, &encoded));
                 }
             }
@@ -86,7 +98,10 @@ impl VcsDriver {
         Ok(self.info_cache.get(identifier).and_then(|v| v.clone()))
     }
 
-    pub(crate) fn get_base_composer_information(&mut self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    pub(crate) fn get_base_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         let composer_file_content = self.get_file_content("composer.json", identifier)?;
 
         let composer_file_content = match composer_file_content {
@@ -95,7 +110,10 @@ impl VcsDriver {
             Some(c) => c,
         };
 
-        let composer = JsonFile::parse_json(&composer_file_content, Some(&format!("{}:composer.json", identifier)))?;
+        let composer = JsonFile::parse_json(
+            &composer_file_content,
+            Some(&format!("{}:composer.json", identifier)),
+        )?;
 
         let mut composer = match composer {
             None => return Ok(None),
@@ -103,9 +121,16 @@ impl VcsDriver {
             Some(c) => c,
         };
 
-        if !composer.contains_key("time") || composer.get("time").map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty())) {
+        if !composer.contains_key("time")
+            || composer
+                .get("time")
+                .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()))
+        {
             if let Some(change_date) = self.get_change_date(identifier)? {
-                composer.insert("time".to_string(), PhpMixed::String(change_date.to_rfc3339()));
+                composer.insert(
+                    "time".to_string(),
+                    PhpMixed::String(change_date.to_rfc3339()),
+                );
             }
         }
 
@@ -127,18 +152,29 @@ impl VcsDriver {
     }
 
     pub(crate) fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
-        let options = self.repo_config.get("options").cloned().unwrap_or(PhpMixed::Array(IndexMap::new()));
+        let options = self
+            .repo_config
+            .get("options")
+            .cloned()
+            .unwrap_or(PhpMixed::Array(IndexMap::new()));
         self.http_downloader.get(url, &options)
     }
 
     pub fn cleanup(&self) {}
 
     // abstract methods to be implemented by subclasses (via VcsDriverInterface trait)
-    pub(crate) fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    pub(crate) fn get_file_content(
+        &self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
         todo!()
     }
 
-    pub(crate) fn get_change_date(&self, identifier: &str) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+    pub(crate) fn get_change_date(
+        &self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
         todo!()
     }
 }

@@ -7,9 +7,9 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise::Promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    array_replace_recursive, chr, extension_loaded, file_get_contents, function_exists, implode,
-    is_numeric, max, min, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
-    InvalidArgumentException, LogicException, PhpMixed, Silencer,
+    InvalidArgumentException, LogicException, PhpMixed, Silencer, array_replace_recursive, chr,
+    extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
+    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 
@@ -119,11 +119,7 @@ impl HttpDownloader {
             ),
         )
         .as_array()
-        .map(|m| {
-            m.iter()
-                .map(|(k, v)| (k.clone(), (**v).clone()))
-                .collect()
-        })
+        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
         .unwrap_or_default();
 
         let curl = if Self::is_curl_enabled() {
@@ -149,7 +145,10 @@ impl HttpDownloader {
         if is_numeric(&max_jobs_env) {
             max_jobs = max(
                 1,
-                min(50, max_jobs_env.as_string().unwrap_or("0").parse().unwrap_or(0)),
+                min(
+                    50,
+                    max_jobs_env.as_string().unwrap_or("0").parse().unwrap_or(0),
+                ),
             );
         }
 
@@ -169,11 +168,7 @@ impl HttpDownloader {
     }
 
     /// Download a file synchronously
-    pub fn get(
-        &mut self,
-        url: &str,
-        options: IndexMap<String, PhpMixed>,
-    ) -> Result<Response> {
+    pub fn get(&mut self, url: &str, options: IndexMap<String, PhpMixed>) -> Result<Response> {
         if "" == url {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -296,19 +291,10 @@ impl HttpDownloader {
                     .map(|(k, v)| (k, Box::new(v)))
                     .collect(),
             ),
-            PhpMixed::Array(
-                options
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
+            PhpMixed::Array(options.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
         )
         .as_array()
-        .map(|m| {
-            m.iter()
-                .map(|(k, v)| (k.clone(), (**v).clone()))
-                .collect()
-        })
+        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
         .unwrap_or_default();
     }
 
@@ -336,11 +322,7 @@ impl HttpDownloader {
             ),
         )
         .as_array()
-        .map(|m| {
-            m.iter()
-                .map(|(k, v)| (k.clone(), (**v).clone()))
-                .collect()
-        })
+        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
         .unwrap_or_default();
 
         let id = self.id_gen;
@@ -371,10 +353,9 @@ impl HttpDownloader {
         }
 
         // capture username/password from URL if there is one
-        if let Some(m) = Preg::is_match_strict_groups(
-            r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i",
-            &request.url,
-        ) {
+        if let Some(m) =
+            Preg::is_match_strict_groups(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i", &request.url)
+        {
             self.io.set_authentication(
                 origin.clone(),
                 rawurldecode(m.get(1).cloned().unwrap_or_default().as_str()),
@@ -391,19 +372,13 @@ impl HttpDownloader {
         let canceler: Box<dyn Fn()> = Box::new(|| {
             // PHP canceler logic — TODO(phase-b)
             let _ = IrrecoverableDownloadException {
-                inner: TransportException::new(
-                    "Download canceled".to_string(),
-                    0,
-                ),
+                inner: TransportException::new("Download canceled".to_string(), 0),
             };
             let _ = Url::sanitize("");
         });
         let _ = (resolver, canceler);
 
-        let promise = Promise::new(
-            Box::new(|_resolve, _reject| {}),
-            Box::new(|| {}),
-        );
+        let promise = Promise::new(Box::new(|_resolve, _reject| {}), Box::new(|| {}));
         // TODO(phase-b): wire promise.then() side-effects: mark job done & store response/exception
         let promise: Box<dyn PromiseInterface> = Box::new(promise);
 
@@ -430,7 +405,11 @@ impl HttpDownloader {
 
         let (request, origin, copy_to) = {
             let job = self.jobs.get(&id).unwrap();
-            (job.request.clone(), job.origin.clone(), job.request.copy_to.clone())
+            (
+                job.request.clone(),
+                job.origin.clone(),
+                job.request.copy_to.clone(),
+            )
         };
         let url = request.url.clone();
         let options = request.options.clone();
@@ -473,7 +452,10 @@ impl HttpDownloader {
                 // job.resolve(response) — TODO(phase-b)
             } else {
                 let mut e = TransportException::new(
-                    format!("Network disabled, request canceled: {}", Url::sanitize(&url)),
+                    format!(
+                        "Network disabled, request canceled: {}",
+                        Url::sanitize(&url)
+                    ),
                     499,
                 );
                 e.set_status_code(499);
@@ -601,11 +583,7 @@ impl HttpDownloader {
     ) -> Result<()> {
         let clean_message = |msg: &str| -> String {
             if !io.is_decorated() {
-                return Preg::replace(
-                    &format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"),
-                    "",
-                    msg,
-                );
+                return Preg::replace(&format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"), "", msg);
             }
 
             msg.to_string()
@@ -711,7 +689,10 @@ impl HttpDownloader {
             ssl_map.insert("verify_peer".to_string(), Box::new(PhpMixed::Bool(false)));
             ctx_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
             let mut http_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            http_map.insert("follow_location".to_string(), Box::new(PhpMixed::Bool(false)));
+            http_map.insert(
+                "follow_location".to_string(),
+                Box::new(PhpMixed::Bool(false)),
+            );
             http_map.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
             ctx_options.insert("http".to_string(), PhpMixed::Array(http_map));
             let test_connectivity = file_get_contents(
@@ -744,14 +725,10 @@ impl HttpDownloader {
             return false;
         }
 
-        let allow_self_signed = job
-            .request
-            .options
-            .get("ssl")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("allow_self_signed").cloned(),
-                _ => None,
-            });
+        let allow_self_signed = job.request.options.get("ssl").and_then(|v| match v {
+            PhpMixed::Array(m) => m.get("allow_self_signed").cloned(),
+            _ => None,
+        });
         if let Some(v) = allow_self_signed {
             if !shirabe_php_shim::empty(&v) {
                 return false;

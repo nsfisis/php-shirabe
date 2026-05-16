@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
-use indexmap::IndexMap;
 
 #[derive(Debug)]
 pub struct HtmlOutputFormatter {
@@ -66,11 +66,19 @@ impl HtmlOutputFormatter {
 
         for code_str in codes_str.split(';') {
             let code: i64 = code_str.parse().unwrap_or(0);
-            if let Some(&(_, color)) = Self::AVAILABLE_FOREGROUND_COLORS.iter().find(|&&(k, _)| k == code) {
+            if let Some(&(_, color)) = Self::AVAILABLE_FOREGROUND_COLORS
+                .iter()
+                .find(|&&(k, _)| k == code)
+            {
                 out.push_str(&format!("color:{};", color));
-            } else if let Some(&(_, color)) = Self::AVAILABLE_BACKGROUND_COLORS.iter().find(|&&(k, _)| k == code) {
+            } else if let Some(&(_, color)) = Self::AVAILABLE_BACKGROUND_COLORS
+                .iter()
+                .find(|&&(k, _)| k == code)
+            {
                 out.push_str(&format!("background-color:{};", color));
-            } else if let Some(&(_, option)) = Self::AVAILABLE_OPTIONS.iter().find(|&&(k, _)| k == code) {
+            } else if let Some(&(_, option)) =
+                Self::AVAILABLE_OPTIONS.iter().find(|&&(k, _)| k == code)
+            {
                 match option {
                     "bold" => out.push_str("font-weight:bold;"),
                     "underscore" => out.push_str("text-decoration:underline;"),

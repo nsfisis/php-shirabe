@@ -7,9 +7,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
-    array_map_str_fn, array_slice, array_slice_strs, explode, get_class, implode, in_array,
-    is_string, sprintf, str_replace, str_starts_with, strpos, strtolower, var_export,
-    InvalidArgumentException, PhpMixed, UnexpectedValueException,
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn, array_slice,
+    array_slice_strs, explode, get_class, implode, in_array, is_string, sprintf, str_replace,
+    str_starts_with, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 
@@ -27,8 +27,7 @@ use crate::repository::array_repository::ArrayRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::util::silencer::Silencer;
 
-static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> =
-    LazyLock::new(|| Mutex::new(None));
+static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
 
 static IS_PLATFORM_PACKAGE_CACHE: LazyLock<Mutex<IndexMap<String, bool>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
@@ -153,7 +152,11 @@ impl PlatformRepository {
             .as_ref()
             .unwrap()
             .normalize(&pretty_version, None)?;
-        let mut composer = CompletePackage::new("composer".to_string(), version.clone(), pretty_version.clone());
+        let mut composer = CompletePackage::new(
+            "composer".to_string(),
+            version.clone(),
+            pretty_version.clone(),
+        );
         composer.set_description("Composer package".to_string());
         self.add_package(Box::new(composer))?;
 
@@ -163,8 +166,11 @@ impl PlatformRepository {
             .as_ref()
             .unwrap()
             .normalize(&pretty_version, None)?;
-        let mut composer_plugin_api =
-            CompletePackage::new("composer-plugin-api".to_string(), version.clone(), pretty_version.clone());
+        let mut composer_plugin_api = CompletePackage::new(
+            "composer-plugin-api".to_string(),
+            version.clone(),
+            pretty_version.clone(),
+        );
         composer_plugin_api.set_description("The Composer Plugin API".to_string());
         self.add_package(Box::new(composer_plugin_api))?;
 
@@ -174,8 +180,11 @@ impl PlatformRepository {
             .as_ref()
             .unwrap()
             .normalize(&pretty_version, None)?;
-        let mut composer_runtime_api =
-            CompletePackage::new("composer-runtime-api".to_string(), version.clone(), pretty_version.clone());
+        let mut composer_runtime_api = CompletePackage::new(
+            "composer-runtime-api".to_string(),
+            version.clone(),
+            pretty_version.clone(),
+        );
         composer_runtime_api.set_description("The Composer Runtime API".to_string());
         self.add_package(Box::new(composer_runtime_api))?;
 
@@ -195,8 +204,8 @@ impl PlatformRepository {
                 version = v;
             }
             Err(_) => {
-                pretty_version =
-                    Preg::replace("#^([^~+-]+).*$#", "$1", &php_version_str).unwrap_or(php_version_str);
+                pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &php_version_str)
+                    .unwrap_or(php_version_str);
                 version = self
                     .version_parser
                     .as_ref()
@@ -205,22 +214,38 @@ impl PlatformRepository {
             }
         }
 
-        let mut php = CompletePackage::new("php".to_string(), version.clone(), pretty_version.clone());
+        let mut php =
+            CompletePackage::new("php".to_string(), version.clone(), pretty_version.clone());
         php.set_description("The PHP interpreter".to_string());
         self.add_package(Box::new(php))?;
 
-        if self.runtime.get_constant("PHP_DEBUG", None).as_bool().unwrap_or(false) {
-            let mut phpdebug =
-                CompletePackage::new("php-debug".to_string(), version.clone(), pretty_version.clone());
+        if self
+            .runtime
+            .get_constant("PHP_DEBUG", None)
+            .as_bool()
+            .unwrap_or(false)
+        {
+            let mut phpdebug = CompletePackage::new(
+                "php-debug".to_string(),
+                version.clone(),
+                pretty_version.clone(),
+            );
             phpdebug.set_description("The PHP interpreter, with debugging symbols".to_string());
             self.add_package(Box::new(phpdebug))?;
         }
 
         if self.runtime.has_constant("PHP_ZTS", None)
-            && self.runtime.get_constant("PHP_ZTS", None).as_bool().unwrap_or(false)
+            && self
+                .runtime
+                .get_constant("PHP_ZTS", None)
+                .as_bool()
+                .unwrap_or(false)
         {
-            let mut phpzts =
-                CompletePackage::new("php-zts".to_string(), version.clone(), pretty_version.clone());
+            let mut phpzts = CompletePackage::new(
+                "php-zts".to_string(),
+                version.clone(),
+                pretty_version.clone(),
+            );
             phpzts.set_description("The PHP interpreter, with Zend Thread Safety".to_string());
             self.add_package(Box::new(phpzts))?;
         }
@@ -232,8 +257,11 @@ impl PlatformRepository {
             .map(|v| v == 8)
             .unwrap_or(false)
         {
-            let mut php64 =
-                CompletePackage::new("php-64bit".to_string(), version.clone(), pretty_version.clone());
+            let mut php64 = CompletePackage::new(
+                "php-64bit".to_string(),
+                version.clone(),
+                pretty_version.clone(),
+            );
             php64.set_description("The PHP interpreter, 64bit".to_string());
             self.add_package(Box::new(php64))?;
         }
@@ -254,8 +282,11 @@ impl PlatformRepository {
         })
         .unwrap_or(PhpMixed::Bool(false));
         if has_inet6 || !matches!(inet_pton_check, PhpMixed::Bool(false)) {
-            let mut php_ipv6 =
-                CompletePackage::new("php-ipv6".to_string(), version.clone(), pretty_version.clone());
+            let mut php_ipv6 = CompletePackage::new(
+                "php-ipv6".to_string(),
+                version.clone(),
+                pretty_version.clone(),
+            );
             php_ipv6.set_description("The PHP interpreter, with IPv6 support".to_string());
             self.add_package(Box::new(php_ipv6))?;
         }
@@ -376,16 +407,9 @@ impl PlatformRepository {
                                     .unwrap_or_default();
                             self.add_library(
                                 &mut libraries,
-                                &format!(
-                                    "{}-openssl{}",
-                                    name,
-                                    if is_fips { "-fips" } else { "" }
-                                ),
+                                &format!("{}-openssl{}", name, if is_fips { "-fips" } else { "" }),
                                 Some(&parsed_version),
-                                Some(&format!(
-                                    "curl OpenSSL version ({})",
-                                    parsed_version
-                                )),
+                                Some(&format!("curl OpenSSL version ({})", parsed_version)),
                                 &[],
                                 if is_fips {
                                     &["curl-openssl".to_string()]
@@ -442,10 +466,9 @@ impl PlatformRepository {
                     }
 
                     // ZLib Version => 1.2.8
-                    if let Ok(Some(zlib_matches)) = Preg::is_match_strict_groups(
-                        "{^ZLib Version => (?<version>.+)$}im",
-                        &info,
-                    ) {
+                    if let Ok(Some(zlib_matches)) =
+                        Preg::is_match_strict_groups("{^ZLib Version => (?<version>.+)$}im", &info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-zlib", name),
@@ -486,9 +509,7 @@ impl PlatformRepository {
                             &info,
                         ) {
                             // If the timezonedb is provided by ext/timezonedb, register that version as a replacement
-                            if external
-                                && loaded_extensions.iter().any(|n| n == "timezonedb")
-                            {
+                            if external && loaded_extensions.iter().any(|n| n == "timezonedb") {
                                 self.add_library(
                                     &mut libraries,
                                     "timezonedb-zoneinfo",
@@ -552,8 +573,8 @@ impl PlatformRepository {
                         "/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im",
                         &info,
                     ) {
-                        let parsed = Version::parse_libjpeg(&libjpeg_matches["version"])
-                            .unwrap_or_default();
+                        let parsed =
+                            Version::parse_libjpeg(&libjpeg_matches["version"]).unwrap_or_default();
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libjpeg", name),
@@ -596,8 +617,7 @@ impl PlatformRepository {
                         "/^libXpm Version => (?<versionId>\\d+)$/im",
                         &info,
                     ) {
-                        let version_id: i64 =
-                            libxpm_matches["versionId"].parse().unwrap_or(0);
+                        let version_id: i64 = libxpm_matches["versionId"].parse().unwrap_or(0);
                         let converted =
                             Version::convert_libxpm_version_id(version_id).unwrap_or_default();
                         self.add_library(
@@ -649,8 +669,7 @@ impl PlatformRepository {
                     let description = "The ICU unicode and globalization support library";
                     // Truthy check is for testing only so we can make the condition fail
                     if self.runtime.has_constant("INTL_ICU_VERSION", None) {
-                        let intl_icu_version =
-                            self.runtime.get_constant("INTL_ICU_VERSION", None);
+                        let intl_icu_version = self.runtime.get_constant("INTL_ICU_VERSION", None);
                         let intl_icu_str = match &intl_icu_version {
                             PhpMixed::String(s) => Some(s.clone()),
                             _ => None,
@@ -663,10 +682,9 @@ impl PlatformRepository {
                             &[],
                             &[],
                         )?;
-                    } else if let Ok(Some(matches)) = Preg::is_match_strict_groups(
-                        "/^ICU version => (?<version>.+)$/im",
-                        &info,
-                    ) {
+                    } else if let Ok(Some(matches)) =
+                        Preg::is_match_strict_groups("/^ICU version => (?<version>.+)$/im", &info)
+                    {
                         self.add_library(
                             &mut libraries,
                             "icu",
@@ -740,8 +758,7 @@ impl PlatformRepository {
                             ])],
                         );
                         let sliced = array_slice(&intl_char_versions, 0, Some(3));
-                        let joined =
-                            implode(".", &Self::php_array_to_string_vec(&sliced));
+                        let joined = implode(".", &Self::php_array_to_string_vec(&sliced));
                         self.add_library(
                             &mut libraries,
                             "icu-unicode",
@@ -754,10 +771,7 @@ impl PlatformRepository {
                 }
 
                 "imagick" => {
-                    let image_magick_version = self.runtime.construct(
-                        "Imagick",
-                        Vec::new(),
-                    )?;
+                    let image_magick_version = self.runtime.construct("Imagick", Vec::new())?;
                     // TODO(plugin): `->getVersion()` is a dynamic method call on Imagick
                     let image_magick_version_str =
                         Self::imagick_get_version_string(&image_magick_version);
@@ -791,10 +805,7 @@ impl PlatformRepository {
                             "/^Vendor Version => (?<versionId>\\d+)$/im",
                             &info,
                         ),
-                        Preg::is_match_strict_groups(
-                            "/^Vendor Name => (?<vendor>.+)$/im",
-                            &info,
-                        ),
+                        Preg::is_match_strict_groups("/^Vendor Name => (?<vendor>.+)$/im", &info),
                     ) {
                         let version_id: i64 = matches["versionId"].parse().unwrap_or(0);
                         let converted =
@@ -1102,15 +1113,9 @@ impl PlatformRepository {
                         let version_built = sprintf(
                             "%d.%d.%d",
                             &[
-                                PhpMixed::Int(
-                                    (lib_rd_kafka_version_int & 0x7F000000) >> 24,
-                                ),
-                                PhpMixed::Int(
-                                    (lib_rd_kafka_version_int & 0x00FF0000) >> 16,
-                                ),
-                                PhpMixed::Int(
-                                    (lib_rd_kafka_version_int & 0x0000FF00) >> 8,
-                                ),
+                                PhpMixed::Int((lib_rd_kafka_version_int & 0x7F000000) >> 24),
+                                PhpMixed::Int((lib_rd_kafka_version_int & 0x00FF0000) >> 16),
+                                PhpMixed::Int((lib_rd_kafka_version_int & 0x0000FF00) >> 8),
                             ],
                         );
                         self.add_library(
@@ -1236,7 +1241,10 @@ impl PlatformRepository {
                 }
 
                 "zip" => {
-                    if self.runtime.has_constant("LIBZIP_VERSION", Some("ZipArchive")) {
+                    if self
+                        .runtime
+                        .has_constant("LIBZIP_VERSION", Some("ZipArchive"))
+                    {
                         let libzip = self
                             .runtime
                             .get_constant("LIBZIP_VERSION", Some("ZipArchive"));
@@ -1308,8 +1316,8 @@ impl PlatformRepository {
                     version = v;
                 }
                 Err(_) => {
-                    pretty_version =
-                        Preg::replace("#^([^~+-]+).*$#", "$1", &hhvm_version).unwrap_or(hhvm_version);
+                    pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &hhvm_version)
+                        .unwrap_or(hhvm_version);
                     version = self
                         .version_parser
                         .as_ref()
@@ -1373,8 +1381,10 @@ impl PlatformRepository {
                 name: self.overrides["php"].name.clone(),
                 version: self.overrides["php"].version.clone(),
             };
-            let mut overrider =
-                self.add_overridden_package(&php_override, Some(package.get_pretty_name().to_string()))?;
+            let mut overrider = self.add_overridden_package(
+                &php_override,
+                Some(package.get_pretty_name().to_string()),
+            )?;
             let actual_text = if package.get_version() == overrider.get_version() {
                 "same as actual".to_string()
             } else {
@@ -1457,8 +1467,7 @@ impl PlatformRepository {
         {
             Ok(v) => v,
             Err(_) => {
-                extra_description =
-                    Some(format!(" (actual version: {})", pretty_version));
+                extra_description = Some(format!(" (actual version: {})", pretty_version));
                 if let Ok(Some(m)) = Preg::is_match_strict_groups(
                     "{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}",
                     &pretty_version,
@@ -1540,7 +1549,11 @@ impl PlatformRepository {
             .map(|s| s.to_string())
             .unwrap_or_else(|| format!("The {} library", name));
 
-        let mut lib = CompletePackage::new(format!("lib-{}", name), version.clone(), pretty_version.to_string());
+        let mut lib = CompletePackage::new(
+            format!("lib-{}", name),
+            version.clone(),
+            pretty_version.to_string(),
+        );
         lib.set_description(description);
 
         let mut replace_links: IndexMap<String, Link> = IndexMap::new();

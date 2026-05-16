@@ -51,16 +51,20 @@ impl InputOption {
         if let SuggestedValues::List(ref list) = this.suggested_values {
             if !list.is_empty() && !this.inner.accept_value() {
                 return Err(LogicException {
-                    message: "Cannot set suggested values if the option does not accept a value.".to_string(),
+                    message: "Cannot set suggested values if the option does not accept a value."
+                        .to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
         } else if let SuggestedValues::Closure(_) = this.suggested_values {
             if !this.inner.accept_value() {
                 return Err(LogicException {
-                    message: "Cannot set suggested values if the option does not accept a value.".to_string(),
+                    message: "Cannot set suggested values if the option does not accept a value."
+                        .to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
         }
 

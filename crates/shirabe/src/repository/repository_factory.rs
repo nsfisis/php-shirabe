@@ -2,7 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{get_debug_type, json_encode, InvalidArgumentException, PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
+};
 
 use crate::config::Config;
 use crate::event_dispatcher::event_dispatcher::EventDispatcher;
@@ -18,7 +20,12 @@ use crate::util::process_executor::ProcessExecutor;
 pub struct RepositoryFactory;
 
 impl RepositoryFactory {
-    pub fn config_from_string(io: &dyn IOInterface, config: &Config, repository: &str, allow_filesystem: bool) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    pub fn config_from_string(
+        io: &dyn IOInterface,
+        config: &Config,
+        repository: &str,
+        allow_filesystem: bool,
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if repository.starts_with("http") {
             let mut repo_config = IndexMap::new();
             repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
@@ -32,23 +39,35 @@ impl RepositoryFactory {
             .unwrap_or("");
 
         if extension == "json" {
-            let json = JsonFile::new(repository.to_string(), Some(Factory::create_http_downloader(io, config)?));
+            let json = JsonFile::new(
+                repository.to_string(),
+                Some(Factory::create_http_downloader(io, config)?),
+            );
             let data = json.read()?;
             let has_packages = data.get("packages").map_or(false, |v| !v.is_null());
             let has_includes = data.get("includes").map_or(false, |v| !v.is_null());
-            let has_provider_includes = data.get("provider-includes").map_or(false, |v| !v.is_null());
+            let has_provider_includes = data
+                .get("provider-includes")
+                .map_or(false, |v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
-                let real_path = std::fs::canonicalize(repository).ok()
+                let real_path = std::fs::canonicalize(repository)
+                    .ok()
                     .and_then(|p| p.to_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| repository.to_string())
                     .replace('\\', "/");
                 let mut repo_config = IndexMap::new();
                 repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
-                repo_config.insert("url".to_string(), PhpMixed::String(format!("file://{}", real_path)));
+                repo_config.insert(
+                    "url".to_string(),
+                    PhpMixed::String(format!("file://{}", real_path)),
+                );
                 return Ok(repo_config);
             } else if allow_filesystem {
                 let mut repo_config = IndexMap::new();
-                repo_config.insert("type".to_string(), PhpMixed::String("filesystem".to_string()));
+                repo_config.insert(
+                    "type".to_string(),
+                    PhpMixed::String("filesystem".to_string()),
+                );
                 repo_config.insert("json".to_string(), PhpMixed::String(repository.to_string()));
                 return Ok(repo_config);
             } else {
@@ -70,12 +89,23 @@ impl RepositoryFactory {
         }.into())
     }
 
-    pub fn from_string(io: &dyn IOInterface, config: &Config, repository: &str, allow_filesystem: bool, rm: Option<&mut RepositoryManager>) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    pub fn from_string(
+        io: &dyn IOInterface,
+        config: &Config,
+        repository: &str,
+        allow_filesystem: bool,
+        rm: Option<&mut RepositoryManager>,
+    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
         let repo_config = Self::config_from_string(io, config, repository, allow_filesystem)?;
         Self::create_repo(io, config, repo_config, rm)
     }
 
-    pub fn create_repo(io: &dyn IOInterface, config: &Config, repo_config: IndexMap<String, PhpMixed>, rm: Option<&mut RepositoryManager>) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    pub fn create_repo(
+        io: &dyn IOInterface,
+        config: &Config,
+        repo_config: IndexMap<String, PhpMixed>,
+        rm: Option<&mut RepositoryManager>,
+    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
         let mut owned_rm;
         let rm = if let Some(rm) = rm {
             rm
@@ -83,13 +113,23 @@ impl RepositoryFactory {
             owned_rm = Self::manager(io, config, None, None, None)?;
             &mut owned_rm
         };
-        let mut repos = Self::create_repos(rm, vec![PhpMixed::Array(
-            repo_config.into_iter().map(|(k, v)| (k, Box::new(v))).collect()
-        )])?;
+        let mut repos = Self::create_repos(
+            rm,
+            vec![PhpMixed::Array(
+                repo_config
+                    .into_iter()
+                    .map(|(k, v)| (k, Box::new(v)))
+                    .collect(),
+            )],
+        )?;
         Ok(repos.remove(0))
     }
 
-    pub fn default_repos(io: Option<&dyn IOInterface>, config: Option<Config>, rm: Option<&mut RepositoryManager>) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+    pub fn default_repos(
+        io: Option<&dyn IOInterface>,
+        config: Option<Config>,
+        rm: Option<&mut RepositoryManager>,
+    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
         let config = match config {
             Some(c) => c,
             None => Factory::create_config(None, None)?,
@@ -103,10 +143,17 @@ impl RepositoryFactory {
             rm
         } else {
             let io = io.ok_or_else(|| InvalidArgumentException {
-                message: "This function requires either an IOInterface or a RepositoryManager".to_string(),
+                message: "This function requires either an IOInterface or a RepositoryManager"
+                    .to_string(),
                 code: 0,
             })?;
-            owned_rm = Self::manager(io, &config, Some(Factory::create_http_downloader(io, &config)?), None, None)?;
+            owned_rm = Self::manager(
+                io,
+                &config,
+                Some(Factory::create_http_downloader(io, &config)?),
+                None,
+                None,
+            )?;
             &mut owned_rm
         };
 
@@ -114,7 +161,13 @@ impl RepositoryFactory {
         Self::create_repos(rm, repo_configs)
     }
 
-    pub fn manager(io: &dyn IOInterface, config: &Config, http_downloader: Option<HttpDownloader>, event_dispatcher: Option<EventDispatcher>, process: Option<ProcessExecutor>) -> anyhow::Result<RepositoryManager> {
+    pub fn manager(
+        io: &dyn IOInterface,
+        config: &Config,
+        http_downloader: Option<HttpDownloader>,
+        event_dispatcher: Option<EventDispatcher>,
+        process: Option<ProcessExecutor>,
+    ) -> anyhow::Result<RepositoryManager> {
         let http_downloader = match http_downloader {
             Some(h) => h,
             None => Factory::create_http_downloader(io, config)?,
@@ -148,14 +201,19 @@ impl RepositoryFactory {
         Ok(rm)
     }
 
-    pub fn default_repos_with_default_manager(io: &dyn IOInterface) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+    pub fn default_repos_with_default_manager(
+        io: &dyn IOInterface,
+    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
         let config = Factory::create_config(Some(io), None)?;
         let mut manager = Self::manager(io, &config, None, None, None)?;
         io.load_configuration(&config);
         Self::default_repos(Some(io), Some(config), Some(&mut manager))
     }
 
-    fn create_repos(rm: &mut RepositoryManager, repo_configs: Vec<PhpMixed>) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+    fn create_repos(
+        rm: &mut RepositoryManager,
+        repo_configs: Vec<PhpMixed>,
+    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
         let mut repo_map: IndexMap<String, Box<dyn RepositoryInterface>> = IndexMap::new();
 
         for (index, repo) in repo_configs.into_iter().enumerate() {
@@ -169,27 +227,51 @@ impl RepositoryFactory {
                 PhpMixed::Array(repo_arr) => {
                     if !repo_arr.contains_key("type") {
                         return Err(UnexpectedValueException {
-                            message: format!("Repository \"{}\" ({}) must have a type defined", index, json_encode(&repo).unwrap_or_default()),
+                            message: format!(
+                                "Repository \"{}\" ({}) must have a type defined",
+                                index,
+                                json_encode(&repo).unwrap_or_default()
+                            ),
                             code: 0,
-                        }.into());
+                        }
+                        .into());
                     }
-                    let repo_type = repo_arr.get("type").and_then(|v| v.as_string()).unwrap_or("").to_string();
-                    let repo_config_map: IndexMap<String, PhpMixed> = repo_arr.iter().map(|(k, v)| (k.clone(), *v.clone())).collect();
-                    let name = Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
+                    let repo_type = repo_arr
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                        .to_string();
+                    let repo_config_map: IndexMap<String, PhpMixed> = repo_arr
+                        .iter()
+                        .map(|(k, v)| (k.clone(), *v.clone()))
+                        .collect();
+                    let name =
+                        Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = repo_arr.get("json").and_then(|v| v.as_string()).unwrap_or("").to_string();
+                        let json_path = repo_arr
+                            .get("json")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string();
                         repo_map.insert(name, Box::new(FilesystemRepository::new(json_path)?));
                     } else {
-                        let created = rm.create_repository(&repo_type, repo_config_map, &index.to_string())?;
+                        let created =
+                            rm.create_repository(&repo_type, repo_config_map, &index.to_string())?;
                         repo_map.insert(name, created);
                     }
                 }
                 _ => {
                     return Err(UnexpectedValueException {
-                        message: format!("Repository \"{}\" ({}) should be an array, {} given", index, json_encode(&repo).unwrap_or_default(), get_debug_type(&repo)),
+                        message: format!(
+                            "Repository \"{}\" ({}) should be an array, {} given",
+                            index,
+                            json_encode(&repo).unwrap_or_default(),
+                            get_debug_type(&repo)
+                        ),
                         code: 0,
-                    }.into());
+                    }
+                    .into());
                 }
             }
         }
@@ -197,7 +279,11 @@ impl RepositoryFactory {
         Ok(repo_map.into_values().collect())
     }
 
-    pub fn generate_repository_name(index: &PhpMixed, repo: &IndexMap<String, PhpMixed>, existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>) -> String {
+    pub fn generate_repository_name(
+        index: &PhpMixed,
+        repo: &IndexMap<String, PhpMixed>,
+        existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>,
+    ) -> String {
         let mut name = match index {
             PhpMixed::Int(_) => {
                 if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
@@ -214,7 +300,11 @@ impl RepositoryFactory {
         name
     }
 
-    fn generate_repository_name_indexed(index: usize, repo: &IndexMap<String, PhpMixed>, existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>) -> String {
+    fn generate_repository_name_indexed(
+        index: usize,
+        repo: &IndexMap<String, PhpMixed>,
+        existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>,
+    ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
             Preg::replace("{^https?://}i", "", url, -1).unwrap_or_else(|_| url.to_string())
         } else {

@@ -7,9 +7,9 @@ use chrono::Utc;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_php_shim::{
-    abs, bin2hex, dirname, file_exists, file_get_contents, file_put_contents, filemtime,
-    function_exists, hash_file, is_dir, is_writable, mkdir, random_bytes, random_int, rename,
-    sprintf, time, unlink, ErrorException, PhpMixed,
+    ErrorException, PhpMixed, abs, bin2hex, dirname, file_exists, file_get_contents,
+    file_put_contents, filemtime, function_exists, hash_file, is_dir, is_writable, mkdir,
+    random_bytes, random_int, rename, sprintf, time, unlink,
 };
 
 use crate::io::io_interface::IOInterface;
@@ -71,10 +71,7 @@ impl Cache {
     }
 
     pub fn is_usable(path: &str) -> bool {
-        !Preg::is_match(
-            r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}",
-            path,
-        )
+        !Preg::is_match(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}", path)
     }
 
     pub fn is_enabled(&mut self) -> bool {
@@ -136,12 +133,7 @@ impl Cache {
                 IOInterface::DEBUG,
             );
 
-            let temp_file_name = format!(
-                "{}{}{}.tmp",
-                self.root,
-                file,
-                bin2hex(&random_bytes(5)),
-            );
+            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)),);
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch (ErrorException)
             let attempt: Result<bool> = {
                 let put = file_put_contents(&temp_file_name, contents.as_bytes());
@@ -188,8 +180,10 @@ impl Cache {
                                 if function_exists("disk_free_space") {
                                     // TODO(phase-b): @disk_free_space suppresses errors
                                     PhpMixed::Float(
-                                        shirabe_php_shim::disk_free_space(&dirname(&temp_file_name))
-                                            .unwrap_or(0.0),
+                                        shirabe_php_shim::disk_free_space(&dirname(
+                                            &temp_file_name,
+                                        ))
+                                        .unwrap_or(0.0),
                                     )
                                 } else {
                                     PhpMixed::String("unknown".to_string())
@@ -197,11 +191,8 @@ impl Cache {
                             ],
                         );
 
-                        self.io.write_error(
-                            PhpMixed::String(message),
-                            true,
-                            IOInterface::NORMAL,
-                        );
+                        self.io
+                            .write_error(PhpMixed::String(message), true, IOInterface::NORMAL);
 
                         return Ok(false);
                     }
@@ -219,7 +210,8 @@ impl Cache {
         if self.is_enabled() && !self.read_only {
             let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
-            self.filesystem.ensure_directory_exists(&dirname(&full_path));
+            self.filesystem
+                .ensure_directory_exists(&dirname(&full_path));
 
             if !file_exists(source) {
                 self.io.write_error(
@@ -232,10 +224,7 @@ impl Cache {
                 );
             } else if self.io.is_debug() {
                 self.io.write_error(
-                    PhpMixed::String(format!(
-                        "Writing {} into cache from {}",
-                        full_path, source,
-                    )),
+                    PhpMixed::String(format!("Writing {} into cache from {}", full_path, source,)),
                     true,
                     IOInterface::NORMAL,
                 );

@@ -3,7 +3,7 @@
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_php_shim::{is_dir, version_compare, PhpMixed, RuntimeException};
+use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 use crate::downloader::vcs_downloader::VcsDownloader;
 use crate::io::io_interface::IOInterface;
@@ -26,7 +26,12 @@ impl SvnDownloader {
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Box<dyn PromiseInterface>> {
         SvnUtil::clean_env();
-        let util = SvnUtil::new(url, &*self.inner.io, &self.inner.config, &self.inner.process);
+        let util = SvnUtil::new(
+            url,
+            &*self.inner.io,
+            &self.inner.config,
+            &self.inner.process,
+        );
         if util.binary_version().is_none() {
             return Err(RuntimeException {
                 message: "svn was not found in your PATH, skipping source download".to_string(),
@@ -52,7 +57,10 @@ impl SvnDownloader {
             if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
                 let repo_config = vcs_repo.get_repo_config();
                 if repo_config.contains_key("svn-cache-credentials") {
-                    if let Some(val) = repo_config.get("svn-cache-credentials").and_then(|v| v.as_bool()) {
+                    if let Some(val) = repo_config
+                        .get("svn-cache-credentials")
+                        .and_then(|v| v.as_bool())
+                    {
                         self.cache_credentials = val;
                     }
                 }
@@ -97,7 +105,12 @@ impl SvnDownloader {
             .into());
         }
 
-        let util = SvnUtil::new(url, &*self.inner.io, &self.inner.config, &self.inner.process);
+        let util = SvnUtil::new(
+            url,
+            &*self.inner.io,
+            &self.inner.config,
+            &self.inner.process,
+        );
         let mut flags: Vec<String> = vec![];
         if version_compare(&util.binary_version().unwrap_or_default(), "1.7.0", ">=") {
             flags.push("--ignore-ancestry".to_string());
@@ -271,9 +284,7 @@ impl SvnDownloader {
                                 "    n - abort the {} and let you manually clean things up",
                                 if update { "update" } else { "uninstall" }
                             ))),
-                            Box::new(PhpMixed::String(
-                                "    v - view modified files".to_string(),
-                            )),
+                            Box::new(PhpMixed::String("    v - view modified files".to_string())),
                             Box::new(PhpMixed::String("    ? - print help".to_string())),
                         ]),
                         true,
@@ -355,11 +366,7 @@ impl SvnDownloader {
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
                 .map_err(|e| {
                     RuntimeException {
-                        message: format!(
-                            "Failed to execute {}\n\n{}",
-                            command.join(" "),
-                            e
-                        ),
+                        message: format!("Failed to execute {}\n\n{}", command.join(" "), e),
                         code: 0,
                     }
                     .into()
@@ -375,9 +382,7 @@ impl SvnDownloader {
     pub(crate) fn discard_changes(&self, path: &str) -> anyhow::Result<Box<dyn PromiseInterface>> {
         let mut output = String::new();
         if self.inner.process.execute(
-            &["svn", "revert", "-R", "."]
-                .map(|s| s.to_string())
-                .to_vec(),
+            &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
             &mut output,
             Some(path.to_string()),
         ) != 0

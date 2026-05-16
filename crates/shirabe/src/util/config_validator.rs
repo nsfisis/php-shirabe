@@ -1,17 +1,17 @@
 //! ref: composer/src/Composer/Util/ConfigValidator.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::seld::json_lint::duplicate_key_exception::DuplicateKeyException;
-use shirabe_external_packages::seld::json_lint::json_parser::JsonParser;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::json::json_validation_exception::JsonValidationException;
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::loader::invalid_package_exception::InvalidPackageException;
 use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::seld::json_lint::duplicate_key_exception::DuplicateKeyException;
+use shirabe_external_packages::seld::json_lint::json_parser::JsonParser;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
@@ -25,7 +25,12 @@ impl ConfigValidator {
         Self { io }
     }
 
-    pub fn validate(&self, file: &str, array_loader_validation_flags: i64, flags: i64) -> (Vec<String>, Vec<String>, Vec<String>) {
+    pub fn validate(
+        &self,
+        file: &str,
+        array_loader_validation_flags: i64,
+        flags: i64,
+    ) -> (Vec<String>, Vec<String>, Vec<String>) {
         let mut errors: Vec<String> = Vec::new();
         let mut publish_errors: Vec<String> = Vec::new();
         let mut warnings: Vec<String> = Vec::new();
@@ -71,7 +76,10 @@ impl ConfigValidator {
                 Err(e) => {
                     if let Some(dup_e) = e.downcast_ref::<DuplicateKeyException>() {
                         let details = dup_e.get_details();
-                        warnings.push(format!("Key {} is a duplicate in {} at line {}", details["key"], file, details["line"]));
+                        warnings.push(format!(
+                            "Key {} is a duplicate in {} at line {}",
+                            details["key"], file, details["line"]
+                        ));
                     }
                 }
             }
@@ -83,20 +91,34 @@ impl ConfigValidator {
         };
 
         // validate actual data
-        if manifest.get("license").map_or(true, |v| matches!(v, PhpMixed::Null)) || !manifest.contains_key("license") {
+        if manifest
+            .get("license")
+            .map_or(true, |v| matches!(v, PhpMixed::Null))
+            || !manifest.contains_key("license")
+        {
             warnings.push("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.".to_string());
         } else {
             let license_val = manifest.get("license").unwrap();
             let licenses: Vec<String> = match license_val {
                 PhpMixed::String(s) => vec![s.clone()],
-                PhpMixed::List(list) => list.iter().filter_map(|v| {
-                    if let PhpMixed::String(s) = v.as_ref() { Some(s.clone()) } else { None }
-                }).collect(),
+                PhpMixed::List(list) => list
+                    .iter()
+                    .filter_map(|v| {
+                        if let PhpMixed::String(s) = v.as_ref() {
+                            Some(s.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
                 _ => Vec::new(),
             };
 
             // strip proprietary since it's not a valid SPDX identifier, but is accepted by composer
-            let licenses: Vec<String> = licenses.into_iter().filter(|l| l != "proprietary").collect();
+            let licenses: Vec<String> = licenses
+                .into_iter()
+                .filter(|l| l != "proprietary")
+                .collect();
 
             let license_validator = SpdxLicenses::new();
             for license in &licenses {
@@ -131,7 +153,11 @@ impl ConfigValidator {
 
         if let Some(PhpMixed::String(name)) = manifest.get("name") {
             if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name) {
-                let suggest_name = Preg::replace(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}", r"\1\3-\2\4", name);
+                let suggest_name = Preg::replace(
+                    r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
+                    r"\1\3-\2\4",
+                    name,
+                );
                 let suggest_name = suggest_name.to_lowercase();
 
                 publish_errors.push(format!(
@@ -148,14 +174,21 @@ impl ConfigValidator {
         }
 
         // check for require-dev overrides
-        if let (Some(PhpMixed::Array(require)), Some(PhpMixed::Array(require_dev))) = (manifest.get("require"), manifest.get("require-dev")) {
-            let require_overrides: Vec<String> = require.keys()
+        if let (Some(PhpMixed::Array(require)), Some(PhpMixed::Array(require_dev))) =
+            (manifest.get("require"), manifest.get("require-dev"))
+        {
+            let require_overrides: Vec<String> = require
+                .keys()
                 .filter(|k| require_dev.contains_key(*k))
                 .cloned()
                 .collect();
 
             if !require_overrides.is_empty() {
-                let plural = if require_overrides.len() > 1 { "are" } else { "is" };
+                let plural = if require_overrides.len() > 1 {
+                    "are"
+                } else {
+                    "is"
+                };
                 warnings.push(format!(
                     "{} {} required both in require and require-dev, this can lead to unexpected behavior",
                     require_overrides.join(", "),
@@ -250,13 +283,21 @@ impl ConfigValidator {
             }
         }
 
-        let loader = ValidatingArrayLoader::new(ArrayLoader::new(), true, None, array_loader_validation_flags);
+        let loader = ValidatingArrayLoader::new(
+            ArrayLoader::new(),
+            true,
+            None,
+            array_loader_validation_flags,
+        );
         let mut manifest_for_load = manifest.clone();
         if !manifest_for_load.contains_key("version") {
             manifest_for_load.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
         }
         if !manifest_for_load.contains_key("name") {
-            manifest_for_load.insert("name".to_string(), PhpMixed::String("dummy/dummy".to_string()));
+            manifest_for_load.insert(
+                "name".to_string(),
+                PhpMixed::String("dummy/dummy".to_string()),
+            );
         }
         match loader.load(manifest_for_load) {
             Ok(_) => {}

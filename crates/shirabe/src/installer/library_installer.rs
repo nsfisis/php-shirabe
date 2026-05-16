@@ -6,7 +6,7 @@ use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    is_link, preg_quote, realpath, rmdir, rtrim, strpos, InvalidArgumentException, LogicException,
+    InvalidArgumentException, LogicException, is_link, preg_quote, realpath, rmdir, rtrim, strpos,
 };
 
 use crate::composer::Composer;
@@ -84,8 +84,11 @@ impl LibraryInstaller {
 
     /// Make sure binaries are installed for a given package.
     pub fn ensure_binaries_presence(&self, package: &dyn PackageInterface) {
-        self.binary_installer
-            .install_binaries(package, &self.get_install_path(package).unwrap(), false);
+        self.binary_installer.install_binaries(
+            package,
+            &self.get_install_path(package).unwrap(),
+            false,
+        );
     }
 
     /// Returns the base path of the package without target-dir path

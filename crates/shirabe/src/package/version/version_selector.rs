@@ -5,7 +5,7 @@ use std::any::Any;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    strtolower, version_compare, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION,
+    PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, strtolower, version_compare,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -20,9 +20,9 @@ use crate::package::base_package::BasePackage;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
+use crate::package::version::version_parser::VersionParser;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_set::RepositorySet;
-use crate::package::version::version_parser::VersionParser;
 
 #[derive(Debug)]
 pub struct VersionSelector {
@@ -140,7 +140,8 @@ impl VersionSelector {
                             if link.get_constraint().matches(provided_constraint.as_ref()) {
                                 continue 'reqs;
                             }
-                            let list_filter_opt = (platform_requirement_filter.as_ref() as &dyn Any)
+                            let list_filter_opt = (platform_requirement_filter.as_ref()
+                                as &dyn Any)
                                 .downcast_ref::<IgnoreListPlatformRequirementFilter>();
                             if let Some(list_filter) = list_filter_opt {
                                 if list_filter.is_upper_bound_ignored(name) {
@@ -168,8 +169,7 @@ impl VersionSelector {
                             _ => true,
                         };
                         if should_warn {
-                            let warn_key =
-                                format!("{}/{}", pkg.get_name(), link.get_target());
+                            let warn_key = format!("{}/{}", pkg.get_name(), link.get_target());
                             let is_first_warning = !already_warned_names.contains_key(&warn_key);
                             already_warned_names.insert(warn_key, true);
                             let latest = if is_latest_version {
@@ -222,15 +222,16 @@ impl VersionSelector {
             Some(p) => p,
         };
 
-        let package = if let Some(alias) = (package.as_ref() as &dyn Any).downcast_ref::<AliasPackage>() {
-            if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                alias.get_alias_of()
+        let package =
+            if let Some(alias) = (package.as_ref() as &dyn Any).downcast_ref::<AliasPackage>() {
+                if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
+                    alias.get_alias_of()
+                } else {
+                    package
+                }
             } else {
                 package
-            }
-        } else {
-            package
-        };
+            };
 
         Ok(Some(package))
     }
@@ -288,7 +289,10 @@ impl VersionSelector {
         if semantic_version_parts.len() == 4
             && Preg::is_match(r"{^\d+\D?}", semantic_version_parts[3]).unwrap_or(false)
         {
-            let mut parts: Vec<String> = semantic_version_parts.iter().map(|s| s.to_string()).collect();
+            let mut parts: Vec<String> = semantic_version_parts
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
             let version = if parts[0] == "0" {
                 parts.truncate(3);
                 parts.join(".")

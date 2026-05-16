@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{array_fill_keys, array_merge, implode, in_array, InvalidArgumentException, PhpMixed, UnexpectedValueException};
 use crate::advisory::audit_config::AuditConfig;
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
@@ -13,6 +9,13 @@ use crate::package::package_interface::PackageInterface;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::repository_set::RepositorySet;
 use crate::repository::repository_utils::RepositoryUtils;
+use anyhow::Result;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
+    implode, in_array,
+};
 
 #[derive(Debug)]
 pub struct AuditCommand {
@@ -40,12 +43,18 @@ impl AuditCommand {
             );
     }
 
-    pub fn execute(&mut self, input: &dyn InputInterface, _output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        _output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.inner.require_composer()?;
         let packages = self.get_packages(&composer, input)?;
 
         if packages.is_empty() {
-            self.inner.get_io().write_error("No packages - skipping audit.");
+            self.inner
+                .get_io()
+                .write_error("No packages - skipping audit.");
             return Ok(0);
         }
 
@@ -57,12 +66,31 @@ impl AuditCommand {
 
         let audit_config = AuditConfig::from_config(composer.get_config())?;
 
-        let abandoned = input.get_option("abandoned").as_string_opt().map(|s| s.to_string());
-        if abandoned.is_some() && !in_array(PhpMixed::String(abandoned.clone().unwrap()), &PhpMixed::from(Auditor::ABANDONEDS.to_vec()), true) {
+        let abandoned = input
+            .get_option("abandoned")
+            .as_string_opt()
+            .map(|s| s.to_string());
+        if abandoned.is_some()
+            && !in_array(
+                PhpMixed::String(abandoned.clone().unwrap()),
+                &PhpMixed::from(Auditor::ABANDONEDS.to_vec()),
+                true,
+            )
+        {
             return Err(InvalidArgumentException {
-                message: format!("--abandoned must be one of {}.", implode(", ", &Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect::<Vec<_>>())),
+                message: format!(
+                    "--abandoned must be one of {}.",
+                    implode(
+                        ", ",
+                        &Auditor::ABANDONEDS
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect::<Vec<_>>()
+                    )
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
@@ -71,23 +99,33 @@ impl AuditCommand {
             array_fill_keys(input.get_option("ignore-severity"), PhpMixed::Null),
             PhpMixed::from(audit_config.ignore_severity_for_audit.clone()),
         );
-        let ignore_unreachable = input.get_option("ignore-unreachable").as_bool().unwrap_or(false) || audit_config.ignore_unreachable;
+        let ignore_unreachable = input
+            .get_option("ignore-unreachable")
+            .as_bool()
+            .unwrap_or(false)
+            || audit_config.ignore_unreachable;
 
-        Ok(auditor.audit(
-            self.inner.get_io(),
-            &repo_set,
-            &packages,
-            &self.inner.get_audit_format(input, "format"),
-            false,
-            &audit_config.ignore_list_for_audit,
-            &abandoned,
-            &ignore_severities,
-            ignore_unreachable,
-            &audit_config.ignore_abandoned_for_audit,
-        )?.min(255))
+        Ok(auditor
+            .audit(
+                self.inner.get_io(),
+                &repo_set,
+                &packages,
+                &self.inner.get_audit_format(input, "format"),
+                false,
+                &audit_config.ignore_list_for_audit,
+                &abandoned,
+                &ignore_severities,
+                ignore_unreachable,
+                &audit_config.ignore_abandoned_for_audit,
+            )?
+            .min(255))
     }
 
-    fn get_packages(&self, composer: &Composer, input: &dyn InputInterface) -> Result<Vec<Box<dyn PackageInterface>>> {
+    fn get_packages(
+        &self,
+        composer: &Composer,
+        input: &dyn InputInterface,
+    ) -> Result<Vec<Box<dyn PackageInterface>>> {
         if input.get_option("locked").as_bool().unwrap_or(false) {
             if !composer.get_locker().is_locked() {
                 return Err(UnexpectedValueException {
@@ -96,14 +134,21 @@ impl AuditCommand {
                 }.into());
             }
             let locker = composer.get_locker();
-            return Ok(locker.get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?.get_packages());
+            return Ok(locker
+                .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?
+                .get_packages());
         }
 
         let root_pkg = composer.get_package();
-        let installed_repo = InstalledRepository::new(vec![composer.get_repository_manager().get_local_repository()]);
+        let installed_repo = InstalledRepository::new(vec![
+            composer.get_repository_manager().get_local_repository(),
+        ]);
 
         if input.get_option("no-dev").as_bool().unwrap_or(false) {
-            return Ok(RepositoryUtils::filter_required_packages(installed_repo.get_packages(), root_pkg));
+            return Ok(RepositoryUtils::filter_required_packages(
+                installed_repo.get_packages(),
+                root_pkg,
+            ));
         }
 
         Ok(installed_repo.get_packages())

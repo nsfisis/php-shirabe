@@ -2,7 +2,9 @@
 
 use indexmap::IndexMap;
 
-use shirabe_php_shim::{array_pop, array_shift, array_unshift, microtime, spl_object_hash, sprintf, PhpMixed};
+use shirabe_php_shim::{
+    PhpMixed, array_pop, array_shift, array_unshift, microtime, spl_object_hash, sprintf,
+};
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 use crate::dependency_resolver::decisions::Decisions;
@@ -183,8 +185,8 @@ impl Solver {
                 continue;
             } else if let Some(ignore_filter) = platform_requirement_filter
                 .as_any()
-                .downcast_ref::<IgnoreListPlatformRequirementFilter>()
-            {
+                .downcast_ref::<IgnoreListPlatformRequirementFilter>(
+            ) {
                 constraint = ignore_filter.filter_constraint(package_name, constraint);
             }
 
@@ -201,8 +203,7 @@ impl Solver {
                 );
                 // TODO(phase-b): store the constraint inside reason_data; PhpMixed needs to
                 // accept a `dyn ConstraintInterface` wrapper.
-                reason_data
-                    .insert("constraint".to_string(), PhpMixed::Null);
+                reason_data.insert("constraint".to_string(), PhpMixed::Null);
                 problem.add_rule(Rule::generic(GenericRule::new(
                     Vec::new(),
                     PhpMixed::Int(Rule::RULE_ROOT_REQUIRE),
@@ -233,7 +234,8 @@ impl Solver {
             true,
             <dyn IOInterface>::DEBUG,
         );
-        let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
+        let mut rule_set_generator =
+            RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
         self.rules =
             rule_set_generator.get_rules_for(request, platform_requirement_filter.as_ref())?;
         drop(rule_set_generator);
@@ -242,8 +244,7 @@ impl Solver {
         self.watch_graph = RuleWatchGraph::new();
 
         for rule in self.rules.iter() {
-            self.watch_graph
-                .insert(RuleWatchNode::new(rule.clone()))?;
+            self.watch_graph.insert(RuleWatchNode::new(rule.clone()))?;
         }
 
         // make decisions based on root require/fix assertions
@@ -298,11 +299,9 @@ impl Solver {
                 .at_offset(self.propagate_index as usize)
                 .clone();
 
-            let conflict = self.watch_graph.propagate_literal(
-                decision.0,
-                level,
-                &mut self.decisions,
-            );
+            let conflict =
+                self.watch_graph
+                    .propagate_literal(decision.0, level, &mut self.decisions);
 
             self.propagate_index += 1;
 
@@ -333,9 +332,7 @@ impl Solver {
             self.propagate_index = self.decisions.count() as i64;
         }
 
-        while !self.branches.is_empty()
-            && self.branches[self.branches.len() - 1].1 >= level
-        {
+        while !self.branches.is_empty() && self.branches[self.branches.len() - 1].1 >= level {
             // PHP: array_pop($this->branches)
             self.branches.pop();
         }
@@ -388,8 +385,7 @@ impl Solver {
             self.rules
                 .add(new_rule.clone().into(), RuleSet::TYPE_LEARNED)?;
 
-            self.learned_why
-                .insert(spl_object_hash(&new_rule), why);
+            self.learned_why.insert(spl_object_hash(&new_rule), why);
 
             let mut rule_node = RuleWatchNode::new(new_rule.clone().into());
             rule_node.watch2_on_highest(&self.decisions);
@@ -408,9 +404,11 @@ impl Solver {
         rule: Rule,
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
-        let mut literals =
-            self.policy
-                .select_preferred_packages(&self.pool, decision_queue, rule.get_required_package());
+        let mut literals = self.policy.select_preferred_packages(
+            &self.pool,
+            decision_queue,
+            rule.get_required_package(),
+        );
 
         let selected_literal = array_shift::<i64>(&mut literals);
 
@@ -422,11 +420,7 @@ impl Solver {
         self.set_propagate_learn(level, selected_literal, rule)
     }
 
-    fn analyze(
-        &mut self,
-        level: i64,
-        rule: Rule,
-    ) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
+    fn analyze(&mut self, level: i64, rule: Rule) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
         let analyzed_rule = rule.clone();
         let mut rule = rule;
         let mut rule_level = 1_i64;

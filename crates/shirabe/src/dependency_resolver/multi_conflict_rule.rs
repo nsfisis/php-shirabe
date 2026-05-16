@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
 
-use anyhow::Result;
-use shirabe_php_shim::{hash_raw, PHP_VERSION_ID, RuntimeException};
 use crate::dependency_resolver::generic_rule::RuleLiterals;
 use crate::dependency_resolver::rule::Rule;
+use anyhow::Result;
+use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
@@ -12,12 +12,17 @@ pub struct MultiConflictRule {
 }
 
 impl MultiConflictRule {
-    pub fn new(mut literals: Vec<i64>, reason: shirabe_php_shim::PhpMixed, reason_data: shirabe_php_shim::PhpMixed) -> Result<Self> {
+    pub fn new(
+        mut literals: Vec<i64>,
+        reason: shirabe_php_shim::PhpMixed,
+        reason_data: shirabe_php_shim::PhpMixed,
+    ) -> Result<Self> {
         if literals.len() < 3 {
             return Err(RuntimeException {
                 message: "multi conflict rule requires at least 3 literals".to_string(),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
 
         // sort all packages ascending by id
@@ -34,8 +39,17 @@ impl MultiConflictRule {
     }
 
     pub fn get_hash(&self) -> Result<i64> {
-        let joined = self.literals.iter().map(|l| l.to_string()).collect::<Vec<_>>().join(",");
-        let algo = if PHP_VERSION_ID > 80100 { "xxh3" } else { "sha1" };
+        let joined = self
+            .literals
+            .iter()
+            .map(|l| l.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let algo = if PHP_VERSION_ID > 80100 {
+            "xxh3"
+        } else {
+            "sha1"
+        };
         let binary = hash_raw(algo, &format!("c:{}", joined));
         let data = shirabe_php_shim::unpack("ihash", &binary);
         match data {
@@ -46,13 +60,15 @@ impl MultiConflictRule {
                     Err(RuntimeException {
                         message: format!("Failed unpacking: {}", joined),
                         code: 0,
-                    }.into())
+                    }
+                    .into())
                 }
             }
             None => Err(RuntimeException {
                 message: format!("Failed unpacking: {}", joined),
                 code: 0,
-            }.into()),
+            }
+            .into()),
         }
     }
 

@@ -1,16 +1,18 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
-use crate::repository::advisory_provider_interface::{AdvisoryProviderInterface, SecurityAdvisoryResult};
+use crate::repository::advisory_provider_interface::{
+    AdvisoryProviderInterface, SecurityAdvisoryResult,
+};
 use crate::repository::repository_interface::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct FilterRepository {
@@ -21,7 +23,10 @@ pub struct FilterRepository {
 }
 
 impl FilterRepository {
-    pub fn new(repo: Box<dyn RepositoryInterface>, options: IndexMap<String, PhpMixed>) -> Result<Self> {
+    pub fn new(
+        repo: Box<dyn RepositoryInterface>,
+        options: IndexMap<String, PhpMixed>,
+    ) -> Result<Self> {
         let mut only: Option<String> = None;
         let mut exclude: Option<String> = None;
         let mut canonical = true;
@@ -29,40 +34,66 @@ impl FilterRepository {
         if let Some(only_val) = options.get("only") {
             match only_val {
                 PhpMixed::List(list) => {
-                    let names: Vec<String> = list.iter().filter_map(|v| {
-                        if let PhpMixed::String(s) = v.as_ref() { Some(s.clone()) } else { None }
-                    }).collect();
+                    let names: Vec<String> = list
+                        .iter()
+                        .filter_map(|v| {
+                            if let PhpMixed::String(s) = v.as_ref() {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     only = Some(BasePackage::package_names_to_regexp(&names));
                 }
                 _ => {
                     return Err(InvalidArgumentException {
-                        message: format!(r#""only" key for repository {} should be an array"#, repo.get_repo_name()),
+                        message: format!(
+                            r#""only" key for repository {} should be an array"#,
+                            repo.get_repo_name()
+                        ),
                         code: 0,
-                    }.into());
+                    }
+                    .into());
                 }
             }
         }
         if let Some(exclude_val) = options.get("exclude") {
             match exclude_val {
                 PhpMixed::List(list) => {
-                    let names: Vec<String> = list.iter().filter_map(|v| {
-                        if let PhpMixed::String(s) = v.as_ref() { Some(s.clone()) } else { None }
-                    }).collect();
+                    let names: Vec<String> = list
+                        .iter()
+                        .filter_map(|v| {
+                            if let PhpMixed::String(s) = v.as_ref() {
+                                Some(s.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                     exclude = Some(BasePackage::package_names_to_regexp(&names));
                 }
                 _ => {
                     return Err(InvalidArgumentException {
-                        message: format!(r#""exclude" key for repository {} should be an array"#, repo.get_repo_name()),
+                        message: format!(
+                            r#""exclude" key for repository {} should be an array"#,
+                            repo.get_repo_name()
+                        ),
                         code: 0,
-                    }.into());
+                    }
+                    .into());
                 }
             }
         }
         if exclude.is_some() && only.is_some() {
             return Err(InvalidArgumentException {
-                message: format!(r#"Only one of "only" and "exclude" can be specified for repository {}"#, repo.get_repo_name()),
+                message: format!(
+                    r#"Only one of "only" and "exclude" can be specified for repository {}"#,
+                    repo.get_repo_name()
+                ),
                 code: 0,
-            }.into());
+            }
+            .into());
         }
         if let Some(canonical_val) = options.get("canonical") {
             match canonical_val {
@@ -71,14 +102,23 @@ impl FilterRepository {
                 }
                 _ => {
                     return Err(InvalidArgumentException {
-                        message: format!(r#""canonical" key for repository {} should be a boolean"#, repo.get_repo_name()),
+                        message: format!(
+                            r#""canonical" key for repository {} should be a boolean"#,
+                            repo.get_repo_name()
+                        ),
                         code: 0,
-                    }.into());
+                    }
+                    .into());
                 }
             }
         }
 
-        Ok(Self { only, exclude, canonical, repo })
+        Ok(Self {
+            only,
+            exclude,
+            canonical,
+            repo,
+        })
     }
 
     pub fn get_repository(&self) -> &dyn RepositoryInterface {
@@ -117,7 +157,11 @@ impl RepositoryInterface for FilterRepository {
         self.repo.has_package(package)
     }
 
-    fn find_package(&self, name: String, constraint: FindPackageConstraint) -> Option<Box<BasePackage>> {
+    fn find_package(
+        &self,
+        name: String,
+        constraint: FindPackageConstraint,
+    ) -> Option<Box<BasePackage>> {
         if !self.is_allowed(&name) {
             return None;
         }
@@ -125,7 +169,11 @@ impl RepositoryInterface for FilterRepository {
         self.repo.find_package(name, constraint)
     }
 
-    fn find_packages(&self, name: String, constraint: Option<FindPackageConstraint>) -> Vec<Box<BasePackage>> {
+    fn find_packages(
+        &self,
+        name: String,
+        constraint: Option<FindPackageConstraint>,
+    ) -> Vec<Box<BasePackage>> {
         if !self.is_allowed(&name) {
             return Vec::new();
         }
@@ -143,10 +191,18 @@ impl RepositoryInterface for FilterRepository {
         package_name_map.retain(|name, _| self.is_allowed(name));
 
         if package_name_map.is_empty() {
-            return LoadPackagesResult { names_found: Vec::new(), packages: Vec::new() };
+            return LoadPackagesResult {
+                names_found: Vec::new(),
+                packages: Vec::new(),
+            };
         }
 
-        let mut result = self.repo.load_packages(package_name_map, acceptable_stabilities, stability_flags, already_loaded);
+        let mut result = self.repo.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        );
         if !self.canonical {
             result.names_found = Vec::new();
         }
@@ -219,7 +275,10 @@ impl AdvisoryProviderInterface for FilterRepository {
             package_constraint_map.retain(|name, _| self.is_allowed(name));
             advisory_repo.get_security_advisories(package_constraint_map, allow_partial_advisories)
         } else {
-            Ok(SecurityAdvisoryResult { names_found: Vec::new(), advisories: IndexMap::new() })
+            Ok(SecurityAdvisoryResult {
+                names_found: Vec::new(),
+                advisories: IndexMap::new(),
+            })
         }
     }
 }

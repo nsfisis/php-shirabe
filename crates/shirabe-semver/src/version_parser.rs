@@ -37,7 +37,11 @@ impl VersionParser {
         php::preg_match(&pattern, &lower, &mut match_);
 
         // match_[3] = the ([.-]?dev)? capture
-        if match_.get(3).and_then(|o| o.as_deref()).is_some_and(|s| !s.is_empty()) {
+        if match_
+            .get(3)
+            .and_then(|o| o.as_deref())
+            .is_some_and(|s| !s.is_empty())
+        {
             return "dev".to_string();
         }
 
@@ -116,8 +120,10 @@ impl VersionParser {
         let mut matches: Vec<Option<String>> = Vec::new();
 
         // match classical versioning
-        let classical_pattern =
-            format!("{{^v?(\\d{{1,5}}+)(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i", MODIFIER_REGEX);
+        let classical_pattern = format!(
+            "{{^v?(\\d{{1,5}}+)(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i",
+            MODIFIER_REGEX
+        );
         if php::preg_match(&classical_pattern, &version, &mut matches) > 0 {
             let m2 = matches[2].as_deref().unwrap_or("");
             let m3 = matches[3].as_deref().unwrap_or("");
@@ -137,12 +143,8 @@ impl VersionParser {
                 MODIFIER_REGEX
             );
             if php::preg_match(&datetime_pattern, &version, &mut matches) > 0 {
-                version = php::preg_replace(
-                    "{\\D}",
-                    ".",
-                    matches[1].as_deref().unwrap_or(""),
-                )
-                .unwrap_or_default();
+                version = php::preg_replace("{\\D}", ".", matches[1].as_deref().unwrap_or(""))
+                    .unwrap_or_default();
                 index = Some(2);
             }
         }
@@ -154,7 +156,10 @@ impl VersionParser {
                 if mi == "stable" {
                     return Ok(version);
                 }
-                let mi1 = matches.get(idx + 1).and_then(|o| o.as_deref()).unwrap_or("");
+                let mi1 = matches
+                    .get(idx + 1)
+                    .and_then(|o| o.as_deref())
+                    .unwrap_or("");
                 version = format!(
                     "{}-{}{}",
                     version,
@@ -203,7 +208,10 @@ impl VersionParser {
             &mut Vec::new(),
         ) > 0
         {
-            format!(" in \"{}\", the alias must be an exact version", full_version)
+            format!(
+                " in \"{}\", the alias must be an exact version",
+                full_version
+            )
         } else if php::preg_match(
             &format!(
                 "{{^{}(?:@(?:{}))?  +as +}}",
@@ -223,7 +231,11 @@ impl VersionParser {
             String::new()
         };
 
-        anyhow::bail!("Invalid version string \"{}\"{}",  orig_version, extra_message)
+        anyhow::bail!(
+            "Invalid version string \"{}\"{}",
+            orig_version,
+            extra_message
+        )
     }
 
     pub fn parse_numeric_alias_prefix(&self, branch: &str) -> Option<String> {
@@ -288,11 +300,8 @@ impl VersionParser {
     ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
         let pretty_constraint = constraints.to_string();
 
-        let or_constraints = php::preg_split(
-            "{\\s*\\|\\|?\\s*}",
-            &php::trim(constraints, None),
-        )
-        .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", constraints))?;
+        let or_constraints = php::preg_split("{\\s*\\|\\|?\\s*}", &php::trim(constraints, None))
+            .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", constraints))?;
 
         let mut or_groups: Vec<Box<dyn ConstraintInterface>> = Vec::new();
 
@@ -301,22 +310,20 @@ impl VersionParser {
                 "{(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)}",
                 or_constraint,
             )
-            .ok_or_else(|| {
-                anyhow::anyhow!("Failed to preg_split string: {}", or_constraint)
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", or_constraint))?;
 
-            let constraint_objects: Vec<Box<dyn ConstraintInterface>> =
-                if and_constraints.len() > 1 {
-                    let mut objs: Vec<Box<dyn ConstraintInterface>> = Vec::new();
-                    for and_constraint in &and_constraints {
-                        for parsed in self.parse_constraint(and_constraint)? {
-                            objs.push(parsed);
-                        }
+            let constraint_objects: Vec<Box<dyn ConstraintInterface>> = if and_constraints.len() > 1
+            {
+                let mut objs: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+                for and_constraint in &and_constraints {
+                    for parsed in self.parse_constraint(and_constraint)? {
+                        objs.push(parsed);
                     }
-                    objs
-                } else {
-                    self.parse_constraint(&and_constraints[0])?
-                };
+                }
+                objs
+            } else {
+                self.parse_constraint(&and_constraints[0])?
+            };
 
             let constraint: Box<dyn ConstraintInterface> = if constraint_objects.len() == 1 {
                 constraint_objects.into_iter().next().unwrap()
@@ -342,7 +349,12 @@ impl VersionParser {
 
         // strip off aliasing
         let mut match_: Vec<Option<String>> = Vec::new();
-        if php::preg_match("{^([^,\\s]++) ++as ++([^,\\s]++)$}", &constraint, &mut match_) > 0 {
+        if php::preg_match(
+            "{^([^,\\s]++) ++as ++([^,\\s]++)$}",
+            &constraint,
+            &mut match_,
+        ) > 0
+        {
             constraint = match_[1].clone().unwrap_or_default();
         }
 
@@ -376,8 +388,16 @@ impl VersionParser {
 
         let mut match_: Vec<Option<String>> = Vec::new();
         if php::preg_match("{^(v)?[xX*](\\.[xX*])*$}i", &constraint, &mut match_) > 0 {
-            let m1_nonempty = !match_.get(1).and_then(|o| o.as_deref()).unwrap_or("").is_empty();
-            let m2_nonempty = !match_.get(2).and_then(|o| o.as_deref()).unwrap_or("").is_empty();
+            let m1_nonempty = !match_
+                .get(1)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("")
+                .is_empty();
+            let m2_nonempty = !match_
+                .get(2)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("")
+                .is_empty();
             if m1_nonempty || m2_nonempty {
                 return Ok(vec![Box::new(Constraint::new(
                     ">=".to_string(),
@@ -385,7 +405,9 @@ impl VersionParser {
                 )?)]);
             }
 
-            return Ok(vec![Box::new(MatchAllConstraint { pretty_string: None })]);
+            return Ok(vec![Box::new(MatchAllConstraint {
+                pretty_string: None,
+            })]);
         }
 
         let version_regex = format!(
@@ -428,20 +450,17 @@ impl VersionParser {
             }
 
             // Calculate the stability suffix
-            let stability_suffix =
-                if matches[5].as_deref().unwrap_or("").is_empty()
-                    && matches[7].as_deref().unwrap_or("").is_empty()
-                    && matches[8].as_deref().unwrap_or("").is_empty()
-                {
-                    "-dev"
-                } else {
-                    ""
-                };
+            let stability_suffix = if matches[5].as_deref().unwrap_or("").is_empty()
+                && matches[7].as_deref().unwrap_or("").is_empty()
+                && matches[8].as_deref().unwrap_or("").is_empty()
+            {
+                "-dev"
+            } else {
+                ""
+            };
 
-            let low_version = self.normalize(
-                &format!("{}{}", &constraint[1..], stability_suffix),
-                None,
-            )?;
+            let low_version =
+                self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
             let lower_bound = Constraint::new(">=".to_string(), low_version)?;
 
             // For upper bound, we increment the position of one more significance,
@@ -478,20 +497,17 @@ impl VersionParser {
             };
 
             // Calculate the stability suffix
-            let stability_suffix =
-                if matches[5].as_deref().unwrap_or("").is_empty()
-                    && matches[7].as_deref().unwrap_or("").is_empty()
-                    && matches[8].as_deref().unwrap_or("").is_empty()
-                {
-                    "-dev"
-                } else {
-                    ""
-                };
+            let stability_suffix = if matches[5].as_deref().unwrap_or("").is_empty()
+                && matches[7].as_deref().unwrap_or("").is_empty()
+                && matches[8].as_deref().unwrap_or("").is_empty()
+            {
+                "-dev"
+            } else {
+                ""
+            };
 
-            let low_version = self.normalize(
-                &format!("{}{}", &constraint[1..], stability_suffix),
-                None,
-            )?;
+            let low_version =
+                self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
             let lower_bound = Constraint::new(">=".to_string(), low_version)?;
 
             // For upper bound, we increment the position of one more significance,
@@ -538,7 +554,10 @@ impl VersionParser {
             );
 
             if low_version == "0.0.0.0-dev" {
-                return Ok(vec![Box::new(Constraint::new("<".to_string(), high_version)?)]);
+                return Ok(vec![Box::new(Constraint::new(
+                    "<".to_string(),
+                    high_version,
+                )?)]);
             }
 
             return Ok(vec![
@@ -563,15 +582,14 @@ impl VersionParser {
             // matches[1]='from' string, matches[2..9]=from captures, matches[10]='to' string,
             // matches[11..18]=to captures, matches[19]='($)'
             // matches[6]=from stability, matches[8]=from dev, matches[9]=from wildcard-dev
-            let low_stability_suffix =
-                if matches[6].as_deref().unwrap_or("").is_empty()
-                    && matches[8].as_deref().unwrap_or("").is_empty()
-                    && matches[9].as_deref().unwrap_or("").is_empty()
-                {
-                    "-dev"
-                } else {
-                    ""
-                };
+            let low_stability_suffix = if matches[6].as_deref().unwrap_or("").is_empty()
+                && matches[8].as_deref().unwrap_or("").is_empty()
+                && matches[9].as_deref().unwrap_or("").is_empty()
+            {
+                "-dev"
+            } else {
+                ""
+            };
 
             let from_str = matches[1].clone().unwrap_or_default(); // matches['from']
             let low_version = self.normalize(&from_str, None)?;
@@ -581,9 +599,8 @@ impl VersionParser {
             )?;
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
-            let empty = |x: &Option<String>| -> bool {
-                x.as_deref().map_or(true, |s| s.is_empty())
-            };
+            let empty =
+                |x: &Option<String>| -> bool { x.as_deref().map_or(true, |s| s.is_empty()) };
 
             // matches[12]=to minor, matches[13]=to patch, matches[15]=to stability,
             // matches[17]=to dev, matches[18]=to wildcard-dev
@@ -636,11 +653,8 @@ impl VersionParser {
                         // dev-foobar except if the constraint uses a known operator, in which
                         // case it must be a parse error
                         if version_str.ends_with("-dev")
-                            && php::preg_match(
-                                "{^[0-9a-zA-Z-./]+$}",
-                                &version_str,
-                                &mut Vec::new(),
-                            ) > 0
+                            && php::preg_match("{^[0-9a-zA-Z-./]+$}", &version_str, &mut Vec::new())
+                                > 0
                         {
                             self.normalize(
                                 &format!("dev-{}", &version_str[..version_str.len() - 4]),
@@ -697,10 +711,30 @@ impl VersionParser {
     ) -> Option<String> {
         let mut parts: [i64; 5] = [
             0,
-            matches.get(1).and_then(|o| o.as_deref()).unwrap_or("0").parse().unwrap_or(0),
-            matches.get(2).and_then(|o| o.as_deref()).unwrap_or("0").parse().unwrap_or(0),
-            matches.get(3).and_then(|o| o.as_deref()).unwrap_or("0").parse().unwrap_or(0),
-            matches.get(4).and_then(|o| o.as_deref()).unwrap_or("0").parse().unwrap_or(0),
+            matches
+                .get(1)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0),
+            matches
+                .get(2)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0),
+            matches
+                .get(3)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0),
+            matches
+                .get(4)
+                .and_then(|o| o.as_deref())
+                .unwrap_or("0")
+                .parse()
+                .unwrap_or(0),
         ];
         let pad_val: i64 = pad.parse().unwrap_or(0);
         let mut position = position;
@@ -722,7 +756,10 @@ impl VersionParser {
             }
         }
 
-        Some(format!("{}.{}.{}.{}", parts[1], parts[2], parts[3], parts[4]))
+        Some(format!(
+            "{}.{}.{}.{}",
+            parts[1], parts[2], parts[3], parts[4]
+        ))
     }
 
     fn expand_stability(&self, stability: &str) -> String {

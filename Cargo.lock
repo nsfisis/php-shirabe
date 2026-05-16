@@ -892,8 +892,29 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1 0.10.6",
+ "shirabe-external-packages",
  "shirabe-php-shim",
+ "shirabe-semver",
  "url",
+]
+
+[[package]]
+name = "shirabe-class-map-generator"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "shirabe-external-packages",
+ "shirabe-php-shim",
+]
+
+[[package]]
+name = "shirabe-external-packages"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "shirabe-php-shim",
 ]
 
 [[package]]
@@ -902,6 +923,14 @@ version = "0.0.1"
 dependencies = [
  "indexmap",
  "zip",
+]
+
+[[package]]
+name = "shirabe-semver"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "shirabe-php-shim",
 ]
 
 [[package]]

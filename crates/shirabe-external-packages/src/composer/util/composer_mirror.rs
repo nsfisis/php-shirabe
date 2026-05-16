@@ -2,7 +2,14 @@
 pub struct ComposerMirror;
 
 impl ComposerMirror {
-    pub fn process_url(mirror: &str, package_name: &str, version: &str, reference: Option<&str>, url: &str, custom_filename: Option<&str>) -> String {
+    pub fn process_url(
+        mirror: &str,
+        package_name: &str,
+        version: &str,
+        reference: Option<&str>,
+        url: &str,
+        custom_filename: Option<&str>,
+    ) -> String {
         todo!()
     }
 

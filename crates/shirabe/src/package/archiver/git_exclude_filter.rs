@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
-use std::path::Path;
-use shirabe_external_packages::composer::pcre::preg::Preg;
 use crate::package::archiver::base_exclude_filter::BaseExcludeFilter;
+use shirabe_external_packages::composer::pcre::preg::Preg;
+use std::path::Path;
 
 pub struct GitExcludeFilter {
     inner: BaseExcludeFilter,
@@ -20,10 +20,9 @@ impl GitExcludeFilter {
                 .lines()
                 .map(|l| l.to_string())
                 .collect();
-            let patterns = filter.inner.parse_lines(
-                lines,
-                |line| GitExcludeFilter::parse_git_attributes_line_static(line),
-            );
+            let patterns = filter.inner.parse_lines(lines, |line| {
+                GitExcludeFilter::parse_git_attributes_line_static(line)
+            });
             filter.inner.exclude_patterns.extend(patterns);
         }
 

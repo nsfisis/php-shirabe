@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/IO/IOInterface.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
-use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
 use crate::config::Config;
+use indexmap::IndexMap;
+use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
+use shirabe_php_shim::PhpMixed;
 
 pub trait IOInterface: LoggerInterface {
     const QUIET: i64 = 1;
@@ -38,11 +38,25 @@ pub trait IOInterface: LoggerInterface {
 
     fn ask_confirmation(&self, question: String, default: bool) -> bool;
 
-    fn ask_and_validate(&self, question: String, validator: Box<dyn Fn(PhpMixed) -> PhpMixed>, attempts: Option<i64>, default: PhpMixed) -> PhpMixed;
+    fn ask_and_validate(
+        &self,
+        question: String,
+        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        attempts: Option<i64>,
+        default: PhpMixed,
+    ) -> PhpMixed;
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String>;
 
-    fn select(&self, question: String, choices: Vec<String>, default: PhpMixed, attempts: PhpMixed, error_message: String, multiselect: bool) -> PhpMixed;
+    fn select(
+        &self,
+        question: String,
+        choices: Vec<String>,
+        default: PhpMixed,
+        attempts: PhpMixed,
+        error_message: String,
+        multiselect: bool,
+    ) -> PhpMixed;
 
     fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>>;
 
@@ -50,7 +64,12 @@ pub trait IOInterface: LoggerInterface {
 
     fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>>;
 
-    fn set_authentication(&self, repository_name: String, username: String, password: Option<String>);
+    fn set_authentication(
+        &self,
+        repository_name: String,
+        username: String,
+        password: Option<String>,
+    );
 
     fn load_configuration(&self, config: &Config);
 }

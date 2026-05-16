@@ -5,9 +5,9 @@ use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    is_scalar, is_string, json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr,
-    trigger_error, trim, ucfirst, Exception, LogicException, PhpMixed, UnexpectedValueException,
-    E_USER_DEPRECATED,
+    E_USER_DEPRECATED, Exception, LogicException, PhpMixed, UnexpectedValueException, is_scalar,
+    is_string, json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr,
+    trigger_error, trim, ucfirst,
 };
 
 use crate::package::base_package::{BasePackage, SUPPORTED_LINK_TYPES};
@@ -213,7 +213,9 @@ impl ArrayLoader {
         let _name = config.get("name").and_then(|v| v.as_string()).unwrap_or("");
         let _pretty_version = config_version.as_string().unwrap_or("").to_string();
         let _ = version;
-        todo!("phase-b: dynamic class-string instantiation new $class($name, $version, $prettyVersion)")
+        todo!(
+            "phase-b: dynamic class-string instantiation new $class($name, $version, $prettyVersion)"
+        )
     }
 
     /// @param CompletePackage $package
@@ -482,9 +484,7 @@ impl ArrayLoader {
 
             if let Some(description) = config.get("description") {
                 if !shirabe_php_shim::empty(description) && is_string(description) {
-                    package.set_description(
-                        description.as_string().unwrap_or("").to_string(),
-                    );
+                    package.set_description(description.as_string().unwrap_or("").to_string());
                 }
             }
 
@@ -629,10 +629,9 @@ impl ArrayLoader {
 
                 let mut links: IndexMap<String, Link> = IndexMap::new();
                 let entries: IndexMap<String, PhpMixed> = match entry {
-                    PhpMixed::Array(m) => m
-                        .iter()
-                        .map(|(k, v)| (k.clone(), (**v).clone()))
-                        .collect(),
+                    PhpMixed::Array(m) => {
+                        m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect()
+                    }
                     _ => continue,
                 };
                 for (pretty_target, constraint) in entries {
@@ -781,10 +780,7 @@ impl ArrayLoader {
     /// @param mixed[] $config the entire package config
     ///
     /// @return string|null normalized version of the branch alias or null if there is none
-    pub fn get_branch_alias(
-        &self,
-        config: &IndexMap<String, PhpMixed>,
-    ) -> Result<Option<String>> {
+    pub fn get_branch_alias(&self, config: &IndexMap<String, PhpMixed>) -> Result<Option<String>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(UnexpectedValueException {
                 message: "no/invalid version defined".to_string(),
@@ -824,7 +820,8 @@ impl ArrayLoader {
                 }
 
                 // normalize without -dev and ensure it's a numeric branch that is parseable
-                let validated_target_branch = if target_branch == VersionParser::DEFAULT_BRANCH_ALIAS
+                let validated_target_branch = if target_branch
+                    == VersionParser::DEFAULT_BRANCH_ALIAS
                 {
                     VersionParser::DEFAULT_BRANCH_ALIAS.to_string()
                 } else {
@@ -841,9 +838,12 @@ impl ArrayLoader {
                 }
 
                 // If using numeric aliases ensure the alias is a valid subversion
-                let source_prefix =
-                    self.version_parser.parse_numeric_alias_prefix(&source_branch);
-                let target_prefix = self.version_parser.parse_numeric_alias_prefix(&target_branch);
+                let source_prefix = self
+                    .version_parser
+                    .parse_numeric_alias_prefix(&source_branch);
+                let target_prefix = self
+                    .version_parser
+                    .parse_numeric_alias_prefix(&target_branch);
                 if let (Some(sp), Some(tp)) = (source_prefix.as_ref(), target_prefix.as_ref()) {
                     if stripos(tp, sp) != Some(0) {
                         continue;

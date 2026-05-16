@@ -4,10 +4,10 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
-    filter_var, ini_get, json_decode, parse_url, preg_quote, restore_error_handler,
-    set_error_handler, sprintf, strpos, strtolower, strtr, substr, trim,
-    PhpMixed, RuntimeException, FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID,
+    FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID, PhpMixed,
+    RuntimeException, array_replace_recursive, base64_encode, explode, extension_loaded,
+    file_put_contents, filter_var, ini_get, json_decode, parse_url, preg_quote,
+    restore_error_handler, set_error_handler, sprintf, strpos, strtolower, strtr, substr, trim,
 };
 
 use crate::config::Config;
@@ -61,7 +61,10 @@ impl RemoteFilesystem {
         auth_helper: Option<AuthHelper>,
     ) -> Self {
         let (computed_options, disable_tls_set) = if !disable_tls {
-            (StreamContextFactory::get_tls_defaults(&options, &*io), false)
+            (
+                StreamContextFactory::get_tls_defaults(&options, &*io),
+                false,
+            )
         } else {
             (IndexMap::new(), true)
         };
@@ -99,7 +102,13 @@ impl RemoteFilesystem {
         progress: bool,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
-        self.get(origin_url, file_url, options, Some(file_name.to_string()), progress)
+        self.get(
+            origin_url,
+            file_url,
+            options,
+            Some(file_name.to_string()),
+            progress,
+        )
     }
 
     pub fn get_contents(
@@ -131,9 +140,7 @@ impl RemoteFilesystem {
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
-            if let Ok(Some(m)) =
-                Preg::is_match_strict_groups("{^HTTP/\\S+ (\\d+)}i", header)
-            {
+            if let Ok(Some(m)) = Preg::is_match_strict_groups("{^HTTP/\\S+ (\\d+)}i", header) {
                 value = Some(m["1"].parse().unwrap_or(0));
             }
         }
@@ -219,10 +226,7 @@ impl RemoteFilesystem {
 
         if let Some(http_opts) = options.get_mut("http") {
             if let PhpMixed::Array(m) = http_opts {
-                m.insert(
-                    "ignore_errors".to_string(),
-                    Box::new(PhpMixed::Bool(true)),
-                );
+                m.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
             }
         }
 
@@ -380,7 +384,10 @@ impl RemoteFilesystem {
                 FILTER_VALIDATE_BOOLEAN,
             )
         {
-            error_message = format!("allow_url_fopen must be enabled in php.ini ({})", error_message);
+            error_message = format!(
+                "allow_url_fopen must be enabled in php.ini ({})",
+                error_message
+            );
         }
         restore_error_handler();
         if let Some(e) = caught_e {
@@ -428,7 +435,9 @@ impl RemoteFilesystem {
         }
 
         let bitbucket_login_match = origin_url == "bitbucket.org"
-            && !self.auth_helper.is_public_bit_bucket_download(&self.file_url)
+            && !self
+                .auth_helper
+                .is_public_bit_bucket_download(&self.file_url)
             && substr(&self.file_url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(
@@ -582,10 +591,8 @@ impl RemoteFilesystem {
             let put_error_message = String::new();
             // TODO(phase-b): set_error_handler closure that captures `put_error_message` by reference
             set_error_handler(|_code, _msg, _file, _line| true);
-            let write_result = file_put_contents(
-                file_name.as_deref().unwrap(),
-                result_str.as_bytes(),
-            );
+            let write_result =
+                file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());
             restore_error_handler();
             if write_result.is_none() {
                 return Err(anyhow::anyhow!(TransportException::new(format!(
@@ -800,7 +807,9 @@ impl RemoteFilesystem {
         self.retry = result.retry;
 
         if self.retry {
-            return Err(anyhow::anyhow!(TransportException::new("RETRY".to_string())));
+            return Err(anyhow::anyhow!(TransportException::new(
+                "RETRY".to_string()
+            )));
         }
         Ok(())
     }
@@ -856,9 +865,9 @@ impl RemoteFilesystem {
                 );
             }
         }
-        options =
-            self.auth_helper
-                .add_authentication_options(options, origin_url, &self.file_url);
+        options = self
+            .auth_helper
+            .add_authentication_options(options, origin_url, &self.file_url);
 
         let http_entry = options
             .entry("http".to_string())
@@ -888,9 +897,7 @@ impl RemoteFilesystem {
         result: Option<String>,
     ) -> anyhow::Result<Option<String>> {
         let mut target_url: Option<String> = None;
-        if let Some(location_header) =
-            Response::find_header_value(response_headers, "location")
-        {
+        if let Some(location_header) = Response::find_header_value(response_headers, "location") {
             // TODO(phase-b): use PHP_URL_SCHEME once available to detect absolute URLs.
             if !parse_url(&location_header, PHP_URL_HOST)
                 .as_string()
@@ -954,10 +961,7 @@ impl RemoteFilesystem {
                 <dyn IOInterface>::DEBUG,
             );
 
-            additional_options.insert(
-                "redirects".to_string(),
-                PhpMixed::Int(self.redirects),
-            );
+            additional_options.insert("redirects".to_string(), PhpMixed::Int(self.redirects));
 
             let host = parse_url(&target_url, PHP_URL_HOST)
                 .as_string()

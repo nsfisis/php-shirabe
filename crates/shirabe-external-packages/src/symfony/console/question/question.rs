@@ -8,7 +8,10 @@ impl Question {
         todo!()
     }
 
-    pub fn set_validator(&mut self, validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>) {
+    pub fn set_validator(
+        &mut self,
+        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+    ) {
         todo!()
     }
 

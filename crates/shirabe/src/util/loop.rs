@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Util/Loop.php
 
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_php_shim::microtime;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
 use crate::util::http_downloader::HttpDownloader;
 use crate::util::process_executor::ProcessExecutor;
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
+use shirabe_php_shim::microtime;
 
 #[derive(Debug)]
 pub struct Loop {
@@ -17,7 +17,10 @@ pub struct Loop {
 }
 
 impl Loop {
-    pub fn new(mut http_downloader: HttpDownloader, process_executor: Option<ProcessExecutor>) -> Self {
+    pub fn new(
+        mut http_downloader: HttpDownloader,
+        process_executor: Option<ProcessExecutor>,
+    ) -> Self {
         http_downloader.enable_async();
 
         let process_executor = process_executor.map(|mut pe| {
@@ -41,7 +44,11 @@ impl Loop {
         self.process_executor.as_ref()
     }
 
-    pub fn wait(&mut self, promises: Vec<Box<dyn PromiseInterface>>, progress: Option<&mut ProgressBar>) -> Result<()> {
+    pub fn wait(
+        &mut self,
+        promises: Vec<Box<dyn PromiseInterface>>,
+        progress: Option<&mut ProgressBar>,
+    ) -> Result<()> {
         let mut uncaught: Option<anyhow::Error> = None;
 
         shirabe_external_packages::react::promise::all(&promises).then(

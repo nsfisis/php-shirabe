@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php
 
-use indexmap::IndexMap;
-use shirabe_php_shim::{touch, chmod, PhpMixed};
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use crate::command::base_command::BaseCommand;
 use crate::config::Config;
 use crate::config::json_config_source::JsonConfigSource;
@@ -11,6 +7,10 @@ use crate::factory::Factory;
 use crate::json::json_file::JsonFile;
 use crate::util::platform::Platform;
 use crate::util::silencer::Silencer;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::{PhpMixed, chmod, touch};
 
 #[derive(Debug)]
 pub struct BaseConfigCommand {
@@ -63,7 +63,10 @@ impl BaseConfigCommand {
             touch(&path);
             self.config_file.as_mut().unwrap().write(PhpMixed::Array({
                 let mut m = IndexMap::new();
-                m.insert("config".to_string(), Box::new(PhpMixed::Array(IndexMap::new())));
+                m.insert(
+                    "config".to_string(),
+                    Box::new(PhpMixed::Array(IndexMap::new())),
+                );
                 m
             }))?;
             let _ = Silencer::call(|| {

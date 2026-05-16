@@ -6,15 +6,15 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_php_shim::{
-    array_map, base64_decode, basename_with_suffix, chmod, class_exists, copy, defined, dirname,
-    end_arr, exec, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    fileowner, fileperms, function_exists, hash_file, ini_get, in_array, is_array, is_file,
-    is_numeric, is_writable, iterator_to_array, json_decode, openssl_free_key,
-    openssl_get_md_methods, openssl_pkey_get_public, openssl_verify, posix_geteuid,
-    posix_getpwuid, random_int, rename, server_argv, sprintf, str_contains, str_replace, strpos,
-    strtolower, strtr, tempnam, unlink, usleep, version_compare, InvalidArgumentException, Phar,
-    PharException, PhpMixed, RuntimeException, UnexpectedValueException, OPENSSL_ALGO_SHA384,
-    PHP_EOL, PHP_VERSION_ID,
+    InvalidArgumentException, OPENSSL_ALGO_SHA384, PHP_EOL, PHP_VERSION_ID, Phar, PharException,
+    PhpMixed, RuntimeException, UnexpectedValueException, array_map, base64_decode,
+    basename_with_suffix, chmod, class_exists, copy, defined, dirname, end_arr, exec,
+    extension_loaded, file_exists, file_get_contents, file_put_contents, fileowner, fileperms,
+    function_exists, hash_file, in_array, ini_get, is_array, is_file, is_numeric, is_writable,
+    iterator_to_array, json_decode, openssl_free_key, openssl_get_md_methods,
+    openssl_pkey_get_public, openssl_verify, posix_geteuid, posix_getpwuid, random_int, rename,
+    server_argv, sprintf, str_contains, str_replace, strpos, strtolower, strtr, tempnam, unlink,
+    usleep, version_compare,
 };
 
 use crate::command::base_command::BaseCommand;
@@ -154,11 +154,19 @@ impl SelfUpdateCommand {
             }
         }
 
-        if input.get_option("set-channel-only").as_bool().unwrap_or(false) {
+        if input
+            .get_option("set-channel-only")
+            .as_bool()
+            .unwrap_or(false)
+        {
             return Ok(0);
         }
 
-        let cache_dir = config.get("cache-dir").as_string().unwrap_or("").to_string();
+        let cache_dir = config
+            .get("cache-dir")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
         let rollback_dir = config.get("data-dir").as_string().unwrap_or("").to_string();
         let home = config.get("home").as_string().unwrap_or("").to_string();
         let local_filename = Phar::running(false);
@@ -414,7 +422,8 @@ impl SelfUpdateCommand {
             ],
         );
 
-        let updating_to_tag = !Preg::is_match(r"{^[0-9a-f]{40}$}", &update_version).unwrap_or(false);
+        let updating_to_tag =
+            !Preg::is_match(r"{^[0-9a-f]{40}$}", &update_version).unwrap_or(false);
 
         io.write(
             PhpMixed::String(sprintf(
@@ -458,16 +467,9 @@ impl SelfUpdateCommand {
             IOInterface::NORMAL,
         );
         http_downloader.copy(&remote_filename, &temp_filename)?;
-        io.write_error(
-            PhpMixed::String(String::new()),
-            true,
-            IOInterface::NORMAL,
-        );
+        io.write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
 
-        if !file_exists(&temp_filename)
-            || signature.is_none()
-            || signature.as_deref() == Some("")
-        {
+        if !file_exists(&temp_filename) || signature.is_none() || signature.as_deref() == Some("") {
             io.write_error(
                 PhpMixed::String(
                     "<error>The download of the new composer version failed for an unexpected reason</error>"
@@ -675,20 +677,21 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         );
 
         // TODO(phase-b): closure captures none; PHP throws inside the closure on bad input
-        let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> = Box::new(|value: PhpMixed| -> PhpMixed {
-            let value_str = value.as_string().unwrap_or("").to_string();
-            if !Preg::is_match(r"{^-----BEGIN PUBLIC KEY-----$}", &shirabe_php_shim::trim(&value_str, None))
+        let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
+            Box::new(|value: PhpMixed| -> PhpMixed {
+                let value_str = value.as_string().unwrap_or("").to_string();
+                if !Preg::is_match(
+                    r"{^-----BEGIN PUBLIC KEY-----$}",
+                    &shirabe_php_shim::trim(&value_str, None),
+                )
                 .unwrap_or(false)
-            {
-                // TODO(phase-b): closure cannot throw
-                panic!("{}", "Invalid input");
-            }
+                {
+                    // TODO(phase-b): closure cannot throw
+                    panic!("{}", "Invalid input");
+                }
 
-            PhpMixed::String(format!(
-                "{}\n",
-                shirabe_php_shim::trim(&value_str, None)
-            ))
-        });
+                PhpMixed::String(format!("{}\n", shirabe_php_shim::trim(&value_str, None)))
+            });
 
         let mut dev_key = String::new();
         let mut match_: Option<String> = None;
@@ -717,17 +720,17 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 if line_str.is_empty() {
                     break;
                 }
-                dev_key.push_str(&format!(
-                    "{}\n",
-                    shirabe_php_shim::trim(&line_str, None)
-                ));
+                dev_key.push_str(&format!("{}\n", shirabe_php_shim::trim(&line_str, None)));
                 if shirabe_php_shim::trim(&line_str, None) == "-----END PUBLIC KEY-----" {
                     break;
                 }
             }
         }
         let _ = &validator;
-        let key_path = format!("{}/keys.dev.pub", config.get("home").as_string().unwrap_or(""));
+        let key_path = format!(
+            "{}/keys.dev.pub",
+            config.get("home").as_string().unwrap_or("")
+        );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
         io.write(
             PhpMixed::String(format!(
@@ -765,16 +768,16 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 if line_str.is_empty() {
                     break;
                 }
-                tags_key.push_str(&format!(
-                    "{}\n",
-                    shirabe_php_shim::trim(&line_str, None)
-                ));
+                tags_key.push_str(&format!("{}\n", shirabe_php_shim::trim(&line_str, None)));
                 if shirabe_php_shim::trim(&line_str, None) == "-----END PUBLIC KEY-----" {
                     break;
                 }
             }
         }
-        let key_path = format!("{}/keys.tags.pub", config.get("home").as_string().unwrap_or(""));
+        let key_path = format!(
+            "{}/keys.tags.pub",
+            config.get("home").as_string().unwrap_or("")
+        );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
         io.write(
             PhpMixed::String(format!(
@@ -821,12 +824,17 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 
         let old_file = format!(
             "{}/{}{}",
-            rollback_dir, rollback_version, Self::OLD_INSTALL_EXT
+            rollback_dir,
+            rollback_version,
+            Self::OLD_INSTALL_EXT
         );
 
         if !is_file(&old_file) {
             return Err(FilesystemException::new(
-                format!("Composer rollback failed: \"{}\" could not be found", old_file),
+                format!(
+                    "Composer rollback failed: \"{}\" could not be found",
+                    old_file
+                ),
                 0,
             )
             .0
@@ -834,7 +842,10 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         }
         if !Filesystem::is_readable(&old_file) {
             return Err(FilesystemException::new(
-                format!("Composer rollback failed: \"{}\" could not be read", old_file),
+                format!(
+                    "Composer rollback failed: \"{}\" could not be read",
+                    old_file
+                ),
                 0,
             )
             .0
@@ -877,7 +888,11 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             io.write_error(
                 PhpMixed::String(format!(
                     "<error>The {} file is corrupted ({})</error>",
-                    if backup_target.is_some() { "update" } else { "backup" },
+                    if backup_target.is_some() {
+                        "update"
+                    } else {
+                        "backup"
+                    },
                     error.unwrap_or_default()
                 )),
                 true,
@@ -931,15 +946,16 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 let _ = unlink(new_filename);
                 let action = format!(
                     "Composer {}",
-                    if backup_target.is_some() { "update" } else { "rollback" }
+                    if backup_target.is_some() {
+                        "update"
+                    } else {
+                        "rollback"
+                    }
                 );
                 Err(FilesystemException::new(
                     format!(
                         "{} failed: \"{}\" could not be written.{}{}",
-                        action,
-                        local_filename,
-                        PHP_EOL,
-                        e
+                        action, local_filename, PHP_EOL, e
                     ),
                     0,
                 )
@@ -1061,7 +1077,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             IOInterface::NORMAL,
         );
         let help_message = "Please run the self-update command as an Administrator.";
-        let question = "Complete this operation with Administrator privileges [<comment>Y,n</comment>]? ";
+        let question =
+            "Complete this operation with Administrator privileges [<comment>Y,n</comment>]? ";
 
         if !io.ask_confirmation(question.to_string(), true) {
             io.write_error(
@@ -1081,10 +1098,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             Some(f) => f,
             None => {
                 io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>Operation failed. {}</error>",
-                        help_message
-                    )),
+                    PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
                     true,
                     IOInterface::NORMAL,
                 );
@@ -1095,7 +1109,11 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 
         let mut output: Vec<String> = vec![];
         let mut exit_code: i64 = 0;
-        exec("sudo config 2> NUL", Some(&mut output), Some(&mut exit_code));
+        exec(
+            "sudo config 2> NUL",
+            Some(&mut output),
+            Some(&mut exit_code),
+        );
         let using_sudo = exit_code == 0;
 
         let script = if using_sudo {
@@ -1151,10 +1169,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             );
         } else {
             io.write_error(
-                PhpMixed::String(format!(
-                    "<error>Operation failed. {}</error>",
-                    help_message
-                )),
+                PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
                 true,
                 IOInterface::NORMAL,
             );

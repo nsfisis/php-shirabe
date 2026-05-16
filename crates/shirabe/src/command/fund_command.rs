@@ -29,35 +29,63 @@ impl FundCommand {
         self.inner
             .set_name("fund")
             .set_description("Discover how to help fund the maintenance of your dependencies")
-            .set_definition(vec![
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string())), vec!["text".to_string(), "json".to_string()]),
-            ]);
+            .set_definition(vec![InputOption::new(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text or json",
+                Some(PhpMixed::String("text".to_string())),
+                vec!["text".to_string(), "json".to_string()],
+            )]);
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, _output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &self,
+        input: &dyn InputInterface,
+        _output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.inner.require_composer()?;
 
         let repo = composer.get_repository_manager().get_local_repository();
-        let remote_repos = CompositeRepository::new(composer.get_repository_manager().get_repositories());
+        let remote_repos =
+            CompositeRepository::new(composer.get_repository_manager().get_repositories());
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
 
         let mut packages_to_load: IndexMap<String, Box<MatchAllConstraint>> = IndexMap::new();
         for package in repo.get_packages() {
-            if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some() {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some()
+            {
                 continue;
             }
-            packages_to_load.insert(package.get_name().to_string(), Box::new(MatchAllConstraint::new()));
+            packages_to_load.insert(
+                package.get_name().to_string(),
+                Box::new(MatchAllConstraint::new()),
+            );
         }
 
         // load all packages dev versions in parallel
-        let result = remote_repos.load_packages(&packages_to_load, &IndexMap::from([("dev".to_string(), BasePackage::STABILITY_DEV)]), &IndexMap::new())?;
+        let result = remote_repos.load_packages(
+            &packages_to_load,
+            &IndexMap::from([("dev".to_string(), BasePackage::STABILITY_DEV)]),
+            &IndexMap::new(),
+        )?;
 
         // collect funding data from default branches
         for package in &result.packages {
-            if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_none() {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_none()
+            {
                 // TODO: check for CompleteAliasPackage as well
-                if let Some(complete_pkg) = (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>() {
-                    if complete_pkg.is_default_branch() && !complete_pkg.get_funding().is_empty() && packages_to_load.contains_key(complete_pkg.get_name()) {
+                if let Some(complete_pkg) =
+                    (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
+                {
+                    if complete_pkg.is_default_branch()
+                        && !complete_pkg.get_funding().is_empty()
+                        && packages_to_load.contains_key(complete_pkg.get_name())
+                    {
                         Self::insert_funding_data(&mut fundings, complete_pkg)?;
                         packages_to_load.remove(complete_pkg.get_name());
                     }
@@ -67,11 +95,17 @@ impl FundCommand {
 
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages() {
-            if (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_some() || !packages_to_load.contains_key(package.get_name()) {
+            if (package.as_any() as &dyn Any)
+                .downcast_ref::<AliasPackage>()
+                .is_some()
+                || !packages_to_load.contains_key(package.get_name())
+            {
                 continue;
             }
             // TODO: check for CompleteAliasPackage as well
-            if let Some(complete_pkg) = (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>() {
+            if let Some(complete_pkg) =
+                (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
+            {
                 if !complete_pkg.get_funding().is_empty() {
                     Self::insert_funding_data(&mut fundings, complete_pkg)?;
                 }
@@ -82,9 +116,16 @@ impl FundCommand {
 
         let io = self.inner.get_io();
 
-        let format = input.get_option("format").as_string().unwrap_or("text").to_string();
+        let format = input
+            .get_option("format")
+            .as_string()
+            .unwrap_or("text")
+            .to_string();
         if !matches!(format.as_str(), "text" | "json") {
-            io.write_error(&format!("Unsupported format \"{}\". See help for supported formats.", format));
+            io.write_error(&format!(
+                "Unsupported format \"{}\". See help for supported formats.",
+                format
+            ));
             return Ok(1);
         }
 
@@ -102,12 +143,18 @@ impl FundCommand {
                         io.write(&line);
                         prev = Some(line);
                     }
-                    io.write(&format!("    <href={}>{}</>", OutputFormatter::escape(url), url));
+                    io.write(&format!(
+                        "    <href={}>{}</>",
+                        OutputFormatter::escape(url),
+                        url
+                    ));
                 }
             }
 
             io.write("");
-            io.write("Please consider following these links and sponsoring the work of package authors!");
+            io.write(
+                "Please consider following these links and sponsoring the work of package authors!",
+            );
             io.write("Thank you!");
         } else if format == "json" {
             io.write(&JsonFile::encode(&fundings));
@@ -118,7 +165,10 @@ impl FundCommand {
         Ok(0)
     }
 
-    fn insert_funding_data(fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>, package: &CompletePackage) -> Result<()> {
+    fn insert_funding_data(
+        fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
+        package: &CompletePackage,
+    ) -> Result<()> {
         let pretty_name = package.get_pretty_name();
         let (vendor, package_name) = pretty_name.split_once('/').unwrap_or(("", pretty_name));
 
@@ -128,15 +178,25 @@ impl FundCommand {
                 continue;
             }
             let mut url = url_val.unwrap().to_string();
-            let r#type = funding_option.get("type").and_then(|v| v.as_string()).unwrap_or("");
+            let r#type = funding_option
+                .get("type")
+                .and_then(|v| v.as_string())
+                .unwrap_or("");
             if r#type == "github" {
-                if let Ok(Some(matches)) = Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url) {
+                if let Ok(Some(matches)) =
+                    Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
+                {
                     if let Some(sponsor) = matches.into_iter().nth(1) {
                         url = format!("https://github.com/sponsors/{}", sponsor);
                     }
                 }
             }
-            fundings.entry(vendor.to_string()).or_default().entry(url).or_default().push(package_name.to_string());
+            fundings
+                .entry(vendor.to_string())
+                .or_default()
+                .entry(url)
+                .or_default()
+                .push(package_name.to_string());
         }
         Ok(())
     }

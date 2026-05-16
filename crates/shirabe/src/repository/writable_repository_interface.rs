@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Repository/WritableRepositoryInterface.php
 
-use anyhow::Result;
 use crate::installer::installation_manager::InstallationManager;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::repository_interface::RepositoryInterface;
+use anyhow::Result;
 
 pub trait WritableRepositoryInterface: RepositoryInterface {
     fn write(&mut self, dev_mode: bool, installation_manager: &InstallationManager) -> Result<()>;

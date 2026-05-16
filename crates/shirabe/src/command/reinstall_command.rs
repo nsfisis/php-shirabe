@@ -68,7 +68,9 @@ impl ReinstallCommand {
         let composer = self.inner.require_composer()?;
 
         let local_repo = composer.get_repository_manager().get_local_repository();
-        let mut packages_to_reinstall: Vec<Box<dyn crate::package::package_interface::PackageInterface>> = vec![];
+        let mut packages_to_reinstall: Vec<
+            Box<dyn crate::package::package_interface::PackageInterface>,
+        > = vec![];
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
         let type_option = input.get_option("type");
@@ -79,12 +81,20 @@ impl ReinstallCommand {
         if type_count > 0 {
             if packages_count > 0 {
                 return Err(InvalidArgumentException {
-                    message: "You cannot specify package names and filter by type at the same time.".to_string(),
+                    message:
+                        "You cannot specify package names and filter by type at the same time."
+                            .to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
-            let filter_types: Vec<String> = type_option.as_list()
-                .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+            let filter_types: Vec<String> = type_option
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages() {
                 if filter_types.contains(&package.get_type().to_string()) {
@@ -95,12 +105,19 @@ impl ReinstallCommand {
         } else {
             if packages_count == 0 {
                 return Err(InvalidArgumentException {
-                    message: "You must pass one or more package names to be reinstalled.".to_string(),
+                    message: "You must pass one or more package names to be reinstalled."
+                        .to_string(),
                     code: 0,
-                }.into());
+                }
+                .into());
             }
-            let patterns: Vec<String> = packages_arg.as_list()
-                .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+            let patterns: Vec<String> = packages_arg
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default();
             for pattern in &patterns {
                 let pattern_regexp = BasePackage::package_name_to_regexp(pattern);
@@ -130,7 +147,8 @@ impl ReinstallCommand {
 
         let present_packages = local_repo.get_packages();
         let result_packages = present_packages.clone();
-        let present_packages: Vec<_> = present_packages.into_iter()
+        let present_packages: Vec<_> = present_packages
+            .into_iter()
             .filter(|package| !package_names_to_reinstall.contains(&package.get_name().to_string()))
             .collect();
 
@@ -140,15 +158,24 @@ impl ReinstallCommand {
         let mut install_order = indexmap::IndexMap::new();
         for (index, op) in install_operations.iter().enumerate() {
             if let Some(install_op) = (op.as_any() as &dyn Any).downcast_ref::<InstallOperation>() {
-                if (install_op.get_package().as_any() as &dyn Any).downcast_ref::<AliasPackage>().is_none() {
+                if (install_op.get_package().as_any() as &dyn Any)
+                    .downcast_ref::<AliasPackage>()
+                    .is_none()
+                {
                     install_order.insert(install_op.get_package().get_name().to_string(), index);
                 }
             }
         }
 
         uninstall_operations.sort_by(|a, b| {
-            let a_order = install_order.get(a.get_package().get_name()).copied().unwrap_or(0);
-            let b_order = install_order.get(b.get_package().get_name()).copied().unwrap_or(0);
+            let a_order = install_order
+                .get(a.get_package().get_name())
+                .copied()
+                .unwrap_or(0);
+            let b_order = install_order
+                .get(b.get_package().get_name())
+                .copied()
+                .unwrap_or(0);
             b_order.cmp(&a_order)
         });
 
@@ -165,13 +192,15 @@ impl ReinstallCommand {
         event_dispatcher.dispatch(command_event.get_name(), &command_event);
 
         let config = composer.get_config();
-        let (prefer_source, prefer_dist) = self.inner.get_preferred_install_options(config, input)?;
+        let (prefer_source, prefer_dist) =
+            self.inner.get_preferred_install_options(config, input)?;
 
         let installation_manager = composer.get_installation_manager();
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
-        installation_manager.set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+        installation_manager
+            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {
             installation_manager.disable_plugins();
         }
@@ -188,19 +217,36 @@ impl ReinstallCommand {
         installation_manager.execute(local_repo, install_operations, dev_mode);
 
         if !input.get_option("no-autoloader").as_bool().unwrap_or(false) {
-            let optimize = input.get_option("optimize-autoloader").as_bool().unwrap_or(false)
+            let optimize = input
+                .get_option("optimize-autoloader")
+                .as_bool()
+                .unwrap_or(false)
                 || config.get("optimize-autoloader").as_bool().unwrap_or(false);
-            let authoritative = input.get_option("classmap-authoritative").as_bool().unwrap_or(false)
-                || config.get("classmap-authoritative").as_bool().unwrap_or(false);
-            let apcu_prefix = input.get_option("apcu-autoloader-prefix").as_string_opt().map(|s| s.to_string());
+            let authoritative = input
+                .get_option("classmap-authoritative")
+                .as_bool()
+                .unwrap_or(false)
+                || config
+                    .get("classmap-authoritative")
+                    .as_bool()
+                    .unwrap_or(false);
+            let apcu_prefix = input
+                .get_option("apcu-autoloader-prefix")
+                .as_string_opt()
+                .map(|s| s.to_string());
             let apcu = apcu_prefix.is_some()
-                || input.get_option("apcu-autoloader").as_bool().unwrap_or(false)
+                || input
+                    .get_option("apcu-autoloader")
+                    .as_bool()
+                    .unwrap_or(false)
                 || config.get("apcu-autoloader").as_bool().unwrap_or(false);
 
             let generator = composer.get_autoload_generator();
             generator.set_class_map_authoritative(authoritative);
             generator.set_apcu(apcu, apcu_prefix.as_deref());
-            generator.set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input)?);
+            generator.set_platform_requirement_filter(
+                self.inner.get_platform_requirement_filter(input)?,
+            );
             generator.dump(
                 config,
                 local_repo,

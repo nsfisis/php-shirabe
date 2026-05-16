@@ -12,7 +12,9 @@ use crate::package::root_package::RootPackage;
 pub struct PackageSorter;
 
 impl PackageSorter {
-    pub fn get_most_current_version(packages: Vec<Box<dyn PackageInterface>>) -> Option<Box<dyn PackageInterface>> {
+    pub fn get_most_current_version(
+        packages: Vec<Box<dyn PackageInterface>>,
+    ) -> Option<Box<dyn PackageInterface>> {
         if packages.is_empty() {
             return None;
         }
@@ -31,23 +33,32 @@ impl PackageSorter {
         Some(highest)
     }
 
-    pub fn sort_packages_alphabetically(mut packages: Vec<Box<dyn PackageInterface>>) -> Vec<Box<dyn PackageInterface>> {
+    pub fn sort_packages_alphabetically(
+        mut packages: Vec<Box<dyn PackageInterface>>,
+    ) -> Vec<Box<dyn PackageInterface>> {
         packages.sort_by_key(|p| p.get_name());
         packages
     }
 
-    pub fn sort_packages(packages: Vec<Box<dyn PackageInterface>>, weights: IndexMap<String, i64>) -> Vec<Box<dyn PackageInterface>> {
+    pub fn sort_packages(
+        packages: Vec<Box<dyn PackageInterface>>,
+        weights: IndexMap<String, i64>,
+    ) -> Vec<Box<dyn PackageInterface>> {
         let mut usage_list: IndexMap<String, Vec<String>> = IndexMap::new();
 
         for package in &packages {
             let mut links: IndexMap<String, Link> = package.get_requires();
             // TODO: check for RootAliasPackage as well
-            if let Some(root_package) = (package.as_any() as &dyn Any).downcast_ref::<RootPackage>() {
+            if let Some(root_package) = (package.as_any() as &dyn Any).downcast_ref::<RootPackage>()
+            {
                 links.extend(root_package.get_dev_requires());
             }
             for link in links.values() {
                 let target = link.get_target().to_string();
-                usage_list.entry(target).or_default().push(package.get_name().to_string());
+                usage_list
+                    .entry(target)
+                    .or_default()
+                    .push(package.get_name().to_string());
             }
         }
 
@@ -73,7 +84,8 @@ impl PackageSorter {
             }
         });
 
-        let mut packages: Vec<Option<Box<dyn PackageInterface>>> = packages.into_iter().map(Some).collect();
+        let mut packages: Vec<Option<Box<dyn PackageInterface>>> =
+            packages.into_iter().map(Some).collect();
         weighted_packages
             .into_iter()
             .map(|(_, _, index)| packages[index].take().unwrap())

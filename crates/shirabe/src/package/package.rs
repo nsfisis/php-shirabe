@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::util::composer_mirror::ComposerMirror;
-use shirabe_php_shim::{strpos, trigger_error, PhpMixed, E_USER_DEPRECATED};
+use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, strpos, trigger_error};
 
 use crate::package::base_package::BasePackage;
 use crate::package::link::Link;
@@ -109,7 +109,10 @@ impl Package {
     }
 
     pub fn get_type(&self) -> String {
-        self.r#type.clone().filter(|s| !s.is_empty()).unwrap_or_else(|| "library".to_string())
+        self.r#type
+            .clone()
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| "library".to_string())
     }
 
     pub fn get_stability(&self) -> &str {

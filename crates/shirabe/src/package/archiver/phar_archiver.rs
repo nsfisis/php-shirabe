@@ -2,8 +2,8 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    bzcompress, file_exists, file_put_contents, function_exists, gzcompress, pack, str_repeat,
-    strrpos, unlink, FilesystemIterator, Phar, PharData, PhpMixed, RuntimeException,
+    FilesystemIterator, Phar, PharData, PhpMixed, RuntimeException, bzcompress, file_exists,
+    file_put_contents, function_exists, gzcompress, pack, str_repeat, strrpos, unlink,
 };
 
 use crate::package::archiver::archivable_files_filter::ArchivableFilesFilter;
@@ -79,14 +79,14 @@ impl ArchiverInterface for PharArchiver {
                     let eocd = pack(
                         "VvvvvVVv",
                         &[
-                            PhpMixed::Int(0x06054b50),  // End of central directory signature
-                            PhpMixed::Int(0),           // Number of this disk
-                            PhpMixed::Int(0),           // Disk where central directory starts
-                            PhpMixed::Int(0),           // Number of central directory records on this disk
-                            PhpMixed::Int(0),           // Total number of central directory records
-                            PhpMixed::Int(0),           // Size of central directory (bytes)
-                            PhpMixed::Int(0),           // Offset of start of central directory
-                            PhpMixed::Int(0),           // Comment length
+                            PhpMixed::Int(0x06054b50), // End of central directory signature
+                            PhpMixed::Int(0),          // Number of this disk
+                            PhpMixed::Int(0),          // Disk where central directory starts
+                            PhpMixed::Int(0), // Number of central directory records on this disk
+                            PhpMixed::Int(0), // Total number of central directory records
+                            PhpMixed::Int(0), // Size of central directory (bytes)
+                            PhpMixed::Int(0), // Offset of start of central directory
+                            PhpMixed::Int(0), // Comment length
                         ],
                     );
                     file_put_contents(&target, &eocd);
@@ -100,10 +100,12 @@ impl ArchiverInterface for PharArchiver {
                         .into());
                     }
                     if format == "tar.gz" && function_exists("gzcompress") {
-                        let data = gzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
+                        let data =
+                            gzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
                         file_put_contents(&target, &data);
                     } else if format == "tar.bz2" && function_exists("bzcompress") {
-                        let data = bzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
+                        let data =
+                            bzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
                         file_put_contents(&target, &data);
                     }
                 }

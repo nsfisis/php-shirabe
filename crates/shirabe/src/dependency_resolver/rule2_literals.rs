@@ -12,7 +12,12 @@ pub struct Rule2Literals {
 }
 
 impl Rule2Literals {
-    pub fn new(literal1: i64, literal2: i64, reason: shirabe_php_shim::PhpMixed, reason_data: shirabe_php_shim::PhpMixed) -> Self {
+    pub fn new(
+        literal1: i64,
+        literal2: i64,
+        reason: shirabe_php_shim::PhpMixed,
+        reason_data: shirabe_php_shim::PhpMixed,
+    ) -> Self {
         let (literal1, literal2) = if literal1 < literal2 {
             (literal1, literal2)
         } else {
@@ -52,7 +57,11 @@ impl Rule2Literals {
     }
 
     pub fn to_string(&self) -> String {
-        let prefix = if self.inner.is_disabled() { "disabled(" } else { "(" };
+        let prefix = if self.inner.is_disabled() {
+            "disabled("
+        } else {
+            "("
+        };
         format!("{}{}|{})", prefix, self.literal1, self.literal2)
     }
 }

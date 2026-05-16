@@ -4,8 +4,8 @@ use std::any::Any;
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    array_filter, array_intersect, array_keys, array_pop, array_unshift, spl_object_hash, strcmp,
-    uasort, PhpMixed,
+    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, spl_object_hash,
+    strcmp, uasort,
 };
 
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
@@ -150,9 +150,7 @@ impl Transaction {
                 visited.insert(spl_object_hash(package.as_ref()), true);
 
                 stack.push(package.clone_box());
-                if let Some(alias) =
-                    (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-                {
+                if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
                     stack.push(alias.get_alias_of().clone_box());
                 } else {
                     for link in package.get_requires().values() {
@@ -170,15 +168,14 @@ impl Transaction {
                     .downcast_ref::<AliasPackage>()
                     .is_some()
                 {
-                    let alias_key =
-                        format!("{}::{}", package.get_name(), package.get_version());
+                    let alias_key = format!("{}::{}", package.get_name(), package.get_version());
                     if present_alias_map.contains_key(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
                         // TODO(phase-b): MarkAliasInstalledOperation::new expects AliasPackage by value
-                        operations.push(Box::new(MarkAliasInstalledOperation::new(
-                            todo!("package as AliasPackage by value"),
-                        )));
+                        operations.push(Box::new(MarkAliasInstalledOperation::new(todo!(
+                            "package as AliasPackage by value"
+                        ))));
                     }
                 } else if let Some(source) = present_package_map.get(package.get_name()) {
                     // do we need to update?
@@ -187,9 +184,8 @@ impl Transaction {
                     // TODO(phase-b): downcast to CompletePackageInterface trait object
                     let package_is_complete = false;
                     let present_is_complete = false;
-                    let abandoned_or_replacement_changed = package_is_complete
-                        && present_is_complete
-                        && {
+                    let abandoned_or_replacement_changed =
+                        package_is_complete && present_is_complete && {
                             // PHP: $package->isAbandoned() !== $presentPackageMap[$package->getName()]->isAbandoned()
                             //      || $package->getReplacementPackage() !== $presentPackageMap[$package->getName()]->getReplacementPackage()
                             todo!("compare abandoned/replacement across CompletePackageInterface")
@@ -221,9 +217,9 @@ impl Transaction {
         }
         for (_name_version, _package) in remove_alias_map {
             // TODO(phase-b): MarkAliasUninstalledOperation::new expects AliasPackage by value
-            operations.push(Box::new(MarkAliasUninstalledOperation::new(
-                todo!("package as AliasPackage by value"),
-            )));
+            operations.push(Box::new(MarkAliasUninstalledOperation::new(todo!(
+                "package as AliasPackage by value"
+            ))));
         }
 
         let operations = self.move_plugins_to_front(operations);
@@ -368,9 +364,7 @@ impl Transaction {
                 || package.get_type() == "composer-installer";
 
             // is this a plugin or a dependency of a plugin?
-            if is_plugin
-                || array_intersect(&package.get_names(true), &plugin_requires).len() > 0
-            {
+            if is_plugin || array_intersect(&package.get_names(true), &plugin_requires).len() > 0 {
                 // get the package's requires, but filter out any platform requirements
                 let requires: Vec<String> = array_filter(
                     &array_keys(&package.get_requires()),

@@ -19,7 +19,11 @@ impl Runtime {
         todo!()
     }
 
-    pub fn invoke(&self, callable: Box<dyn Fn(Vec<PhpMixed>) -> PhpMixed>, arguments: Vec<PhpMixed>) -> PhpMixed {
+    pub fn invoke(
+        &self,
+        callable: Box<dyn Fn(Vec<PhpMixed>) -> PhpMixed>,
+        arguments: Vec<PhpMixed>,
+    ) -> PhpMixed {
         todo!()
     }
 

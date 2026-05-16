@@ -8,7 +8,12 @@ impl Filesystem {
         todo!()
     }
 
-    pub fn copy(&self, origin_file: &str, target_file: &str, override_file: bool) -> anyhow::Result<()> {
+    pub fn copy(
+        &self,
+        origin_file: &str,
+        target_file: &str,
+        override_file: bool,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -20,7 +25,12 @@ impl Filesystem {
         todo!()
     }
 
-    pub fn touch(&self, files: PhpMixed, time: Option<i64>, atime: Option<i64>) -> anyhow::Result<()> {
+    pub fn touch(
+        &self,
+        files: PhpMixed,
+        time: Option<i64>,
+        atime: Option<i64>,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -28,7 +38,13 @@ impl Filesystem {
         todo!()
     }
 
-    pub fn chmod(&self, files: PhpMixed, mode: u32, umask: u32, recursive: bool) -> anyhow::Result<()> {
+    pub fn chmod(
+        &self,
+        files: PhpMixed,
+        mode: u32,
+        umask: u32,
+        recursive: bool,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 
@@ -44,7 +60,12 @@ impl Filesystem {
         todo!()
     }
 
-    pub fn symlink(&self, origin_dir: &str, target_dir: &str, copy_on_windows: bool) -> anyhow::Result<()> {
+    pub fn symlink(
+        &self,
+        origin_dir: &str,
+        target_dir: &str,
+        copy_on_windows: bool,
+    ) -> anyhow::Result<()> {
         todo!()
     }
 

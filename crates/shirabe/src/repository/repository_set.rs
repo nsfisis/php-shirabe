@@ -5,8 +5,8 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    array_merge, array_merge_recursive, ksort, strtolower, LogicException, PhpMixed,
-    RuntimeException,
+    LogicException, PhpMixed, RuntimeException, array_merge, array_merge_recursive, ksort,
+    strtolower,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
@@ -184,7 +184,11 @@ impl RepositorySet {
             (repo.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
         {
             // TODO(phase-b): clone composite.get_repositories() — Box<dyn RepositoryInterface> cloning
-            composite.get_repositories().iter().map(|r| r.clone_box()).collect()
+            composite
+                .get_repositories()
+                .iter()
+                .map(|r| r.clone_box())
+                .collect()
         } else {
             vec![repo]
         };
@@ -479,7 +483,8 @@ impl RepositorySet {
                     .is_some();
             if is_installed && !self.allow_installed_repositories {
                 return Err(LogicException {
-                    message: "The pool can not accept packages from an installed repository".to_string(),
+                    message: "The pool can not accept packages from an installed repository"
+                        .to_string(),
                     code: 0,
                 }
                 .into());
@@ -503,7 +508,8 @@ impl RepositorySet {
                     .is_some();
             if is_installed && !self.allow_installed_repositories {
                 return Err(LogicException {
-                    message: "The pool can not accept packages from an installed repository".to_string(),
+                    message: "The pool can not accept packages from an installed repository"
+                        .to_string(),
                     code: 0,
                 }
                 .into());
@@ -548,7 +554,14 @@ impl RepositorySet {
         }
 
         // TODO(phase-b): Pool::new signature
-        Ok(Pool::new(packages, vec![], IndexMap::new(), IndexMap::new(), IndexMap::new(), IndexMap::new()))
+        Ok(Pool::new(
+            packages,
+            vec![],
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+        ))
     }
 
     pub fn create_pool_for_package(
@@ -587,7 +600,15 @@ impl RepositorySet {
             request.restrict_packages(allowed_packages);
         }
 
-        self.create_pool(request, Box::new(NullIO::new()), None, None, vec![], None, None)
+        self.create_pool(
+            request,
+            Box::new(NullIO::new()),
+            None,
+            None,
+            vec![],
+            None,
+            None,
+        )
     }
 
     /// @param array[] $aliases

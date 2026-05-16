@@ -1,9 +1,9 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
-use std::sync::Mutex;
 use indexmap::IndexMap;
-use shirabe_php_shim::preg_quote;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_php_shim::preg_quote;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
 struct TypeConfigEntry {
@@ -90,7 +90,7 @@ impl PhpFileCleaner {
                 if char == '<' && self.peek('<') {
                     let mut r#match: Vec<String> = vec![];
                     if self.r#match(
-                        r"{<<<[ \t]*+(['\"]?)([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*+)\1(?:\r\n|\n|\r)}A",
+                        r#"{<<<[ \t]*+(['\"]?)([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*+)\1(?:\r\n|\n|\r)}A"#,
                         Some(&mut r#match),
                     ) {
                         self.index += r#match[0].len();
@@ -120,9 +120,7 @@ impl PhpFileCleaner {
                     };
                     if let Some(entry) = type_entry {
                         let end = self.index + entry.length;
-                        if end <= self.len
-                            && &self.contents[self.index..end] == entry.name
-                        {
+                        if end <= self.len && &self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
                             let mut r#match: Vec<String> = vec![];
                             if Preg::is_match_at(

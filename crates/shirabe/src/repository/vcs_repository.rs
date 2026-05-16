@@ -4,8 +4,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    array_search_mixed, count, get_class, in_array, str_replace, strpos, InvalidArgumentException,
-    PhpMixed,
+    InvalidArgumentException, PhpMixed, array_search_mixed, count, get_class, in_array,
+    str_replace, strpos,
 };
 use shirabe_semver::constraint::constraint::Constraint;
 
@@ -135,7 +135,10 @@ impl VcsRepository {
         });
 
         let url = Platform::expand_path(
-            repo_config.get("url").and_then(|v| v.as_string()).unwrap_or(""),
+            repo_config
+                .get("url")
+                .and_then(|v| v.as_string())
+                .unwrap_or(""),
         );
         repo_config.insert("url".to_string(), PhpMixed::String(url.clone()));
         let r#type = repo_config
@@ -145,7 +148,8 @@ impl VcsRepository {
             .to_string();
         let is_verbose = io.is_verbose();
         let is_very_verbose = io.is_very_verbose();
-        let process_executor = process.unwrap_or_else(|| ProcessExecutor::new(Some(Box::new(&*io)), None));
+        let process_executor =
+            process.unwrap_or_else(|| ProcessExecutor::new(Some(Box::new(&*io)), None));
 
         Ok(Self {
             inner,
@@ -189,11 +193,7 @@ impl VcsRepository {
         .unwrap_or(driver_class);
         let _ = driver;
 
-        format!(
-            "vcs repo ({} {})",
-            driver_type,
-            Url::sanitize(&self.url)
-        )
+        format!("vcs repo ({} {})", driver_type, Url::sanitize(&self.url))
     }
 
     pub fn get_repo_config(&self) -> &IndexMap<String, PhpMixed> {
@@ -292,7 +292,12 @@ impl VcsRepository {
         let mut has_root_identifier_composer_json = false;
         let root_identifier_result = self.driver.as_mut().unwrap().get_root_identifier();
         if let Ok(root_identifier) = root_identifier_result {
-            match self.driver.as_mut().unwrap().has_composer_file(&root_identifier) {
+            match self
+                .driver
+                .as_mut()
+                .unwrap()
+                .has_composer_file(&root_identifier)
+            {
                 Ok(b) => {
                     has_root_identifier_composer_json = b;
                     if has_root_identifier_composer_json {
@@ -348,7 +353,9 @@ impl VcsRepository {
             let mut tag = tag;
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name.clone().unwrap_or_else(|| self.url.clone()),
+                self.package_name
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone()),
                 tag
             );
 
@@ -411,14 +418,12 @@ impl VcsRepository {
 
                 // manually versioned package
                 if data.contains_key("version") {
-                    let normalized = self
-                        .version_parser
-                        .as_ref()
-                        .unwrap()
-                        .normalize(
-                            data.get("version").and_then(|v| v.as_string()).unwrap_or(""),
-                            None,
-                        )?;
+                    let normalized = self.version_parser.as_ref().unwrap().normalize(
+                        data.get("version")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or(""),
+                        None,
+                    )?;
                     data.insert(
                         "version_normalized".to_string(),
                         PhpMixed::String(normalized),
@@ -438,7 +443,9 @@ impl VcsRepository {
                     PhpMixed::String(Preg::replace(
                         r"{[.-]?dev$}i",
                         "",
-                        data.get("version").and_then(|v| v.as_string()).unwrap_or(""),
+                        data.get("version")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or(""),
                     )),
                 );
                 data.insert(
@@ -503,16 +510,14 @@ impl VcsRepository {
                 }
 
                 if is_very_verbose {
-                    self.io.write_error(&format!(
-                        "Importing tag {} ({})",
-                        tag, version_normalized
-                    ));
+                    self.io
+                        .write_error(&format!("Importing tag {} ({})", tag, version_normalized));
                 }
 
                 let driver = self.driver.as_mut().unwrap();
                 let processed = self.pre_process(&**driver, data, &identifier)?;
                 let loaded = self.loader.as_ref().unwrap().load(processed, None)?;
-                self.inner.add_package(Box::new(loaded as Box<dyn _>))?;
+                self.inner.add_package(Box::new(loaded))?;
                 Ok(())
             })();
             if let Err(e) = result {
@@ -575,7 +580,9 @@ impl VcsRepository {
         for (branch, identifier) in branches {
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name.clone().unwrap_or_else(|| self.url.clone()),
+                self.package_name
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone()),
                 branch
             );
             if is_very_verbose {
@@ -609,7 +616,11 @@ impl VcsRepository {
                 version = format!("dev-{}", str_replace("#", "+", &branch));
                 parsed_branch = str_replace("#", "+", &parsed_branch);
             } else {
-                let prefix = if strpos(&branch, "v") == Some(0) { "v" } else { "" };
+                let prefix = if strpos(&branch, "v") == Some(0) {
+                    "v"
+                } else {
+                    ""
+                };
                 version = format!(
                     "{}{}",
                     prefix,
@@ -617,8 +628,7 @@ impl VcsRepository {
                 );
             }
 
-            let is_default_branch =
-                self.driver.as_mut().unwrap().get_root_identifier()? == branch;
+            let is_default_branch = self.driver.as_mut().unwrap().get_root_identifier()? == branch;
             let cached_package = self.get_cached_package_version(
                 &version,
                 &identifier,
@@ -666,26 +676,29 @@ impl VcsRepository {
                     self.io.write_error(&format!(
                         "Importing branch {} ({})",
                         branch,
-                        data.get("version").and_then(|v| v.as_string()).unwrap_or("")
+                        data.get("version")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
                     ));
                 }
 
                 let package_data = self.pre_process(&**driver, data, &identifier)?;
-                let package = self.loader.as_ref().unwrap().load(package_data.clone(), None)?;
+                let package = self
+                    .loader
+                    .as_ref()
+                    .unwrap()
+                    .load(package_data.clone(), None)?;
                 // TODO(phase-b): `$this->loader instanceof ValidatingArrayLoader` downcast
                 let loader_as_validating: Option<&ValidatingArrayLoader> = None;
                 if let Some(validating) = loader_as_validating {
                     if count(&PhpMixed::Null) > 0 {
                         let _ = validating;
-                        return Err(InvalidPackageException::new(
-                            vec![],
-                            vec![],
-                            package_data,
-                        )
-                        .into());
+                        return Err(
+                            InvalidPackageException::new(vec![], vec![], package_data).into()
+                        );
                     }
                 }
-                self.inner.add_package(Box::new(package as Box<dyn _>))?;
+                self.inner.add_package(Box::new(package))?;
                 Ok(())
             })();
             if let Err(e) = result {
@@ -712,10 +725,8 @@ impl VcsRepository {
                     self.io.write_error("");
                 }
                 self.branch_error_occurred = true;
-                self.io.write_error(&format!(
-                    "<error>Skipped branch {}, {}</error>",
-                    branch, e
-                ));
+                self.io
+                    .write_error(&format!("<error>Skipped branch {}, {}</error>", branch, e));
                 self.io.write_error("");
                 continue;
             }
@@ -810,12 +821,10 @@ impl VcsRepository {
                 _ => None,
             })
             .unwrap_or(false);
-        let source_reference = data
-            .get("source")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("reference").cloned(),
-                _ => None,
-            });
+        let source_reference = data.get("source").and_then(|v| match v {
+            PhpMixed::Array(m) => m.get("reference").cloned(),
+            _ => None,
+        });
         if dist_is_array && dist_lacks_reference && source_reference.is_some() {
             if let Some(PhpMixed::Array(dist_map)) = data.get_mut("dist") {
                 dist_map.insert("reference".to_string(), source_reference.unwrap());
@@ -889,7 +898,9 @@ impl VcsRepository {
         if let VersionCacheResult::Package(ref mut data) = cached_package {
             let msg = format!(
                 "Found cached composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name.clone().unwrap_or_else(|| self.url.clone()),
+                self.package_name
+                    .clone()
+                    .unwrap_or_else(|| self.url.clone()),
                 version
             );
             if is_very_verbose {
@@ -908,7 +919,11 @@ impl VcsRepository {
                 data.insert("default-branch".to_string(), PhpMixed::Bool(true));
             }
 
-            let name = data.get("name").and_then(|v| v.as_string()).unwrap_or("").to_string();
+            let name = data
+                .get("name")
+                .and_then(|v| v.as_string())
+                .unwrap_or("")
+                .to_string();
             let version_normalized = data
                 .get("version_normalized")
                 .and_then(|v| v.as_string())
@@ -930,7 +945,7 @@ impl VcsRepository {
 
         if let VersionCacheResult::Package(data) = cached_package {
             let loaded = self.loader.as_ref().unwrap().load(data, None)?;
-            return Ok(CachedPackageResult::Package(Box::new(loaded as Box<dyn _>)));
+            return Ok(CachedPackageResult::Package(Box::new(loaded)));
         }
 
         Ok(CachedPackageResult::None)

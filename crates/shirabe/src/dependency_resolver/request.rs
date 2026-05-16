@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Request.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{spl_object_hash, strtolower, LogicException};
+use shirabe_php_shim::{LogicException, spl_object_hash, strtolower};
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
 

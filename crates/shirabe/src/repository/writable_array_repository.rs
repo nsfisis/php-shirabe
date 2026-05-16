@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Repository/WritableArrayRepository.php
 
-use anyhow::Result;
 use crate::installer::installation_manager::InstallationManager;
 use crate::repository::array_repository::ArrayRepository;
+use anyhow::Result;
 
 #[derive(Debug)]
 pub struct WritableArrayRepository {
@@ -25,7 +25,11 @@ impl WritableArrayRepository {
         &self.dev_package_names
     }
 
-    pub fn write(&mut self, dev_mode: bool, _installation_manager: &InstallationManager) -> Result<()> {
+    pub fn write(
+        &mut self,
+        dev_mode: bool,
+        _installation_manager: &InstallationManager,
+    ) -> Result<()> {
         self.dev_mode = Some(dev_mode);
         Ok(())
     }

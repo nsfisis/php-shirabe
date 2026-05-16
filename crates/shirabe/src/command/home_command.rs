@@ -3,7 +3,7 @@
 use anyhow::Result;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{filter_var, FILTER_VALIDATE_URL};
+use shirabe_php_shim::{FILTER_VALIDATE_URL, filter_var};
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
@@ -37,31 +37,60 @@ impl HomeCommand {
                     None,
                     self.suggest_installed_package(),
                 ),
-                InputOption::new("homepage", Some(shirabe_php_shim::PhpMixed::String("H".to_string())), Some(InputOption::VALUE_NONE), "Open the homepage instead of the repository URL.", None, vec![]),
-                InputOption::new("show", Some(shirabe_php_shim::PhpMixed::String("s".to_string())), Some(InputOption::VALUE_NONE), "Only show the homepage or repository URL.", None, vec![]),
+                InputOption::new(
+                    "homepage",
+                    Some(shirabe_php_shim::PhpMixed::String("H".to_string())),
+                    Some(InputOption::VALUE_NONE),
+                    "Open the homepage instead of the repository URL.",
+                    None,
+                    vec![],
+                ),
+                InputOption::new(
+                    "show",
+                    Some(shirabe_php_shim::PhpMixed::String("s".to_string())),
+                    Some(InputOption::VALUE_NONE),
+                    "Only show the homepage or repository URL.",
+                    None,
+                    vec![],
+                ),
             ])
             .set_help(
                 "The home command opens or shows a package's repository URL or\n\
                 homepage in your default browser.\n\n\
                 To open the homepage by default, use -H or --homepage.\n\
                 To show instead of open the repository or homepage URL, use -s or --show.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#browse-home"
+                Read more at https://getcomposer.org/doc/03-cli.md#browse-home",
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, _output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &self,
+        input: &dyn InputInterface,
+        _output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let repos = self.initialize_repos()?;
         let io = self.inner.get_io();
         let mut return_code: i64 = 0;
 
-        let packages: Vec<String> = input.get_argument("packages")
+        let packages: Vec<String> = input
+            .get_argument("packages")
             .as_list()
-            .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let packages = if packages.is_empty() {
             io.write_error("No package specified, opening homepage for the root package");
-            vec![self.inner.require_composer()?.get_package().get_name().to_string()]
+            vec![
+                self.inner
+                    .require_composer()?
+                    .get_package()
+                    .get_name()
+                    .to_string(),
+            ]
         } else {
             packages
         };
@@ -87,12 +116,19 @@ impl HomeCommand {
 
             if !package_exists {
                 return_code = 1;
-                io.write_error(&format!("<warning>Package {} not found</warning>", package_name));
+                io.write_error(&format!(
+                    "<warning>Package {} not found</warning>",
+                    package_name
+                ));
             }
 
             if !handled {
                 return_code = 1;
-                let msg = if show_homepage { "Invalid or missing homepage" } else { "Invalid or missing repository URL" };
+                let msg = if show_homepage {
+                    "Invalid or missing homepage"
+                } else {
+                    "Invalid or missing repository URL"
+                };
                 io.write_error(&format!("<warning>{} for {}</warning>", msg, package_name));
             }
         }
@@ -100,9 +136,17 @@ impl HomeCommand {
         Ok(return_code)
     }
 
-    fn handle_package(&self, package: &dyn CompletePackageInterface, show_homepage: bool, show_only: bool) -> bool {
+    fn handle_package(
+        &self,
+        package: &dyn CompletePackageInterface,
+        show_homepage: bool,
+        show_only: bool,
+    ) -> bool {
         let support = package.get_support();
-        let mut url = support.get("source").and_then(|v| v.as_string()).map(|s| s.to_string())
+        let mut url = support
+            .get("source")
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_string())
             .or_else(|| package.get_source_url().map(|s| s.to_string()));
         if url.as_deref().map_or(true, |s| s.is_empty()) || show_homepage {
             url = package.get_homepage().map(|s| s.to_string());
@@ -143,7 +187,10 @@ impl HomeCommand {
         } else if osx == 0 {
             process.execute(&["open", url], None);
         } else {
-            io.write_error(&format!("No suitable browser opening command found, open yourself: {}", url));
+            io.write_error(&format!(
+                "No suitable browser opening command found, open yourself: {}",
+                url
+            ));
         }
     }
 
@@ -152,14 +199,20 @@ impl HomeCommand {
 
         if let Some(composer) = composer {
             let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
-            repos.push(Box::new(RootPackageRepository::new(composer.get_package().clone_package())));
-            repos.push(Box::new(composer.get_repository_manager().get_local_repository()));
+            repos.push(Box::new(RootPackageRepository::new(
+                composer.get_package().clone_package(),
+            )));
+            repos.push(Box::new(
+                composer.get_repository_manager().get_local_repository(),
+            ));
             for repo in composer.get_repository_manager().get_repositories() {
                 repos.push(repo);
             }
             return Ok(repos);
         }
 
-        Ok(RepositoryFactory::default_repos_with_default_manager(self.inner.get_io()))
+        Ok(RepositoryFactory::default_repos_with_default_manager(
+            self.inner.get_io(),
+        ))
     }
 }

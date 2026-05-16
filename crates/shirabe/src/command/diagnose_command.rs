@@ -8,15 +8,14 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
 use shirabe_php_shim::{
-    count, curl_version, defined, disk_free_space, extension_loaded, file_exists, filter_var,
-    function_exists, get_class, hash, implode, ini_get, ioncube_loader_iversion,
-    ioncube_loader_version, is_array, is_string, key, max_i64, ob_get_clean, ob_start, phpinfo,
-    reset, rtrim, sprintf, str_contains, str_replace, str_starts_with, strpos, strstr, strtolower,
-    trim, version_compare, FILTER_VALIDATE_BOOLEAN, INFO_GENERAL,
-    InvalidArgumentException, PhpMixed, RuntimeException,
-    OPENSSL_VERSION_NUMBER, OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL, PHP_VERSION,
-    PHP_VERSION_ID, PHP_WINDOWS_VERSION_BUILD,
     CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD,
+    FILTER_VALIDATE_BOOLEAN, INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER,
+    OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID,
+    PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count, curl_version, defined,
+    disk_free_space, extension_loaded, file_exists, filter_var, function_exists, get_class, hash,
+    implode, ini_get, ioncube_loader_iversion, ioncube_loader_version, is_array, is_string, key,
+    max_i64, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf, str_contains, str_replace,
+    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 
 use crate::advisory::auditor::Auditor;
@@ -70,7 +69,11 @@ impl DiagnoseCommand {
             );
     }
 
-    pub(crate) fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> anyhow::Result<i64> {
+    pub(crate) fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> anyhow::Result<i64> {
         let composer = self.inner.try_composer();
         let io = self.inner.get_io();
 
@@ -78,8 +81,16 @@ impl DiagnoseCommand {
         if let Some(ref c) = composer {
             config = c.get_config().clone();
 
-            let command_event = CommandEvent::new(PluginEvents::COMMAND, "diagnose", input, output, vec![], IndexMap::new());
-            c.get_event_dispatcher().dispatch(command_event.get_name(), &command_event);
+            let command_event = CommandEvent::new(
+                PluginEvents::COMMAND,
+                "diagnose",
+                input,
+                output,
+                vec![],
+                IndexMap::new(),
+            );
+            c.get_event_dispatcher()
+                .dispatch(command_event.get_name(), &command_event);
             self.process = Some(
                 c.get_loop()
                     .get_process_executor()
@@ -94,7 +105,10 @@ impl DiagnoseCommand {
         let mut secure_http_wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         config_inner.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
-        secure_http_wrap.insert("config".to_string(), Box::new(PhpMixed::Array(config_inner)));
+        secure_http_wrap.insert(
+            "config".to_string(),
+            Box::new(PhpMixed::Array(config_inner)),
+        );
         let mut config = config;
         config.merge(PhpMixed::Array(secure_http_wrap), Config::SOURCE_COMMAND);
         config.prohibit_url_by_config("http://repo.packagist.org", &NullIO::new());
@@ -111,26 +125,40 @@ impl DiagnoseCommand {
             self.output_result(r);
         }
 
-        io.write(&format!("Composer version: <comment>{}</comment>", Composer::get_version()));
+        io.write(&format!(
+            "Composer version: <comment>{}</comment>",
+            Composer::get_version()
+        ));
 
         io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
         let r = self.check_composer_audit(&config)?;
         self.output_result(r);
 
-        let platform_overrides = config.get("platform").as_array().cloned().unwrap_or_default();
+        let platform_overrides = config
+            .get("platform")
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         let platform_repo = PlatformRepository::new(vec![], platform_overrides);
         let php_pkg = platform_repo.find_package("php", "*").unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
         if let Some(cp) = php_pkg.as_complete_package_interface() {
             if str_contains(&cp.get_description().unwrap_or_default(), "overridden") {
-                php_version = format!("{} - {}", php_version, cp.get_description().unwrap_or_default());
+                php_version = format!(
+                    "{} - {}",
+                    php_version,
+                    cp.get_description().unwrap_or_default()
+                );
             }
         }
 
         io.write(&format!("PHP version: <comment>{}</comment>", php_version));
 
         if defined("PHP_BINARY") {
-            io.write(&format!("PHP binary path: <comment>{}</comment>", PHP_BINARY));
+            io.write(&format!(
+                "PHP binary path: <comment>{}</comment>",
+                PHP_BINARY
+            ));
         }
 
         io.write(&format!(
@@ -242,7 +270,10 @@ impl DiagnoseCommand {
                 }
                 io.write_no_newline(&format!(
                     "Checking connectivity to {}: ",
-                    repo_arr.get("url").and_then(|v| v.as_string()).unwrap_or("")
+                    repo_arr
+                        .get("url")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
                 ));
                 let r = self.check_composer_repo(&url, &config)?;
                 self.output_result(r);
@@ -257,7 +288,8 @@ impl DiagnoseCommand {
         };
         let proxy_check_result: Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
-                let proxy = proxy_manager.get_proxy_for_request(&format!("{}://repo.packagist.org", proto));
+                let proxy =
+                    proxy_manager.get_proxy_for_request(&format!("{}://repo.packagist.org", proto));
                 if !proxy.get_status().is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
                     io.write_no_newline(&format!("Checking {} proxy with {}: ", r#type, proto));
@@ -274,14 +306,22 @@ impl DiagnoseCommand {
                 self.output_result(if is_string(&status) {
                     status
                 } else {
-                    PhpMixed::String(format!("<error>[{}] {}</error>", get_class(&e), e.to_string()))
+                    PhpMixed::String(format!(
+                        "<error>[{}] {}</error>",
+                        get_class(&e),
+                        e.to_string()
+                    ))
                 });
             } else {
                 return Err(e);
             }
         }
 
-        let oauth = config.get("github-oauth").as_array().cloned().unwrap_or_default();
+        let oauth = config
+            .get("github-oauth")
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
         if count(&oauth) > 0 {
             for (domain, token) in &oauth {
                 io.write_no_newline(&format!("Checking {} oauth access: ", domain));
@@ -313,10 +353,18 @@ impl DiagnoseCommand {
                         if te.get_code() == 401 {
                             self.output_result(PhpMixed::String("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
                         } else {
-                            self.output_result(PhpMixed::String(format!("<error>[{}] {}</error>", get_class(&e), e.to_string())));
+                            self.output_result(PhpMixed::String(format!(
+                                "<error>[{}] {}</error>",
+                                get_class(&e),
+                                e.to_string()
+                            )));
                         }
                     } else {
-                        self.output_result(PhpMixed::String(format!("<error>[{}] {}</error>", get_class(&e), e.to_string())));
+                        self.output_result(PhpMixed::String(format!(
+                            "<error>[{}] {}</error>",
+                            get_class(&e),
+                            e.to_string()
+                        )));
                     }
                 }
             }
@@ -379,7 +427,11 @@ impl DiagnoseCommand {
 
         let mut output = String::new();
         self.process.as_mut().unwrap().execute(
-            &vec!["git".to_string(), "config".to_string(), "color.ui".to_string()],
+            &vec![
+                "git".to_string(),
+                "config".to_string(),
+                "color.ui".to_string(),
+            ],
             &mut output,
         );
         if strtolower(&trim(&output, " \t\n\r\0\u{0B}")) == "always" {
@@ -393,7 +445,10 @@ impl DiagnoseCommand {
         };
 
         if version_compare("2.24.0", &git_version, ">") {
-            return format!("<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>", git_version);
+            return format!(
+                "<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>",
+                git_version
+            );
         }
 
         format!("<info>OK</> <comment>git version {}</>", git_version)
@@ -411,7 +466,10 @@ impl DiagnoseCommand {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
-        match self.http_downloader.as_mut().unwrap().get(&format!("{}://repo.packagist.org/packages.json", proto), IndexMap::new()) {
+        match self.http_downloader.as_mut().unwrap().get(
+            &format!("{}://repo.packagist.org/packages.json", proto),
+            IndexMap::new(),
+        ) {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
@@ -456,7 +514,12 @@ impl DiagnoseCommand {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
-        match self.http_downloader.as_mut().unwrap().get(url, IndexMap::new()) {
+        match self
+            .http_downloader
+            .as_mut()
+            .unwrap()
+            .get(url, IndexMap::new())
+        {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
@@ -489,7 +552,11 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_http_proxy(&mut self, proxy: &RequestProxy, protocol: &str) -> anyhow::Result<PhpMixed> {
+    fn check_http_proxy(
+        &mut self,
+        proxy: &RequestProxy,
+        protocol: &str,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
@@ -508,21 +575,32 @@ impl DiagnoseCommand {
             .http_downloader
             .as_mut()
             .unwrap()
-            .get(&format!("{}://repo.packagist.org/packages.json", protocol), IndexMap::new())?
+            .get(
+                &format!("{}://repo.packagist.org/packages.json", protocol),
+                IndexMap::new(),
+            )?
             .decode_json()?;
         if let Some(provider_includes) = json.as_array().and_then(|a| a.get("provider-includes")) {
             let mut hash_val = reset(&provider_includes.as_array().cloned().unwrap_or_default());
-            hash_val = hash_val.as_array().and_then(|a| a.get("sha256")).map(|v| (**v).clone()).unwrap_or(PhpMixed::Null);
+            hash_val = hash_val
+                .as_array()
+                .and_then(|a| a.get("sha256"))
+                .map(|v| (**v).clone())
+                .unwrap_or(PhpMixed::Null);
             let path = str_replace(
                 "%hash%",
                 hash_val.as_string().unwrap_or(""),
-                &key(&provider_includes.as_array().cloned().unwrap_or_default()).unwrap_or_default(),
+                &key(&provider_includes.as_array().cloned().unwrap_or_default())
+                    .unwrap_or_default(),
             );
             let provider = self
                 .http_downloader
                 .as_mut()
                 .unwrap()
-                .get(&format!("{}://repo.packagist.org/{}", protocol, path), IndexMap::new())?
+                .get(
+                    &format!("{}://repo.packagist.org/{}", protocol, path),
+                    IndexMap::new(),
+                )?
                 .get_body();
 
             if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
@@ -533,7 +611,10 @@ impl DiagnoseCommand {
             }
         }
 
-        Ok(PhpMixed::String(format!("<info>OK</> <comment>{}</>", proxy_status)))
+        Ok(PhpMixed::String(format!(
+            "<info>OK</> <comment>{}</>",
+            proxy_status
+        )))
     }
 
     fn check_github_oauth(&mut self, domain: &str, token: &str) -> anyhow::Result<PhpMixed> {
@@ -542,7 +623,11 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        self.inner.get_io().set_authentication(domain.to_string(), token.to_string(), Some("x-oauth-basic".to_string()));
+        self.inner.get_io().set_authentication(
+            domain.to_string(),
+            token.to_string(),
+            Some("x-oauth-basic".to_string()),
+        );
         let url = if domain == "github.com" {
             format!("https://api.{}/", domain)
         } else {
@@ -550,14 +635,19 @@ impl DiagnoseCommand {
         };
 
         let mut opts: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        opts.insert("retry-auth-failure".to_string(), Box::new(PhpMixed::Bool(false)));
+        opts.insert(
+            "retry-auth-failure".to_string(),
+            Box::new(PhpMixed::Bool(false)),
+        );
 
         match self.http_downloader.as_mut().unwrap().get(&url, opts) {
             Ok(response) => {
                 let expiration = response.get_header("github-authentication-token-expiration");
 
                 if expiration.is_none() {
-                    return Ok(PhpMixed::String("<info>OK</> <comment>does not expire</>".to_string()));
+                    return Ok(PhpMixed::String(
+                        "<info>OK</> <comment>does not expire</>".to_string(),
+                    ));
                 }
 
                 Ok(PhpMixed::String(format!(
@@ -574,19 +664,31 @@ impl DiagnoseCommand {
                         )));
                     }
                 }
-                Ok(PhpMixed::String(format!("<error>[{}] {}</error>", get_class(&e), e.to_string())))
+                Ok(PhpMixed::String(format!(
+                    "<error>[{}] {}</error>",
+                    get_class(&e),
+                    e.to_string()
+                )))
             }
         }
     }
 
-    fn get_github_rate_limit(&mut self, domain: &str, token: Option<&str>) -> anyhow::Result<PhpMixed> {
+    fn get_github_rate_limit(
+        &mut self,
+        domain: &str,
+        token: Option<&str>,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
         }
 
         if let Some(t) = token {
-            self.inner.get_io().set_authentication(domain.to_string(), t.to_string(), Some("x-oauth-basic".to_string()));
+            self.inner.get_io().set_authentication(
+                domain.to_string(),
+                t.to_string(),
+                Some("x-oauth-basic".to_string()),
+            );
         }
 
         let url = if domain == "github.com" {
@@ -595,8 +697,16 @@ impl DiagnoseCommand {
             format!("https://{}/api/rate_limit", domain)
         };
         let mut opts: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        opts.insert("retry-auth-failure".to_string(), Box::new(PhpMixed::Bool(false)));
-        let data = self.http_downloader.as_mut().unwrap().get(&url, opts)?.decode_json()?;
+        opts.insert(
+            "retry-auth-failure".to_string(),
+            Box::new(PhpMixed::Bool(false)),
+        );
+        let data = self
+            .http_downloader
+            .as_mut()
+            .unwrap()
+            .get(&url, opts)?
+            .decode_json()?;
 
         Ok(data
             .as_array()
@@ -614,7 +724,11 @@ impl DiagnoseCommand {
 
         let min_space_free = 1024 * 1024;
         let home_dir = config.get("home").as_string().unwrap_or("").to_string();
-        let vendor_dir = config.get("vendor-dir").as_string().unwrap_or("").to_string();
+        let vendor_dir = config
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
         let mut dir = home_dir.clone();
         let df_home = disk_free_space(&home_dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
@@ -634,7 +748,9 @@ impl DiagnoseCommand {
         let mut errors: Vec<Box<PhpMixed>> = vec![];
         let io = self.inner.get_io();
 
-        if file_exists(&format!("{}/keys.tags.pub", home)) && file_exists(&format!("{}/keys.dev.pub", home)) {
+        if file_exists(&format!("{}/keys.tags.pub", home))
+            && file_exists(&format!("{}/keys.dev.pub", home))
+        {
             io.write("");
         }
 
@@ -644,7 +760,9 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.tags.pub", home))
             ));
         } else {
-            errors.push(Box::new(PhpMixed::String("<error>Missing pubkey for tags verification</error>".to_string())));
+            errors.push(Box::new(PhpMixed::String(
+                "<error>Missing pubkey for tags verification</error>".to_string(),
+            )));
         }
 
         if file_exists(&format!("{}/keys.dev.pub", home)) {
@@ -653,11 +771,15 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.dev.pub", home))
             ));
         } else {
-            errors.push(Box::new(PhpMixed::String("<error>Missing pubkey for dev verification</error>".to_string())));
+            errors.push(Box::new(PhpMixed::String(
+                "<error>Missing pubkey for dev verification</error>".to_string(),
+            )));
         }
 
         if !errors.is_empty() {
-            errors.push(Box::new(PhpMixed::String("<error>Run composer self-update --update-keys to set them up</error>".to_string())));
+            errors.push(Box::new(PhpMixed::String(
+                "<error>Run composer self-update --update-keys to set them up</error>".to_string(),
+            )));
         }
 
         if !errors.is_empty() {
@@ -676,10 +798,21 @@ impl DiagnoseCommand {
         let versions_util = Versions::new(config.clone(), self.http_downloader.clone().unwrap());
         let latest = match versions_util.get_latest() {
             Ok(l) => l,
-            Err(e) => return Ok(PhpMixed::String(format!("<error>[{}] {}</error>", get_class(&e), e.to_string()))),
+            Err(e) => {
+                return Ok(PhpMixed::String(format!(
+                    "<error>[{}] {}</error>",
+                    get_class(&e),
+                    e.to_string()
+                )));
+            }
         };
 
-        let latest_version = latest.as_array().and_then(|a| a.get("version")).and_then(|v| v.as_string()).unwrap_or("").to_string();
+        let latest_version = latest
+            .as_array()
+            .and_then(|a| a.get("version"))
+            .and_then(|v| v.as_string())
+            .unwrap_or("")
+            .to_string();
         if Composer::VERSION != latest_version && Composer::VERSION != "@package_version@" {
             return Ok(PhpMixed::String(format!(
                 "<comment>You are not running the latest {} version, run `composer self-update` to update ({} => {})</comment>",
@@ -723,12 +856,22 @@ impl DiagnoseCommand {
         if version != "@package_version@" {
             let version_parser = VersionParser::new();
             let normalized_version = version_parser.normalize(&version, None)?;
-            let root_pkg = RootPackage::new("composer/composer".to_string(), normalized_version, version.clone());
+            let root_pkg = RootPackage::new(
+                "composer/composer".to_string(),
+                normalized_version,
+                version.clone(),
+            );
             packages.push(Box::new(root_pkg));
         }
         let mut repo_config: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        repo_config.insert("type".to_string(), Box::new(PhpMixed::String("composer".to_string())));
-        repo_config.insert("url".to_string(), Box::new(PhpMixed::String("https://packagist.org".to_string())));
+        repo_config.insert(
+            "type".to_string(),
+            Box::new(PhpMixed::String("composer".to_string())),
+        );
+        repo_config.insert(
+            "url".to_string(),
+            Box::new(PhpMixed::String("https://packagist.org".to_string())),
+        );
         repo_set.add_repository(Box::new(ComposerRepository::new(
             PhpMixed::Array(repo_config),
             Box::new(NullIO::new()),
@@ -750,11 +893,20 @@ impl DiagnoseCommand {
             &IndexMap::new(),
         ) {
             Ok(r) => r,
-            Err(e) => return Ok(PhpMixed::String(format!("<highlight>Failed performing audit: {}</>", e.to_string()))),
+            Err(e) => {
+                return Ok(PhpMixed::String(format!(
+                    "<highlight>Failed performing audit: {}</>",
+                    e.to_string()
+                )));
+            }
         };
 
         if result > 0 {
-            return Ok(PhpMixed::String(format!("<highlight>Audit found some issues:</>{}{}", PHP_EOL, io.get_output())));
+            return Ok(PhpMixed::String(format!(
+                "<highlight>Audit found some issues:</>{}{}",
+                PHP_EOL,
+                io.get_output()
+            )));
         }
 
         Ok(PhpMixed::Bool(true))
@@ -768,20 +920,51 @@ impl DiagnoseCommand {
 
             let version = curl_version();
             let version_arr = version.as_array().cloned().unwrap_or_default();
-            let libz_version = version_arr.get("libz_version").and_then(|v| v.as_string()).filter(|s| !s.is_empty()).unwrap_or("missing").to_string();
-            let brotli_version = version_arr.get("brotli_version").and_then(|v| v.as_string()).filter(|s| !s.is_empty()).unwrap_or("missing").to_string();
-            let ssl_version = version_arr.get("ssl_version").and_then(|v| v.as_string()).filter(|s| !s.is_empty()).unwrap_or("missing").to_string();
-            let features = version_arr.get("features").and_then(|v| v.as_int()).unwrap_or(0);
-            let has_zstd = features != 0 && defined("CURL_VERSION_ZSTD") && 0 != (features & CURL_VERSION_ZSTD);
+            let libz_version = version_arr
+                .get("libz_version")
+                .and_then(|v| v.as_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("missing")
+                .to_string();
+            let brotli_version = version_arr
+                .get("brotli_version")
+                .and_then(|v| v.as_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("missing")
+                .to_string();
+            let ssl_version = version_arr
+                .get("ssl_version")
+                .and_then(|v| v.as_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or("missing")
+                .to_string();
+            let features = version_arr
+                .get("features")
+                .and_then(|v| v.as_int())
+                .unwrap_or(0);
+            let has_zstd = features != 0
+                && defined("CURL_VERSION_ZSTD")
+                && 0 != (features & CURL_VERSION_ZSTD);
             let mut http_versions = "1.0, 1.1".to_string();
-            if features != 0 && defined("CURL_VERSION_HTTP2") && defined("CURL_HTTP_VERSION_2_0") && (CURL_VERSION_HTTP2 & features) != 0 {
+            if features != 0
+                && defined("CURL_VERSION_HTTP2")
+                && defined("CURL_HTTP_VERSION_2_0")
+                && (CURL_VERSION_HTTP2 & features) != 0
+            {
                 http_versions.push_str(", 2");
             }
-            if features != 0 && defined("CURL_VERSION_HTTP3") && (features & CURL_VERSION_HTTP3) != 0 {
+            if features != 0
+                && defined("CURL_VERSION_HTTP3")
+                && (features & CURL_VERSION_HTTP3) != 0
+            {
                 http_versions.push_str(", 3");
             }
 
-            let curl_version_str = version_arr.get("version").and_then(|v| v.as_string()).unwrap_or("").to_string();
+            let curl_version_str = version_arr
+                .get("version")
+                .and_then(|v| v.as_string())
+                .unwrap_or("")
+                .to_string();
             return format!(
                 "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
                 curl_version_str,
@@ -876,12 +1059,18 @@ impl DiagnoseCommand {
             errors.insert("iconv_mbstring".to_string(), PhpMixed::Bool(true));
         }
 
-        if !filter_var(&ini_get("allow_url_fopen"), FILTER_VALIDATE_BOOLEAN).as_bool().unwrap_or(false) {
+        if !filter_var(&ini_get("allow_url_fopen"), FILTER_VALIDATE_BOOLEAN)
+            .as_bool()
+            .unwrap_or(false)
+        {
             errors.insert("allow_url_fopen".to_string(), PhpMixed::Bool(true));
         }
 
         if extension_loaded("ionCube Loader") && ioncube_loader_iversion() < 40009 {
-            errors.insert("ioncube".to_string(), PhpMixed::String(ioncube_loader_version()));
+            errors.insert(
+                "ioncube".to_string(),
+                PhpMixed::String(ioncube_loader_version()),
+            );
         }
 
         if PHP_VERSION_ID < 70205 {
@@ -898,7 +1087,9 @@ impl DiagnoseCommand {
 
         if !defined("HHVM_VERSION")
             && !extension_loaded("apcu")
-            && filter_var(&ini_get("apc.enable_cli"), FILTER_VALIDATE_BOOLEAN).as_bool().unwrap_or(false)
+            && filter_var(&ini_get("apc.enable_cli"), FILTER_VALIDATE_BOOLEAN)
+                .as_bool()
+                .unwrap_or(false)
         {
             warnings.insert("apc_cli".to_string(), PhpMixed::Bool(true));
         }
@@ -930,7 +1121,10 @@ impl DiagnoseCommand {
             }
         }
 
-        if filter_var(&ini_get("xdebug.profiler_enabled"), FILTER_VALIDATE_BOOLEAN).as_bool().unwrap_or(false) {
+        if filter_var(&ini_get("xdebug.profiler_enabled"), FILTER_VALIDATE_BOOLEAN)
+            .as_bool()
+            .unwrap_or(false)
+        {
             warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
         } else if XdebugHandler::is_xdebug_active() {
             warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
@@ -942,12 +1136,19 @@ impl DiagnoseCommand {
                     && version_compare(PHP_VERSION, "7.3.10", "<")))
         {
             let _ = PHP_WINDOWS_VERSION_BUILD;
-            warnings.insert("onedrive".to_string(), PhpMixed::String(PHP_VERSION.to_string()));
+            warnings.insert(
+                "onedrive".to_string(),
+                PhpMixed::String(PHP_VERSION.to_string()),
+            );
         }
 
         if extension_loaded("uopz")
-            && !(filter_var(&ini_get("uopz.disable"), FILTER_VALIDATE_BOOLEAN).as_bool().unwrap_or(false)
-                || filter_var(&ini_get("uopz.exit"), FILTER_VALIDATE_BOOLEAN).as_bool().unwrap_or(false))
+            && !(filter_var(&ini_get("uopz.disable"), FILTER_VALIDATE_BOOLEAN)
+                .as_bool()
+                .unwrap_or(false)
+                || filter_var(&ini_get("uopz.exit"), FILTER_VALIDATE_BOOLEAN)
+                    .as_bool()
+                    .unwrap_or(false))
         {
             warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
         }
@@ -959,11 +1160,26 @@ impl DiagnoseCommand {
         if !errors.is_empty() {
             for (error, current) in &errors {
                 let text = match error.as_str() {
-                    "json" => format!("{}The json extension is missing.{}Install it or recompile php without --disable-json", PHP_EOL, PHP_EOL),
-                    "phar" => format!("{}The phar extension is missing.{}Install it or recompile php without --disable-phar", PHP_EOL, PHP_EOL),
-                    "filter" => format!("{}The filter extension is missing.{}Install it or recompile php without --disable-filter", PHP_EOL, PHP_EOL),
-                    "hash" => format!("{}The hash extension is missing.{}Install it or recompile php without --disable-hash", PHP_EOL, PHP_EOL),
-                    "iconv_mbstring" => format!("{}The iconv OR mbstring extension is required and both are missing.{}Install either of them or recompile php without --disable-iconv", PHP_EOL, PHP_EOL),
+                    "json" => format!(
+                        "{}The json extension is missing.{}Install it or recompile php without --disable-json",
+                        PHP_EOL, PHP_EOL
+                    ),
+                    "phar" => format!(
+                        "{}The phar extension is missing.{}Install it or recompile php without --disable-phar",
+                        PHP_EOL, PHP_EOL
+                    ),
+                    "filter" => format!(
+                        "{}The filter extension is missing.{}Install it or recompile php without --disable-filter",
+                        PHP_EOL, PHP_EOL
+                    ),
+                    "hash" => format!(
+                        "{}The hash extension is missing.{}Install it or recompile php without --disable-hash",
+                        PHP_EOL, PHP_EOL
+                    ),
+                    "iconv_mbstring" => format!(
+                        "{}The iconv OR mbstring extension is required and both are missing.{}Install either of them or recompile php without --disable-iconv",
+                        PHP_EOL, PHP_EOL
+                    ),
                     "php" => format!(
                         "{}Your PHP ({}) is too old, you must upgrade to PHP 7.2.5 or higher.",
                         PHP_EOL,
@@ -1034,7 +1250,8 @@ impl DiagnoseCommand {
                     ),
                     "openssl_version" => {
                         // Attempt to parse version number out, fallback to whole string value.
-                        let openssl_trimmed = trim(&strstr(OPENSSL_VERSION_TEXT, " ", false), " \t\n\r\0\u{0B}");
+                        let openssl_trimmed =
+                            trim(&strstr(OPENSSL_VERSION_TEXT, " ", false), " \t\n\r\0\u{0B}");
                         let mut openssl_version = strstr(&openssl_trimmed, " ", true);
                         if openssl_version.is_empty() {
                             openssl_version = OPENSSL_VERSION_TEXT.to_string();
@@ -1107,8 +1324,12 @@ impl DiagnoseCommand {
 
     /// Check if allow_url_fopen is ON
     fn check_connectivity(&self) -> PhpMixed {
-        if !ini_get("allow_url_fopen").parse::<bool>().unwrap_or(false) && ini_get("allow_url_fopen") != "1" {
-            return PhpMixed::String("<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string());
+        if !ini_get("allow_url_fopen").parse::<bool>().unwrap_or(false)
+            && ini_get("allow_url_fopen") != "1"
+        {
+            return PhpMixed::String(
+                "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string(),
+            );
         }
 
         PhpMixed::Bool(true)
@@ -1130,8 +1351,14 @@ impl DiagnoseCommand {
 
     /// Check if Composer network is enabled for HTTP/S
     fn check_composer_network_http_enablement(&self) -> PhpMixed {
-        if Platform::get_env("COMPOSER_DISABLE_NETWORK").map(|v| !v.is_empty() && v != "0").unwrap_or(false) {
-            return PhpMixed::String("<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>".to_string());
+        if Platform::get_env("COMPOSER_DISABLE_NETWORK")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+        {
+            return PhpMixed::String(
+                "<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>"
+                    .to_string(),
+            );
         }
 
         PhpMixed::Bool(true)

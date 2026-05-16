@@ -8,9 +8,10 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
-    array_keys, array_slice, array_unshift, array_values, asort, count, explode, file_get_contents,
-    implode, in_array, is_array, is_file, is_numeric, is_string, json_decode, levenshtein,
-    sprintf, strlen, strpos, trim, InvalidArgumentException, LogicException, PhpMixed, PHP_EOL,
+    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys, array_slice,
+    array_unshift, array_values, asort, count, explode, file_get_contents, implode, in_array,
+    is_array, is_file, is_numeric, is_string, json_decode, levenshtein, sprintf, strlen, strpos,
+    trim,
 };
 
 use crate::composer::Composer;
@@ -40,29 +41,29 @@ pub trait PackageDiscoveryTrait {
     // PHP: trait dependencies (provided by BaseCommand)
     fn get_io(&self) -> &dyn IOInterface;
     fn try_composer(&self) -> Option<Composer>;
-    fn require_composer(&self, disable_plugins: Option<bool>, disable_scripts: Option<bool>)
-        -> Composer;
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer;
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
     ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>;
 
-    fn normalize_requirements(
-        &self,
-        requires: Vec<String>,
-    ) -> Vec<IndexMap<String, String>>;
+    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>>;
 
     fn get_repos(&mut self) -> &CompositeRepository {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
-            let mut repos: Vec<Box<dyn crate::repository::repository_interface::RepositoryInterface>> = vec![
+            let mut repos: Vec<
+                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+            > = vec![
                 // TODO(phase-b): PlatformRepository::new() signature
                 Box::new(todo!("PlatformRepository::new()") as PlatformRepository),
             ];
             let io_owned: Box<dyn IOInterface> = todo!("clone self.get_io() into a Box");
-            for repo in
-                RepositoryFactory::default_repos_with_default_manager(io_owned)
-            {
+            for repo in RepositoryFactory::default_repos_with_default_manager(io_owned) {
                 repos.push(repo);
             }
             *self.get_repos_mut() = Some(CompositeRepository::new(repos));
@@ -192,10 +193,7 @@ pub trait PackageDiscoveryTrait {
                                 &[
                                     PhpMixed::String(version),
                                     PhpMixed::String(
-                                        requirement
-                                            .get("name")
-                                            .cloned()
-                                            .unwrap_or_default(),
+                                        requirement.get("name").cloned().unwrap_or_default(),
                                     ),
                                 ],
                             )),
@@ -245,10 +243,7 @@ pub trait PackageDiscoveryTrait {
             let mut matches = self.get_repos().search(package.clone(), 0, None);
 
             if count(&PhpMixed::List(
-                matches
-                    .iter()
-                    .map(|_| Box::new(PhpMixed::Null))
-                    .collect(),
+                matches.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
             )) > 0
             {
                 // Remove existing packages from search results.
@@ -277,10 +272,7 @@ pub trait PackageDiscoveryTrait {
                 if !exact_match {
                     let providers = self.get_repos().get_providers(package.clone());
                     if count(&PhpMixed::List(
-                        providers
-                            .iter()
-                            .map(|_| Box::new(PhpMixed::Null))
-                            .collect(),
+                        providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
                     )) > 0
                     {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
@@ -352,16 +344,12 @@ pub trait PackageDiscoveryTrait {
                         true,
                         IOInterface::NORMAL,
                     );
-                    io.write_error(
-                        PhpMixed::String(String::new()),
-                        true,
-                        IOInterface::NORMAL,
-                    );
+                    io.write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> = Box::new(
-                        move |selection_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
+                        Box::new(move |selection_mixed: PhpMixed| -> PhpMixed {
                             let selection = selection_mixed.as_string().unwrap_or("").to_string();
                             if "" == selection {
                                 return PhpMixed::Bool(false);
@@ -399,8 +387,7 @@ pub trait PackageDiscoveryTrait {
 
                             // TODO(phase-b): throw new \Exception('Not a valid selection');
                             panic!("Not a valid selection");
-                        },
-                    );
+                        });
 
                     package = io
                         .ask_and_validate(
@@ -416,16 +403,15 @@ pub trait PackageDiscoveryTrait {
 
                 // no constraint yet, determine the best version automatically
                 if !package.is_empty() && strpos(&package, " ").is_none() {
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> = Box::new(
-                        |input_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
+                        Box::new(|input_mixed: PhpMixed| -> PhpMixed {
                             let input = trim(input_mixed.as_string().unwrap_or(""), None);
                             if strlen(&input) > 0 {
                                 PhpMixed::String(input)
                             } else {
                                 PhpMixed::Bool(false)
                             }
-                        },
-                    );
+                        });
 
                     let constraint_mixed = io.ask_and_validate(
                         "Enter the version constraint to require (or leave blank to use the latest version): ".to_string(),
@@ -523,26 +509,22 @@ pub trait PackageDiscoveryTrait {
             // Check if it is a virtual package provided by others
             let providers = repo_set.get_providers(name);
             if count(&PhpMixed::List(
-                providers
-                    .iter()
-                    .map(|_| Box::new(PhpMixed::Null))
-                    .collect(),
+                providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
             )) > 0
             {
                 let mut constraint = "*".to_string();
                 if input.is_interactive() {
                     let providers_count = providers.len();
                     let name_owned = name.to_string();
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> = Box::new(
-                        move |value_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
+                        Box::new(move |value_mixed: PhpMixed| -> PhpMixed {
                             let value = value_mixed.as_string().unwrap_or("").to_string();
                             let parser = VersionParser::new();
                             // TODO(phase-b): parse_constraints returns Result
                             let _ = parser.parse_constraints(&value);
 
                             PhpMixed::String(value)
-                        },
-                    );
+                        });
                     constraint = self
                         .get_io()
                         .ask_and_validate(
@@ -676,10 +658,7 @@ pub trait PackageDiscoveryTrait {
             // Check for similar names/typos
             let similar = self.find_similar(name)?;
             if count(&PhpMixed::List(
-                similar
-                    .iter()
-                    .map(|_| Box::new(PhpMixed::Null))
-                    .collect(),
+                similar.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
             )) > 0
             {
                 if in_array(
@@ -737,7 +716,11 @@ pub trait PackageDiscoveryTrait {
                     message: sprintf(
                         &format!(
                             "Could not find package %s.\n\nDid you mean {}?\n    %s",
-                            if similar.len() > 1 { "one of these" } else { "this" },
+                            if similar.len() > 1 {
+                                "one of these"
+                            } else {
+                                "this"
+                            },
                         ),
                         &[
                             PhpMixed::String(name.to_string()),
@@ -779,7 +762,8 @@ pub trait PackageDiscoveryTrait {
         let results: Vec<SearchResult> = match (|| -> Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
                 return Err(LogicException {
-                    message: "findSimilar was called before $this->repos was initialized".to_string(),
+                    message: "findSimilar was called before $this->repos was initialized"
+                        .to_string(),
                     code: 0,
                 }
                 .into());
@@ -890,8 +874,11 @@ pub trait PackageDiscoveryTrait {
                     .is_some();
                 if has_config_platform && is_complete {
                     // TODO(phase-b): platform_pkg.get_description() via CompletePackageInterface
-                    platform_pkg_version =
-                        format!("{} ({})", platform_pkg_version, todo!("platform_pkg.get_description()"));
+                    platform_pkg_version = format!(
+                        "{} ({})",
+                        platform_pkg_version,
+                        todo!("platform_pkg.get_description()")
+                    );
                 }
                 details.push(format!(
                     "{} {} requires {} {} which does not match your installed version {}.",
@@ -905,15 +892,16 @@ pub trait PackageDiscoveryTrait {
         }
 
         if count(&PhpMixed::List(
-            details
-                .iter()
-                .map(|_| Box::new(PhpMixed::Null))
-                .collect(),
+            details.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
         )) == 0
         {
             return String::new();
         }
 
-        format!(":{}  - {}", PHP_EOL, implode(&format!("{}  - ", PHP_EOL), &details))
+        format!(
+            ":{}  - {}",
+            PHP_EOL,
+            implode(&format!("{}  - ", PHP_EOL), &details)
+        )
     }
 }

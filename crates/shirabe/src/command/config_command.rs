@@ -8,19 +8,18 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
-    array_filter, array_filter_use_key, array_is_list, array_map, array_merge, array_unique,
-    call_user_func, count, escapeshellcmd, exec, explode, file_exists, file_get_contents, implode,
-    in_array, is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort,
-    sprintf, str_replace, str_starts_with, strpos, strtolower, system, touch, var_export,
-    InvalidArgumentException, JsonObject, PhpMixed, RuntimeException,
-    ArrayObject,
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
+    ArrayObject, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
+    JsonObject, PhpMixed, RuntimeException, array_filter, array_filter_use_key, array_is_list,
+    array_map, array_merge, array_unique, call_user_func, count, escapeshellcmd, exec, explode,
+    file_exists, file_get_contents, implode, in_array, is_array, is_bool, is_dir, is_numeric,
+    is_object, is_string, json_encode, key, sort, sprintf, str_replace, str_starts_with, strpos,
+    strtolower, system, touch, var_export,
 };
 
 use crate::advisory::auditor::Auditor;
 use crate::command::base_config_command::BaseConfigCommand;
-use crate::config::json_config_source::JsonConfigSource;
 use crate::config::Config;
+use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
@@ -120,23 +119,50 @@ impl ConfigCommand {
     ) -> anyhow::Result<()> {
         self.inner.initialize(input, output)?;
 
-        let auth_config_file = self.inner.get_auth_config_file(input, self.inner.config.as_ref().unwrap());
+        let auth_config_file = self
+            .inner
+            .get_auth_config_file(input, self.inner.config.as_ref().unwrap());
 
-        self.auth_config_file = Some(JsonFile::new(auth_config_file, None, Some(self.inner.inner.get_io())));
-        self.auth_config_source = Some(JsonConfigSource::new_with_auth(self.auth_config_file.as_ref().unwrap(), true));
+        self.auth_config_file = Some(JsonFile::new(
+            auth_config_file,
+            None,
+            Some(self.inner.inner.get_io()),
+        ));
+        self.auth_config_source = Some(JsonConfigSource::new_with_auth(
+            self.auth_config_file.as_ref().unwrap(),
+            true,
+        ));
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
-        if input.get_option("global").as_bool() == Some(true) && !self.auth_config_file.as_ref().unwrap().exists() {
+        if input.get_option("global").as_bool() == Some(true)
+            && !self.auth_config_file.as_ref().unwrap().exists()
+        {
             touch(self.auth_config_file.as_ref().unwrap().get_path());
             let mut empty_objs: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             for k in &[
-                "bitbucket-oauth", "github-oauth", "gitlab-oauth", "gitlab-token",
-                "http-basic", "bearer", "forgejo-token",
+                "bitbucket-oauth",
+                "github-oauth",
+                "gitlab-oauth",
+                "gitlab-token",
+                "http-basic",
+                "bearer",
+                "forgejo-token",
             ] {
-                empty_objs.insert(k.to_string(), Box::new(PhpMixed::Object(ArrayObject::new())));
+                empty_objs.insert(
+                    k.to_string(),
+                    Box::new(PhpMixed::Object(ArrayObject::new())),
+                );
             }
-            self.auth_config_file.as_mut().unwrap().write(PhpMixed::Array(empty_objs))?;
-            let path_clone = self.auth_config_file.as_ref().unwrap().get_path().to_string();
+            self.auth_config_file
+                .as_mut()
+                .unwrap()
+                .write(PhpMixed::Array(empty_objs))?;
+            let path_clone = self
+                .auth_config_file
+                .as_ref()
+                .unwrap()
+                .get_path()
+                .to_string();
             Silencer::call(|| {
                 shirabe_php_shim::chmod(&path_clone, 0o600);
                 Ok(())
@@ -169,15 +195,28 @@ impl ConfigCommand {
             }
 
             let file = if input.get_option("auth").as_bool() == Some(true) {
-                self.auth_config_file.as_ref().unwrap().get_path().to_string()
+                self.auth_config_file
+                    .as_ref()
+                    .unwrap()
+                    .get_path()
+                    .to_string()
             } else {
-                self.inner.config_file.as_ref().unwrap().get_path().to_string()
+                self.inner
+                    .config_file
+                    .as_ref()
+                    .unwrap()
+                    .get_path()
+                    .to_string()
             };
             system(&format!(
                 "{} {}{}",
                 editor.unwrap_or_default(),
                 file,
-                if Platform::is_windows() { "" } else { " > `tty`" }
+                if Platform::is_windows() {
+                    ""
+                } else {
+                    " > `tty`"
+                }
             ));
 
             return Ok(0);
@@ -201,7 +240,10 @@ impl ConfigCommand {
             );
         }
 
-        self.inner.inner.get_io().load_configuration(self.inner.config.as_ref().unwrap());
+        self.inner
+            .inner
+            .get_io()
+            .load_configuration(self.inner.config.as_ref().unwrap());
 
         // List the configuration of the file settings
         if input.get_option("list").as_bool() == Some(true) {
@@ -226,7 +268,11 @@ impl ConfigCommand {
         let setting_values_raw = input.get_argument("setting-value");
         let setting_values: Vec<String> = setting_values_raw
             .as_list()
-            .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect())
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
             .unwrap_or_default();
         if !setting_values.is_empty() && input.get_option("unset").as_bool() == Some(true) {
             return Err(RuntimeException {
@@ -243,7 +289,10 @@ impl ConfigCommand {
             properties_defaults.insert("type".to_string(), PhpMixed::String("library".to_string()));
             properties_defaults.insert("description".to_string(), PhpMixed::String(String::new()));
             properties_defaults.insert("homepage".to_string(), PhpMixed::String(String::new()));
-            properties_defaults.insert("minimum-stability".to_string(), PhpMixed::String("stable".to_string()));
+            properties_defaults.insert(
+                "minimum-stability".to_string(),
+                PhpMixed::String("stable".to_string()),
+            );
             properties_defaults.insert("prefer-stable".to_string(), PhpMixed::Bool(false));
             properties_defaults.insert("keywords".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("license".to_string(), PhpMixed::List(vec![]));
@@ -251,22 +300,46 @@ impl ConfigCommand {
             properties_defaults.insert("extra".to_string(), PhpMixed::List(vec![]));
             let raw_data = self.inner.config_file.as_ref().unwrap().read()?;
             let mut data = self.inner.config.as_ref().unwrap().all();
-            let mut source = self.inner.config.as_ref().unwrap().get_source_of_value(&setting_key);
+            let mut source = self
+                .inner
+                .config
+                .as_ref()
+                .unwrap()
+                .get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
             let mut matches: Vec<String> = vec![];
-            if Preg::is_match("/^repos?(?:itories)?(?:\\.(.+))?/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+            if Preg::is_match(
+                "/^repos?(?:itories)?(?:\\.(.+))?/",
+                &setting_key,
+                Some(&mut matches),
+            )
+            .unwrap_or(false)
+            {
                 if matches.get(1).is_none() {
-                    value = data.as_array().and_then(|a| a.get("repositories")).map(|v| (**v).clone()).unwrap_or_else(|| PhpMixed::Array(IndexMap::new()));
+                    value = data
+                        .as_array()
+                        .and_then(|a| a.get("repositories"))
+                        .map(|v| (**v).clone())
+                        .unwrap_or_else(|| PhpMixed::Array(IndexMap::new()));
                 } else {
                     let repo_key = matches[1].clone();
-                    let repos = data.as_array().and_then(|a| a.get("repositories")).map(|v| (**v).clone());
-                    value = match repos.as_ref().and_then(|r| r.as_array().and_then(|a| a.get(&repo_key))) {
+                    let repos = data
+                        .as_array()
+                        .and_then(|a| a.get("repositories"))
+                        .map(|v| (**v).clone());
+                    value = match repos
+                        .as_ref()
+                        .and_then(|r| r.as_array().and_then(|a| a.get(&repo_key)))
+                    {
                         Some(v) => (**v).clone(),
-                        None => return Err(InvalidArgumentException {
-                            message: format!("There is no {} repository defined", repo_key),
-                            code: 0,
-                        }.into()),
+                        None => {
+                            return Err(InvalidArgumentException {
+                                message: format!("There is no {} repository defined", repo_key),
+                                code: 0,
+                            }
+                            .into());
+                        }
                     };
                 }
             } else if strpos(&setting_key, ".").is_some() {
@@ -274,7 +347,11 @@ impl ConfigCommand {
                 if bits[0] == "extra" || bits[0] == "suggest" {
                     data = raw_data.clone();
                 } else {
-                    data = data.as_array().and_then(|a| a.get("config")).map(|v| (**v).clone()).unwrap_or(PhpMixed::Null);
+                    data = data
+                        .as_array()
+                        .and_then(|a| a.get("config"))
+                        .map(|v| (**v).clone())
+                        .unwrap_or(PhpMixed::Null);
                 }
                 let mut r#match = false;
                 let mut key_acc: Option<String> = None;
@@ -303,10 +380,20 @@ impl ConfigCommand {
                 }
 
                 value = data;
-            } else if data.as_array().and_then(|a| a.get("config")).and_then(|c| c.as_array()).map(|c| c.contains_key(&setting_key)).unwrap_or(false) {
+            } else if data
+                .as_array()
+                .and_then(|a| a.get("config"))
+                .and_then(|c| c.as_array())
+                .map(|c| c.contains_key(&setting_key))
+                .unwrap_or(false)
+            {
                 value = self.inner.config.as_ref().unwrap().get_with_flags(
                     &setting_key,
-                    if input.get_option("absolute").as_bool() == Some(true) { 0 } else { Config::RELATIVE_PATHS },
+                    if input.get_option("absolute").as_bool() == Some(true) {
+                        0
+                    } else {
+                        Config::RELATIVE_PATHS
+                    },
                 );
                 // ensure we get {} output for properties which are objects
                 if value.as_array().map(|a| a.is_empty()).unwrap_or(false) {
@@ -335,7 +422,11 @@ impl ConfigCommand {
                             "object",
                             &type_array
                                 .as_list()
-                                .map(|l| l.iter().filter_map(|v| v.as_string().map(|s| s.to_string())).collect::<Vec<_>>())
+                                .map(|l| {
+                                    l.iter()
+                                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                                        .collect::<Vec<_>>()
+                                })
                                 .unwrap_or_default(),
                             true,
                         ) {
@@ -343,11 +434,20 @@ impl ConfigCommand {
                         }
                     }
                 }
-            } else if raw_data.as_array().and_then(|a| a.get(&setting_key)).is_some()
+            } else if raw_data
+                .as_array()
+                .and_then(|a| a.get(&setting_key))
+                .is_some()
                 && in_array(setting_key.as_str(), &properties, true)
             {
                 value = (**raw_data.as_array().unwrap().get(&setting_key).unwrap()).clone();
-                source = self.inner.config_file.as_ref().unwrap().get_path().to_string();
+                source = self
+                    .inner
+                    .config_file
+                    .as_ref()
+                    .unwrap()
+                    .get_path()
+                    .to_string();
             } else if let Some(v) = properties_defaults.get(&setting_key) {
                 value = v.clone();
                 source = "defaults".to_string();
@@ -384,7 +484,12 @@ impl ConfigCommand {
         let boolean_validator = |val: &PhpMixed| -> bool {
             in_array(
                 val.as_string().unwrap_or(""),
-                &vec!["true".to_string(), "false".to_string(), "1".to_string(), "0".to_string()],
+                &vec![
+                    "true".to_string(),
+                    "false".to_string(),
+                    "1".to_string(),
+                    "0".to_string(),
+                ],
                 true,
             )
         };
@@ -399,19 +504,39 @@ impl ConfigCommand {
 
         // allow unsetting audit config entirely
         if input.get_option("unset").as_bool() == Some(true) && setting_key == "audit" {
-            self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_config_setting(&setting_key);
 
             return Ok(0);
         }
 
         if input.get_option("unset").as_bool() == Some(true)
-            && (unique_config_values.contains_key(&setting_key) || multi_config_values.contains_key(&setting_key))
+            && (unique_config_values.contains_key(&setting_key)
+                || multi_config_values.contains_key(&setting_key))
         {
-            if setting_key == "disable-tls" && self.inner.config.as_ref().unwrap().get("disable-tls").as_bool().unwrap_or(false) {
-                self.inner.inner.get_io().write_error("<info>You are now running Composer with SSL/TLS protection enabled.</info>");
+            if setting_key == "disable-tls"
+                && self
+                    .inner
+                    .config
+                    .as_ref()
+                    .unwrap()
+                    .get("disable-tls")
+                    .as_bool()
+                    .unwrap_or(false)
+            {
+                self.inner.inner.get_io().write_error(
+                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
+                );
             }
 
-            self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_config_setting(&setting_key);
 
             return Ok(0);
         }
@@ -427,42 +552,69 @@ impl ConfigCommand {
         }
         // handle preferred-install per-package config
         let mut matches: Vec<String> = vec![];
-        if Preg::is_match("/^preferred-install\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match(
+            "/^preferred-install\\.(.+)/",
+            &setting_key,
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&setting_key);
 
                 return Ok(0);
             }
 
             let validator = &unique_config_values.get("preferred-install").unwrap().0;
-            if !validator(&PhpMixed::String(values[0].clone())).as_bool().unwrap_or(false) {
+            if !validator(&PhpMixed::String(values[0].clone()))
+                .as_bool()
+                .unwrap_or(false)
+            {
                 return Err(RuntimeException {
-                    message: format!("Invalid value for {}. Should be one of: auto, source, or dist", setting_key),
+                    message: format!(
+                        "Invalid value for {}. Should be one of: auto, source, or dist",
+                        setting_key
+                    ),
                     code: 0,
                 }
                 .into());
             }
 
-            self.inner.config_source.as_mut().unwrap().add_config_setting(&setting_key, PhpMixed::String(values[0].clone()));
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_config_setting(&setting_key, PhpMixed::String(values[0].clone()));
 
             return Ok(0);
         }
 
         // handle allow-plugins config setting elements true or false to add/remove
         let mut matches: Vec<String> = vec![];
-        if Preg::is_match("{^allow-plugins\\.([a-zA-Z0-9/*-]+)}", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match(
+            "{^allow-plugins\\.([a-zA-Z0-9/*-]+)}",
+            &setting_key,
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&setting_key);
 
                 return Ok(0);
             }
 
             if !boolean_validator(&PhpMixed::String(values[0].clone())) {
                 return Err(RuntimeException {
-                    message: sprintf(
-                        "\"%s\" is an invalid value",
-                        &[values[0].clone().into()],
-                    ),
+                    message: sprintf("\"%s\" is an invalid value", &[values[0].clone().into()]),
                     code: 0,
                 }
                 .into());
@@ -470,7 +622,11 @@ impl ConfigCommand {
 
             let normalized_value = boolean_normalizer(&PhpMixed::String(values[0].clone()));
 
-            self.inner.config_source.as_mut().unwrap().add_config_setting(&setting_key, normalized_value);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_config_setting(&setting_key, normalized_value);
 
             return Ok(0);
         }
@@ -493,7 +649,11 @@ impl ConfigCommand {
         if input.get_option("unset").as_bool() == Some(true)
             && (unique_props.contains_key(&setting_key) || multi_props.contains_key(&setting_key))
         {
-            self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_property(&setting_key);
 
             return Ok(0);
         }
@@ -510,17 +670,33 @@ impl ConfigCommand {
 
         // handle repositories
         let mut matches: Vec<String> = vec![];
-        if Preg::is_match_strict_groups("/^repos?(?:itories)?\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match_strict_groups(
+            "/^repos?(?:itories)?\\.(.+)/",
+            &setting_key,
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_repository(&matches[1]);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_repository(&matches[1]);
 
                 return Ok(0);
             }
 
             if 2 == count(&values) {
                 let mut repo: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                repo.insert("type".to_string(), Box::new(PhpMixed::String(values[0].clone())));
-                repo.insert("url".to_string(), Box::new(PhpMixed::String(values[1].clone())));
+                repo.insert(
+                    "type".to_string(),
+                    Box::new(PhpMixed::String(values[0].clone())),
+                );
+                repo.insert(
+                    "url".to_string(),
+                    Box::new(PhpMixed::String(values[1].clone())),
+                );
                 self.inner.config_source.as_mut().unwrap().add_repository(
                     &matches[1],
                     PhpMixed::Array(repo),
@@ -533,7 +709,10 @@ impl ConfigCommand {
             if 1 == count(&values) {
                 let value = strtolower(&values[0]);
                 if boolean_validator(&PhpMixed::String(value.clone())) {
-                    if !boolean_normalizer(&PhpMixed::String(value.clone())).as_bool().unwrap_or(false) {
+                    if !boolean_normalizer(&PhpMixed::String(value.clone()))
+                        .as_bool()
+                        .unwrap_or(false)
+                    {
                         self.inner.config_source.as_mut().unwrap().add_repository(
                             &matches[1],
                             PhpMixed::Bool(false),
@@ -565,7 +744,11 @@ impl ConfigCommand {
         let mut matches: Vec<String> = vec![];
         if Preg::is_match("/^extra\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_property(&setting_key);
 
                 return Ok(0);
             }
@@ -592,7 +775,8 @@ impl ConfigCommand {
                             ));
                         } else {
                             // PHP "+" operator on arrays: keep keys from left, fill from right
-                            let mut merged: IndexMap<String, Box<PhpMixed>> = value.as_array().cloned().unwrap_or_default();
+                            let mut merged: IndexMap<String, Box<PhpMixed>> =
+                                value.as_array().cloned().unwrap_or_default();
                             if let Some(cv) = current_value.as_array() {
                                 for (k, v) in cv {
                                     if !merged.contains_key(k) {
@@ -605,7 +789,11 @@ impl ConfigCommand {
                     }
                 }
             }
-            self.inner.config_source.as_mut().unwrap().add_property(&setting_key, value);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_property(&setting_key, value);
 
             return Ok(0);
         }
@@ -614,7 +802,11 @@ impl ConfigCommand {
         let mut matches: Vec<String> = vec![];
         if Preg::is_match("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_property(&setting_key);
 
                 return Ok(0);
             }
@@ -629,10 +821,17 @@ impl ConfigCommand {
         }
 
         // handle unsetting extra/suggest
-        if in_array(setting_key.as_str(), &vec!["suggest".to_string(), "extra".to_string()], true)
-            && input.get_option("unset").as_bool() == Some(true)
+        if in_array(
+            setting_key.as_str(),
+            &vec!["suggest".to_string(), "extra".to_string()],
+            true,
+        ) && input.get_option("unset").as_bool() == Some(true)
         {
-            self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_property(&setting_key);
 
             return Ok(0);
         }
@@ -641,7 +840,11 @@ impl ConfigCommand {
         let mut matches: Vec<String> = vec![];
         if Preg::is_match("/^platform\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&setting_key);
 
                 return Ok(0);
             }
@@ -651,14 +854,22 @@ impl ConfigCommand {
             } else {
                 PhpMixed::String(values[0].clone())
             };
-            self.inner.config_source.as_mut().unwrap().add_config_setting(&setting_key, value);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_config_setting(&setting_key, value);
 
             return Ok(0);
         }
 
         // handle unsetting platform
         if setting_key == "platform" && input.get_option("unset").as_bool() == Some(true) {
-            self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_config_setting(&setting_key);
 
             return Ok(0);
         }
@@ -666,16 +877,28 @@ impl ConfigCommand {
         // handle audit.ignore and audit.ignore-abandoned with --merge support
         if in_array(
             setting_key.as_str(),
-            &vec!["audit.ignore".to_string(), "audit.ignore-abandoned".to_string()],
+            &vec![
+                "audit.ignore".to_string(),
+                "audit.ignore-abandoned".to_string(),
+            ],
             true,
         ) {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_config_setting(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&setting_key);
 
                 return Ok(0);
             }
 
-            let mut value: PhpMixed = PhpMixed::List(values.iter().map(|s| Box::new(PhpMixed::String(s.clone()))).collect());
+            let mut value: PhpMixed = PhpMixed::List(
+                values
+                    .iter()
+                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .collect(),
+            );
             if input.get_option("json").as_bool() == Some(true) {
                 value = JsonFile::parse_json(&values[0], "composer.json")?;
                 if !is_array(&value) {
@@ -709,7 +932,8 @@ impl ConfigCommand {
                         ));
                     } else if !array_is_list(&current_value) && !array_is_list(&value) {
                         // Both are associative arrays (objects), merge them
-                        let mut merged: IndexMap<String, Box<PhpMixed>> = value.as_array().cloned().unwrap_or_default();
+                        let mut merged: IndexMap<String, Box<PhpMixed>> =
+                            value.as_array().cloned().unwrap_or_default();
                         if let Some(cv) = current_value.as_array() {
                             for (k, v) in cv {
                                 if !merged.contains_key(k) {
@@ -728,7 +952,11 @@ impl ConfigCommand {
                 }
             }
 
-            self.inner.config_source.as_mut().unwrap().add_config_setting(&setting_key, value);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_config_setting(&setting_key, value);
 
             return Ok(0);
         }
@@ -851,30 +1079,50 @@ impl ConfigCommand {
         let mut matches: Vec<String> = vec![];
         if Preg::is_match("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
-                self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+                self.inner
+                    .config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_property(&setting_key);
 
                 return Ok(0);
             }
 
             let value: PhpMixed = if count(&values) > 1 {
-                PhpMixed::List(values.iter().map(|s| Box::new(PhpMixed::String(s.clone()))).collect())
+                PhpMixed::List(
+                    values
+                        .iter()
+                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .collect(),
+                )
             } else {
                 PhpMixed::String(values[0].clone())
             };
-            self.inner.config_source.as_mut().unwrap().add_property(&setting_key, value);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .add_property(&setting_key, value);
 
             return Ok(0);
         }
 
         // handle unsetting other top level properties
         if input.get_option("unset").as_bool() == Some(true) {
-            self.inner.config_source.as_mut().unwrap().remove_property(&setting_key);
+            self.inner
+                .config_source
+                .as_mut()
+                .unwrap()
+                .remove_property(&setting_key);
 
             return Ok(0);
         }
 
         Err(InvalidArgumentException {
-            message: format!("Setting {} does not exist or is not supported by this command", setting_key),
+            message: format!(
+                "Setting {} does not exist or is not supported by this command",
+                setting_key
+            ),
             code: 0,
         }
         .into())
@@ -917,11 +1165,27 @@ impl ConfigCommand {
 
         if key == "disable-tls" {
             if !normalized_value.as_bool().unwrap_or(false)
-                && self.inner.config.as_ref().unwrap().get("disable-tls").as_bool().unwrap_or(false)
+                && self
+                    .inner
+                    .config
+                    .as_ref()
+                    .unwrap()
+                    .get("disable-tls")
+                    .as_bool()
+                    .unwrap_or(false)
             {
-                self.inner.inner.get_io().write_error("<info>You are now running Composer with SSL/TLS protection enabled.</info>");
+                self.inner.inner.get_io().write_error(
+                    "<info>You are now running Composer with SSL/TLS protection enabled.</info>",
+                );
             } else if normalized_value.as_bool().unwrap_or(false)
-                && !self.inner.config.as_ref().unwrap().get("disable-tls").as_bool().unwrap_or(false)
+                && !self
+                    .inner
+                    .config
+                    .as_ref()
+                    .unwrap()
+                    .get("disable-tls")
+                    .as_bool()
+                    .unwrap_or(false)
             {
                 self.inner.inner.get_io().write_error("<warning>You are now running Composer with SSL/TLS protection disabled.</warning>");
             }
@@ -943,7 +1207,12 @@ impl ConfigCommand {
         method: &str,
     ) -> anyhow::Result<()> {
         let (validator, normalizer) = callbacks;
-        let values_mixed = PhpMixed::List(values.iter().map(|s| Box::new(PhpMixed::String(s.clone()))).collect());
+        let values_mixed = PhpMixed::List(
+            values
+                .iter()
+                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .collect(),
+        );
         let validation = validator(&values_mixed);
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
@@ -984,15 +1253,20 @@ impl ConfigCommand {
         let raw_contents_arr = raw_contents.as_array().cloned().unwrap_or_default();
         let mut k = k;
         for (key, value) in &contents_arr {
-            if k.is_none() && !in_array(
-                key.as_str(),
-                &vec!["config".to_string(), "repositories".to_string()],
-                true,
-            ) {
+            if k.is_none()
+                && !in_array(
+                    key.as_str(),
+                    &vec!["config".to_string(), "repositories".to_string()],
+                    true,
+                )
+            {
                 continue;
             }
 
-            let raw_val = raw_contents_arr.get(key).map(|v| (**v).clone()).unwrap_or(PhpMixed::Null);
+            let raw_val = raw_contents_arr
+                .get(key)
+                .map(|v| (**v).clone())
+                .unwrap_or(PhpMixed::Null);
 
             let value_inner = (**value).clone();
 
@@ -1034,7 +1308,11 @@ impl ConfigCommand {
             let source = if show_source {
                 format!(
                     " ({})",
-                    self.inner.config.as_ref().unwrap().get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
+                    self.inner
+                        .config
+                        .as_ref()
+                        .unwrap()
+                        .get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
                 )
             } else {
                 String::new()
@@ -1050,11 +1328,21 @@ impl ConfigCommand {
                     k.clone().unwrap()
                 };
                 let id = Preg::replace("{\\..*$}", "", &id_source);
-                let id = Preg::replace("{[^a-z0-9]}i", "-", &strtolower(&shirabe_php_shim::trim(&id, " \t\n\r\0\u{0B}")));
+                let id = Preg::replace(
+                    "{[^a-z0-9]}i",
+                    "-",
+                    &strtolower(&shirabe_php_shim::trim(&id, " \t\n\r\0\u{0B}")),
+                );
                 let id = Preg::replace("{-+}", "-", &id);
                 link = format!("https://getcomposer.org/doc/06-config.md#{}", id);
             }
-            if is_string(&raw_val) && raw_val.as_string().map(|s| s.to_string()).unwrap_or_default() != value_display {
+            if is_string(&raw_val)
+                && raw_val
+                    .as_string()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    != value_display
+            {
                 io.write(
                     &format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
@@ -1103,16 +1391,24 @@ impl ConfigCommand {
 
             // load configuration
             // TODO: BaseConfigCommand::get_composer_config_file is an instance method; using a free helper here.
-            let config_file = JsonFile::new(get_composer_config_file_static(input, &config), None, None);
+            let config_file =
+                JsonFile::new(get_composer_config_file_static(input, &config), None, None);
             if config_file.exists() {
-                config.merge(config_file.read().unwrap_or(PhpMixed::Null), config_file.get_path());
+                config.merge(
+                    config_file.read().unwrap_or(PhpMixed::Null),
+                    config_file.get_path(),
+                );
             }
 
             // load auth-configuration
-            let auth_config_file = JsonFile::new(get_auth_config_file_static(input, &config), None, None);
+            let auth_config_file =
+                JsonFile::new(get_auth_config_file_static(input, &config), None, None);
             if auth_config_file.exists() {
                 let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                wrap.insert("config".to_string(), Box::new(auth_config_file.read().unwrap_or(PhpMixed::Null)));
+                wrap.insert(
+                    "config".to_string(),
+                    Box::new(auth_config_file.read().unwrap_or(PhpMixed::Null)),
+                );
                 config.merge(PhpMixed::Array(wrap), auth_config_file.get_path());
             }
 
@@ -1120,20 +1416,38 @@ impl ConfigCommand {
             let raw_config = config.raw();
             let raw_arr = raw_config.as_array().cloned().unwrap_or_default();
             let mut keys: Vec<String> = array_merge(
-                flatten_setting_keys(raw_arr.get("config").map(|v| (**v).clone()).unwrap_or(PhpMixed::Null), ""),
-                flatten_setting_keys(raw_arr.get("repositories").map(|v| (**v).clone()).unwrap_or(PhpMixed::Null), "repositories."),
+                flatten_setting_keys(
+                    raw_arr
+                        .get("config")
+                        .map(|v| (**v).clone())
+                        .unwrap_or(PhpMixed::Null),
+                    "",
+                ),
+                flatten_setting_keys(
+                    raw_arr
+                        .get("repositories")
+                        .map(|v| (**v).clone())
+                        .unwrap_or(PhpMixed::Null),
+                    "repositories.",
+                ),
             );
 
             // if unsetting …
             if input.get_option("unset").as_bool() == Some(true) {
                 // … keep only the currently customized setting-keys …
-                let sources = vec![config_file.get_path().to_string(), auth_config_file.get_path().to_string()];
+                let sources = vec![
+                    config_file.get_path().to_string(),
+                    auth_config_file.get_path().to_string(),
+                ];
                 keys = array_filter(keys, |k: &String| -> bool {
                     in_array(config.get_source_of_value(k).as_str(), &sources, true)
                 });
             } else {
                 // … add all configurable package-properties, no matter if it exist
-                let configurable: Vec<String> = ConfigCommand::CONFIGURABLE_PACKAGE_PROPERTIES.iter().map(|s| s.to_string()).collect();
+                let configurable: Vec<String> = ConfigCommand::CONFIGURABLE_PACKAGE_PROPERTIES
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
                 keys = array_merge(keys, configurable);
 
                 // it would be nice to distinguish between showing and setting
@@ -1144,9 +1458,17 @@ impl ConfigCommand {
 
             // add all existing configurable package-properties
             if config_file.exists() {
-                let configurable: Vec<String> = ConfigCommand::CONFIGURABLE_PACKAGE_PROPERTIES.iter().map(|s| s.to_string()).collect();
+                let configurable: Vec<String> = ConfigCommand::CONFIGURABLE_PACKAGE_PROPERTIES
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
                 let properties = array_filter_use_key(
-                    config_file.read().unwrap_or(PhpMixed::Null).as_array().cloned().unwrap_or_default(),
+                    config_file
+                        .read()
+                        .unwrap_or(PhpMixed::Null)
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default(),
                     |key: &String| -> bool { in_array(key.as_str(), &configurable, true) },
                 );
 
@@ -1176,7 +1498,12 @@ pub type NormalizerFn = Box<dyn Fn(&PhpMixed) -> PhpMixed>;
 fn boolean_validator(val: &PhpMixed) -> PhpMixed {
     PhpMixed::Bool(in_array(
         val.as_string().unwrap_or(""),
-        &vec!["true".to_string(), "false".to_string(), "1".to_string(), "0".to_string()],
+        &vec![
+            "true".to_string(),
+            "false".to_string(),
+            "1".to_string(),
+            "0".to_string(),
+        ],
         true,
     ))
 }
@@ -1198,26 +1525,54 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             Box::new(|val| PhpMixed::Int(shirabe_php_shim::intval(val.as_string().unwrap_or("0")))),
         ),
     );
-    m.insert("use-include-path".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("use-github-api".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
+    m.insert(
+        "use-include-path".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "use-github-api".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
     m.insert(
         "preferred-install".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["auto".to_string(), "source".to_string(), "dist".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec!["auto".to_string(), "source".to_string(), "dist".to_string()],
+                    true,
+                ))
+            }),
             Box::new(|val| val.clone()),
         ),
     );
     m.insert(
         "gitlab-protocol".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["git".to_string(), "http".to_string(), "https".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec!["git".to_string(), "http".to_string(), "https".to_string()],
+                    true,
+                ))
+            }),
             Box::new(|val| val.clone()),
         ),
     );
     m.insert(
         "store-auths".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["true".to_string(), "false".to_string(), "prompt".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "true".to_string(),
+                        "false".to_string(),
+                        "prompt".to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| {
                 let s = val.as_string().unwrap_or("");
                 if s == "prompt" {
@@ -1228,16 +1583,73 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             }),
         ),
     );
-    m.insert("notify-on-install".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("vendor-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("bin-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("archive-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("archive-format".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("data-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("cache-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("cache-files-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("cache-repo-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("cache-vcs-dir".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
+    m.insert(
+        "notify-on-install".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "vendor-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "bin-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "archive-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "archive-format".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "data-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "cache-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "cache-files-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "cache-repo-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "cache-vcs-dir".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
     m.insert(
         "cache-ttl".to_string(),
         (
@@ -1255,21 +1667,53 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
     m.insert(
         "cache-files-maxsize".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(Preg::is_match("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i", val.as_string().unwrap_or(""), None).unwrap_or(false))),
+            Box::new(|val| {
+                PhpMixed::Bool(
+                    Preg::is_match(
+                        "/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i",
+                        val.as_string().unwrap_or(""),
+                        None,
+                    )
+                    .unwrap_or(false),
+                )
+            }),
             Box::new(|val| val.clone()),
         ),
     );
     m.insert(
         "bin-compat".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["auto".to_string(), "full".to_string(), "proxy".to_string(), "symlink".to_string()], false))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "auto".to_string(),
+                        "full".to_string(),
+                        "proxy".to_string(),
+                        "symlink".to_string(),
+                    ],
+                    false,
+                ))
+            }),
             Box::new(|val| val.clone()),
         ),
     );
     m.insert(
         "discard-changes".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["stash".to_string(), "true".to_string(), "false".to_string(), "1".to_string(), "0".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "stash".to_string(),
+                        "true".to_string(),
+                        "false".to_string(),
+                        "1".to_string(),
+                        "0".to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| {
                 let s = val.as_string().unwrap_or("");
                 if s == "stash" {
@@ -1293,18 +1737,55 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             }),
         ),
     );
-    m.insert("sort-packages".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("optimize-autoloader".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("classmap-authoritative".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("apcu-autoloader".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("prepend-autoloader".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("update-with-minimal-changes".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("disable-tls".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("secure-http".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
+    m.insert(
+        "sort-packages".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "optimize-autoloader".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "classmap-authoritative".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "apcu-autoloader".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "prepend-autoloader".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "update-with-minimal-changes".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "disable-tls".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "secure-http".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
     m.insert(
         "bump-after-update".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["dev".to_string(), "no-dev".to_string(), "true".to_string(), "false".to_string(), "1".to_string(), "0".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "dev".to_string(),
+                        "no-dev".to_string(),
+                        "true".to_string(),
+                        "false".to_string(),
+                        "1".to_string(),
+                        "0".to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| {
                 let s = val.as_string().unwrap_or("");
                 if s == "dev" || s == "no-dev" {
@@ -1318,25 +1799,71 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
     m.insert(
         "cafile".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(file_exists(val.as_string().unwrap_or("")) && Filesystem::is_readable(val.as_string().unwrap_or("")))),
-            Box::new(|val| if val.as_string() == Some("null") { PhpMixed::Null } else { val.clone() }),
+            Box::new(|val| {
+                PhpMixed::Bool(
+                    file_exists(val.as_string().unwrap_or(""))
+                        && Filesystem::is_readable(val.as_string().unwrap_or("")),
+                )
+            }),
+            Box::new(|val| {
+                if val.as_string() == Some("null") {
+                    PhpMixed::Null
+                } else {
+                    val.clone()
+                }
+            }),
         ),
     );
     m.insert(
         "capath".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(is_dir(val.as_string().unwrap_or("")) && Filesystem::is_readable(val.as_string().unwrap_or("")))),
-            Box::new(|val| if val.as_string() == Some("null") { PhpMixed::Null } else { val.clone() }),
+            Box::new(|val| {
+                PhpMixed::Bool(
+                    is_dir(val.as_string().unwrap_or(""))
+                        && Filesystem::is_readable(val.as_string().unwrap_or("")),
+                )
+            }),
+            Box::new(|val| {
+                if val.as_string() == Some("null") {
+                    PhpMixed::Null
+                } else {
+                    val.clone()
+                }
+            }),
         ),
     );
-    m.insert("github-expose-hostname".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("htaccess-protect".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("lock".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("allow-plugins".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
+    m.insert(
+        "github-expose-hostname".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "htaccess-protect".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "lock".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "allow-plugins".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
     m.insert(
         "platform-check".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["php-only".to_string(), "true".to_string(), "false".to_string(), "1".to_string(), "0".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "php-only".to_string(),
+                        "true".to_string(),
+                        "false".to_string(),
+                        "1".to_string(),
+                        "0".to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| {
                 let s = val.as_string().unwrap_or("");
                 if s == "php-only" {
@@ -1350,7 +1877,17 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
     m.insert(
         "use-parent-dir".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec!["true".to_string(), "false".to_string(), "prompt".to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        "true".to_string(),
+                        "false".to_string(),
+                        "prompt".to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| {
                 let s = val.as_string().unwrap_or("");
                 if s == "prompt" {
@@ -1364,13 +1901,32 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
     m.insert(
         "audit.abandoned".to_string(),
         (
-            Box::new(|val| PhpMixed::Bool(in_array(val.as_string().unwrap_or(""), &vec![Auditor::ABANDONED_IGNORE.to_string(), Auditor::ABANDONED_REPORT.to_string(), Auditor::ABANDONED_FAIL.to_string()], true))),
+            Box::new(|val| {
+                PhpMixed::Bool(in_array(
+                    val.as_string().unwrap_or(""),
+                    &vec![
+                        Auditor::ABANDONED_IGNORE.to_string(),
+                        Auditor::ABANDONED_REPORT.to_string(),
+                        Auditor::ABANDONED_FAIL.to_string(),
+                    ],
+                    true,
+                ))
+            }),
             Box::new(|val| val.clone()),
         ),
     );
-    m.insert("audit.ignore-unreachable".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("audit.block-insecure".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
-    m.insert("audit.block-abandoned".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
+    m.insert(
+        "audit.ignore-unreachable".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "audit.block-insecure".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
+    m.insert(
+        "audit.block-abandoned".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
 
     let _ = identity;
     m
@@ -1387,8 +1943,14 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
-                        if !in_array(val.as_string().unwrap_or(""), &vec!["git".to_string(), "https".to_string(), "ssh".to_string()], false) {
-                            return PhpMixed::String("valid protocols include: git, https, ssh".to_string());
+                        if !in_array(
+                            val.as_string().unwrap_or(""),
+                            &vec!["git".to_string(), "https".to_string(), "ssh".to_string()],
+                            false,
+                        ) {
+                            return PhpMixed::String(
+                                "valid protocols include: git, https, ssh".to_string(),
+                            );
                         }
                     }
                 }
@@ -1430,8 +1992,19 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
                 }
                 if let Some(list) = vals.as_list() {
                     for val in list {
-                        if !in_array(val.as_string().unwrap_or(""), &vec!["low".to_string(), "medium".to_string(), "high".to_string(), "critical".to_string()], true) {
-                            return PhpMixed::String("valid severities include: low, medium, high, critical".to_string());
+                        if !in_array(
+                            val.as_string().unwrap_or(""),
+                            &vec![
+                                "low".to_string(),
+                                "medium".to_string(),
+                                "high".to_string(),
+                                "critical".to_string(),
+                            ],
+                            true,
+                        ) {
+                            return PhpMixed::String(
+                                "valid severities include: low, medium, high, critical".to_string(),
+                            );
                         }
                     }
                 }
@@ -1445,11 +2018,41 @@ fn build_multi_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)> 
 
 fn build_unique_props() -> IndexMap<String, (ValidatorFn, NormalizerFn)> {
     let mut m: IndexMap<String, (ValidatorFn, NormalizerFn)> = IndexMap::new();
-    m.insert("name".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("type".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("description".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("homepage".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
-    m.insert("version".to_string(), (Box::new(|val| PhpMixed::Bool(is_string(val))), Box::new(|val| val.clone())));
+    m.insert(
+        "name".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "type".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "description".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "homepage".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
+    m.insert(
+        "version".to_string(),
+        (
+            Box::new(|val| PhpMixed::Bool(is_string(val))),
+            Box::new(|val| val.clone()),
+        ),
+    );
     m.insert(
         "minimum-stability".to_string(),
         (
@@ -1457,10 +2060,17 @@ fn build_unique_props() -> IndexMap<String, (ValidatorFn, NormalizerFn)> {
                 let normalized = VersionParser::normalize_stability(val.as_string().unwrap_or(""));
                 PhpMixed::Bool(base_package::STABILITIES.contains_key(normalized.as_str()))
             }),
-            Box::new(|val| PhpMixed::String(VersionParser::normalize_stability(val.as_string().unwrap_or("")))),
+            Box::new(|val| {
+                PhpMixed::String(VersionParser::normalize_stability(
+                    val.as_string().unwrap_or(""),
+                ))
+            }),
         ),
     );
-    m.insert("prefer-stable".to_string(), (Box::new(boolean_validator), Box::new(boolean_normalizer)));
+    m.insert(
+        "prefer-stable".to_string(),
+        (Box::new(boolean_validator), Box::new(boolean_normalizer)),
+    );
     m
 }
 
@@ -1505,7 +2115,10 @@ fn flatten_setting_keys(config: PhpMixed, prefix: &str) -> Vec<String> {
         // array-lists must not be added to completion
         // sub-keys of repository-keys must not be added to completion
         if is_array(value) && !array_is_list(value) && prefix != "repositories." {
-            keys.push(flatten_setting_keys((**value).clone(), &format!("{}{}.", prefix, key)));
+            keys.push(flatten_setting_keys(
+                (**value).clone(),
+                &format!("{}{}.", prefix, key),
+            ));
         }
     }
 
@@ -1519,7 +2132,10 @@ fn flatten_setting_keys(config: PhpMixed, prefix: &str) -> Vec<String> {
 // Helpers for the suggester since BaseConfigCommand methods need an instance.
 fn get_composer_config_file_static(input: &CompletionInput, config: &Config) -> String {
     if input.get_option("global").as_bool() == Some(true) {
-        format!("{}/config.json", config.get("home").as_string().unwrap_or(""))
+        format!(
+            "{}/config.json",
+            config.get("home").as_string().unwrap_or("")
+        )
     } else {
         input
             .get_option("file")
