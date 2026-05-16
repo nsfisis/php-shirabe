@@ -34,6 +34,12 @@ impl ConstraintInterface for MatchNoneConstraint {
         "[]".to_string()
     }
 
+    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
+        Box::new(MatchNoneConstraint {
+            pretty_string: self.pretty_string.clone(),
+        })
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

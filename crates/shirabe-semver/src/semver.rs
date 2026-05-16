@@ -14,13 +14,14 @@ impl Semver {
 
     fn version_parser() -> &'static VersionParser {
         static VERSION_PARSER: OnceLock<VersionParser> = OnceLock::new();
-        VERSION_PARSER.get_or_init(VersionParser::new)
+        VERSION_PARSER.get_or_init(|| VersionParser)
     }
 
     pub fn satisfies(version: String, constraints: String) -> anyhow::Result<bool> {
         let version_parser = Self::version_parser();
-        let provider = Constraint::new("==".to_string(), version_parser.normalize(version)?);
-        let parsed_constraints = version_parser.parse_constraints(constraints)?;
+        let provider =
+            Constraint::new("==".to_string(), version_parser.normalize(&version, None)?)?;
+        let parsed_constraints = version_parser.parse_constraints(&constraints)?;
         Ok(parsed_constraints.matches(&provider))
     }
 
@@ -49,9 +50,9 @@ impl Semver {
             .iter()
             .enumerate()
             .map(|(key, version)| -> anyhow::Result<(String, usize)> {
-                let normalized_version = version_parser.normalize(version.clone())?;
+                let normalized_version = version_parser.normalize(version, None)?;
                 let normalized_version =
-                    version_parser.normalize_default_branch(normalized_version);
+                    version_parser.normalize_default_branch(&normalized_version);
                 Ok((normalized_version, key))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;

@@ -30,7 +30,7 @@ impl Comparator {
     }
 
     pub fn compare(version1: String, operator: String, version2: String) -> bool {
-        let constraint = Constraint::new(operator, version2);
-        constraint.match_specific(&Constraint::new("==".to_string(), version1), true)
+        let constraint = Constraint::new(operator, version2).unwrap();
+        constraint.match_specific(&Constraint::new("==".to_string(), version1).unwrap(), true)
     }
 }

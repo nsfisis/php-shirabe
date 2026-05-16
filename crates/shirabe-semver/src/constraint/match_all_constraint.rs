@@ -34,6 +34,12 @@ impl ConstraintInterface for MatchAllConstraint {
         "*".to_string()
     }
 
+    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
+        Box::new(MatchAllConstraint {
+            pretty_string: self.pretty_string.clone(),
+        })
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

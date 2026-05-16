@@ -56,7 +56,7 @@ impl CompilingMatcher {
             .find(|(op, _)| *op == operator)
             .map(|(_, s)| *s)
             .expect("unknown operator");
-        let result = constraint.matches(&Constraint::new(trans_op.to_string(), version));
+        let result = constraint.matches(&Constraint::new(trans_op.to_string(), version).unwrap());
 
         Self::result_cache()
             .lock()

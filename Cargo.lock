@@ -931,6 +931,7 @@ name = "shirabe-semver"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "indexmap",
  "shirabe-php-shim",
 ]
 

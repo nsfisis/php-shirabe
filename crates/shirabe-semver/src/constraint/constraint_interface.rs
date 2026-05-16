@@ -22,5 +22,7 @@ pub trait ConstraintInterface {
         false
     }
 
+    fn clone_box(&self) -> Box<dyn ConstraintInterface>;
+
     fn as_any(&self) -> &dyn std::any::Any;
 }

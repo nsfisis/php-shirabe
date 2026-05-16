@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php
 
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use anyhow::bail;
 use shirabe_php_shim as php;
@@ -8,13 +8,13 @@ use shirabe_php_shim as php;
 use crate::constraint::bound::Bound;
 use crate::constraint::constraint_interface::ConstraintInterface;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Constraint {
     pub(crate) operator: i64,
     pub(crate) version: String,
     pub(crate) pretty_string: Option<String>,
-    pub(crate) lower_bound: RefCell<Option<Bound>>,
-    pub(crate) upper_bound: RefCell<Option<Bound>>,
+    pub(crate) lower_bound: Mutex<Option<Bound>>,
+    pub(crate) upper_bound: Mutex<Option<Bound>>,
 }
 
 impl Constraint {
@@ -73,8 +73,8 @@ impl Constraint {
             operator: op_int,
             version,
             pretty_string: None,
-            lower_bound: RefCell::new(None),
-            upper_bound: RefCell::new(None),
+            lower_bound: Mutex::new(None),
+            upper_bound: Mutex::new(None),
         })
     }
 
@@ -284,13 +284,13 @@ impl Constraint {
     }
 
     fn extract_bounds(&self) {
-        if self.lower_bound.borrow().is_some() {
+        if self.lower_bound.lock().unwrap().is_some() {
             return;
         }
 
         if self.version.starts_with("dev-") {
-            *self.lower_bound.borrow_mut() = Some(Bound::zero());
-            *self.upper_bound.borrow_mut() = Some(Bound::positive_infinity());
+            *self.lower_bound.lock().unwrap() = Some(Bound::zero());
+            *self.upper_bound.lock().unwrap() = Some(Bound::positive_infinity());
             return;
         }
 
@@ -313,8 +313,20 @@ impl Constraint {
             _ => panic!("unknown operator: {}", self.operator),
         };
 
-        *self.lower_bound.borrow_mut() = Some(lower);
-        *self.upper_bound.borrow_mut() = Some(upper);
+        *self.lower_bound.lock().unwrap() = Some(lower);
+        *self.upper_bound.lock().unwrap() = Some(upper);
+    }
+}
+
+impl Clone for Constraint {
+    fn clone(&self) -> Self {
+        Self {
+            operator: self.operator,
+            version: self.version.clone(),
+            pretty_string: self.pretty_string.clone(),
+            lower_bound: Mutex::new(self.lower_bound.lock().unwrap().clone()),
+            upper_bound: Mutex::new(self.upper_bound.lock().unwrap().clone()),
+        }
     }
 }
 
@@ -350,7 +362,8 @@ impl ConstraintInterface for Constraint {
     fn get_lower_bound(&self) -> Bound {
         self.extract_bounds();
         self.lower_bound
-            .borrow()
+            .lock()
+            .unwrap()
             .clone()
             .expect("extract_bounds should have set lower_bound")
     }
@@ -358,9 +371,14 @@ impl ConstraintInterface for Constraint {
     fn get_upper_bound(&self) -> Bound {
         self.extract_bounds();
         self.upper_bound
-            .borrow()
+            .lock()
+            .unwrap()
             .clone()
             .expect("extract_bounds should have set upper_bound")
+    }
+
+    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
+        Box::new(self.clone())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

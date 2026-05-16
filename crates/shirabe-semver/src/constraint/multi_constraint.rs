@@ -166,8 +166,8 @@ impl MultiConstraint {
                                 Some(Box::new(
                                     MultiConstraint::new(
                                         vec![
-                                            l_mc.constraints[0].clone(),
-                                            r_mc.constraints[1].clone(),
+                                            l_mc.constraints[0].clone_box(),
+                                            r_mc.constraints[1].clone_box(),
                                         ],
                                         true,
                                     )
@@ -309,6 +309,17 @@ impl ConstraintInterface for MultiConstraint {
 
     fn is_disjunctive(&self) -> bool {
         !self.conjunctive
+    }
+
+    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
+        Box::new(MultiConstraint {
+            constraints: self.constraints.iter().map(|c| c.clone_box()).collect(),
+            pretty_string: self.pretty_string.clone(),
+            string: RefCell::new(self.string.borrow().clone()),
+            conjunctive: self.conjunctive,
+            lower_bound: RefCell::new(self.lower_bound.borrow().clone()),
+            upper_bound: RefCell::new(self.upper_bound.borrow().clone()),
+        })
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

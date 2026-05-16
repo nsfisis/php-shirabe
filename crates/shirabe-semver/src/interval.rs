@@ -31,13 +31,14 @@ impl Interval {
 
     pub fn from_zero() -> &'static Constraint {
         static ZERO: OnceLock<Constraint> = OnceLock::new();
-        ZERO.get_or_init(|| Constraint::new(">=".to_string(), "0.0.0.0-dev".to_string()))
+        ZERO.get_or_init(|| Constraint::new(">=".to_string(), "0.0.0.0-dev".to_string()).unwrap())
     }
 
     pub fn until_positive_infinity() -> &'static Constraint {
         static POSITIVE_INFINITY: OnceLock<Constraint> = OnceLock::new();
-        POSITIVE_INFINITY
-            .get_or_init(|| Constraint::new("<".to_string(), format!("{}.0.0.0", i64::MAX)))
+        POSITIVE_INFINITY.get_or_init(|| {
+            Constraint::new("<".to_string(), format!("{}.0.0.0", i64::MAX)).unwrap()
+        })
     }
 
     pub fn any() -> Self {
