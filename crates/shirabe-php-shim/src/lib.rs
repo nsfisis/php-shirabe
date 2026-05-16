@@ -683,3 +683,50 @@ pub fn strtolower(s: &str) -> String {
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
+
+pub fn is_file(path: &str) -> bool {
+    todo!()
+}
+
+pub fn spl_object_hash<T: ?Sized>(object: &T) -> String {
+    todo!()
+}
+
+pub fn serialize(value: &PhpMixed) -> String {
+    todo!()
+}
+
+pub fn stream_context_create(options: &IndexMap<String, PhpMixed>, params: Option<&IndexMap<String, PhpMixed>>) -> PhpMixed {
+    todo!()
+}
+
+pub fn stripos(haystack: &str, needle: &str) -> Option<usize> {
+    todo!()
+}
+
+pub fn php_uname(mode: &str) -> String {
+    todo!()
+}
+
+pub fn uasort<F>(array: &mut Vec<String>, compare: F)
+where
+    F: Fn(&str, &str) -> i64,
+{
+    todo!()
+}
+
+pub fn array_replace_recursive(base: IndexMap<String, PhpMixed>, replacement: IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+
+pub const PHP_MAJOR_VERSION: i64 = 8;
+pub const PHP_MINOR_VERSION: i64 = 1;
+pub const PHP_RELEASE_VERSION: i64 = 0;
+
+pub const GLOB_MARK: i64 = 8;
+pub const GLOB_ONLYDIR: i64 = 1024;
+pub const GLOB_BRACE: i64 = 4096;
+
+pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
+    todo!()
+}
