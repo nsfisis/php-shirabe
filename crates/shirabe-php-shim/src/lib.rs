@@ -1105,6 +1105,43 @@ pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
     todo!()
 }
 
+pub fn sort<T: Ord>(array: &mut Vec<T>) {
+    todo!()
+}
+
+pub fn sort_with_flags<T: Ord>(array: &mut Vec<T>, flags: i64) {
+    todo!()
+}
+
+pub const SORT_REGULAR: i64 = 0;
+pub const SORT_NUMERIC: i64 = 1;
+pub const SORT_STRING: i64 = 2;
+pub const SORT_NATURAL: i64 = 6;
+pub const SORT_FLAG_CASE: i64 = 8;
+
+pub fn usort<T, F>(array: &mut Vec<T>, compare: F)
+where
+    F: FnMut(&T, &T) -> i64,
+{
+    todo!()
+}
+
+pub fn ksort<V>(array: &mut IndexMap<String, V>) {
+    todo!()
+}
+
+pub fn is_int(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn is_null(value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn r#eval(code: &str) -> PhpMixed {
+    todo!()
+}
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
