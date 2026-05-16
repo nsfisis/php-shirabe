@@ -272,7 +272,25 @@ impl Phar {
     pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
         todo!()
     }
+
+    pub fn running(return_full: bool) -> String {
+        todo!()
+    }
 }
+
+#[derive(Debug)]
+pub struct PharException {
+    pub message: String,
+    pub code: i64,
+}
+
+impl std::fmt::Display for PharException {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for PharException {}
 
 #[derive(Debug)]
 pub struct PharFileInfo;
@@ -815,6 +833,56 @@ pub const FILTER_VALIDATE_EMAIL: i64 = 274;
 pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
     todo!()
 }
+
+pub fn copy(source: &str, dest: &str) -> bool {
+    todo!()
+}
+
+pub fn exec(command: &str, output: Option<&mut Vec<String>>, exit_code: Option<&mut i64>) -> Option<String> {
+    todo!()
+}
+
+pub fn tempnam(dir: &str, prefix: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn openssl_verify(data: &str, signature: &[u8], pub_key_id: PhpMixed, algorithm: PhpMixed) -> i64 {
+    todo!()
+}
+
+pub fn openssl_pkey_get_public(public_key: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn openssl_get_md_methods() -> Vec<String> {
+    todo!()
+}
+
+pub fn openssl_free_key(key: PhpMixed) {
+    todo!()
+}
+
+pub fn iterator_to_array<T>(iter: T) -> Vec<PhpMixed>
+where
+    T: IntoIterator<Item = PhpMixed>,
+{
+    todo!()
+}
+
+pub fn end_arr<V: Clone>(array: &IndexMap<String, V>) -> Option<V> {
+    todo!()
+}
+
+pub fn fileowner(filename: &str) -> Option<i64> {
+    todo!()
+}
+
+pub fn unlink_silent(path: &str) -> bool {
+    todo!()
+}
+
+pub const OPENSSL_ALGO_SHA384: i64 = 9;
+pub const PHP_VERSION_ID: i64 = 80100;
 
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
