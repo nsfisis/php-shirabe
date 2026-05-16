@@ -881,6 +881,23 @@ pub fn unlink_silent(path: &str) -> bool {
     todo!()
 }
 
+pub fn array_unique<T: Clone>(array: &[T]) -> Vec<T> {
+    todo!()
+}
+
+pub fn current(value: PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn key(value: PhpMixed) -> Option<String> {
+    todo!()
+}
+
+pub fn reset<T: Clone>(array: &[T]) -> Option<T> {
+    todo!()
+}
+
+
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
 pub const PHP_VERSION_ID: i64 = 80100;
 
