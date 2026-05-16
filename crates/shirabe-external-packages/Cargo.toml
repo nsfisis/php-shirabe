@@ -1,10 +1,9 @@
 [package]
-name = "shirabe-class-map-generator"
+name = "shirabe-external-packages"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-shirabe-external-packages.workspace = true
-shirabe-php-shim.workspace = true
 anyhow.workspace = true
 indexmap.workspace = true
+shirabe-php-shim = { path = "../shirabe-php-shim" }

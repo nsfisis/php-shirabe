@@ -4,7 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+shirabe-external-packages.workspace = true
 shirabe-php-shim.workspace = true
+shirabe-semver.workspace = true
 anyhow.workspace = true
 base64.workspace = true
 chrono.workspace = true
