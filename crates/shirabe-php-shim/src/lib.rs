@@ -1174,6 +1174,10 @@ where
     todo!()
 }
 
+pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
+    todo!()
+}
+
 pub const PHP_EOL: &str = "\n";
 
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
