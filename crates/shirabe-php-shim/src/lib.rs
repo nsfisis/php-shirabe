@@ -480,6 +480,10 @@ pub fn rawurlencode(s: &str) -> String {
     todo!()
 }
 
+pub fn urlencode(s: &str) -> String {
+    todo!()
+}
+
 pub fn base64_encode(data: &str) -> String {
     todo!()
 }
@@ -761,6 +765,9 @@ pub fn array_replace_recursive(base: IndexMap<String, PhpMixed>, replacement: In
 pub const PHP_MAJOR_VERSION: i64 = 8;
 pub const PHP_MINOR_VERSION: i64 = 1;
 pub const PHP_RELEASE_VERSION: i64 = 0;
+
+pub const PHP_WINDOWS_VERSION_MAJOR: i64 = 0;
+pub const PHP_WINDOWS_VERSION_MINOR: i64 = 0;
 
 pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
