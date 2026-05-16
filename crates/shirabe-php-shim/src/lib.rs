@@ -999,6 +999,26 @@ pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
     todo!()
 }
 
+pub fn mkdir(pathname: &str, mode: u32, recursive: bool) -> bool {
+    todo!()
+}
+
+pub fn rename(old_name: &str, new_name: &str) -> bool {
+    todo!()
+}
+
+pub fn clearstatcache() {
+    todo!()
+}
+
+pub fn disk_free_space(directory: &str) -> Option<f64> {
+    todo!()
+}
+
+pub fn filemtime(filename: &str) -> Option<i64> {
+    todo!()
+}
+
 pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
