@@ -1079,6 +1079,18 @@ pub fn filter_var_with_options(
     todo!()
 }
 
+pub fn memory_get_usage() -> i64 {
+    todo!()
+}
+
+pub fn mb_check_encoding(value: &str, encoding: &str) -> bool {
+    todo!()
+}
+
+pub fn iconv(in_charset: &str, out_charset: &str, string: &str) -> Option<String> {
+    todo!()
+}
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
