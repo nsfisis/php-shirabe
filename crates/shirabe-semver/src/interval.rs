@@ -4,13 +4,13 @@ use std::sync::OnceLock;
 
 use crate::constraint::constraint::Constraint;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DevConstraintSet {
     pub names: Vec<String>,
     pub exclude: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Interval {
     start: Constraint,
     end: Constraint,

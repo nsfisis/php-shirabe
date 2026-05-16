@@ -615,6 +615,22 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     todo!()
 }
 
+// Returns 1 on match, 0 on no match; populates matches[0]=full match, matches[1..]=captures.
+// Optional groups that did not participate in the match are stored as None.
+pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>>) -> i64 {
+    todo!()
+}
+
+// Returns Some(result) on success, None on error.
+pub fn preg_replace(pattern: &str, replacement: &str, subject: &str) -> Option<String> {
+    todo!()
+}
+
+// Returns Some(parts) on success, None on error.
+pub fn preg_split(pattern: &str, subject: &str) -> Option<Vec<String>> {
+    todo!()
+}
+
 pub fn dirname(path: &str) -> String {
     todo!()
 }

@@ -8,7 +8,7 @@ use shirabe_php_shim as php;
 use crate::constraint::bound::Bound;
 use crate::constraint::constraint_interface::ConstraintInterface;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Constraint {
     pub(crate) operator: i64,
     pub(crate) version: String,
