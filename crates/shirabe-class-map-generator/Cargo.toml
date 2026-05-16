@@ -1,0 +1,8 @@
+[package]
+name = "shirabe-class-map-generator"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shirabe-php-shim.workspace = true
+anyhow.workspace = true
