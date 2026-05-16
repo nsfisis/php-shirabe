@@ -1041,6 +1041,18 @@ pub fn array_key_exists<V>(key: &str, array: &IndexMap<String, V>) -> bool {
     todo!()
 }
 
+pub fn fgets(handle: PhpMixed) -> Option<String> {
+    todo!()
+}
+
+pub fn umask() -> u32 {
+    todo!()
+}
+
+pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+    todo!()
+}
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
