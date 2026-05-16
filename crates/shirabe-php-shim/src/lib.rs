@@ -864,6 +864,12 @@ pub fn str_contains(haystack: &str, needle: &str) -> bool {
     todo!()
 }
 
+pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
+pub const DATE_ATOM: &str = "Y-m-d\\TH:i:sP";
+
 pub fn usleep(microseconds: u64) {
     todo!()
 }
@@ -989,6 +995,27 @@ pub fn array_reverse<T: Clone>(array: &[T], preserve_keys: bool) -> Vec<T> {
 pub fn array_filter<T: Clone, F>(array: &[T], callback: F) -> Vec<T>
 where
     F: Fn(&T) -> bool,
+{
+    todo!()
+}
+
+pub fn array_all<T, F>(array: &[T], callback: F) -> bool
+where
+    F: Fn(&T) -> bool,
+{
+    todo!()
+}
+
+pub fn array_any<T, F>(array: &[T], callback: F) -> bool
+where
+    F: Fn(&T) -> bool,
+{
+    todo!()
+}
+
+pub fn array_reduce<T, U, F>(array: &[T], callback: F, initial: U) -> U
+where
+    F: Fn(U, &T) -> U,
 {
     todo!()
 }
