@@ -238,9 +238,14 @@ pub const E_USER_NOTICE: i64 = 1024;
 pub const E_DEPRECATED: i64 = 8192;
 pub const E_USER_DEPRECATED: i64 = 16384;
 
+pub const PHP_URL_SCHEME: i64 = 0;
 pub const PHP_URL_HOST: i64 = 1;
 pub const PHP_URL_PORT: i64 = 2;
+pub const PHP_URL_USER: i64 = 3;
+pub const PHP_URL_PASS: i64 = 4;
 pub const PHP_URL_PATH: i64 = 5;
+pub const PHP_URL_QUERY: i64 = 6;
+pub const PHP_URL_FRAGMENT: i64 = 7;
 pub const PATHINFO_FILENAME: i64 = 64;
 pub const PATHINFO_EXTENSION: i64 = 4;
 pub const PATHINFO_DIRNAME: i64 = 1;
@@ -944,6 +949,22 @@ pub fn env_unset(name: &str) {
 }
 
 pub fn env_contains_key(name: &str) -> bool {
+    todo!()
+}
+
+pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
+    todo!()
+}
+
+pub fn trim(s: &str, chars: Option<&str>) -> String {
+    todo!()
+}
+
+pub fn count(value: &PhpMixed) -> i64 {
+    todo!()
+}
+
+pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
     todo!()
 }
 
