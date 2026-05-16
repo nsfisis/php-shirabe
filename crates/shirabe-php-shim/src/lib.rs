@@ -853,6 +853,100 @@ pub fn abs(value: i64) -> i64 {
     todo!()
 }
 
+pub fn str_contains(haystack: &str, needle: &str) -> bool {
+    todo!()
+}
+
+pub fn usleep(microseconds: u64) {
+    todo!()
+}
+
+pub fn mb_strlen(s: &str, encoding: &str) -> i64 {
+    todo!()
+}
+
+pub fn strlen(s: &str) -> i64 {
+    todo!()
+}
+
+pub fn substr(s: &str, offset: i64, length: Option<i64>) -> String {
+    todo!()
+}
+
+pub fn strtoupper(s: &str) -> String {
+    todo!()
+}
+
+pub fn stream_isatty(stream: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn posix_getuid() -> i64 {
+    todo!()
+}
+
+pub fn posix_geteuid() -> i64 {
+    todo!()
+}
+
+pub fn posix_getpwuid(uid: i64) -> PhpMixed {
+    todo!()
+}
+
+pub fn posix_isatty(stream: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn fstat(stream: PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn getenv(name: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn putenv(setting: &str) -> bool {
+    todo!()
+}
+
+/// PHP superglobal $_SERVER access
+pub fn server_get(name: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn server_set(name: &str, value: String) {
+    todo!()
+}
+
+pub fn server_unset(name: &str) {
+    todo!()
+}
+
+pub fn server_contains_key(name: &str) -> bool {
+    todo!()
+}
+
+pub fn server_argv() -> Vec<String> {
+    todo!()
+}
+
+/// PHP superglobal $_ENV access
+pub fn env_get(name: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn env_set(name: &str, value: String) {
+    todo!()
+}
+
+pub fn env_unset(name: &str) {
+    todo!()
+}
+
+pub fn env_contains_key(name: &str) -> bool {
+    todo!()
+}
+
 impl Phar {
     pub const SHA512: i64 = 16;
 
