@@ -17,7 +17,7 @@ impl Zip {
         }
 
         let mut zip = ZipArchive::new();
-        if !zip.open(path_to_zip) {
+        if zip.open(path_to_zip, 0).is_err() {
             return Ok(None);
         }
 

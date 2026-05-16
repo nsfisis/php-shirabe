@@ -344,11 +344,23 @@ impl ZipArchive {
         todo!()
     }
 
-    pub fn open(&mut self, filename: &str) -> bool {
+    pub fn open(&mut self, filename: &str, flags: i64) -> Result<(), i64> {
         todo!()
     }
 
-    pub fn close(&self) {
+    pub fn close(&self) -> bool {
+        todo!()
+    }
+
+    pub fn count(&self) -> i64 {
+        todo!()
+    }
+
+    pub fn stat_index(&self, index: i64) -> Option<IndexMap<String, Box<PhpMixed>>> {
+        todo!()
+    }
+
+    pub fn extract_to(&self, path: &str) -> bool {
         todo!()
     }
 
@@ -388,6 +400,15 @@ impl ZipArchive {
 impl ZipArchive {
     pub const CREATE: i64 = 1;
     pub const OPSYS_UNIX: i64 = 3;
+    pub const ER_SEEK: i64 = 4;
+    pub const ER_READ: i64 = 5;
+    pub const ER_NOENT: i64 = 9;
+    pub const ER_EXISTS: i64 = 10;
+    pub const ER_OPEN: i64 = 11;
+    pub const ER_MEMORY: i64 = 14;
+    pub const ER_INVAL: i64 = 18;
+    pub const ER_NOZIP: i64 = 19;
+    pub const ER_INCONS: i64 = 21;
 }
 
 pub trait JsonSerializable {
@@ -581,6 +602,24 @@ pub fn html_entity_decode(s: &str) -> String {
 }
 
 pub fn hash_file(algo: &str, filename: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn filesize(path: &str) -> Option<i64> {
+    todo!()
+}
+
+pub fn random_int(min: i64, max: i64) -> i64 {
+    todo!()
+}
+
+pub fn json_encode_ex(value: &PhpMixed, flags: i64) -> Option<String> {
+    todo!()
+}
+
+pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
+
+pub fn is_array(value: &PhpMixed) -> bool {
     todo!()
 }
 

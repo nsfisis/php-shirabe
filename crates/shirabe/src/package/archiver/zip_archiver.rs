@@ -41,8 +41,7 @@ impl ArchiverInterface for ZipArchiver {
         let sources = fs.normalize_path(&sources);
 
         let mut zip = ZipArchive::new();
-        let res = zip.open(&target, ZipArchive::CREATE);
-        if res == true {
+        if zip.open(&target, ZipArchive::CREATE).is_ok() {
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             for file in files {
                 let filepath = file.get_pathname();
