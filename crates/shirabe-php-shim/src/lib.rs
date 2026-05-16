@@ -781,6 +781,22 @@ pub fn ord(c: &str) -> i64 {
     todo!()
 }
 
+pub fn gethostname() -> String {
+    todo!()
+}
+
+pub fn feof(stream: PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn str_replace_array(
+    search: &[String],
+    replace: &[String],
+    subject: &str,
+) -> String {
+    todo!()
+}
+
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
