@@ -258,6 +258,14 @@ pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> V
     todo!()
 }
 
+pub fn array_shift<T>(array: &mut Vec<T>) -> T {
+    todo!()
+}
+
+pub fn array_unshift<T>(array: &mut Vec<T>, value: T) -> i64 {
+    todo!()
+}
+
 pub fn empty(value: &PhpMixed) -> bool {
     todo!()
 }
