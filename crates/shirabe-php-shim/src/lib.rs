@@ -797,6 +797,21 @@ pub fn str_replace_array(
     todo!()
 }
 
+pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
+    todo!()
+}
+
+pub fn ucwords(s: &str) -> String {
+    todo!()
+}
+
+pub fn get_current_user() -> String {
+    todo!()
+}
+
+pub const FILE_IGNORE_NEW_LINES: i64 = 2;
+pub const FILTER_VALIDATE_EMAIL: i64 = 274;
+
 pub fn array_intersect_key(array1: &IndexMap<String, Box<PhpMixed>>, array2: &IndexMap<String, Box<PhpMixed>>) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
