@@ -809,6 +809,15 @@ pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
     todo!()
 }
 
+pub fn http_build_query_mixed(
+    data: &IndexMap<String, PhpMixed>,
+    numeric_prefix: &str,
+    arg_separator: &str,
+) -> String {
+    let _ = (data, numeric_prefix, arg_separator);
+    todo!()
+}
+
 pub fn http_build_query(data: &[(&str, &str)], sep_str: &str, sep: &str) -> String {
     todo!()
 }
@@ -826,6 +835,15 @@ pub fn dirname_levels(path: &str, levels: i64) -> String {
 }
 
 pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
+    todo!()
+}
+
+pub fn array_search_mixed(
+    needle: &PhpMixed,
+    haystack: &PhpMixed,
+    strict: bool,
+) -> Option<PhpMixed> {
+    let _ = (needle, haystack, strict);
     todo!()
 }
 
