@@ -1033,6 +1033,14 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
     todo!()
 }
 
+pub fn max(a: i64, b: i64) -> i64 {
+    todo!()
+}
+
+pub fn array_key_exists<V>(key: &str, array: &IndexMap<String, V>) -> bool {
+    todo!()
+}
+
 pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
     todo!()
 }
