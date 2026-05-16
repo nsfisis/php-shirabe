@@ -785,3 +785,63 @@ pub fn trigger_error(message: &str, error_level: i64) {
 pub fn sys_get_temp_dir() -> String {
     todo!()
 }
+
+pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
+    todo!()
+}
+
+pub fn http_build_query(data: &[(&str, &str)], sep_str: &str, sep: &str) -> String {
+    todo!()
+}
+
+pub fn token_get_all(source: &str) -> Vec<PhpMixed> {
+    todo!()
+}
+
+pub const T_COMMENT: i64 = 315;
+pub const T_DOC_COMMENT: i64 = 316;
+pub const T_WHITESPACE: i64 = 317;
+
+pub fn dirname_levels(path: &str, levels: i64) -> String {
+    todo!()
+}
+
+pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
+    todo!()
+}
+
+pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option<String> {
+    todo!()
+}
+
+pub fn strcmp(s1: &str, s2: &str) -> i64 {
+    todo!()
+}
+
+impl Phar {
+    pub const SHA512: i64 = 16;
+
+    pub fn new_phar(filename: String, flags: i64, alias: &str) -> Self {
+        todo!()
+    }
+
+    pub fn set_signature_algorithm(&mut self, algo: i64) {
+        todo!()
+    }
+
+    pub fn start_buffering(&mut self) {
+        todo!()
+    }
+
+    pub fn stop_buffering(&mut self) {
+        todo!()
+    }
+
+    pub fn add_from_string(&mut self, path: &str, content: &str) {
+        todo!()
+    }
+
+    pub fn set_stub(&mut self, stub: &str) {
+        todo!()
+    }
+}
