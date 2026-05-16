@@ -841,6 +841,18 @@ pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
     todo!()
 }
 
+pub fn str_pad(input: &str, length: usize, pad_string: &str, pad_type: i64) -> String {
+    todo!()
+}
+
+pub const STR_PAD_LEFT: i64 = 0;
+pub const STR_PAD_RIGHT: i64 = 1;
+pub const STR_PAD_BOTH: i64 = 2;
+
+pub fn abs(value: i64) -> i64 {
+    todo!()
+}
+
 impl Phar {
     pub const SHA512: i64 = 16;
 
