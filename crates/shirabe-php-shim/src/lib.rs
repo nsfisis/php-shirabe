@@ -527,6 +527,44 @@ pub fn filter_var(value: &str, filter: i64) -> bool {
 }
 
 pub fn ini_get(option: &str) -> Option<String> {
+    let _ = option;
+    todo!()
+}
+
+pub fn apcu_add(key: &str, var: PhpMixed) -> bool {
+    let _ = (key, var);
+    todo!()
+}
+
+pub fn apcu_fetch(key: &str, success: &mut bool) -> PhpMixed {
+    let _ = (key, success);
+    todo!()
+}
+
+pub fn spl_autoload_register(
+    callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>,
+    throw: bool,
+    prepend: bool,
+) -> bool {
+    let _ = (callback, throw, prepend);
+    todo!()
+}
+
+pub fn spl_autoload_unregister(
+    callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>,
+) -> bool {
+    let _ = callback;
+    todo!()
+}
+
+pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
+    let _ = filename;
+    todo!()
+}
+
+/// Equivalent to PHP `include $file;`
+pub fn include_file(file: &str) -> PhpMixed {
+    let _ = file;
     todo!()
 }
 
