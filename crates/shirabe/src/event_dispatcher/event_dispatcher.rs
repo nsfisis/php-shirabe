@@ -63,7 +63,7 @@ pub enum Callable {
 ///     `$dispatcher->dispatch(ScriptEvents::POST_INSTALL_CMD);`
 #[derive(Debug)]
 pub struct EventDispatcher {
-    pub(crate) composer: PartialComposer,
+    pub(crate) composer: Box<PartialComposer>,
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) loader: Option<ClassLoader>,
     pub(crate) process: ProcessExecutor,
