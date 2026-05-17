@@ -72,7 +72,7 @@ pub struct RuntimeException {
 }
 
 impl std::fmt::Display for RuntimeException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -84,7 +84,7 @@ pub struct UnexpectedValueException {
 }
 
 impl std::fmt::Display for UnexpectedValueException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -96,7 +96,7 @@ pub struct InvalidArgumentException {
 }
 
 impl std::fmt::Display for InvalidArgumentException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -108,7 +108,7 @@ pub struct LogicException {
 }
 
 impl std::fmt::Display for LogicException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -120,7 +120,7 @@ pub struct BadMethodCallException {
 }
 
 impl std::fmt::Display for BadMethodCallException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -132,7 +132,7 @@ pub struct OutOfBoundsException {
 }
 
 impl std::fmt::Display for OutOfBoundsException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -147,60 +147,60 @@ pub struct ErrorException {
 }
 
 impl std::fmt::Display for ErrorException {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
 
-pub fn is_bool(value: &PhpMixed) -> bool {
+pub fn is_bool(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_string(value: &PhpMixed) -> bool {
+pub fn is_string(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_int(value: &PhpMixed) -> bool {
+pub fn is_int(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_scalar(value: &PhpMixed) -> bool {
+pub fn is_scalar(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_numeric(value: &PhpMixed) -> bool {
+pub fn is_numeric(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn strtotime(time: &str) -> Option<i64> {
+pub fn strtotime(_time: &str) -> Option<i64> {
     todo!()
 }
 
-pub fn strcasecmp(s1: &str, s2: &str) -> i64 {
+pub fn strcasecmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn sprintf(format: &str, args: &[PhpMixed]) -> String {
+pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
     todo!()
 }
 
-pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
+pub fn array_values<V: Clone>(_array: &IndexMap<String, V>) -> Vec<V> {
     todo!()
 }
 
-pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
+pub fn array_keys<V>(_array: &IndexMap<String, V>) -> Vec<String> {
     todo!()
 }
 
-pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
+pub fn str_replace(_search: &str, _replace: &str, _subject: &str) -> String {
     todo!()
 }
 
-pub fn php_to_string(value: &PhpMixed) -> String {
+pub fn php_to_string(_value: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
+pub fn substr(_s: &str, _start: i64, _length: Option<i64>) -> String {
     todo!()
 }
 
@@ -212,187 +212,187 @@ pub fn spl_autoload_functions() -> Vec<PhpMixed> {
     todo!()
 }
 
-pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
+pub fn array_push(_array: &mut Vec<String>, _value: String) -> i64 {
     todo!()
 }
 
-pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
+pub fn array_search_in_vec(_needle: &str, _haystack: &[String]) -> Option<usize> {
     todo!()
 }
 
-pub fn array_map_str_fn<F: Fn(&str) -> String>(callback: F, array: &[String]) -> Vec<String> {
+pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
     todo!()
 }
 
-pub fn is_callable(value: &PhpMixed) -> bool {
+pub fn is_callable(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_object(value: &PhpMixed) -> bool {
+pub fn is_object(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn is_a(object_or_class: &PhpMixed, class: &str, allow_string: bool) -> bool {
+pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> bool {
     todo!()
 }
 
-pub fn str_contains(haystack: &str, needle: &str) -> bool {
+pub fn str_contains(_haystack: &str, _needle: &str) -> bool {
     todo!()
 }
 
-pub fn str_starts_with(haystack: &str, needle: &str) -> bool {
+pub fn str_starts_with(_haystack: &str, _needle: &str) -> bool {
     todo!()
 }
 
-pub fn str_ends_with(haystack: &str, needle: &str) -> bool {
+pub fn str_ends_with(_haystack: &str, _needle: &str) -> bool {
     todo!()
 }
 
-pub fn strpos(haystack: &str, needle: &str) -> Option<usize> {
+pub fn strpos(_haystack: &str, _needle: &str) -> Option<usize> {
     todo!()
 }
 
-pub fn strtoupper(s: &str) -> String {
+pub fn strtoupper(_s: &str) -> String {
     todo!()
 }
 
-pub fn strlen(s: &str) -> i64 {
+pub fn strlen(_s: &str) -> i64 {
     todo!()
 }
 
-pub fn krsort<V>(array: &mut IndexMap<i64, V>) {
+pub fn krsort<V>(_array: &mut IndexMap<i64, V>) {
     todo!()
 }
 
-pub fn max_i64(a: i64, b: i64) -> i64 {
+pub fn max_i64(_a: i64, _b: i64) -> i64 {
     todo!()
 }
 
-pub fn count_mixed(value: &PhpMixed) -> i64 {
+pub fn count_mixed(_value: &PhpMixed) -> i64 {
     todo!()
 }
 
-pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> PhpMixed {
+pub fn array_slice_mixed(_value: &PhpMixed, _offset: i64, _length: Option<i64>) -> PhpMixed {
     todo!()
 }
 
-pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+pub fn array_slice_strs(_value: &[String], _offset: i64, _length: Option<i64>) -> Vec<String> {
     todo!()
 }
 
-pub fn empty(value: &PhpMixed) -> bool {
+pub fn empty(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn method_exists(object: &PhpMixed, method_name: &str) -> bool {
+pub fn method_exists(_object: &PhpMixed, _method_name: &str) -> bool {
     todo!()
 }
 
-pub fn get_class(object: &PhpMixed) -> String {
+pub fn get_class(_object: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn get_debug_type(value: &PhpMixed) -> String {
+pub fn get_debug_type(_value: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn defined(name: &str) -> bool {
+pub fn defined(_name: &str) -> bool {
     todo!()
 }
 
-pub fn hash(algo: &str, data: &str) -> String {
+pub fn hash(_algo: &str, _data: &str) -> String {
     todo!()
 }
 
-pub fn hash_raw(algo: &str, data: &str) -> Vec<u8> {
+pub fn hash_raw(_algo: &str, _data: &str) -> Vec<u8> {
     todo!()
 }
 
-pub fn pack(format: &str, values: &[PhpMixed]) -> Vec<u8> {
+pub fn pack(_format: &str, _values: &[PhpMixed]) -> Vec<u8> {
     todo!()
 }
 
-pub fn unpack(format: &str, data: &[u8]) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn unpack(_format: &str, _data: &[u8]) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
 pub const PHP_VERSION_ID: i64 = 80100;
 
-pub fn extension_loaded(name: &str) -> bool {
+pub fn extension_loaded(_name: &str) -> bool {
     todo!()
 }
 
-pub fn gzopen(file: &str, mode: &str) -> PhpMixed {
+pub fn gzopen(_file: &str, _mode: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn gzread(file: PhpMixed, length: i64) -> String {
+pub fn gzread(_file: PhpMixed, _length: i64) -> String {
     todo!()
 }
 
-pub fn gzclose(file: PhpMixed) {
+pub fn gzclose(_file: PhpMixed) {
     todo!()
 }
 
-pub fn fseek(stream: PhpMixed, offset: i64) -> i64 {
+pub fn fseek(_stream: PhpMixed, _offset: i64) -> i64 {
     todo!()
 }
 
-pub fn rewind(stream: PhpMixed) -> bool {
+pub fn rewind(_stream: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn strip_tags(str: &str) -> String {
+pub fn strip_tags(_str: &str) -> String {
     todo!()
 }
 
 pub const PHP_EOL: &str = "\n";
 
-pub fn fopen(file: &str, mode: &str) -> PhpMixed {
+pub fn fopen(_file: &str, _mode: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn fwrite(file: PhpMixed, data: &str, length: i64) {
+pub fn fwrite(_file: PhpMixed, _data: &str, _length: i64) {
     todo!()
 }
 
-pub fn fclose(file: PhpMixed) {
+pub fn fclose(_file: PhpMixed) {
     todo!()
 }
 
-pub fn parse_url(url: &str, component: i64) -> PhpMixed {
+pub fn parse_url(_url: &str, _component: i64) -> PhpMixed {
     todo!()
 }
 
-pub fn parse_url_all(url: &str) -> PhpMixed {
+pub fn parse_url_all(_url: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn pathinfo(path: PhpMixed, option: i64) -> PhpMixed {
+pub fn pathinfo(_path: PhpMixed, _option: i64) -> PhpMixed {
     todo!()
 }
 
-pub fn strtr(str: &str, from: &str, to: &str) -> String {
+pub fn strtr(_str: &str, _from: &str, _to: &str) -> String {
     todo!()
 }
 
-pub fn implode(glue: &str, pieces: &[String]) -> String {
+pub fn implode(_glue: &str, _pieces: &[String]) -> String {
     todo!()
 }
 
-pub fn version_compare(v1: &str, v2: &str, op: &str) -> bool {
+pub fn version_compare(_v1: &str, _v2: &str, _op: &str) -> bool {
     todo!()
 }
 
-pub fn version_compare_2(v1: &str, v2: &str) -> i64 {
+pub fn version_compare_2(_v1: &str, _v2: &str) -> i64 {
     todo!()
 }
 
-pub fn microtime(get_as_float: bool) -> f64 {
+pub fn microtime(_get_as_float: bool) -> f64 {
     todo!()
 }
 
-pub fn error_reporting(level: Option<i64>) -> i64 {
+pub fn error_reporting(_level: Option<i64>) -> i64 {
     todo!()
 }
 
@@ -431,15 +431,15 @@ impl Phar {
     pub const GZ: i64 = 4096;
     pub const BZ2: i64 = 8192;
 
-    pub fn new(a: String) -> Self {
+    pub fn new(_a: String) -> Self {
         todo!()
     }
 
-    pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
+    pub fn extract_to(&self, _a: &str, _b: Option<()>, _c: bool) {
         todo!()
     }
 
-    pub fn running(return_full: bool) -> String {
+    pub fn running(_return_full: bool) -> String {
         todo!()
     }
 }
@@ -481,15 +481,15 @@ pub struct PharData {
 }
 
 impl PharData {
-    pub fn new(a: String) -> Self {
+    pub fn new(_a: String) -> Self {
         todo!()
     }
 
-    pub fn new_with_format(path: String, flags: i64, alias: &str, format: i64) -> Self {
+    pub fn new_with_format(_path: String, _flags: i64, _alias: &str, _format: i64) -> Self {
         todo!()
     }
 
-    pub fn can_compress(algo: i64) -> bool {
+    pub fn can_compress(_algo: i64) -> bool {
         todo!()
     }
 
@@ -497,7 +497,7 @@ impl PharData {
         todo!()
     }
 
-    pub fn get(&self, key: &str) -> Option<PharFileInfo> {
+    pub fn get(&self, _key: &str) -> Option<PharFileInfo> {
         todo!()
     }
 
@@ -506,23 +506,23 @@ impl PharData {
         std::iter::empty()
     }
 
-    pub fn extract_to(&self, a: &str, b: Option<()>, c: bool) {
+    pub fn extract_to(&self, _a: &str, _b: Option<()>, _c: bool) {
         todo!()
     }
 
-    pub fn add_empty_dir(&self, a: &str) {
+    pub fn add_empty_dir(&self, _a: &str) {
         todo!()
     }
 
     pub fn build_from_iterator(
         &self,
-        iter: &mut dyn Iterator<Item = std::path::PathBuf>,
-        base: &str,
+        _iter: &mut dyn Iterator<Item = std::path::PathBuf>,
+        _base: &str,
     ) {
         todo!()
     }
 
-    pub fn compress(&self, algo: i64) {
+    pub fn compress(&self, _algo: i64) {
         todo!()
     }
 }
@@ -532,12 +532,18 @@ pub struct ZipArchive {
     pub num_files: i64,
 }
 
+impl Default for ZipArchive {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ZipArchive {
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn open(&mut self, filename: &str, flags: i64) -> Result<(), i64> {
+    pub fn open(&mut self, _filename: &str, _flags: i64) -> Result<(), i64> {
         todo!()
     }
 
@@ -549,39 +555,39 @@ impl ZipArchive {
         todo!()
     }
 
-    pub fn stat_index(&self, index: i64) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    pub fn stat_index(&self, _index: i64) -> Option<IndexMap<String, Box<PhpMixed>>> {
         todo!()
     }
 
-    pub fn extract_to(&self, path: &str) -> bool {
+    pub fn extract_to(&self, _path: &str) -> bool {
         todo!()
     }
 
-    pub fn locate_name(&self, name: &str) -> Option<i64> {
+    pub fn locate_name(&self, _name: &str) -> Option<i64> {
         todo!()
     }
 
-    pub fn get_from_index(&self, index: i64) -> Option<String> {
+    pub fn get_from_index(&self, _index: i64) -> Option<String> {
         todo!()
     }
 
-    pub fn get_name_index(&self, index: i64) -> String {
+    pub fn get_name_index(&self, _index: i64) -> String {
         todo!()
     }
 
-    pub fn get_stream(&self, name: &str) -> Option<PhpMixed> {
+    pub fn get_stream(&self, _name: &str) -> Option<PhpMixed> {
         todo!()
     }
 
-    pub fn add_empty_dir(&self, local_name: &str) -> bool {
+    pub fn add_empty_dir(&self, _local_name: &str) -> bool {
         todo!()
     }
 
-    pub fn add_file(&self, filepath: &str, local_name: &str) -> bool {
+    pub fn add_file(&self, _filepath: &str, _local_name: &str) -> bool {
         todo!()
     }
 
-    pub fn set_external_attributes_name(&self, name: &str, opsys: i64, attr: i64) -> bool {
+    pub fn set_external_attributes_name(&self, _name: &str, _opsys: i64, _attr: i64) -> bool {
         todo!()
     }
 
@@ -612,11 +618,11 @@ pub trait Countable {
     fn count(&self) -> i64;
 }
 
-pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
+pub fn in_array(_needle: PhpMixed, _haystack: &PhpMixed, _strict: bool) -> bool {
     todo!()
 }
 
-pub fn realpath(path: &str) -> Option<String> {
+pub fn realpath(_path: &str) -> Option<String> {
     todo!()
 }
 
@@ -625,102 +631,102 @@ pub const JSON_UNESCAPED_SLASHES: i64 = 64;
 pub const JSON_PRETTY_PRINT: i64 = 128;
 pub const JSON_THROW_ON_ERROR: i64 = 4194304;
 
-pub fn json_encode(value: &PhpMixed) -> Option<String> {
+pub fn json_encode(_value: &PhpMixed) -> Option<String> {
     todo!()
 }
 
-pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
+pub fn preg_quote(_str: &str, _delimiter: Option<char>) -> String {
     todo!()
 }
 
 // Returns 1 on match, 0 on no match; populates matches[0]=full match, matches[1..]=captures.
 // Optional groups that did not participate in the match are stored as None.
-pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>>) -> i64 {
+pub fn preg_match(_pattern: &str, _subject: &str, _matches: &mut Vec<Option<String>>) -> i64 {
     todo!()
 }
 
 // Returns Some(result) on success, None on error.
-pub fn preg_replace(pattern: &str, replacement: &str, subject: &str) -> Option<String> {
+pub fn preg_replace(_pattern: &str, _replacement: &str, _subject: &str) -> Option<String> {
     todo!()
 }
 
 // Returns Some(parts) on success, None on error.
-pub fn preg_split(pattern: &str, subject: &str) -> Option<Vec<String>> {
+pub fn preg_split(_pattern: &str, _subject: &str) -> Option<Vec<String>> {
     todo!()
 }
 
-pub fn dirname(path: &str) -> String {
+pub fn dirname(_path: &str) -> String {
     todo!()
 }
 
-pub fn stream_get_contents(stream: PhpMixed) -> Option<String> {
+pub fn stream_get_contents(_stream: PhpMixed) -> Option<String> {
     todo!()
 }
 
-pub fn class_exists(name: &str) -> bool {
+pub fn class_exists(_name: &str) -> bool {
     todo!()
 }
 
-pub fn function_exists(name: &str) -> bool {
+pub fn function_exists(_name: &str) -> bool {
     todo!()
 }
 
-pub fn mb_convert_encoding(string: Vec<u8>, to_encoding: &str, from_encoding: &str) -> String {
+pub fn mb_convert_encoding(_string: Vec<u8>, _to_encoding: &str, _from_encoding: &str) -> String {
     todo!()
 }
 
-pub fn touch(path: &str) -> bool {
+pub fn touch(_path: &str) -> bool {
     todo!()
 }
 
-pub fn chmod(path: &str, mode: u32) -> bool {
+pub fn chmod(_path: &str, _mode: u32) -> bool {
     todo!()
 }
 
-pub fn strpbrk(haystack: &str, char_list: &str) -> Option<String> {
+pub fn strpbrk(_haystack: &str, _char_list: &str) -> Option<String> {
     todo!()
 }
 
-pub fn rawurldecode(s: &str) -> String {
+pub fn rawurldecode(_s: &str) -> String {
     todo!()
 }
 
-pub fn rawurlencode(s: &str) -> String {
+pub fn rawurlencode(_s: &str) -> String {
     todo!()
 }
 
-pub fn urlencode(s: &str) -> String {
+pub fn urlencode(_s: &str) -> String {
     todo!()
 }
 
-pub fn base64_encode(data: &str) -> String {
+pub fn base64_encode(_data: &str) -> String {
     todo!()
 }
 
-pub fn base64_decode(data: &str) -> Option<Vec<u8>> {
+pub fn base64_decode(_data: &str) -> Option<Vec<u8>> {
     todo!()
 }
 
-pub fn substr_count(haystack: &str, needle: &str) -> i64 {
+pub fn substr_count(_haystack: &str, _needle: &str) -> i64 {
     todo!()
 }
 
 pub fn openssl_x509_parse(
-    certificate: &str,
-    short_names: bool,
+    _certificate: &str,
+    _short_names: bool,
 ) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
-pub fn openssl_get_publickey(certificate: &str) -> Option<PhpMixed> {
+pub fn openssl_get_publickey(_certificate: &str) -> Option<PhpMixed> {
     todo!()
 }
 
-pub fn openssl_pkey_get_details(key: PhpMixed) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn openssl_pkey_get_details(_key: PhpMixed) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
-pub fn fileperms(path: &str) -> i64 {
+pub fn fileperms(_path: &str) -> i64 {
     todo!()
 }
 
@@ -729,7 +735,7 @@ pub const FILTER_VALIDATE_URL: i64 = 273;
 pub const FILTER_VALIDATE_IP: i64 = 275;
 pub const FILTER_VALIDATE_INT: i64 = 257;
 
-pub fn filter_var(value: &str, filter: i64) -> bool {
+pub fn filter_var(_value: &str, _filter: i64) -> bool {
     todo!()
 }
 
@@ -773,7 +779,7 @@ pub fn include_file(file: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn set_error_handler(callback: fn(i64, &str, &str, i64) -> bool) {
+pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {
     todo!()
 }
 
@@ -785,7 +791,7 @@ pub const PHP_VERSION: &str = "8.1.0";
 
 pub const STDERR: i64 = 2;
 
-pub fn is_resource(value: &PhpMixed) -> bool {
+pub fn is_resource(_value: &PhpMixed) -> bool {
     todo!()
 }
 
@@ -793,7 +799,7 @@ pub fn is_resource(value: &PhpMixed) -> bool {
 pub struct RarEntry;
 
 impl RarEntry {
-    pub fn extract(&self, path: &str) -> bool {
+    pub fn extract(&self, _path: &str) -> bool {
         todo!()
     }
 }
@@ -810,7 +816,7 @@ pub fn var_export_str(_value: &str, _return: bool) -> String {
 pub struct RarArchive;
 
 impl RarArchive {
-    pub fn open(file: &str) -> Option<Self> {
+    pub fn open(_file: &str) -> Option<Self> {
         todo!()
     }
 
@@ -823,19 +829,19 @@ impl RarArchive {
     }
 }
 
-pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
+pub fn array_fill_keys(_keys: PhpMixed, _value: PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
+pub fn array_merge(_array1: PhpMixed, _array2: PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
+pub fn substr_replace(_string: &str, _replace: &str, _start: usize, _length: usize) -> String {
     todo!()
 }
 
-pub fn constant(name: &str) -> PhpMixed {
+pub fn constant(_name: &str) -> PhpMixed {
     todo!()
 }
 
@@ -843,7 +849,7 @@ pub fn get_loaded_extensions() -> Vec<String> {
     todo!()
 }
 
-pub fn phpversion(extension: &str) -> Option<String> {
+pub fn phpversion(_extension: &str) -> Option<String> {
     todo!()
 }
 
@@ -855,65 +861,65 @@ pub fn ob_get_clean() -> Option<String> {
     todo!()
 }
 
-pub fn html_entity_decode(s: &str) -> String {
+pub fn html_entity_decode(_s: &str) -> String {
     todo!()
 }
 
-pub fn hash_file(algo: &str, filename: &str) -> Option<String> {
+pub fn hash_file(_algo: &str, _filename: &str) -> Option<String> {
     todo!()
 }
 
-pub fn filesize(path: &str) -> Option<i64> {
+pub fn filesize(_path: &str) -> Option<i64> {
     todo!()
 }
 
-pub fn random_int(min: i64, max: i64) -> i64 {
+pub fn random_int(_min: i64, _max: i64) -> i64 {
     todo!()
 }
 
-pub fn json_encode_ex(value: &PhpMixed, flags: i64) -> Option<String> {
+pub fn json_encode_ex(_value: &PhpMixed, _flags: i64) -> Option<String> {
     todo!()
 }
 
 pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
 
-pub fn is_array(value: &PhpMixed) -> bool {
+pub fn is_array(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn strnatcasecmp(s1: &str, s2: &str) -> i64 {
+pub fn strnatcasecmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn file_exists(path: &str) -> bool {
+pub fn file_exists(_path: &str) -> bool {
     todo!()
 }
 
-pub fn is_writable(path: &str) -> bool {
+pub fn is_writable(_path: &str) -> bool {
     todo!()
 }
 
-pub fn unlink(path: &str) -> bool {
+pub fn unlink(_path: &str) -> bool {
     todo!()
 }
 
-pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
+pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
     todo!()
 }
 
-pub fn str_repeat(s: &str, count: usize) -> String {
+pub fn str_repeat(_s: &str, _count: usize) -> String {
     todo!()
 }
 
-pub fn strrpos(haystack: &str, needle: &str) -> Option<usize> {
+pub fn strrpos(_haystack: &str, _needle: &str) -> Option<usize> {
     todo!()
 }
 
-pub fn gzcompress(data: &[u8]) -> Option<Vec<u8>> {
+pub fn gzcompress(_data: &[u8]) -> Option<Vec<u8>> {
     todo!()
 }
 
-pub fn bzcompress(data: &[u8]) -> Option<Vec<u8>> {
+pub fn bzcompress(_data: &[u8]) -> Option<Vec<u8>> {
     todo!()
 }
 
@@ -921,19 +927,19 @@ pub fn getcwd() -> Option<String> {
     todo!()
 }
 
-pub fn chdir(path: &str) -> anyhow::Result<()> {
+pub fn chdir(_path: &str) -> anyhow::Result<()> {
     todo!()
 }
 
-pub fn glob(pattern: &str) -> Vec<String> {
+pub fn glob(_pattern: &str) -> Vec<String> {
     todo!()
 }
 
-pub fn basename(path: &str) -> String {
+pub fn basename(_path: &str) -> String {
     todo!()
 }
 
-pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
+pub fn explode(_delimiter: &str, _string: &str) -> Vec<String> {
     todo!()
 }
 
@@ -1028,31 +1034,31 @@ pub fn curl_init() -> CurlHandle {
     todo!()
 }
 
-pub fn curl_close(handle: CurlHandle) {
+pub fn curl_close(_handle: CurlHandle) {
     todo!()
 }
 
-pub fn curl_setopt(handle: &CurlHandle, option: i64, value: PhpMixed) -> bool {
+pub fn curl_setopt(_handle: &CurlHandle, _option: i64, _value: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn curl_setopt_array(handle: &CurlHandle, options: &IndexMap<i64, PhpMixed>) -> bool {
+pub fn curl_setopt_array(_handle: &CurlHandle, _options: &IndexMap<i64, PhpMixed>) -> bool {
     todo!()
 }
 
-pub fn curl_getinfo(handle: &CurlHandle) -> PhpMixed {
+pub fn curl_getinfo(_handle: &CurlHandle) -> PhpMixed {
     todo!()
 }
 
-pub fn curl_error(handle: &CurlHandle) -> String {
+pub fn curl_error(_handle: &CurlHandle) -> String {
     todo!()
 }
 
-pub fn curl_errno(handle: &CurlHandle) -> i64 {
+pub fn curl_errno(_handle: &CurlHandle) -> i64 {
     todo!()
 }
 
-pub fn curl_strerror(errornum: i64) -> Option<String> {
+pub fn curl_strerror(_errornum: i64) -> Option<String> {
     todo!()
 }
 
@@ -1060,27 +1066,27 @@ pub fn curl_multi_init() -> CurlMultiHandle {
     todo!()
 }
 
-pub fn curl_multi_setopt(mh: &CurlMultiHandle, option: i64, value: PhpMixed) -> bool {
+pub fn curl_multi_setopt(_mh: &CurlMultiHandle, _option: i64, _value: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn curl_multi_add_handle(mh: &CurlMultiHandle, handle: &CurlHandle) -> i64 {
+pub fn curl_multi_add_handle(_mh: &CurlMultiHandle, _handle: &CurlHandle) -> i64 {
     todo!()
 }
 
-pub fn curl_multi_remove_handle(mh: &CurlMultiHandle, handle: &CurlHandle) -> i64 {
+pub fn curl_multi_remove_handle(_mh: &CurlMultiHandle, _handle: &CurlHandle) -> i64 {
     todo!()
 }
 
-pub fn curl_multi_exec(mh: &CurlMultiHandle, still_running: &mut bool) -> i64 {
+pub fn curl_multi_exec(_mh: &CurlMultiHandle, _still_running: &mut bool) -> i64 {
     todo!()
 }
 
-pub fn curl_multi_select(mh: &CurlMultiHandle, timeout: f64) -> i64 {
+pub fn curl_multi_select(_mh: &CurlMultiHandle, _timeout: f64) -> i64 {
     todo!()
 }
 
-pub fn curl_multi_info_read(mh: &CurlMultiHandle) -> PhpMixed {
+pub fn curl_multi_info_read(_mh: &CurlMultiHandle) -> PhpMixed {
     todo!()
 }
 
@@ -1088,12 +1094,12 @@ pub fn curl_share_init() -> CurlShareHandle {
     todo!()
 }
 
-pub fn curl_share_setopt(sh: &CurlShareHandle, option: i64, value: PhpMixed) -> bool {
+pub fn curl_share_setopt(_sh: &CurlShareHandle, _option: i64, _value: PhpMixed) -> bool {
     todo!()
 }
 
 /// Cast a `\CurlHandle` to int (its spl_object_id) as `(int) $curlHandle` in PHP.
-pub fn curl_handle_id(handle: &CurlHandle) -> i64 {
+pub fn curl_handle_id(_handle: &CurlHandle) -> i64 {
     todo!()
 }
 
@@ -1112,31 +1118,31 @@ pub fn stream_get_contents_with_max(stream: PhpMixed, max_length: Option<i64>) -
     todo!()
 }
 
-pub fn bin2hex(data: &[u8]) -> String {
+pub fn bin2hex(_data: &[u8]) -> String {
     todo!()
 }
 
-pub fn random_bytes(length: usize) -> Vec<u8> {
+pub fn random_bytes(_length: usize) -> Vec<u8> {
     todo!()
 }
 
-pub fn is_dir(path: &str) -> bool {
+pub fn is_dir(_path: &str) -> bool {
     todo!()
 }
 
-pub fn file_get_contents(path: &str) -> Option<String> {
+pub fn file_get_contents(_path: &str) -> Option<String> {
     todo!()
 }
 
-pub fn strtolower(s: &str) -> String {
+pub fn strtolower(_s: &str) -> String {
     todo!()
 }
 
-pub fn ctype_alnum(s: &str) -> bool {
+pub fn ctype_alnum(_s: &str) -> bool {
     todo!()
 }
 
-pub fn ord(c: &str) -> i64 {
+pub fn ord(_c: &str) -> i64 {
     todo!()
 }
 
@@ -1144,19 +1150,19 @@ pub fn gethostname() -> String {
     todo!()
 }
 
-pub fn feof(stream: PhpMixed) -> bool {
+pub fn feof(_stream: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn str_replace_array(search: &[String], replace: &[String], subject: &str) -> String {
+pub fn str_replace_array(_search: &[String], _replace: &[String], _subject: &str) -> String {
     todo!()
 }
 
-pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
+pub fn file(_filename: &str, _flags: i64) -> Option<Vec<String>> {
     todo!()
 }
 
-pub fn ucwords(s: &str) -> String {
+pub fn ucwords(_s: &str) -> String {
     todo!()
 }
 
@@ -1166,36 +1172,36 @@ pub fn get_current_user() -> String {
 
 pub const FILE_IGNORE_NEW_LINES: i64 = 2;
 
-pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
+pub fn array_diff(_array1: &[String], _array2: &[String]) -> Vec<String> {
     todo!()
 }
 
-pub fn copy(source: &str, dest: &str) -> bool {
+pub fn copy(_source: &str, _dest: &str) -> bool {
     todo!()
 }
 
 pub fn exec(
-    command: &str,
-    output: Option<&mut Vec<String>>,
-    exit_code: Option<&mut i64>,
+    _command: &str,
+    _output: Option<&mut Vec<String>>,
+    _exit_code: Option<&mut i64>,
 ) -> Option<String> {
     todo!()
 }
 
-pub fn tempnam(dir: &str, prefix: &str) -> Option<String> {
+pub fn tempnam(_dir: &str, _prefix: &str) -> Option<String> {
     todo!()
 }
 
 pub fn openssl_verify(
-    data: &str,
-    signature: &[u8],
-    pub_key_id: PhpMixed,
-    algorithm: PhpMixed,
+    _data: &str,
+    _signature: &[u8],
+    _pub_key_id: PhpMixed,
+    _algorithm: PhpMixed,
 ) -> i64 {
     todo!()
 }
 
-pub fn openssl_pkey_get_public(public_key: &str) -> PhpMixed {
+pub fn openssl_pkey_get_public(_public_key: &str) -> PhpMixed {
     todo!()
 }
 
@@ -1203,82 +1209,82 @@ pub fn openssl_get_md_methods() -> Vec<String> {
     todo!()
 }
 
-pub fn openssl_free_key(key: PhpMixed) {
+pub fn openssl_free_key(_key: PhpMixed) {
     todo!()
 }
 
-pub fn iterator_to_array<T>(iter: T) -> Vec<PhpMixed>
+pub fn iterator_to_array<T>(_iter: T) -> Vec<PhpMixed>
 where
     T: IntoIterator<Item = PhpMixed>,
 {
     todo!()
 }
 
-pub fn end_arr<V: Clone>(array: &IndexMap<String, V>) -> Option<V> {
+pub fn end_arr<V: Clone>(_array: &IndexMap<String, V>) -> Option<V> {
     todo!()
 }
 
-pub fn fileowner(filename: &str) -> Option<i64> {
+pub fn fileowner(_filename: &str) -> Option<i64> {
     todo!()
 }
 
-pub fn unlink_silent(path: &str) -> bool {
+pub fn unlink_silent(_path: &str) -> bool {
     todo!()
 }
 
-pub fn array_unique<T: Clone>(array: &[T]) -> Vec<T> {
+pub fn array_unique<T: Clone>(_array: &[T]) -> Vec<T> {
     todo!()
 }
 
-pub fn current(value: PhpMixed) -> PhpMixed {
+pub fn current(_value: PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn key(value: PhpMixed) -> Option<String> {
+pub fn key(_value: PhpMixed) -> Option<String> {
     todo!()
 }
 
-pub fn reset<T: Clone>(array: &[T]) -> Option<T> {
+pub fn reset<T: Clone>(_array: &[T]) -> Option<T> {
     todo!()
 }
 
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
 
 pub fn array_intersect_key(
-    array1: &IndexMap<String, Box<PhpMixed>>,
-    array2: &IndexMap<String, Box<PhpMixed>>,
+    _array1: &IndexMap<String, Box<PhpMixed>>,
+    _array2: &IndexMap<String, Box<PhpMixed>>,
 ) -> IndexMap<String, Box<PhpMixed>> {
     todo!()
 }
 
-pub fn is_file(path: &str) -> bool {
+pub fn is_file(_path: &str) -> bool {
     todo!()
 }
 
-pub fn spl_object_hash<T: ?Sized>(object: &T) -> String {
+pub fn spl_object_hash<T: ?Sized>(_object: &T) -> String {
     todo!()
 }
 
-pub fn serialize(value: &PhpMixed) -> String {
+pub fn serialize(_value: &PhpMixed) -> String {
     todo!()
 }
 
 pub fn stream_context_create(
-    options: &IndexMap<String, PhpMixed>,
-    params: Option<&IndexMap<String, PhpMixed>>,
+    _options: &IndexMap<String, PhpMixed>,
+    _params: Option<&IndexMap<String, PhpMixed>>,
 ) -> PhpMixed {
     todo!()
 }
 
-pub fn stripos(haystack: &str, needle: &str) -> Option<usize> {
+pub fn stripos(_haystack: &str, _needle: &str) -> Option<usize> {
     todo!()
 }
 
-pub fn php_uname(mode: &str) -> String {
+pub fn php_uname(_mode: &str) -> String {
     todo!()
 }
 
-pub fn uasort<F>(array: &mut Vec<String>, compare: F)
+pub fn uasort<F>(_array: &mut Vec<String>, _compare: F)
 where
     F: Fn(&str, &str) -> i64,
 {
@@ -1286,8 +1292,8 @@ where
 }
 
 pub fn array_replace_recursive(
-    base: IndexMap<String, PhpMixed>,
-    replacement: IndexMap<String, PhpMixed>,
+    _base: IndexMap<String, PhpMixed>,
+    _replacement: IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
     todo!()
 }
@@ -1303,7 +1309,7 @@ pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
 pub const GLOB_BRACE: i64 = 4096;
 
-pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
+pub fn glob_with_flags(_pattern: &str, _flags: i64) -> Vec<String> {
     todo!()
 }
 
@@ -1311,11 +1317,11 @@ pub fn time() -> i64 {
     todo!()
 }
 
-pub fn date(format: &str, timestamp: Option<i64>) -> String {
+pub fn date(_format: &str, _timestamp: Option<i64>) -> String {
     todo!()
 }
 
-pub fn trigger_error(message: &str, error_level: i64) {
+pub fn trigger_error(_message: &str, _error_level: i64) {
     todo!()
 }
 
@@ -1323,7 +1329,7 @@ pub fn sys_get_temp_dir() -> String {
     todo!()
 }
 
-pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
+pub fn json_decode(_s: &str, _assoc: bool) -> anyhow::Result<PhpMixed> {
     todo!()
 }
 
@@ -1336,11 +1342,11 @@ pub fn http_build_query_mixed(
     todo!()
 }
 
-pub fn http_build_query(data: &[(&str, &str)], sep_str: &str, sep: &str) -> String {
+pub fn http_build_query(_data: &[(&str, &str)], _sep_str: &str, _sep: &str) -> String {
     todo!()
 }
 
-pub fn token_get_all(source: &str) -> Vec<PhpMixed> {
+pub fn token_get_all(_source: &str) -> Vec<PhpMixed> {
     todo!()
 }
 
@@ -1348,11 +1354,11 @@ pub const T_COMMENT: i64 = 315;
 pub const T_DOC_COMMENT: i64 = 316;
 pub const T_WHITESPACE: i64 = 317;
 
-pub fn dirname_levels(path: &str, levels: i64) -> String {
+pub fn dirname_levels(_path: &str, _levels: i64) -> String {
     todo!()
 }
 
-pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
+pub fn strtr_array(_s: &str, _pairs: &IndexMap<String, String>) -> String {
     todo!()
 }
 
@@ -1365,27 +1371,27 @@ pub fn array_search_mixed(
     todo!()
 }
 
-pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option<String> {
+pub fn array_search(_needle: &str, _haystack: &IndexMap<String, String>) -> Option<String> {
     todo!()
 }
 
-pub fn strcmp(s1: &str, s2: &str) -> i64 {
+pub fn strcmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn rtrim(s: &str, chars: Option<&str>) -> String {
+pub fn rtrim(_s: &str, _chars: Option<&str>) -> String {
     todo!()
 }
 
-pub fn rmdir(dir: &str) -> bool {
+pub fn rmdir(_dir: &str) -> bool {
     todo!()
 }
 
-pub fn is_link(path: &str) -> bool {
+pub fn is_link(_path: &str) -> bool {
     todo!()
 }
 
-pub fn str_pad(input: &str, length: usize, pad_string: &str, pad_type: i64) -> String {
+pub fn str_pad(_input: &str, _length: usize, _pad_string: &str, _pad_type: i64) -> String {
     todo!()
 }
 
@@ -1393,29 +1399,29 @@ pub const STR_PAD_LEFT: i64 = 0;
 pub const STR_PAD_RIGHT: i64 = 1;
 pub const STR_PAD_BOTH: i64 = 2;
 
-pub fn abs(value: i64) -> i64 {
+pub fn abs(_value: i64) -> i64 {
     todo!()
 }
 
 pub const DATE_ATOM: &str = "Y-m-d\\TH:i:sP";
 
-pub fn ucfirst(s: &str) -> String {
+pub fn ucfirst(_s: &str) -> String {
     todo!()
 }
 
-pub fn strval(value: &PhpMixed) -> String {
+pub fn strval(_value: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn usleep(microseconds: u64) {
+pub fn usleep(_microseconds: u64) {
     todo!()
 }
 
-pub fn mb_strlen(s: &str, encoding: &str) -> i64 {
+pub fn mb_strlen(_s: &str, _encoding: &str) -> i64 {
     todo!()
 }
 
-pub fn stream_isatty(stream: PhpMixed) -> bool {
+pub fn stream_isatty(_stream: PhpMixed) -> bool {
     todo!()
 }
 
@@ -1427,40 +1433,40 @@ pub fn posix_geteuid() -> i64 {
     todo!()
 }
 
-pub fn posix_getpwuid(uid: i64) -> PhpMixed {
+pub fn posix_getpwuid(_uid: i64) -> PhpMixed {
     todo!()
 }
 
-pub fn posix_isatty(stream: PhpMixed) -> bool {
+pub fn posix_isatty(_stream: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn fstat(stream: PhpMixed) -> PhpMixed {
+pub fn fstat(_stream: PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn getenv(name: &str) -> Option<String> {
+pub fn getenv(_name: &str) -> Option<String> {
     todo!()
 }
 
-pub fn putenv(setting: &str) -> bool {
+pub fn putenv(_setting: &str) -> bool {
     todo!()
 }
 
 /// PHP superglobal $_SERVER access
-pub fn server_get(name: &str) -> Option<String> {
+pub fn server_get(_name: &str) -> Option<String> {
     todo!()
 }
 
-pub fn server_set(name: &str, value: String) {
+pub fn server_set(_name: &str, _value: String) {
     todo!()
 }
 
-pub fn server_unset(name: &str) {
+pub fn server_unset(_name: &str) {
     todo!()
 }
 
-pub fn server_contains_key(name: &str) -> bool {
+pub fn server_contains_key(_name: &str) -> bool {
     todo!()
 }
 
@@ -1469,83 +1475,83 @@ pub fn server_argv() -> Vec<String> {
 }
 
 /// PHP superglobal $_ENV access
-pub fn env_get(name: &str) -> Option<String> {
+pub fn env_get(_name: &str) -> Option<String> {
     todo!()
 }
 
-pub fn env_set(name: &str, value: String) {
+pub fn env_set(_name: &str, _value: String) {
     todo!()
 }
 
-pub fn env_unset(name: &str) {
+pub fn env_unset(_name: &str) {
     todo!()
 }
 
-pub fn env_contains_key(name: &str) -> bool {
+pub fn env_contains_key(_name: &str) -> bool {
     todo!()
 }
 
-pub fn trim(s: &str, chars: Option<&str>) -> String {
+pub fn trim(_s: &str, _chars: Option<&str>) -> String {
     todo!()
 }
 
-pub fn count(value: &PhpMixed) -> i64 {
+pub fn count(_value: &PhpMixed) -> i64 {
     todo!()
 }
 
-pub fn array_shift<T>(array: &mut Vec<T>) -> Option<T> {
+pub fn array_shift<T>(_array: &mut Vec<T>) -> Option<T> {
     todo!()
 }
 
-pub fn array_pop<T>(array: &mut Vec<T>) -> Option<T> {
+pub fn array_pop<T>(_array: &mut Vec<T>) -> Option<T> {
     todo!()
 }
 
-pub fn array_unshift<T>(array: &mut Vec<T>, value: T) {
+pub fn array_unshift<T>(_array: &mut Vec<T>, _value: T) {
     todo!()
 }
 
-pub fn array_reverse<T: Clone>(array: &[T], preserve_keys: bool) -> Vec<T> {
+pub fn array_reverse<T: Clone>(_array: &[T], _preserve_keys: bool) -> Vec<T> {
     todo!()
 }
 
-pub fn array_filter<T: Clone, F>(array: &[T], callback: F) -> Vec<T>
+pub fn array_filter<T: Clone, F>(_array: &[T], _callback: F) -> Vec<T>
 where
     F: Fn(&T) -> bool,
 {
     todo!()
 }
 
-pub fn array_all<T, F>(array: &[T], callback: F) -> bool
+pub fn array_all<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
     todo!()
 }
 
-pub fn array_any<T, F>(array: &[T], callback: F) -> bool
+pub fn array_any<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
     todo!()
 }
 
-pub fn array_reduce<T, U, F>(array: &[T], callback: F, initial: U) -> U
+pub fn array_reduce<T, U, F>(_array: &[T], _callback: F, _initial: U) -> U
 where
     F: Fn(U, &T) -> U,
 {
     todo!()
 }
 
-pub fn array_intersect<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
+pub fn array_intersect<T: Clone + PartialEq>(_array1: &[T], _array2: &[T]) -> Vec<T> {
     todo!()
 }
 
-pub fn mkdir(pathname: &str, mode: u32, recursive: bool) -> bool {
+pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
     todo!()
 }
 
-pub fn rename(old_name: &str, new_name: &str) -> bool {
+pub fn rename(_old_name: &str, _new_name: &str) -> bool {
     todo!()
 }
 
@@ -1553,11 +1559,11 @@ pub fn clearstatcache() {
     todo!()
 }
 
-pub fn disk_free_space(directory: &str) -> Option<f64> {
+pub fn disk_free_space(_directory: &str) -> Option<f64> {
     todo!()
 }
 
-pub fn filemtime(filename: &str) -> Option<i64> {
+pub fn filemtime(_filename: &str) -> Option<i64> {
     todo!()
 }
 
@@ -1567,23 +1573,23 @@ pub fn php_dir() -> String {
 }
 
 /// Equivalent to PHP's `require <file>` returning the file's return value
-pub fn require_php_file(filename: &str) -> PhpMixed {
+pub fn require_php_file(_filename: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn array_flip(array: &PhpMixed) -> PhpMixed {
+pub fn array_flip(_array: &PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn max(a: i64, b: i64) -> i64 {
+pub fn max(_a: i64, _b: i64) -> i64 {
     todo!()
 }
 
-pub fn array_key_exists<V>(key: &str, array: &IndexMap<String, V>) -> bool {
+pub fn array_key_exists<V>(_key: &str, _array: &IndexMap<String, V>) -> bool {
     todo!()
 }
 
-pub fn fgets(handle: PhpMixed) -> Option<String> {
+pub fn fgets(_handle: PhpMixed) -> Option<String> {
     todo!()
 }
 
@@ -1591,30 +1597,30 @@ pub fn umask() -> u32 {
     todo!()
 }
 
-pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+pub fn basename_with_suffix(_path: &str, _suffix: &str) -> String {
     todo!()
 }
 
-pub fn inet_pton(host: &str) -> Option<Vec<u8>> {
+pub fn inet_pton(_host: &str) -> Option<Vec<u8>> {
     todo!()
 }
 
-pub fn ltrim(s: &str, chars: Option<&str>) -> String {
+pub fn ltrim(_s: &str, _chars: Option<&str>) -> String {
     todo!()
 }
 
-pub fn floor(value: f64) -> f64 {
+pub fn floor(_value: f64) -> f64 {
     todo!()
 }
 
-pub fn chr(value: u8) -> String {
+pub fn chr(_value: u8) -> String {
     todo!()
 }
 
 pub fn filter_var_with_options(
-    value: &str,
-    filter: i64,
-    options: &IndexMap<String, PhpMixed>,
+    _value: &str,
+    _filter: i64,
+    _options: &IndexMap<String, PhpMixed>,
 ) -> PhpMixed {
     todo!()
 }
@@ -1623,11 +1629,11 @@ pub fn memory_get_usage() -> i64 {
     todo!()
 }
 
-pub fn mb_check_encoding(value: &str, encoding: &str) -> bool {
+pub fn mb_check_encoding(_value: &str, _encoding: &str) -> bool {
     todo!()
 }
 
-pub fn iconv(in_charset: &str, out_charset: &str, string: &str) -> Option<String> {
+pub fn iconv(_in_charset: &str, _out_charset: &str, _string: &str) -> Option<String> {
     todo!()
 }
 
@@ -1641,11 +1647,11 @@ pub fn json_last_error() -> i64 {
     todo!()
 }
 
-pub fn sort<T: Ord>(array: &mut Vec<T>) {
+pub fn sort<T: Ord>(_array: &mut Vec<T>) {
     todo!()
 }
 
-pub fn sort_with_flags<T: Ord>(array: &mut Vec<T>, flags: i64) {
+pub fn sort_with_flags<T: Ord>(_array: &mut Vec<T>, _flags: i64) {
     todo!()
 }
 
@@ -1655,70 +1661,70 @@ pub const SORT_STRING: i64 = 2;
 pub const SORT_NATURAL: i64 = 6;
 pub const SORT_FLAG_CASE: i64 = 8;
 
-pub fn usort<T, F>(array: &mut Vec<T>, compare: F)
+pub fn usort<T, F>(_array: &mut Vec<T>, _compare: F)
 where
     F: FnMut(&T, &T) -> i64,
 {
     todo!()
 }
 
-pub fn ksort<V>(array: &mut IndexMap<String, V>) {
+pub fn ksort<V>(_array: &mut IndexMap<String, V>) {
     todo!()
 }
 
-pub fn is_null(value: &PhpMixed) -> bool {
+pub fn is_null(_value: &PhpMixed) -> bool {
     todo!()
 }
 
-pub fn r#eval(code: &str) -> PhpMixed {
+pub fn r#eval(_code: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn array_is_list(array: &PhpMixed) -> bool {
+pub fn array_is_list(_array: &PhpMixed) -> bool {
     todo!()
 }
 
 pub fn array_splice<T>(
-    array: &mut Vec<T>,
-    offset: i64,
-    length: Option<i64>,
-    replacement: Vec<T>,
+    _array: &mut Vec<T>,
+    _offset: i64,
+    _length: Option<i64>,
+    _replacement: Vec<T>,
 ) -> Vec<T> {
     todo!()
 }
 
-pub fn array_pop_first<T>(array: &mut Vec<T>) -> Option<T> {
+pub fn array_pop_first<T>(_array: &mut Vec<T>) -> Option<T> {
     todo!()
 }
 
-pub fn reset_first<T: Clone>(array: &[T]) -> Option<T> {
+pub fn reset_first<T: Clone>(_array: &[T]) -> Option<T> {
     todo!()
 }
 
-pub fn call_user_func<T>(callback: &str, args: &[PhpMixed]) -> T
+pub fn call_user_func<T>(_callback: &str, _args: &[PhpMixed]) -> T
 where
     T: From<PhpMixed>,
 {
     todo!()
 }
 
-pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
+pub fn array_merge_recursive(_arrays: Vec<PhpMixed>) -> PhpMixed {
     todo!()
 }
 
-pub fn levenshtein(string1: &str, string2: &str) -> i64 {
+pub fn levenshtein(_string1: &str, _string2: &str) -> i64 {
     todo!()
 }
 
 pub fn array_slice<V: Clone>(
-    array: &IndexMap<String, V>,
-    offset: i64,
-    length: Option<i64>,
+    _array: &IndexMap<String, V>,
+    _offset: i64,
+    _length: Option<i64>,
 ) -> IndexMap<String, V> {
     todo!()
 }
 
-pub fn asort<V: Ord>(array: &mut IndexMap<String, V>) {
+pub fn asort<V: Ord>(_array: &mut IndexMap<String, V>) {
     todo!()
 }
 
@@ -1726,11 +1732,11 @@ pub const PHP_INT_MAX: i64 = i64::MAX;
 pub const PHP_INT_MIN: i64 = i64::MIN;
 pub const PHP_INT_SIZE: i64 = 8;
 
-pub fn call_user_func_array(callback: &str, args: &PhpMixed) -> PhpMixed {
+pub fn call_user_func_array(_callback: &str, _args: &PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn array_map<T, U, F>(callback: F, array: &[T]) -> Vec<U>
+pub fn array_map<T, U, F>(_callback: F, _array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
 {
@@ -1740,11 +1746,11 @@ where
 impl Phar {
     pub const SHA512: i64 = 16;
 
-    pub fn new_phar(filename: String, flags: i64, alias: &str) -> Self {
+    pub fn new_phar(_filename: String, _flags: i64, _alias: &str) -> Self {
         todo!()
     }
 
-    pub fn set_signature_algorithm(&mut self, algo: i64) {
+    pub fn set_signature_algorithm(&mut self, _algo: i64) {
         todo!()
     }
 
@@ -1756,16 +1762,16 @@ impl Phar {
         todo!()
     }
 
-    pub fn add_from_string(&mut self, path: &str, content: &str) {
+    pub fn add_from_string(&mut self, _path: &str, _content: &str) {
         todo!()
     }
 
-    pub fn set_stub(&mut self, stub: &str) {
+    pub fn set_stub(&mut self, _stub: &str) {
         todo!()
     }
 }
 
-pub fn php_strip_whitespace(path: &str) -> String {
+pub fn php_strip_whitespace(_path: &str) -> String {
     todo!()
 }
 
@@ -1773,7 +1779,7 @@ pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
-pub fn is_readable(path: &str) -> bool {
+pub fn is_readable(_path: &str) -> bool {
     todo!()
 }
 
@@ -1781,11 +1787,11 @@ pub fn stream_get_wrappers() -> Vec<String> {
     todo!()
 }
 
-pub fn php_require(file: &str) -> PhpMixed {
+pub fn php_require(_file: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn intval(value: &PhpMixed) -> i64 {
+pub fn intval(_value: &PhpMixed) -> i64 {
     todo!()
 }
 
@@ -1805,26 +1811,26 @@ impl RecursiveIteratorIterator {
     pub const CHILD_FIRST: i64 = 16;
 }
 
-pub fn recursive_directory_iterator(path: &str, flags: i64) -> RecursiveDirectoryIterator {
+pub fn recursive_directory_iterator(_path: &str, _flags: i64) -> RecursiveDirectoryIterator {
     todo!()
 }
 
 pub fn recursive_iterator_iterator(
-    iter: RecursiveDirectoryIterator,
-    mode: i64,
+    _iter: RecursiveDirectoryIterator,
+    _mode: i64,
 ) -> RecursiveIteratorIterator {
     todo!()
 }
 
-pub fn globals_get(name: &str) -> PhpMixed {
+pub fn globals_get(_name: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn globals_set(name: &str, value: PhpMixed) {
+pub fn globals_set(_name: &str, _value: PhpMixed) {
     todo!()
 }
 
-pub fn clone<T: Clone>(value: T) -> T {
+pub fn clone<T: Clone>(_value: T) -> T {
     todo!()
 }
 
@@ -1832,7 +1838,7 @@ pub fn date_default_timezone_get() -> String {
     todo!()
 }
 
-pub fn date_default_timezone_set(tz: &str) -> bool {
+pub fn date_default_timezone_set(_tz: &str) -> bool {
     todo!()
 }
 
@@ -1840,23 +1846,23 @@ pub fn getmypid() -> i64 {
     todo!()
 }
 
-pub fn ini_set(varname: &str, value: &str) -> Option<String> {
+pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
     todo!()
 }
 
-pub fn is_subclass_of(object_or_class: &PhpMixed, class_name: &str, allow_string: bool) -> bool {
+pub fn is_subclass_of(_object_or_class: &PhpMixed, _class_name: &str, _allow_string: bool) -> bool {
     todo!()
 }
 
-pub fn memory_get_peak_usage(real_usage: bool) -> i64 {
+pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
     todo!()
 }
 
-pub fn register_shutdown_function(callback: Box<dyn Fn()>) {
+pub fn register_shutdown_function(_callback: Box<dyn Fn()>) {
     todo!()
 }
 
-pub fn round(value: f64, precision: i64) -> f64 {
+pub fn round(_value: f64, _precision: i64) -> f64 {
     todo!()
 }
 
@@ -1868,39 +1874,39 @@ pub fn composer_dev_warning_time() -> i64 {
     todo!()
 }
 
-pub fn instantiate_class(class: &str, args: Vec<PhpMixed>) -> PhpMixed {
+pub fn instantiate_class(_class: &str, _args: Vec<PhpMixed>) -> PhpMixed {
     todo!()
 }
 
 pub fn array_filter_use_key(
-    array: &IndexMap<String, PhpMixed>,
-    callback: Box<dyn Fn(&str) -> bool>,
+    _array: &IndexMap<String, PhpMixed>,
+    _callback: Box<dyn Fn(&str) -> bool>,
 ) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 
-pub fn escapeshellcmd(command: &str) -> String {
+pub fn escapeshellcmd(_command: &str) -> String {
     todo!()
 }
 
-pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
+pub fn system(_command: &str, _result_code: Option<&mut i64>) -> Option<String> {
     todo!()
 }
 
-pub fn array_chunk<T: Clone>(array: &[T], size: i64, preserve_keys: bool) -> Vec<Vec<T>> {
+pub fn array_chunk<T: Clone>(_array: &[T], _size: i64, _preserve_keys: bool) -> Vec<Vec<T>> {
     todo!()
 }
 
 pub fn number_format(
-    number: f64,
-    decimals: i64,
-    decimal_separator: &str,
-    thousands_separator: &str,
+    _number: f64,
+    _decimals: i64,
+    _decimal_separator: &str,
+    _thousands_separator: &str,
 ) -> String {
     todo!()
 }
 
-pub fn is_executable(path: &str) -> bool {
+pub fn is_executable(_path: &str) -> bool {
     todo!()
 }
 
@@ -1916,65 +1922,65 @@ pub fn gc_enable() {
     todo!()
 }
 
-pub fn addcslashes(string: &str, charlist: &str) -> String {
+pub fn addcslashes(_string: &str, _charlist: &str) -> String {
     todo!()
 }
 
-pub fn strnatcmp(s1: &str, s2: &str) -> i64 {
+pub fn strnatcmp(_s1: &str, _s2: &str) -> i64 {
     todo!()
 }
 
-pub fn uksort<V, F>(array: &mut IndexMap<String, V>, callback: F)
+pub fn uksort<V, F>(_array: &mut IndexMap<String, V>, _callback: F)
 where
     F: FnMut(&str, &str) -> i64,
 {
     todo!()
 }
 
-pub fn end<V: Clone>(array: &[V]) -> Option<V> {
+pub fn end<V: Clone>(_array: &[V]) -> Option<V> {
     todo!()
 }
 
-pub fn fileatime(filename: &str) -> Option<i64> {
+pub fn fileatime(_filename: &str) -> Option<i64> {
     todo!()
 }
 
-pub fn fread(handle: PhpMixed, length: i64) -> Option<String> {
+pub fn fread(_handle: PhpMixed, _length: i64) -> Option<String> {
     todo!()
 }
 
-pub fn lstat(filename: &str) -> Option<IndexMap<String, Box<PhpMixed>>> {
+pub fn lstat(_filename: &str) -> Option<IndexMap<String, Box<PhpMixed>>> {
     todo!()
 }
 
-pub fn react_promise_resolve(value: PhpMixed) -> PhpMixed {
+pub fn react_promise_resolve(_value: PhpMixed) -> PhpMixed {
     todo!()
 }
 
-pub fn symlink(target: &str, link: &str) -> bool {
+pub fn symlink(_target: &str, _link: &str) -> bool {
     todo!()
 }
 
 pub fn array_diff_key(
-    array1: IndexMap<String, PhpMixed>,
-    array2: &IndexMap<String, PhpMixed>,
+    _array1: IndexMap<String, PhpMixed>,
+    _array2: &IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 
-pub fn min(a: i64, b: i64) -> i64 {
+pub fn min(_a: i64, _b: i64) -> i64 {
     todo!()
 }
 
-pub fn escapeshellarg(arg: &str) -> String {
+pub fn escapeshellarg(_arg: &str) -> String {
     todo!()
 }
 
-pub fn strcspn(string: &str, characters: &str) -> usize {
+pub fn strcspn(_string: &str, _characters: &str) -> usize {
     todo!()
 }
 
-pub fn strstr(haystack: &str, needle: &str) -> Option<String> {
+pub fn strstr(_haystack: &str, _needle: &str) -> Option<String> {
     todo!()
 }
 
@@ -1986,15 +1992,15 @@ pub fn ioncube_loader_version() -> String {
     todo!()
 }
 
-pub fn phpinfo(what: i64) {
+pub fn phpinfo(_what: i64) {
     todo!()
 }
 
-pub fn opendir(path: &str) -> Option<PhpMixed> {
+pub fn opendir(_path: &str) -> Option<PhpMixed> {
     todo!()
 }
 
-pub fn stream_copy_to_stream(source: PhpMixed, dest: PhpMixed) -> Option<i64> {
+pub fn stream_copy_to_stream(_source: PhpMixed, _dest: PhpMixed) -> Option<i64> {
     todo!()
 }
 
@@ -2016,7 +2022,7 @@ pub struct ArrayObject {
 }
 
 impl ArrayObject {
-    pub fn new(array: Option<PhpMixed>) -> Self {
+    pub fn new(_array: Option<PhpMixed>) -> Self {
         todo!()
     }
 }

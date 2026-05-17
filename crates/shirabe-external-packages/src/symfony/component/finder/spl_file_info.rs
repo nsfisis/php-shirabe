@@ -2,7 +2,7 @@
 pub struct SplFileInfo;
 
 impl SplFileInfo {
-    pub fn new(path: &str) -> Self {
+    pub fn new(_path: &str) -> Self {
         todo!()
     }
 
@@ -18,7 +18,7 @@ impl SplFileInfo {
         todo!()
     }
 
-    pub fn get_basename(&self, suffix: Option<&str>) -> String {
+    pub fn get_basename(&self, _suffix: Option<&str>) -> String {
         todo!()
     }
 

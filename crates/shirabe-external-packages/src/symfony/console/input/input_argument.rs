@@ -9,10 +9,10 @@ impl InputArgument {
     pub const IS_ARRAY: i64 = 4;
 
     pub fn new(
-        name: &str,
-        mode: Option<i64>,
-        description: &str,
-        default: Option<PhpMixed>,
+        _name: &str,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: Option<PhpMixed>,
     ) -> Self {
         todo!()
     }

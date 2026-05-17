@@ -4,19 +4,19 @@ use shirabe_php_shim::PhpMixed;
 pub struct Table;
 
 impl Table {
-    pub fn new(output: &dyn std::any::Any) -> Self {
+    pub fn new(_output: &dyn std::any::Any) -> Self {
         todo!()
     }
 
-    pub fn set_headers(&mut self, headers: Vec<PhpMixed>) -> &mut Self {
+    pub fn set_headers(&mut self, _headers: Vec<PhpMixed>) -> &mut Self {
         todo!()
     }
 
-    pub fn set_rows(&mut self, rows: Vec<PhpMixed>) -> &mut Self {
+    pub fn set_rows(&mut self, _rows: Vec<PhpMixed>) -> &mut Self {
         todo!()
     }
 
-    pub fn add_row(&mut self, row: PhpMixed) -> &mut Self {
+    pub fn add_row(&mut self, _row: PhpMixed) -> &mut Self {
         todo!()
     }
 

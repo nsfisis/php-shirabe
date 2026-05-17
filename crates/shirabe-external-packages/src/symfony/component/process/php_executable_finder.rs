@@ -1,12 +1,18 @@
 #[derive(Debug)]
 pub struct PhpExecutableFinder;
 
+impl Default for PhpExecutableFinder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PhpExecutableFinder {
     pub fn new() -> Self {
         todo!()
     }
 
-    pub fn find(&self, include_args: bool) -> Option<String> {
+    pub fn find(&self, _include_args: bool) -> Option<String> {
         todo!()
     }
 

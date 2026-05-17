@@ -6,89 +6,89 @@ use shirabe_php_shim::PhpMixed;
 pub struct SymfonyStyle;
 
 impl SymfonyStyle {
-    pub fn new(input: &dyn InputInterface, output: &dyn OutputInterface) -> Self {
+    pub fn new(_input: &dyn InputInterface, _output: &dyn OutputInterface) -> Self {
         todo!()
     }
 
-    pub fn title(&mut self, message: &str) {
+    pub fn title(&mut self, _message: &str) {
         todo!()
     }
 
-    pub fn section(&mut self, message: &str) {
+    pub fn section(&mut self, _message: &str) {
         todo!()
     }
 
-    pub fn text(&mut self, message: &str) {
+    pub fn text(&mut self, _message: &str) {
         todo!()
     }
 
-    pub fn comment(&mut self, message: &str) {
+    pub fn comment(&mut self, _message: &str) {
         todo!()
     }
 
-    pub fn success(&mut self, message: PhpMixed) {
+    pub fn success(&mut self, _message: PhpMixed) {
         todo!()
     }
 
-    pub fn error(&mut self, message: PhpMixed) {
+    pub fn error(&mut self, _message: PhpMixed) {
         todo!()
     }
 
-    pub fn warning(&mut self, message: PhpMixed) {
+    pub fn warning(&mut self, _message: PhpMixed) {
         todo!()
     }
 
-    pub fn note(&mut self, message: PhpMixed) {
+    pub fn note(&mut self, _message: PhpMixed) {
         todo!()
     }
 
-    pub fn listing(&mut self, elements: &[String]) {
+    pub fn listing(&mut self, _elements: &[String]) {
         todo!()
     }
 
-    pub fn new_line(&mut self, count: i64) {
+    pub fn new_line(&mut self, _count: i64) {
         todo!()
     }
 
     pub fn ask(
         &mut self,
-        question: &str,
-        default: Option<&str>,
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+        _question: &str,
+        _default: Option<&str>,
+        _validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
     ) -> PhpMixed {
         todo!()
     }
 
     pub fn ask_hidden(
         &mut self,
-        question: &str,
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+        _question: &str,
+        _validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
     ) -> PhpMixed {
         todo!()
     }
 
-    pub fn confirm(&mut self, question: &str, default: bool) -> bool {
+    pub fn confirm(&mut self, _question: &str, _default: bool) -> bool {
         todo!()
     }
 
     pub fn choice(
         &mut self,
-        question: &str,
-        choices: Vec<PhpMixed>,
-        default: Option<PhpMixed>,
+        _question: &str,
+        _choices: Vec<PhpMixed>,
+        _default: Option<PhpMixed>,
     ) -> PhpMixed {
         todo!()
     }
 
-    pub fn table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>) {
+    pub fn table(&mut self, _headers: Vec<PhpMixed>, _rows: Vec<PhpMixed>) {
         todo!()
     }
 
-    pub fn progress_start(&mut self, max: i64) {
+    pub fn progress_start(&mut self, _max: i64) {
         todo!()
     }
 
-    pub fn progress_advance(&mut self, step: i64) {
+    pub fn progress_advance(&mut self, _step: i64) {
         todo!()
     }
 
@@ -100,11 +100,11 @@ impl SymfonyStyle {
         todo!()
     }
 
-    pub fn writeln(&mut self, messages: PhpMixed, r#type: i64) {
+    pub fn writeln(&mut self, _messages: PhpMixed, _type: i64) {
         todo!()
     }
 
-    pub fn write(&mut self, messages: PhpMixed, newline: bool, r#type: i64) {
+    pub fn write(&mut self, _messages: PhpMixed, _newline: bool, _type: i64) {
         todo!()
     }
 }

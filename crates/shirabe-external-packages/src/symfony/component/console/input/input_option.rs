@@ -11,11 +11,11 @@ impl InputOption {
     pub const VALUE_NEGATABLE: i64 = 16;
 
     pub fn new(
-        name: &str,
-        shortcut: Option<&str>,
-        mode: Option<i64>,
-        description: &str,
-        default: PhpMixed,
+        _name: &str,
+        _shortcut: Option<&str>,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: PhpMixed,
     ) -> Self {
         todo!()
     }

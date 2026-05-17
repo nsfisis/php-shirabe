@@ -1,5 +1,4 @@
 use crate::symfony::component::console::formatter::output_formatter::OutputFormatter;
-use crate::symfony::component::console::output::console_output_interface::ConsoleOutputInterface;
 use crate::symfony::component::console::output::output_interface::OutputInterface;
 
 #[derive(Debug)]
@@ -7,9 +6,9 @@ pub struct ConsoleOutput;
 
 impl ConsoleOutput {
     pub fn new(
-        verbosity: i64,
-        decorated: Option<bool>,
-        formatter: Option<OutputFormatter>,
+        _verbosity: i64,
+        _decorated: Option<bool>,
+        _formatter: Option<OutputFormatter>,
     ) -> Self {
         todo!()
     }

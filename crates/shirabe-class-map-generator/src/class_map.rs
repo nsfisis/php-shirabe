@@ -2,9 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{
-    Countable, InvalidArgumentException, OutOfBoundsException, rtrim, strpos, strtr,
-};
+use shirabe_php_shim::{Countable, OutOfBoundsException, rtrim, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -17,6 +15,12 @@ pub struct ClassMap {
     pub map: IndexMap<String, String>,
     ambiguous_classes: IndexMap<String, Vec<String>>,
     psr_violations: IndexMap<String, Vec<PsrViolationEntry>>,
+}
+
+impl Default for ClassMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ClassMap {

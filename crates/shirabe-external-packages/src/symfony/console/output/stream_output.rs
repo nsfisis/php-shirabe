@@ -5,7 +5,7 @@ use shirabe_php_shim::PhpMixed;
 pub struct StreamOutput;
 
 impl StreamOutput {
-    pub fn new(stream: PhpMixed, verbosity: i64, decorated: Option<bool>) -> Self {
+    pub fn new(_stream: PhpMixed, _verbosity: i64, _decorated: Option<bool>) -> Self {
         todo!()
     }
 }

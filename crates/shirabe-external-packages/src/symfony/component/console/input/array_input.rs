@@ -8,8 +8,8 @@ pub struct ArrayInput;
 
 impl ArrayInput {
     pub fn new(
-        parameters: IndexMap<String, PhpMixed>,
-        definition: Option<InputDefinition>,
+        _parameters: IndexMap<String, PhpMixed>,
+        _definition: Option<InputDefinition>,
     ) -> Self {
         todo!()
     }

@@ -9,9 +9,9 @@ pub struct QuestionHelper;
 impl QuestionHelper {
     pub fn ask(
         &self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
-        question: &Question,
+        _input: &mut dyn InputInterface,
+        _output: &mut dyn OutputInterface,
+        _question: &Question,
     ) -> Option<PhpMixed> {
         todo!()
     }

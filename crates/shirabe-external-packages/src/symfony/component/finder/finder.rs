@@ -3,6 +3,12 @@ use crate::symfony::component::finder::spl_file_info::SplFileInfo;
 #[derive(Debug)]
 pub struct Finder;
 
+impl Default for Finder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Finder {
     pub fn new() -> Self {
         todo!()
@@ -20,11 +26,11 @@ impl Finder {
         todo!()
     }
 
-    pub fn depth(&mut self, level: i64) -> &mut Self {
+    pub fn depth(&mut self, _level: i64) -> &mut Self {
         todo!()
     }
 
-    pub fn r#in(&mut self, dirs: &str) -> &mut Self {
+    pub fn r#in(&mut self, _dirs: &str) -> &mut Self {
         todo!()
     }
 
@@ -32,23 +38,23 @@ impl Finder {
         todo!()
     }
 
-    pub fn exclude(&mut self, exclude: &[String]) -> &mut Self {
+    pub fn exclude(&mut self, _exclude: &[String]) -> &mut Self {
         todo!()
     }
 
-    pub fn ignore_vcs(&mut self, ignore_vcs: bool) -> &mut Self {
+    pub fn ignore_vcs(&mut self, _ignore_vcs: bool) -> &mut Self {
         todo!()
     }
 
-    pub fn ignore_dot_files(&mut self, ignore_dot_files: bool) -> &mut Self {
+    pub fn ignore_dot_files(&mut self, _ignore_dot_files: bool) -> &mut Self {
         todo!()
     }
 
-    pub fn not_name(&mut self, pattern: &str) -> &mut Self {
+    pub fn not_name(&mut self, _pattern: &str) -> &mut Self {
         todo!()
     }
 
-    pub fn name(&mut self, pattern: &str) -> &mut Self {
+    pub fn name(&mut self, _pattern: &str) -> &mut Self {
         todo!()
     }
 

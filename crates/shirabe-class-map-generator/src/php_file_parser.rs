@@ -45,17 +45,17 @@ impl PhpFileParser {
                 message,
                 &[shirabe_php_shim::PhpMixed::String(path.to_string())],
             );
-            if let Some(error) = error {
-                if let Some(err_msg) = error.get("message") {
-                    message = format!(
-                        "{}{}{}{}{}",
-                        message,
-                        PHP_EOL,
-                        "The following message may be helpful:",
-                        PHP_EOL,
-                        err_msg.as_string().unwrap_or("")
-                    );
-                }
+            if let Some(error) = error
+                && let Some(err_msg) = error.get("message")
+            {
+                message = format!(
+                    "{}{}{}{}{}",
+                    message,
+                    PHP_EOL,
+                    "The following message may be helpful:",
+                    PHP_EOL,
+                    err_msg.as_string().unwrap_or("")
+                );
             }
 
             return Err(anyhow!(RuntimeException { message, code: 0 }));

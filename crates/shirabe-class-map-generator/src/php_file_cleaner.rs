@@ -120,7 +120,7 @@ impl PhpFileCleaner {
                     };
                     if let Some(entry) = type_entry {
                         let end = self.index + entry.length;
-                        if end <= self.len && &self.contents[self.index..end] == entry.name {
+                        if end <= self.len && self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
                             let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
                             if Preg::is_match5(

@@ -4,22 +4,22 @@ use shirabe_php_shim::PhpMixed;
 pub struct Question;
 
 impl Question {
-    pub fn new(question: &str, default: Option<PhpMixed>) -> Self {
+    pub fn new(_question: &str, _default: Option<PhpMixed>) -> Self {
         todo!()
     }
 
     pub fn set_validator(
         &mut self,
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
+        _validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
     ) {
         todo!()
     }
 
-    pub fn set_max_attempts(&mut self, attempts: Option<i64>) {
+    pub fn set_max_attempts(&mut self, _attempts: Option<i64>) {
         todo!()
     }
 
-    pub fn set_hidden(&mut self, hidden: bool) {
+    pub fn set_hidden(&mut self, _hidden: bool) {
         todo!()
     }
 

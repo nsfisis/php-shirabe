@@ -3,9 +3,9 @@ pub struct OutputFormatterStyle;
 
 impl OutputFormatterStyle {
     pub fn new(
-        foreground: Option<&str>,
-        background: Option<&str>,
-        options: Option<Vec<String>>,
+        _foreground: Option<&str>,
+        _background: Option<&str>,
+        _options: Option<Vec<String>>,
     ) -> Self {
         todo!()
     }

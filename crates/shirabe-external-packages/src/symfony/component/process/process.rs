@@ -1,5 +1,4 @@
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Process;
@@ -9,57 +8,57 @@ impl Process {
     pub const OUT: &'static str = "out";
 
     pub fn new(
-        command: Vec<String>,
-        cwd: Option<String>,
-        env: Option<IndexMap<String, String>>,
-        input: Option<String>,
-        timeout: Option<f64>,
+        _command: Vec<String>,
+        _cwd: Option<String>,
+        _env: Option<IndexMap<String, String>>,
+        _input: Option<String>,
+        _timeout: Option<f64>,
     ) -> Self {
         todo!()
     }
 
     pub fn from_shell_commandline(
-        command: &str,
-        cwd: Option<&str>,
-        env: Option<IndexMap<String, String>>,
-        input: Option<String>,
-        timeout: Option<f64>,
+        _command: &str,
+        _cwd: Option<&str>,
+        _env: Option<IndexMap<String, String>>,
+        _input: Option<String>,
+        _timeout: Option<f64>,
     ) -> Self {
         todo!()
     }
 
-    pub fn set_timeout(&mut self, timeout: Option<f64>) -> &mut Self {
+    pub fn set_timeout(&mut self, _timeout: Option<f64>) -> &mut Self {
         todo!()
     }
 
-    pub fn set_env(&mut self, env: IndexMap<String, String>) -> &mut Self {
+    pub fn set_env(&mut self, _env: IndexMap<String, String>) -> &mut Self {
         todo!()
     }
 
-    pub fn set_input(&mut self, input: Option<String>) -> &mut Self {
+    pub fn set_input(&mut self, _input: Option<String>) -> &mut Self {
         todo!()
     }
 
-    pub fn run(&mut self, callback: Option<Box<dyn FnMut(&str, &str)>>) -> i64 {
+    pub fn run(&mut self, _callback: Option<Box<dyn FnMut(&str, &str)>>) -> i64 {
         todo!()
     }
 
     pub fn must_run(
         &mut self,
-        callback: Option<Box<dyn FnMut(&str, &str)>>,
+        _callback: Option<Box<dyn FnMut(&str, &str)>>,
     ) -> anyhow::Result<&mut Self> {
         todo!()
     }
 
-    pub fn start(&mut self, callback: Option<Box<dyn FnMut(&str, &str)>>) {
+    pub fn start(&mut self, _callback: Option<Box<dyn FnMut(&str, &str)>>) {
         todo!()
     }
 
-    pub fn wait(&mut self, callback: Option<Box<dyn FnMut(&str, &str)>>) -> i64 {
+    pub fn wait(&mut self, _callback: Option<Box<dyn FnMut(&str, &str)>>) -> i64 {
         todo!()
     }
 
-    pub fn stop(&mut self, timeout: f64, signal: Option<i64>) -> Option<i64> {
+    pub fn stop(&mut self, _timeout: f64, _signal: Option<i64>) -> Option<i64> {
         todo!()
     }
 
@@ -107,7 +106,7 @@ impl Process {
         todo!()
     }
 
-    pub fn set_working_directory(&mut self, cwd: &str) -> &mut Self {
+    pub fn set_working_directory(&mut self, _cwd: &str) -> &mut Self {
         todo!()
     }
 }

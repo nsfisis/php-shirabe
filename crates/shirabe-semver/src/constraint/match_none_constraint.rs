@@ -22,10 +22,10 @@ impl ConstraintInterface for MatchNoneConstraint {
     }
 
     fn get_pretty_string(&self) -> String {
-        if let Some(ref s) = self.pretty_string {
-            if !s.is_empty() {
-                return s.clone();
-            }
+        if let Some(ref s) = self.pretty_string
+            && !s.is_empty()
+        {
+            return s.clone();
         }
         self.__to_string()
     }

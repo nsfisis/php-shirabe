@@ -6,7 +6,7 @@ impl SignalHandler {
     pub const SIGTERM: &'static str = "SIGTERM";
     pub const SIGHUP: &'static str = "SIGHUP";
 
-    pub fn create(signals: Vec<String>, callback: Box<dyn Fn(String, &SignalHandler)>) -> Self {
+    pub fn create(_signals: Vec<String>, _callback: Box<dyn Fn(String, &SignalHandler)>) -> Self {
         todo!()
     }
 

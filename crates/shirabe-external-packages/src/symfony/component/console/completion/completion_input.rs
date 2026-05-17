@@ -1,5 +1,3 @@
-use shirabe_php_shim::PhpMixed;
-
 #[derive(Debug)]
 pub struct CompletionInput;
 
@@ -16,11 +14,11 @@ impl CompletionInput {
         todo!()
     }
 
-    pub fn must_suggest_option_values_for(&self, name: &str) -> bool {
+    pub fn must_suggest_option_values_for(&self, _name: &str) -> bool {
         todo!()
     }
 
-    pub fn must_suggest_argument_values_for(&self, name: &str) -> bool {
+    pub fn must_suggest_argument_values_for(&self, _name: &str) -> bool {
         todo!()
     }
 }

@@ -8,11 +8,11 @@ impl CaBundle {
         todo!()
     }
 
-    pub fn get_system_ca_root_bundle_path(logger: Option<&dyn LoggerInterface>) -> String {
+    pub fn get_system_ca_root_bundle_path(_logger: Option<&dyn LoggerInterface>) -> String {
         todo!()
     }
 
-    pub fn validate_ca_file(ca_file: &str, logger: Option<&dyn LoggerInterface>) -> bool {
+    pub fn validate_ca_file(_ca_file: &str, _logger: Option<&dyn LoggerInterface>) -> bool {
         todo!()
     }
 

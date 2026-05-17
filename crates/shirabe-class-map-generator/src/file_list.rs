@@ -8,6 +8,12 @@ pub struct FileList {
     pub files: IndexMap<String, bool>,
 }
 
+impl Default for FileList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FileList {
     pub fn new() -> Self {
         FileList {

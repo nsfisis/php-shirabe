@@ -6,7 +6,7 @@ use shirabe_php_shim::PhpMixed;
 pub struct StringInput;
 
 impl StringInput {
-    pub fn new(input: &str) -> Self {
+    pub fn new(_input: &str) -> Self {
         todo!()
     }
 }

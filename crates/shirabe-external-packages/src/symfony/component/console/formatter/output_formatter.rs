@@ -2,11 +2,11 @@
 pub struct OutputFormatter;
 
 impl OutputFormatter {
-    pub fn new(decorated: bool) -> Self {
+    pub fn new(_decorated: bool) -> Self {
         todo!()
     }
 
-    pub fn format(&self, message: &str) -> String {
+    pub fn format(&self, _message: &str) -> String {
         todo!()
     }
 
@@ -14,22 +14,22 @@ impl OutputFormatter {
         todo!()
     }
 
-    pub fn set_decorated(&mut self, decorated: bool) {
+    pub fn set_decorated(&mut self, _decorated: bool) {
         todo!()
     }
 
-    pub fn escape(text: &str) -> String {
+    pub fn escape(_text: &str) -> String {
         todo!()
     }
 
-    pub fn escape_trailing_backslash(text: &str) -> String {
+    pub fn escape_trailing_backslash(_text: &str) -> String {
         todo!()
     }
 
     pub fn set_style(
         &mut self,
-        name: &str,
-        style: crate::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle,
+        _name: &str,
+        _style: crate::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle,
     ) {
         todo!()
     }

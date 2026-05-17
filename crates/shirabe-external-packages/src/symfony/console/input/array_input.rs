@@ -6,7 +6,7 @@ use shirabe_php_shim::PhpMixed;
 pub struct ArrayInput;
 
 impl ArrayInput {
-    pub fn new(parameters: IndexMap<String, PhpMixed>) -> Self {
+    pub fn new(_parameters: IndexMap<String, PhpMixed>) -> Self {
         todo!()
     }
 }

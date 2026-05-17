@@ -4,15 +4,15 @@ use crate::symfony::component::console::output::output_interface::OutputInterfac
 pub struct ProgressBar;
 
 impl ProgressBar {
-    pub fn new(output: &dyn OutputInterface, max: i64) -> Self {
+    pub fn new(_output: &dyn OutputInterface, _max: i64) -> Self {
         todo!()
     }
 
-    pub fn start(&mut self, max: Option<i64>) {
+    pub fn start(&mut self, _max: Option<i64>) {
         todo!()
     }
 
-    pub fn advance(&mut self, step: i64) {
+    pub fn advance(&mut self, _step: i64) {
         todo!()
     }
 
@@ -20,7 +20,7 @@ impl ProgressBar {
         todo!()
     }
 
-    pub fn set_format(&mut self, format: &str) {
+    pub fn set_format(&mut self, _format: &str) {
         todo!()
     }
 

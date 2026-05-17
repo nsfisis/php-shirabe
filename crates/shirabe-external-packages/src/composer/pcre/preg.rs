@@ -2,518 +2,518 @@
 pub struct Preg;
 
 impl Preg {
-    pub fn r#match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn r#match(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn match_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn match_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_strict_groups4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn match_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn match_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_with_offsets3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_with_offsets4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn match_with_offsets5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn match_all(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+    pub fn match_all(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
-    pub fn match_all_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+    pub fn match_all_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_strict_groups4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
-    pub fn match_all_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+    pub fn match_all_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_with_offsets3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_with_offsets4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _flags: i64,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
     pub fn match_all_with_offsets5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<usize> {
         todo!()
     }
 
-    pub fn replace(pattern: &str, replacement: &str, subject: &str) -> anyhow::Result<String> {
+    pub fn replace(_pattern: &str, _replacement: &str, _subject: &str) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace4(
-        pattern: &str,
-        replacement: &str,
-        subject: &str,
-        limit: i64,
+        _pattern: &str,
+        _replacement: &str,
+        _subject: &str,
+        _limit: i64,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace5(
-        pattern: &str,
-        replacement: &str,
-        subject: &str,
-        limit: i64,
-        count: &mut usize,
+        _pattern: &str,
+        _replacement: &str,
+        _subject: &str,
+        _limit: i64,
+        _count: &mut usize,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
-        replacement: F,
-        subject: &str,
+        _pattern: &str,
+        _replacement: F,
+        _subject: &str,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback4<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
-        replacement: F,
-        subject: &str,
-        limit: i64,
+        _pattern: &str,
+        _replacement: F,
+        _subject: &str,
+        _limit: i64,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback5<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
-        replacement: F,
-        subject: &str,
-        limit: i64,
-        count: &mut usize,
+        _pattern: &str,
+        _replacement: F,
+        _subject: &str,
+        _limit: i64,
+        _count: &mut usize,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback6<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        pattern: &str,
-        replacement: F,
-        subject: &str,
-        limit: i64,
-        count: Option<&mut usize>,
-        flags: i64,
+        _pattern: &str,
+        _replacement: F,
+        _subject: &str,
+        _limit: i64,
+        _count: Option<&mut usize>,
+        _flags: i64,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback_array(
-        pattern: &indexmap::IndexMap<String, String>,
-        subject: &str,
+        _pattern: &indexmap::IndexMap<String, String>,
+        _subject: &str,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback_array3(
-        pattern: &indexmap::IndexMap<String, String>,
-        subject: &str,
-        limit: i64,
+        _pattern: &indexmap::IndexMap<String, String>,
+        _subject: &str,
+        _limit: i64,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback_array4(
-        pattern: &indexmap::IndexMap<String, String>,
-        subject: &str,
-        limit: i64,
-        count: &mut usize,
+        _pattern: &indexmap::IndexMap<String, String>,
+        _subject: &str,
+        _limit: i64,
+        _count: &mut usize,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
     pub fn replace_callback_array5(
-        pattern: &indexmap::IndexMap<String, String>,
-        subject: &str,
-        limit: i64,
-        count: Option<&mut usize>,
-        flags: i64,
+        _pattern: &indexmap::IndexMap<String, String>,
+        _subject: &str,
+        _limit: i64,
+        _count: Option<&mut usize>,
+        _flags: i64,
     ) -> anyhow::Result<String> {
         todo!()
     }
 
-    pub fn split(pattern: &str, subject: &str) -> anyhow::Result<Vec<String>> {
+    pub fn split(_pattern: &str, _subject: &str) -> anyhow::Result<Vec<String>> {
         todo!()
     }
 
-    pub fn split3(pattern: &str, subject: &str, limit: i64) -> anyhow::Result<Vec<String>> {
+    pub fn split3(_pattern: &str, _subject: &str, _limit: i64) -> anyhow::Result<Vec<String>> {
         todo!()
     }
 
     pub fn split4(
-        pattern: &str,
-        subject: &str,
-        limit: i64,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _limit: i64,
+        _flags: i64,
     ) -> anyhow::Result<Vec<String>> {
         todo!()
     }
 
     pub fn split_with_offsets(
-        pattern: &str,
-        subject: &str,
+        _pattern: &str,
+        _subject: &str,
     ) -> anyhow::Result<Vec<(String, usize)>> {
         todo!()
     }
 
     pub fn split_with_offsets3(
-        pattern: &str,
-        subject: &str,
-        limit: i64,
+        _pattern: &str,
+        _subject: &str,
+        _limit: i64,
     ) -> anyhow::Result<Vec<(String, usize)>> {
         todo!()
     }
 
     pub fn split_with_offsets4(
-        pattern: &str,
-        subject: &str,
-        limit: i64,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _limit: i64,
+        _flags: i64,
     ) -> anyhow::Result<Vec<(String, usize)>> {
         todo!()
     }
 
-    pub fn grep(pattern: &str, array: &[&str]) -> anyhow::Result<Vec<String>> {
+    pub fn grep(_pattern: &str, _array: &[&str]) -> anyhow::Result<Vec<String>> {
         todo!()
     }
 
-    pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> anyhow::Result<Vec<String>> {
+    pub fn grep3(_pattern: &str, _array: &[&str], _flags: i64) -> anyhow::Result<Vec<String>> {
         todo!()
     }
 
-    pub fn is_match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn is_match_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_strict_groups4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn is_match_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_with_offsets3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_with_offsets4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_with_offsets5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn is_match_all(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match_all(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn is_match_all_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match_all_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_strict_groups4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
-    pub fn is_match_all_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match_all_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_with_offsets3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_with_offsets4(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        flags: i64,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _flags: i64,
     ) -> anyhow::Result<bool> {
         todo!()
     }
 
     pub fn is_match_all_with_offsets5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        flags: i64,
-        offset: usize,
+        _pattern: &str,
+        _subject: &str,
+        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        _flags: i64,
+        _offset: usize,
     ) -> anyhow::Result<bool> {
         todo!()
     }

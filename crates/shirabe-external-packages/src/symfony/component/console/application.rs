@@ -6,19 +6,19 @@ use shirabe_php_shim::PhpMixed;
 pub struct Application;
 
 impl Application {
-    pub fn new(name: &str, version: &str) -> Self {
+    pub fn new(_name: &str, _version: &str) -> Self {
         todo!()
     }
 
     pub fn run(
         &mut self,
-        input: Option<&mut dyn InputInterface>,
-        output: Option<&mut dyn OutputInterface>,
+        _input: Option<&mut dyn InputInterface>,
+        _output: Option<&mut dyn OutputInterface>,
     ) -> anyhow::Result<i64> {
         todo!()
     }
 
-    pub fn set_name(&mut self, name: &str) {
+    pub fn set_name(&mut self, _name: &str) {
         todo!()
     }
 
@@ -26,7 +26,7 @@ impl Application {
         todo!()
     }
 
-    pub fn set_version(&mut self, version: &str) {
+    pub fn set_version(&mut self, _version: &str) {
         todo!()
     }
 
@@ -34,19 +34,19 @@ impl Application {
         todo!()
     }
 
-    pub fn add(&mut self, command: PhpMixed) -> Option<PhpMixed> {
+    pub fn add(&mut self, _command: PhpMixed) -> Option<PhpMixed> {
         todo!()
     }
 
-    pub fn get(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    pub fn get(&self, _name: &str) -> anyhow::Result<PhpMixed> {
         todo!()
     }
 
-    pub fn set_auto_exit(&mut self, auto_exit: bool) {
+    pub fn set_auto_exit(&mut self, _auto_exit: bool) {
         todo!()
     }
 
-    pub fn set_catch_exceptions(&mut self, catch_exceptions: bool) {
+    pub fn set_catch_exceptions(&mut self, _catch_exceptions: bool) {
         todo!()
     }
 
@@ -54,7 +54,7 @@ impl Application {
         todo!()
     }
 
-    pub fn set_helper_set(&mut self, helper_set: PhpMixed) {
+    pub fn set_helper_set(&mut self, _helper_set: PhpMixed) {
         todo!()
     }
 
@@ -66,11 +66,11 @@ impl Application {
         todo!()
     }
 
-    pub fn find(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    pub fn find(&self, _name: &str) -> anyhow::Result<PhpMixed> {
         todo!()
     }
 
-    pub fn all(&self, namespace: Option<&str>) -> Vec<PhpMixed> {
+    pub fn all(&self, _namespace: Option<&str>) -> Vec<PhpMixed> {
         todo!()
     }
 
@@ -80,8 +80,8 @@ impl Application {
 
     pub fn set_default_command(
         &mut self,
-        command_name: &str,
-        is_single_command: bool,
+        _command_name: &str,
+        _is_single_command: bool,
     ) -> &mut Self {
         todo!()
     }

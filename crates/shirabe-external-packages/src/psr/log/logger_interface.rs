@@ -1,5 +1,3 @@
-use shirabe_php_shim::PhpMixed;
-
 pub trait LoggerInterface {
     fn emergency(&self, message: &str, context: &[(&str, &str)]);
     fn alert(&self, message: &str, context: &[(&str, &str)]);

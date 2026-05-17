@@ -393,11 +393,7 @@ impl Intervals {
                     if branches.exclude {
                         // disjunctive constraint, so only exclude what's excluded in all constraints
                         // !=a,!=b || !=b,!=c => !=b
-                        branches.names = branches
-                            .names
-                            .into_iter()
-                            .filter(|n| b.names.contains(n))
-                            .collect();
+                        branches.names.retain(|n| b.names.contains(n));
                     } else {
                         // disjunctive constraint so exclude all names which are not explicitly
                         // included in the alternative
@@ -414,11 +410,7 @@ impl Intervals {
                         // disjunctive constraint so exclude all names which are not explicitly
                         // included in the alternative
                         // !=a,!=b || (==b || ==c) => !=a
-                        branches.names = branches
-                            .names
-                            .into_iter()
-                            .filter(|n| !b.names.contains(n))
-                            .collect();
+                        branches.names.retain(|n| !b.names.contains(n));
                     } else {
                         // disjunctive constraint, so just add all the other branches
                         // (==a || ==b) || ==c => ==a || ==b || ==c
@@ -438,11 +430,7 @@ impl Intervals {
                     } else {
                         // conjunctive, so only keep included names which are not excluded
                         // (==a||==c) && !=a,!=b => ==c
-                        branches.names = branches
-                            .names
-                            .into_iter()
-                            .filter(|n| !b.names.contains(n))
-                            .collect();
+                        branches.names.retain(|n| !b.names.contains(n));
                     }
                 } else {
                     if branches.exclude {
@@ -457,11 +445,7 @@ impl Intervals {
                     } else {
                         // conjunctive, so only keep names that are included in both
                         // (==a||==b) && (==a||==c) => ==a
-                        branches.names = branches
-                            .names
-                            .into_iter()
-                            .filter(|n| b.names.contains(n))
-                            .collect();
+                        branches.names.retain(|n| b.names.contains(n));
                     }
                 }
             }

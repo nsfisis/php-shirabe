@@ -7,11 +7,11 @@ use shirabe_php_shim::PhpMixed;
 pub struct Command;
 
 impl Command {
-    pub fn new(name: Option<&str>) -> Self {
+    pub fn new(_name: Option<&str>) -> Self {
         todo!()
     }
 
-    pub fn set_name(&mut self, name: &str) -> &mut Self {
+    pub fn set_name(&mut self, _name: &str) -> &mut Self {
         todo!()
     }
 
@@ -19,7 +19,7 @@ impl Command {
         todo!()
     }
 
-    pub fn set_description(&mut self, description: &str) -> &mut Self {
+    pub fn set_description(&mut self, _description: &str) -> &mut Self {
         todo!()
     }
 
@@ -27,11 +27,11 @@ impl Command {
         todo!()
     }
 
-    pub fn set_help(&mut self, help: &str) -> &mut Self {
+    pub fn set_help(&mut self, _help: &str) -> &mut Self {
         todo!()
     }
 
-    pub fn set_definition(&mut self, definition: PhpMixed) -> &mut Self {
+    pub fn set_definition(&mut self, _definition: PhpMixed) -> &mut Self {
         todo!()
     }
 
@@ -41,26 +41,26 @@ impl Command {
 
     pub fn add_argument(
         &mut self,
-        name: &str,
-        mode: Option<i64>,
-        description: &str,
-        default: PhpMixed,
+        _name: &str,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: PhpMixed,
     ) -> &mut Self {
         todo!()
     }
 
     pub fn add_option(
         &mut self,
-        name: &str,
-        shortcut: Option<&str>,
-        mode: Option<i64>,
-        description: &str,
-        default: PhpMixed,
+        _name: &str,
+        _shortcut: Option<&str>,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: PhpMixed,
     ) -> &mut Self {
         todo!()
     }
 
-    pub fn set_aliases(&mut self, aliases: &[String]) -> &mut Self {
+    pub fn set_aliases(&mut self, _aliases: &[String]) -> &mut Self {
         todo!()
     }
 
@@ -68,7 +68,7 @@ impl Command {
         todo!()
     }
 
-    pub fn set_hidden(&mut self, hidden: bool) -> &mut Self {
+    pub fn set_hidden(&mut self, _hidden: bool) -> &mut Self {
         todo!()
     }
 
@@ -78,13 +78,13 @@ impl Command {
 
     pub fn run(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        _input: &mut dyn InputInterface,
+        _output: &mut dyn OutputInterface,
     ) -> anyhow::Result<i64> {
         todo!()
     }
 
-    pub fn get_helper(&self, name: &str) -> PhpMixed {
+    pub fn get_helper(&self, _name: &str) -> PhpMixed {
         todo!()
     }
 

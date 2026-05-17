@@ -191,10 +191,10 @@ impl VersionParser {
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
             // have had a dev- prefix already when passed to normalize
-            if let Ok(normalized) = self.normalize_branch(&branch_name) {
-                if !normalized.starts_with("dev-") {
-                    return Ok(normalized);
-                }
+            if let Ok(normalized) = self.normalize_branch(&branch_name)
+                && !normalized.starts_with("dev-")
+            {
+                return Ok(normalized);
             }
         }
 
@@ -599,8 +599,7 @@ impl VersionParser {
             )?;
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
-            let empty =
-                |x: &Option<String>| -> bool { x.as_deref().map_or(true, |s| s.is_empty()) };
+            let empty = |x: &Option<String>| -> bool { x.as_deref().is_none_or(|s| s.is_empty()) };
 
             // matches[12]=to minor, matches[13]=to patch, matches[15]=to stability,
             // matches[17]=to dev, matches[18]=to wildcard-dev
@@ -645,37 +644,34 @@ impl VersionParser {
             let version_str = match_[2].clone().unwrap_or_default();
             let op_str = match_[1].clone().unwrap_or_default();
 
-            let version_result: anyhow::Result<String> = (|| {
-                match self.normalize(&version_str, None) {
-                    Ok(v) => Ok(v),
-                    Err(e) => {
-                        // recover from an invalid constraint like foobar-dev which should be
-                        // dev-foobar except if the constraint uses a known operator, in which
-                        // case it must be a parse error
-                        if version_str.ends_with("-dev")
-                            && php::preg_match("{^[0-9a-zA-Z-./]+$}", &version_str, &mut Vec::new())
-                                > 0
-                        {
-                            self.normalize(
-                                &format!("dev-{}", &version_str[..version_str.len() - 4]),
-                                None,
-                            )
-                        } else {
-                            Err(e)
-                        }
+            let version_result: anyhow::Result<String> = (match self.normalize(&version_str, None) {
+                Ok(v) => Ok(v),
+                Err(e) => {
+                    // recover from an invalid constraint like foobar-dev which should be
+                    // dev-foobar except if the constraint uses a known operator, in which
+                    // case it must be a parse error
+                    if version_str.ends_with("-dev")
+                        && php::preg_match("{^[0-9a-zA-Z-./]+$}", &version_str, &mut Vec::new()) > 0
+                    {
+                        self.normalize(
+                            &format!("dev-{}", &version_str[..version_str.len() - 4]),
+                            None,
+                        )
+                    } else {
+                        Err(e)
                     }
                 }
-            })();
+            });
 
             if let Ok(mut version) = version_result {
                 let op = if op_str.is_empty() { "=" } else { &op_str };
 
-                if op != "==" && op != "=" {
-                    if let Some(ref stab_mod) = stability_modifier {
-                        if Self::parse_stability(&version) == "stable" {
-                            version = format!("{}-{}", version, stab_mod);
-                        }
-                    }
+                if op != "=="
+                    && op != "="
+                    && let Some(ref stab_mod) = stability_modifier
+                    && Self::parse_stability(&version) == "stable"
+                {
+                    version = format!("{}-{}", version, stab_mod);
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);

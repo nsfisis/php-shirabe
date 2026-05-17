@@ -2,11 +2,11 @@
 pub struct OutputFormatter;
 
 impl OutputFormatter {
-    pub fn new(decorated: bool) -> Self {
+    pub fn new(_decorated: bool) -> Self {
         todo!()
     }
 
-    pub fn format(&self, message: &str) -> String {
+    pub fn format(&self, _message: &str) -> String {
         todo!()
     }
 
@@ -14,11 +14,11 @@ impl OutputFormatter {
         todo!()
     }
 
-    pub fn set_decorated(&mut self, decorated: bool) {
+    pub fn set_decorated(&mut self, _decorated: bool) {
         todo!()
     }
 
-    pub fn escape(text: &str) -> String {
+    pub fn escape(_text: &str) -> String {
         todo!()
     }
 }

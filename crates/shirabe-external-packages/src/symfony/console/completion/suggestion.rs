@@ -2,7 +2,7 @@
 pub struct Suggestion;
 
 impl Suggestion {
-    pub fn new(value: String, description: Option<String>) -> Self {
+    pub fn new(_value: String, _description: Option<String>) -> Self {
         todo!()
     }
 

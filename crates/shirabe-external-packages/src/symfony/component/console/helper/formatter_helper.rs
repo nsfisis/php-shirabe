@@ -2,11 +2,11 @@
 pub struct FormatterHelper;
 
 impl FormatterHelper {
-    pub fn format_section(&self, section: &str, message: &str, style: &str) -> String {
+    pub fn format_section(&self, _section: &str, _message: &str, _style: &str) -> String {
         todo!()
     }
 
-    pub fn format_block(&self, messages: &[&str], style: &str, large: bool) -> String {
+    pub fn format_block(&self, _messages: &[&str], _style: &str, _large: bool) -> String {
         todo!()
     }
 }

@@ -200,10 +200,10 @@ impl ClassMapGenerator {
 
             // if a list of scanned files is given, avoid scanning twice the same file to save cycles and avoid generating warnings
             // in case a PSR-0/4 declaration follows another more specific one, or a classmap declaration, which covered this file already
-            if let Some(ref scanned_files) = self.scanned_files {
-                if scanned_files.contains(&real_path) {
-                    continue;
-                }
+            if let Some(ref scanned_files) = self.scanned_files
+                && scanned_files.contains(&real_path)
+            {
+                continue;
             }
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
@@ -228,10 +228,10 @@ impl ClassMapGenerator {
                 )?;
 
                 // if no valid class was found in the file then we do not mark it as scanned as it might still be matched by another rule later
-                if !filtered.is_empty() {
-                    if let Some(ref mut scanned_files) = self.scanned_files {
-                        scanned_files.add(real_path);
-                    }
+                if !filtered.is_empty()
+                    && let Some(ref mut scanned_files) = self.scanned_files
+                {
+                    scanned_files.add(real_path);
                 }
 
                 filtered
