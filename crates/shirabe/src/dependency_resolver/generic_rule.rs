@@ -110,10 +110,6 @@ impl Rule for GenericRule {
         todo!()
     }
 
-    fn to_string(&self) -> String {
-        todo!()
-    }
-
     fn equals(&self, rule: &dyn Rule) -> bool {
         todo!()
     }

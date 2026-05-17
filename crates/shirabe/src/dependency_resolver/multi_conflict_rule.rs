@@ -135,10 +135,6 @@ impl Rule for MultiConflictRule {
         todo!()
     }
 
-    fn to_string(&self) -> String {
-        todo!()
-    }
-
     fn equals(&self, rule: &dyn Rule) -> bool {
         todo!()
     }

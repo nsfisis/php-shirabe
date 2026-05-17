@@ -98,10 +98,6 @@ impl Rule for Rule2Literals {
         todo!()
     }
 
-    fn to_string(&self) -> String {
-        todo!()
-    }
-
     fn equals(&self, rule: &dyn Rule) -> bool {
         todo!()
     }
