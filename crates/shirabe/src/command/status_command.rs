@@ -112,7 +112,7 @@ impl StatusCommand {
                 }
 
                 if let Some(changes) =
-                    change_reporter.get_local_changes(package.as_ref(), target_dir.clone())
+                    change_reporter.get_local_changes(package.as_ref(), &target_dir)?
                 {
                     errors.insert(target_dir.clone(), changes);
                 }

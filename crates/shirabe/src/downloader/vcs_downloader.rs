@@ -457,7 +457,7 @@ pub trait VcsDownloader:
         _update: bool,
     ) -> Result<Box<dyn PromiseInterface>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
-        if self.get_local_changes(package, path.to_string()).is_some() {
+        if self.get_local_changes(package, path)?.is_some() {
             return Err(RuntimeException {
                 message: format!("Source directory {} has uncommitted changes.", path),
                 code: 0,
