@@ -43,7 +43,7 @@ pub trait BaseCommand {
     fn io_mut(&mut self) -> Option<&mut dyn IOInterface>;
 
     /// Gets the application instance for this command.
-    pub fn get_application(&self) -> Result<Application> {
+    fn get_application(&self) -> Result<Application> {
         let application = self.inner().get_application();
         // TODO(phase-b): `$application instanceof Application` downcast from generic Symfony Application
         let application_as_composer: Option<Application> = application;
@@ -62,7 +62,7 @@ pub trait BaseCommand {
     }
 
     /// @deprecated since Composer 2.3.0 use requireComposer or tryComposer depending on whether you have $required set to true or false
-    pub fn get_composer(
+    fn get_composer(
         &mut self,
         required: bool,
         disable_plugins: Option<bool>,
@@ -78,7 +78,7 @@ pub trait BaseCommand {
     }
 
     /// Retrieves the default Composer\Composer instance or throws
-    pub fn require_composer(
+    fn require_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
@@ -106,7 +106,7 @@ pub trait BaseCommand {
     }
 
     /// Retrieves the default Composer\Composer instance or null
-    pub fn try_composer(
+    fn try_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
@@ -125,23 +125,23 @@ pub trait BaseCommand {
         self.composer().clone()
     }
 
-    pub fn set_composer(&mut self, composer: Composer) {
+    fn set_composer(&mut self, composer: Composer) {
         *self.composer_mut() = Some(composer);
     }
 
     /// Removes the cached composer instance
-    pub fn reset_composer(&mut self) -> Result<()> {
+    fn reset_composer(&mut self) -> Result<()> {
         *self.composer_mut() = None;
         self.get_application()?.reset_composer();
         Ok(())
     }
 
     /// Whether or not this command is meant to call another command.
-    pub fn is_proxy_command(&self) -> bool {
+    fn is_proxy_command(&self) -> bool {
         false
     }
 
-    pub fn get_io(&mut self) -> &dyn IOInterface {
+    fn get_io(&mut self) -> &dyn IOInterface {
         if self.io().is_none() {
             let application = self.inner().get_application();
             // TODO(phase-b): `$application instanceof Application` downcast
@@ -156,14 +156,14 @@ pub trait BaseCommand {
         &**self.io().as_ref().unwrap()
     }
 
-    pub fn set_io(&mut self, io: Box<dyn IOInterface>) {
+    fn set_io(&mut self, io: Box<dyn IOInterface>) {
         *self.io_mut() = Some(io);
     }
 
     /// @inheritdoc
     ///
     /// Backport suggested values definition from symfony/console 6.1+
-    pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
+    fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
         let definition = self.inner().get_definition();
         let name = input.get_completion_name().to_string();
         if CompletionInput::TYPE_OPTION_VALUE == input.get_completion_type()
@@ -194,7 +194,7 @@ pub trait BaseCommand {
     }
 
     /// @inheritDoc
-    pub fn initialize(
+    fn initialize(
         &mut self,
         input: &mut dyn InputInterface,
         output: &mut dyn OutputInterface,
@@ -343,7 +343,7 @@ pub trait BaseCommand {
     }
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
-    pub fn create_composer_instance(
+    fn create_composer_instance(
         &self,
         input: &dyn InputInterface,
         io: &dyn IOInterface,
@@ -373,7 +373,7 @@ pub trait BaseCommand {
     }
 
     /// Returns preferSource and preferDist values based on the configuration.
-    pub fn get_preferred_install_options(
+    fn get_preferred_install_options(
         &self,
         config: &Config,
         input: &dyn InputInterface,
@@ -457,7 +457,7 @@ pub trait BaseCommand {
         Ok((prefer_source, prefer_dist))
     }
 
-    pub fn get_platform_requirement_filter(
+    fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
     ) -> Result<Box<dyn PlatformRequirementFilterInterface>> {
@@ -491,10 +491,7 @@ pub trait BaseCommand {
     /// @param array<string> $requirements
     ///
     /// @return array<string, string>
-    pub fn format_requirements(
-        &self,
-        requirements: Vec<String>,
-    ) -> Result<IndexMap<String, String>> {
+    fn format_requirements(&self, requirements: Vec<String>) -> Result<IndexMap<String, String>> {
         let mut requires: IndexMap<String, String> = IndexMap::new();
         let requirements = self.normalize_requirements(requirements)?;
         for requirement in requirements {
@@ -521,7 +518,7 @@ pub trait BaseCommand {
     /// @param array<string> $requirements
     ///
     /// @return list<array{name: string, version?: string}>
-    pub fn normalize_requirements(
+    fn normalize_requirements(
         &self,
         requirements: Vec<String>,
     ) -> Result<Vec<IndexMap<String, String>>> {
@@ -532,14 +529,14 @@ pub trait BaseCommand {
     }
 
     /// @param array<TableSeparator|mixed[]> $table
-    pub fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface) {
+    fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface) {
         let mut renderer = Table::new(output);
         renderer.set_style("compact");
         renderer.set_rows(table).render();
         let _ = TableSeparator::new();
     }
 
-    pub fn get_terminal_width(&self) -> i64 {
+    fn get_terminal_width(&self) -> i64 {
         let terminal = Terminal::new();
         let mut width = terminal.get_width();
 
@@ -555,7 +552,7 @@ pub trait BaseCommand {
     /// @internal
     /// @param 'format'|'audit-format' $optName
     /// @return Auditor::FORMAT_*
-    pub fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String> {
+    fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String> {
         if !input.has_option(opt_name) {
             return Err(LogicException {
                 message: format!(
@@ -588,7 +585,7 @@ pub trait BaseCommand {
     }
 
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
-    pub fn create_audit_config(
+    fn create_audit_config(
         &self,
         config: &Config,
         input: &dyn InputInterface,
