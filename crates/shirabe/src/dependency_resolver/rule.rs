@@ -39,19 +39,7 @@ pub enum ReasonData {
     },
 }
 
-/// @phpstan-type ReasonData Link|BasePackage|string|int|array{packageName: string, constraint: ConstraintInterface}|array{package: BasePackage}
-#[derive(Debug)]
-pub struct Rule {
-    /// @var int
-    pub(crate) bitfield: i64,
-    /// @var Request
-    pub(crate) request: Option<Request>,
-    /// @var Link|BasePackage|ConstraintInterface|string
-    /// @phpstan-var ReasonData
-    pub(crate) reason_data: ReasonData,
-}
-
-impl Rule {
+pub trait Rule: std::fmt::Display {
     // reason constants and // their reason data contents
     pub const RULE_ROOT_REQUIRE: i64 = 2;
     pub const RULE_FIXED: i64 = 3;
@@ -67,11 +55,24 @@ impl Rule {
     const BITFIELD_REASON: i64 = 8;
     const BITFIELD_DISABLED: i64 = 16;
 
+    fn bitfield(&self) -> i64;
+    fn bitfield_mut(&mut self) -> &mut i64;
+    fn request(&self) -> Option<&Request>;
+    fn request_mut(&mut self) -> Option<&mut Request>;
+    fn reason_data(&self) -> Option<&ReasonData>;
+    fn reason_data_mut(&mut self) -> Option<&mut ReasonData>;
+
+    fn get_literals(&self) -> Vec<i64>;
+    fn get_hash(&self) -> PhpMixed;
+    fn to_string(&self) -> String;
+    fn equals(&self, rule: &dyn Rule) -> bool;
+    fn is_assertion(&self) -> bool;
+
     /// @param self::RULE_* $reason     A RULE_* constant describing the reason for generating this rule
     /// @param mixed        $reasonData
     ///
     /// @phpstan-param ReasonData $reasonData
-    pub fn new(reason: i64, reason_data: ReasonData) -> Self {
+    fn new(reason: i64, reason_data: ReasonData) -> Self {
         let bitfield = (0i64 << Self::BITFIELD_DISABLED)
             | (reason << Self::BITFIELD_REASON)
             | (255i64 << Self::BITFIELD_TYPE);
@@ -83,16 +84,16 @@ impl Rule {
     }
 
     /// @return self::RULE_*
-    pub fn get_reason(&self) -> i64 {
+    fn get_reason(&self) -> i64 {
         (self.bitfield & (255 << Self::BITFIELD_REASON)) >> Self::BITFIELD_REASON
     }
 
     /// @phpstan-return ReasonData
-    pub fn get_reason_data(&self) -> &ReasonData {
+    fn get_reason_data(&self) -> &ReasonData {
         &self.reason_data
     }
 
-    pub fn get_required_package(&self) -> Option<String> {
+    fn get_required_package(&self) -> Option<String> {
         match self.get_reason() {
             r if r == Self::RULE_ROOT_REQUIRE => match self.get_reason_data() {
                 ReasonData::RootRequire { package_name, .. } => Some(package_name.clone()),
@@ -111,33 +112,33 @@ impl Rule {
     }
 
     /// @param RuleSet::TYPE_* $type
-    pub fn set_type(&mut self, r#type: i64) {
+    fn set_type(&mut self, r#type: i64) {
         self.bitfield = (self.bitfield & !(255i64 << Self::BITFIELD_TYPE))
             | ((255 & r#type) << Self::BITFIELD_TYPE);
     }
 
-    pub fn get_type(&self) -> i64 {
+    fn get_type(&self) -> i64 {
         (self.bitfield & (255 << Self::BITFIELD_TYPE)) >> Self::BITFIELD_TYPE
     }
 
-    pub fn disable(&mut self) {
+    fn disable(&mut self) {
         self.bitfield = (self.bitfield & !(255i64 << Self::BITFIELD_DISABLED))
             | (1i64 << Self::BITFIELD_DISABLED);
     }
 
-    pub fn enable(&mut self) {
+    fn enable(&mut self) {
         self.bitfield &= !(255i64 << Self::BITFIELD_DISABLED);
     }
 
-    pub fn is_disabled(&self) -> bool {
+    fn is_disabled(&self) -> bool {
         0 != ((self.bitfield & (255 << Self::BITFIELD_DISABLED)) >> Self::BITFIELD_DISABLED)
     }
 
-    pub fn is_enabled(&self) -> bool {
+    fn is_enabled(&self) -> bool {
         0 == ((self.bitfield & (255 << Self::BITFIELD_DISABLED)) >> Self::BITFIELD_DISABLED)
     }
 
-    pub fn is_caused_by_lock(
+    fn is_caused_by_lock(
         &self,
         _repository_set: &RepositorySet,
         request: &Request,
@@ -205,7 +206,7 @@ impl Rule {
     }
 
     /// @internal
-    pub fn get_source_package(&self, pool: &Pool) -> Result<Box<BasePackage>> {
+    fn get_source_package(&self, pool: &Pool) -> Result<Box<BasePackage>> {
         let literals = self.get_literals();
 
         match self.get_reason() {
@@ -244,14 +245,14 @@ impl Rule {
 
     /// @param BasePackage[] $installedMap
     /// @param array<Rule[]> $learnedPool
-    pub fn get_pretty_string(
+    fn get_pretty_string(
         &self,
         repository_set: &RepositorySet,
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
         installed_map: IndexMap<i64, Box<BasePackage>>,
-        _learned_pool: IndexMap<i64, Vec<Box<dyn RuleTrait>>>,
+        _learned_pool: IndexMap<i64, Vec<Box<dyn Rule>>>,
     ) -> String {
         let mut literals = self.get_literals();
 
@@ -621,7 +622,7 @@ impl Rule {
     }
 
     /// @param array<int|BasePackage> $literalsOrPackages An array containing packages or literals
-    pub(crate) fn format_packages_unique(
+    fn format_packages_unique(
         &self,
         pool: &Pool,
         literals_or_packages: Vec<Box<BasePackage>>,
@@ -675,46 +676,5 @@ impl Rule {
         }
 
         package
-    }
-}
-
-/// PHP abstract methods on Rule — concrete subclasses must implement.
-pub trait RuleTrait: std::any::Any {
-    /// @return list<int>
-    fn get_literals(&self) -> Vec<i64>;
-
-    /// @return int|string
-    fn get_hash(&self) -> PhpMixed;
-
-    fn to_string(&self) -> String;
-
-    fn equals(&self, rule: &dyn RuleTrait) -> bool;
-
-    fn is_assertion(&self) -> bool;
-}
-
-// TODO(phase-b): abstract method dispatch — currently Rule has stubs that subclasses override.
-impl Rule {
-    pub fn get_literals(&self) -> Vec<i64> {
-        todo!("abstract: implemented by subclass")
-    }
-
-    pub fn get_hash(&self) -> PhpMixed {
-        todo!("abstract: implemented by subclass")
-    }
-
-    pub fn equals(&self, _rule: &Rule) -> bool {
-        todo!("abstract: implemented by subclass")
-    }
-
-    pub fn is_assertion(&self) -> bool {
-        todo!("abstract: implemented by subclass")
-    }
-}
-
-impl std::fmt::Display for Rule {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO(phase-b): abstract; subclasses provide __toString
-        todo!("abstract: implemented by subclass")
     }
 }

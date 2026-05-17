@@ -23,40 +23,58 @@ use crate::package::version::version_parser::VersionParser;
 use crate::util::filesystem::Filesystem;
 use crate::util::process_executor::ProcessExecutor;
 
-#[derive(Debug)]
-pub struct VcsDownloader {
-    pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) config: Config,
-    pub(crate) process: ProcessExecutor,
-    pub(crate) filesystem: Filesystem,
-    /// @var array<string, true>
-    pub(crate) has_cleaned_changes: IndexMap<String, bool>,
-}
+pub trait VcsDownloader:
+    DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
+{
+    fn io(&self) -> &dyn IOInterface;
+    fn io_mut(&mut self) -> &mut dyn IOInterface;
+    fn config(&self) -> &Config;
+    fn config_mut(&mut self) -> &mut Config;
+    fn process(&self) -> &ProcessExecutor;
+    fn process_mut(&mut self) -> &mut ProcessExecutor;
+    fn filesystem(&self) -> &Filesystem;
+    fn filesystem_mut(&mut self) -> &mut Filesystem;
+    fn has_cleaned_changes(&self) -> &IndexMap<String, bool>;
+    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool>;
 
-impl VcsDownloader {
-    pub fn new(
-        io: Box<dyn IOInterface>,
-        config: Config,
-        process: Option<ProcessExecutor>,
-        fs: Option<Filesystem>,
-    ) -> Self {
-        // TODO(phase-b): ProcessExecutor::new takes &dyn IOInterface; Filesystem::new takes ProcessExecutor
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
-        let filesystem = fs.unwrap_or_else(|| Filesystem::new(&process));
-        Self {
-            io,
-            config,
-            process,
-            filesystem,
-            has_cleaned_changes: IndexMap::new(),
-        }
-    }
+    /// Downloads data needed to run an install/update later
+    fn do_download(
+        &mut self,
+        package: &dyn PackageInterface,
+        path: &str,
+        url: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>>;
 
-    pub fn get_installation_source(&self) -> String {
+    /// Downloads specific package into specific folder.
+    fn do_install(
+        &mut self,
+        package: &dyn PackageInterface,
+        path: &str,
+        url: &str,
+    ) -> Result<Box<dyn PromiseInterface>>;
+
+    /// Updates specific package in specific folder from initial to target version.
+    fn do_update(
+        &mut self,
+        initial: &dyn PackageInterface,
+        target: &dyn PackageInterface,
+        path: &str,
+        url: &str,
+    ) -> Result<Box<dyn PromiseInterface>>;
+
+    /// Fetches the commit logs between two commits
+    fn get_commit_logs(&self, from_reference: &str, to_reference: &str, path: &str) -> String;
+
+    /// Checks if VCS metadata repository has been initialized
+    /// repository example: .git|.svn|.hg
+    fn has_metadata_repository(&self, path: &str) -> bool;
+
+    fn get_installation_source(&self) -> String {
         "source".to_string()
     }
 
-    pub fn download(
+    fn download(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
@@ -88,8 +106,8 @@ impl VcsDownloader {
                     if is_phpunit_exception {
                         return Err(e);
                     }
-                    if self.io.is_debug() {
-                        self.io.write_error(
+                    if self.io().is_debug() {
+                        self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
@@ -100,7 +118,7 @@ impl VcsDownloader {
                             .collect(),
                     )) > 0
                     {
-                        self.io.write_error(
+                        self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
                             IOInterface::NORMAL,
@@ -121,7 +139,7 @@ impl VcsDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn prepare(
+    fn prepare(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
@@ -130,10 +148,10 @@ impl VcsDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         if r#type == "update" {
             self.clean_changes(prev_package.unwrap(), path, true)?;
-            self.has_cleaned_changes
+            self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
-            self.filesystem.empty_directory(path);
+            self.filesystem_mut().empty_directory(path);
         } else if r#type == "uninstall" {
             self.clean_changes(package, path, false)?;
         }
@@ -141,7 +159,7 @@ impl VcsDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn cleanup(
+    fn cleanup(
         &mut self,
         r#type: &str,
         _package: &dyn PackageInterface,
@@ -150,18 +168,21 @@ impl VcsDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         if r#type == "update"
             && prev_package
-                .map(|p| self.has_cleaned_changes.contains_key(&p.get_unique_name()))
+                .map(|p| {
+                    self.has_cleaned_changes()
+                        .contains_key(&p.get_unique_name())
+                })
                 .unwrap_or(false)
         {
             self.reapply_changes(path);
-            self.has_cleaned_changes
+            self.has_cleaned_changes_mut()
                 .shift_remove(&prev_package.unwrap().get_unique_name());
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn install(
+    fn install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
@@ -177,7 +198,7 @@ impl VcsDownloader {
             .into());
         }
 
-        self.io.write_error(
+        self.io_mut().write_error(
             PhpMixed::String(format!(
                 "  - {}: ",
                 InstallOperation::format(package, false)
@@ -199,8 +220,8 @@ impl VcsDownloader {
                     if is_phpunit_exception {
                         return Err(e);
                     }
-                    if self.io.is_debug() {
-                        self.io.write_error(
+                    if self.io().is_debug() {
+                        self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
@@ -211,7 +232,7 @@ impl VcsDownloader {
                             .collect(),
                     )) > 0
                     {
-                        self.io.write_error(
+                        self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
                             IOInterface::NORMAL,
@@ -232,7 +253,7 @@ impl VcsDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn update(
+    fn update(
         &mut self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
@@ -249,7 +270,7 @@ impl VcsDownloader {
             .into());
         }
 
-        self.io.write_error(
+        self.io_mut().write_error(
             PhpMixed::String(format!(
                 "  - {}: ",
                 UpdateOperation::format(initial, target, false),
@@ -277,8 +298,8 @@ impl VcsDownloader {
                     if is_phpunit_exception {
                         return Err(e);
                     }
-                    if self.io.is_debug() {
-                        self.io.write_error(
+                    if self.io().is_debug() {
+                        self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
                             IOInterface::NORMAL,
@@ -289,7 +310,7 @@ impl VcsDownloader {
                             .collect(),
                     )) > 0
                     {
-                        self.io.write_error(
+                        self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
                             IOInterface::NORMAL,
@@ -302,7 +323,7 @@ impl VcsDownloader {
 
         // print the commit logs if in verbose mode and VCS metadata is present
         // because in case of missing metadata code would trigger another exception
-        if exception.is_none() && self.io.is_verbose() && self.has_metadata_repository(path) {
+        if exception.is_none() && self.io().is_verbose() && self.has_metadata_repository(path) {
             let mut message = "Pulling in changes:";
             let mut logs = self.get_commit_logs(
                 initial.get_source_reference().unwrap_or(""),
@@ -329,12 +350,12 @@ impl VcsDownloader {
                 // escape angle brackets for proper output in the console
                 logs = str_replace("<", "\\<", &logs);
 
-                self.io.write_error(
+                self.io_mut().write_error(
                     PhpMixed::String(format!("    {}", message)),
                     true,
                     IOInterface::NORMAL,
                 );
-                self.io
+                self.io_mut()
                     .write_error(PhpMixed::String(logs), true, IOInterface::NORMAL);
             }
         }
@@ -348,12 +369,12 @@ impl VcsDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn remove(
+    fn remove(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.io.write_error(
+        self.io_mut().write_error(
             PhpMixed::String(format!(
                 "  - {}",
                 UninstallOperation::format(package, false)
@@ -362,7 +383,7 @@ impl VcsDownloader {
             IOInterface::NORMAL,
         );
 
-        let promise = self.filesystem.remove_directory_async(path);
+        let promise = self.filesystem_mut().remove_directory_async(path);
 
         let path = path.to_string();
         Ok(
@@ -380,9 +401,9 @@ impl VcsDownloader {
         )
     }
 
-    pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
+    fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let parser = VersionParser::new();
-        let guesser = VersionGuesser::new(&self.config, &self.process, &parser, &*self.io);
+        let guesser = VersionGuesser::new(self.config(), self.process(), &parser, self.io());
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
@@ -398,12 +419,9 @@ impl VcsDownloader {
 
     /// Prompt the user to check if changes should be stashed/removed or the operation aborted
     ///
-    /// @param  bool              $update  if true (update) the changes can be stashed and reapplied after an update,
-    ///                                    if false (remove) the changes should be assumed to be lost if the operation is not aborted
-    ///
-    /// @throws \RuntimeException in case the operation must be aborted
-    /// @phpstan-return PromiseInterface<void|null>
-    pub(crate) fn clean_changes(
+    /// @param  bool $update  if true (update) the changes can be stashed and reapplied after an update,
+    ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
+    fn clean_changes(
         &self,
         package: &dyn PackageInterface,
         path: &str,
@@ -421,90 +439,10 @@ impl VcsDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    /// Reapply previously stashes changes if applicable, only called after an update (regardless if successful or not)
-    ///
-    /// @throws \RuntimeException in case the operation must be aborted or the patch does not apply cleanly
-    pub(crate) fn reapply_changes(&self, _path: &str) {}
+    /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
+    fn reapply_changes(&self, _path: &str) {}
 
-    /// Downloads data needed to run an install/update later
-    ///
-    /// @param PackageInterface      $package     package instance
-    /// @param string                $path        download path
-    /// @param string                $url         package url
-    /// @param PackageInterface|null $prevPackage previous package (in case of an update)
-    /// @phpstan-return PromiseInterface<void|null>
-    // TODO(phase-b): abstract; overridden by concrete subclasses (GitDownloader, SvnDownloader, ...)
-    pub(crate) fn do_download(
-        &mut self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-        _url: &str,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        todo!("abstract: implemented by subclass")
-    }
-
-    /// Downloads specific package into specific folder.
-    ///
-    /// @param PackageInterface $package package instance
-    /// @param string           $path    download path
-    /// @param string           $url     package url
-    /// @phpstan-return PromiseInterface<void|null>
-    // TODO(phase-b): abstract; overridden by concrete subclasses
-    pub(crate) fn do_install(
-        &mut self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-        _url: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        todo!("abstract: implemented by subclass")
-    }
-
-    /// Updates specific package in specific folder from initial to target version.
-    ///
-    /// @param PackageInterface $initial initial package
-    /// @param PackageInterface $target  updated package
-    /// @param string           $path    download path
-    /// @param string           $url     package url
-    /// @phpstan-return PromiseInterface<void|null>
-    // TODO(phase-b): abstract; overridden by concrete subclasses
-    pub(crate) fn do_update(
-        &mut self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
-        _path: &str,
-        _url: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        todo!("abstract: implemented by subclass")
-    }
-
-    /// Fetches the commit logs between two commits
-    ///
-    /// @param  string $fromReference the source reference
-    /// @param  string $toReference   the target reference
-    /// @param  string $path          the package path
-    // TODO(phase-b): abstract; overridden by concrete subclasses
-    pub(crate) fn get_commit_logs(
-        &self,
-        _from_reference: &str,
-        _to_reference: &str,
-        _path: &str,
-    ) -> String {
-        todo!("abstract: implemented by subclass")
-    }
-
-    /// Checks if VCS metadata repository has been initialized
-    /// repository example: .git|.svn|.hg
-    // TODO(phase-b): abstract; overridden by concrete subclasses
-    pub(crate) fn has_metadata_repository(&self, _path: &str) -> bool {
-        todo!("abstract: implemented by subclass")
-    }
-
-    /// @param string[] $urls
-    ///
-    /// @return string[]
     fn prepare_urls(&self, mut urls: Vec<String>) -> Vec<String> {
-        // PHP: foreach ($urls as $index => $url) — mutates in place
         for index in 0..urls.len() {
             let mut url = urls[index].clone();
             if Filesystem::is_local_path(&url) {
@@ -531,92 +469,5 @@ impl VcsDownloader {
         }
 
         urls
-    }
-
-    // TODO(phase-b): get_local_changes belongs to ChangeReportInterface, implemented by subclasses
-    pub(crate) fn get_local_changes(
-        &self,
-        _package: &dyn PackageInterface,
-        _path: String,
-    ) -> Option<String> {
-        todo!("abstract: implemented by ChangeReportInterface subclasses")
-    }
-}
-
-impl DownloaderInterface for VcsDownloader {
-    fn get_installation_source(&self) -> String {
-        VcsDownloader::get_installation_source(self)
-    }
-
-    fn download(
-        &self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): download mutates state; trait method takes &self
-        todo!("download requires &mut self")
-    }
-
-    fn prepare(
-        &self,
-        _type: &str,
-        _package: &dyn PackageInterface,
-        _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): prepare mutates state; trait method takes &self
-        todo!("prepare requires &mut self")
-    }
-
-    fn install(
-        &self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): install mutates state; trait method takes &self
-        todo!("install requires &mut self")
-    }
-
-    fn update(
-        &self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
-        _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): update mutates state; trait method takes &self
-        todo!("update requires &mut self")
-    }
-
-    fn remove(
-        &self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): remove mutates state; trait method takes &self
-        todo!("remove requires &mut self")
-    }
-
-    fn cleanup(
-        &self,
-        _type: &str,
-        _package: &dyn PackageInterface,
-        _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        // TODO(phase-b): cleanup mutates state; trait method takes &self
-        todo!("cleanup requires &mut self")
-    }
-}
-
-impl ChangeReportInterface for VcsDownloader {
-    fn get_local_changes(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
-        VcsDownloader::get_local_changes(self, package, path)
-    }
-}
-
-impl VcsCapableDownloaderInterface for VcsDownloader {
-    fn get_vcs_reference(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
-        VcsDownloader::get_vcs_reference(self, package, &path)
     }
 }

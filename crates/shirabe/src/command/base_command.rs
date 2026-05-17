@@ -34,19 +34,17 @@ use crate::plugin::pre_command_run_event::PreCommandRunEvent;
 use crate::util::platform::Platform;
 
 /// Base class for Composer commands
-#[derive(Debug)]
-pub struct BaseCommand {
-    inner: Command,
-    /// @var Composer|null
-    composer: Option<Composer>,
-    /// @var IOInterface
-    io: Option<Box<dyn IOInterface>>,
-}
+pub trait BaseCommand {
+    fn inner(&self) -> &Command;
+    fn inner_mut(&mut self) -> &mut Command;
+    fn composer(&self) -> Option<&Composer>;
+    fn composer_mut(&mut self) -> Option<&mut Composer>;
+    fn io(&self) -> Option<&dyn IOInterface>;
+    fn io_mut(&mut self) -> Option<&mut dyn IOInterface>;
 
-impl BaseCommand {
     /// Gets the application instance for this command.
     pub fn get_application(&self) -> Result<Application> {
-        let application = self.inner.get_application();
+        let application = self.inner().get_application();
         // TODO(phase-b): `$application instanceof Application` downcast from generic Symfony Application
         let application_as_composer: Option<Application> = application;
         if application_as_composer.is_none() {
@@ -85,12 +83,13 @@ impl BaseCommand {
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Result<Composer> {
-        if self.composer.is_none() {
-            let application = self.inner.get_application();
+        if self.composer().is_none() {
+            let application = self.inner().get_application();
             // TODO(phase-b): `$application instanceof Application` downcast
             let application_as_composer: Option<Application> = application;
             if let Some(app) = application_as_composer {
-                self.composer = Some(app.get_composer(true, disable_plugins, disable_scripts)?);
+                *self.composer_mut() =
+                    Some(app.get_composer(true, disable_plugins, disable_scripts)?);
                 // PHP: assert($this->composer instanceof Composer) — Rust types guarantee this
             } else {
                 return Err(RuntimeException {
@@ -103,7 +102,7 @@ impl BaseCommand {
             }
         }
 
-        Ok(self.composer.clone().unwrap())
+        Ok(self.composer().clone().unwrap())
     }
 
     /// Retrieves the default Composer\Composer instance or null
@@ -112,27 +111,27 @@ impl BaseCommand {
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Option<Composer> {
-        if self.composer.is_none() {
-            let application = self.inner.get_application();
+        if self.composer().is_none() {
+            let application = self.inner().get_application();
             // TODO(phase-b): `$application instanceof Application` downcast
             let application_as_composer: Option<Application> = application;
             if let Some(app) = application_as_composer {
-                self.composer = app
+                *self.composer_mut() = app
                     .get_composer(false, disable_plugins, disable_scripts)
                     .ok();
             }
         }
 
-        self.composer.clone()
+        self.composer().clone()
     }
 
     pub fn set_composer(&mut self, composer: Composer) {
-        self.composer = Some(composer);
+        *self.composer_mut() = Some(composer);
     }
 
     /// Removes the cached composer instance
     pub fn reset_composer(&mut self) -> Result<()> {
-        self.composer = None;
+        *self.composer_mut() = None;
         self.get_application()?.reset_composer();
         Ok(())
     }
@@ -143,29 +142,29 @@ impl BaseCommand {
     }
 
     pub fn get_io(&mut self) -> &dyn IOInterface {
-        if self.io.is_none() {
-            let application = self.inner.get_application();
+        if self.io().is_none() {
+            let application = self.inner().get_application();
             // TODO(phase-b): `$application instanceof Application` downcast
             let application_as_composer: Option<Application> = application;
             if let Some(app) = application_as_composer {
-                self.io = Some(app.get_io());
+                *self.io_mut() = Some(app.get_io());
             } else {
-                self.io = Some(Box::new(NullIO::new()));
+                *self.io_mut() = Some(Box::new(NullIO::new()));
             }
         }
 
-        &**self.io.as_ref().unwrap()
+        &**self.io().as_ref().unwrap()
     }
 
     pub fn set_io(&mut self, io: Box<dyn IOInterface>) {
-        self.io = Some(io);
+        *self.io_mut() = Some(io);
     }
 
     /// @inheritdoc
     ///
     /// Backport suggested values definition from symfony/console 6.1+
     pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
-        let definition = self.inner.get_definition();
+        let definition = self.inner().get_definition();
         let name = input.get_completion_name().to_string();
         if CompletionInput::TYPE_OPTION_VALUE == input.get_completion_type()
             && definition.has_option(&name)
@@ -191,7 +190,7 @@ impl BaseCommand {
                 return;
             }
         }
-        self.inner.complete(input, suggestions);
+        self.inner().complete(input, suggestions);
     }
 
     /// @inheritDoc
@@ -206,7 +205,7 @@ impl BaseCommand {
         let mut disable_scripts =
             input.has_parameter_option(PhpMixed::String("--no-scripts".to_string()));
 
-        let application = self.inner.get_application();
+        let application = self.inner().get_application();
         // TODO(phase-b): `$application instanceof Application` downcast
         let application_as_composer: Option<&Application> = None;
         if let Some(app) = application_as_composer {
@@ -245,7 +244,7 @@ impl BaseCommand {
             let pre_command_run_event = PreCommandRunEvent::new(
                 PluginEvents::PRE_COMMAND_RUN.to_string(),
                 Box::new(input),
-                self.inner.get_name().to_string(),
+                self.inner().get_name().to_string(),
             );
             composer.get_event_dispatcher().dispatch(
                 pre_command_run_event.get_name(),
@@ -340,7 +339,7 @@ impl BaseCommand {
             }
         }
 
-        self.inner.initialize(input, output)
+        self.inner().initialize(input, output)
     }
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
@@ -357,7 +356,7 @@ impl BaseCommand {
         let mut disable_scripts = disable_scripts == Some(true)
             || input.has_parameter_option(PhpMixed::String("--no-scripts".to_string()));
 
-        let application = self.inner.get_application();
+        let application = self.inner().get_application();
         // TODO(phase-b): `$application instanceof Application` downcast
         let application_as_composer: Option<&Application> = None;
         if let Some(app) = application_as_composer {

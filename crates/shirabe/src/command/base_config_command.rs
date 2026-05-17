@@ -12,16 +12,15 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
 
-#[derive(Debug)]
-pub struct BaseConfigCommand {
-    inner: BaseCommand,
-    pub(crate) config: Option<Config>,
-    pub(crate) config_file: Option<JsonFile>,
-    pub(crate) config_source: Option<JsonConfigSource>,
-}
+pub trait BaseConfigCommand: BaseCommand {
+    fn config(&self) -> Option<&Config>;
+    fn config_mut(&mut self) -> Option<&mut Config>;
+    fn config_file(&self) -> Option<&JsonFile>;
+    fn config_file_mut(&mut self) -> Option<&mut JsonFile>;
+    fn config_source(&self) -> Option<&JsonConfigSource>;
+    fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource>;
 
-impl BaseConfigCommand {
-    pub fn initialize(
+    fn initialize(
         &mut self,
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
@@ -33,8 +32,8 @@ impl BaseConfigCommand {
         }
 
         let io = self.inner.get_io();
-        self.config = Some(Factory::create_config(io)?);
-        let config = self.config.as_mut().unwrap();
+        *self.config_mut() = Some(Factory::create_config(io)?);
+        let config = self.config().as_mut().unwrap();
 
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
         if input.get_option("global").as_bool() {
@@ -53,29 +52,33 @@ impl BaseConfigCommand {
             std::fs::write(&config_file, "{\n}\n")?;
         }
 
-        let config = self.config.as_ref().unwrap();
-        self.config_file = Some(JsonFile::new(config_file.clone(), None, Some(io)));
-        self.config_source = Some(JsonConfigSource::new(self.config_file.as_ref().unwrap()));
+        let config = self.config().as_ref().unwrap();
+        *self.config_file_mut() = Some(JsonFile::new(config_file.clone(), None, Some(io)));
+        *self.config_source_mut() =
+            Some(JsonConfigSource::new(self.config_file().as_ref().unwrap()));
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
-        if input.get_option("global").as_bool() && !self.config_file.as_ref().unwrap().exists() {
-            let path = self.config_file.as_ref().unwrap().get_path().to_string();
+        if input.get_option("global").as_bool() && !self.config_file().as_ref().unwrap().exists() {
+            let path = self.config_file().as_ref().unwrap().get_path().to_string();
             touch(&path);
-            self.config_file.as_mut().unwrap().write(PhpMixed::Array({
-                let mut m = IndexMap::new();
-                m.insert(
-                    "config".to_string(),
-                    Box::new(PhpMixed::Array(IndexMap::new())),
-                );
-                m
-            }))?;
+            self.config_file_mut()
+                .as_mut()
+                .unwrap()
+                .write(PhpMixed::Array({
+                    let mut m = IndexMap::new();
+                    m.insert(
+                        "config".to_string(),
+                        Box::new(PhpMixed::Array(IndexMap::new())),
+                    );
+                    m
+                }))?;
             let _ = Silencer::call(|| {
                 chmod(&path, 0o600);
                 Ok(())
             });
         }
 
-        if !self.config_file.as_ref().unwrap().exists() {
+        if !self.config_file().as_ref().unwrap().exists() {
             return Err(anyhow::anyhow!(
                 "File \"{}\" cannot be found in the current directory",
                 config_file
@@ -86,11 +89,7 @@ impl BaseConfigCommand {
     }
 
     /// Get the local composer.json, global config.json, or the file passed by the user
-    pub(crate) fn get_composer_config_file(
-        &self,
-        input: &dyn InputInterface,
-        config: &Config,
-    ) -> String {
+    fn get_composer_config_file(&self, input: &dyn InputInterface, config: &Config) -> String {
         if input.get_option("global").as_bool() {
             format!("{}/config.json", config.get("home"))
         } else {
@@ -104,11 +103,7 @@ impl BaseConfigCommand {
 
     /// Get the local auth.json or global auth.json, or if the user passed in a file to use,
     /// the corresponding auth.json
-    pub(crate) fn get_auth_config_file(
-        &self,
-        input: &dyn InputInterface,
-        config: &Config,
-    ) -> String {
+    fn get_auth_config_file(&self, input: &dyn InputInterface, config: &Config) -> String {
         if input.get_option("global").as_bool() {
             format!("{}/auth.json", config.get("home"))
         } else {

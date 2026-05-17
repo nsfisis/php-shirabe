@@ -1,9 +1,5 @@
 //! ref: composer/src/Composer/Downloader/ArchiveDownloader.php
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::package::package_interface::PackageInterface;
-use crate::util::platform::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -12,64 +8,84 @@ use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
 };
 
-#[derive(Debug)]
-pub struct ArchiveDownloader {
-    pub(crate) inner: FileDownloader,
-    pub(crate) cleanup_executed: IndexMap<String, bool>,
-}
+use crate::dependency_resolver::operation::install_operation::InstallOperation;
+use crate::downloader::file_downloader::FileDownloader;
+use crate::package::package_interface::PackageInterface;
+use crate::util::platform::Platform;
 
-impl ArchiveDownloader {
-    pub fn prepare(
+pub trait ArchiveDownloader {
+    fn inner(&self) -> &FileDownloader;
+    fn inner_mut(&mut self) -> &mut FileDownloader;
+    fn cleanup_executed(&self) -> &IndexMap<String, bool>;
+    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool>;
+
+    fn extract(
+        &self,
+        package: &dyn PackageInterface,
+        file: &str,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>>;
+
+    fn prepare(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.cleanup_executed.remove(package.get_name());
-
-        self.inner.prepare(r#type, package, path, prev_package)
+        self.cleanup_executed_mut().remove(package.get_name());
+        self.inner_mut()
+            .prepare(r#type, package, path, prev_package)
     }
 
-    pub fn cleanup(
+    fn cleanup(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.cleanup_executed
+        self.cleanup_executed_mut()
             .insert(package.get_name().to_string(), true);
-
-        self.inner.cleanup(r#type, package, path, prev_package)
+        self.inner_mut()
+            .cleanup(r#type, package, path, prev_package)
     }
 
-    pub fn install(
+    /// @inheritDoc
+    ///
+    /// @throws \RuntimeException
+    /// @throws \UnexpectedValueException
+    fn install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
     ) -> Result<Box<dyn PromiseInterface>> {
         if output {
-            self.inner.io.write_error(&format!(
+            self.inner().io.write_error(&format!(
                 "  - {}{}",
                 InstallOperation::format(package, false),
                 self.get_install_operation_appendix(package, path)
             ));
         }
 
-        let vendor_dir = self.inner.config.get("vendor-dir");
+        let vendor_dir = self.inner().config.get("vendor-dir");
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if !self.inner.filesystem.normalize_path(&vendor_dir).contains(
-            &self
-                .inner
-                .filesystem
-                .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
-        ) {
-            self.inner.filesystem.empty_directory(path);
+        if !self
+            .inner()
+            .filesystem
+            .normalize_path(&vendor_dir)
+            .contains(
+                &self
+                    .inner()
+                    .filesystem
+                    .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
+            )
+        {
+            self.inner_mut().filesystem.empty_directory(path);
         }
 
         let temporary_dir;
@@ -80,33 +96,34 @@ impl ArchiveDownloader {
             }
         }
 
-        self.inner.add_cleanup_path(package, &temporary_dir);
+        self.inner_mut().add_cleanup_path(package, &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path) || realpath(path) != Platform::get_cwd() {
-            self.inner.add_cleanup_path(package, path);
+            self.inner_mut().add_cleanup_path(package, path);
         }
 
-        self.inner
+        self.inner_mut()
             .filesystem
             .ensure_directory_exists(&temporary_dir);
-        let file_name = self.inner.get_file_name(package, path);
+        let file_name = self.inner().get_file_name(package, path);
 
-        let filesystem = &self.inner.filesystem;
+        let filesystem = &self.inner().filesystem;
 
         let cleanup = move || {
             // remove cache if the file was corrupted
-            self.inner.clear_last_cache_write(package);
+            self.inner_mut().clear_last_cache_write(package);
 
             // clean up
             filesystem.remove_directory(&temporary_dir);
             if is_dir(path) && realpath(path) != Platform::get_cwd() {
                 filesystem.remove_directory(path);
             }
-            self.inner.remove_cleanup_path(package, &temporary_dir);
+            self.inner_mut()
+                .remove_cleanup_path(package, &temporary_dir);
             let realpath_result = realpath(path);
             if let Some(realpath_val) = realpath_result {
-                self.inner.remove_cleanup_path(package, &realpath_val);
+                self.inner_mut().remove_cleanup_path(package, &realpath_val);
             }
         };
 
@@ -155,7 +172,10 @@ impl ArchiveDownloader {
                                     code: 0,
                                 }.into());
                             }
-                            rename_recursively.as_ref().unwrap()(&file, &format!("{}/{}", to, file_basename))?;
+                            rename_recursively.as_ref().unwrap()(
+                                &file,
+                                &format!("{}/{}", to, file_basename),
+                            )?;
                         } else {
                             filesystem.rename(&file, &format!("{}/{}", to, file_basename));
                         }
@@ -179,7 +199,9 @@ impl ArchiveDownloader {
                 }
 
                 let content_dir = get_folder_content(&temporary_dir);
-                let single_dir_at_top_level = content_dir.len() == 1 && is_dir(&content_dir[0].to_string_lossy().to_string());
+                let single_dir_at_top_level =
+                    content_dir.len() == 1
+                        && is_dir(&content_dir[0].to_string_lossy().to_string());
 
                 if rename_as_one {
                     // if the target $path is clear, we can rename the whole package in one go instead of looping over the contents
@@ -204,8 +226,8 @@ impl ArchiveDownloader {
 
                 Ok(promise.then(
                     Box::new(move || -> Result<()> {
-                        self.inner.remove_cleanup_path(package, &temporary_dir);
-                        self.inner.remove_cleanup_path(package, path);
+                        self.inner_mut().remove_cleanup_path(package, &temporary_dir);
+                        self.inner_mut().remove_cleanup_path(package, path);
                         Ok(())
                     }),
                     None,
@@ -218,20 +240,8 @@ impl ArchiveDownloader {
         ))
     }
 
-    pub fn get_install_operation_appendix(
-        &self,
-        _package: &dyn PackageInterface,
-        _path: &str,
-    ) -> &str {
+    /// @inheritDoc
+    fn get_install_operation_appendix(&self, _package: &dyn PackageInterface, _path: &str) -> &str {
         ": Extracting archive"
-    }
-
-    pub(crate) fn extract(
-        &self,
-        _package: &dyn PackageInterface,
-        _file: &str,
-        _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
-        todo!()
     }
 }

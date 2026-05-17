@@ -24,44 +24,41 @@ use crate::repository::repository_interface::{FindPackageConstraint, RepositoryI
 use crate::repository::root_package_repository::RootPackageRepository;
 use crate::util::package_info::PackageInfo;
 
-#[derive(Debug)]
-pub struct BaseDependencyCommand {
-    inner: BaseCommand,
-    pub(crate) colors: Vec<String>,
-}
+pub trait BaseDependencyCommand: BaseCommand {
+    const ARGUMENT_PACKAGE: &'static str = "package";
+    const ARGUMENT_CONSTRAINT: &'static str = "version";
+    const OPTION_RECURSIVE: &'static str = "recursive";
+    const OPTION_TREE: &'static str = "tree";
 
-impl BaseDependencyCommand {
-    pub const ARGUMENT_PACKAGE: &'static str = "package";
-    pub const ARGUMENT_CONSTRAINT: &'static str = "version";
-    pub const OPTION_RECURSIVE: &'static str = "recursive";
-    pub const OPTION_TREE: &'static str = "tree";
+    fn colors(&self) -> &[String];
+    fn colors_mut(&mut self) -> &mut [String];
 
-    pub fn set_name(&mut self, name: &str) -> &mut Self {
+    fn set_name(&mut self, name: &str) -> &mut Self {
         self.inner.set_name(name);
         self
     }
 
-    pub fn set_aliases(&mut self, aliases: Vec<String>) -> &mut Self {
+    fn set_aliases(&mut self, aliases: Vec<String>) -> &mut Self {
         self.inner.set_aliases(aliases);
         self
     }
 
-    pub fn set_description(&mut self, description: &str) -> &mut Self {
+    fn set_description(&mut self, description: &str) -> &mut Self {
         self.inner.set_description(description);
         self
     }
 
-    pub fn set_definition(&mut self, definition: Vec<shirabe_php_shim::PhpMixed>) -> &mut Self {
+    fn set_definition(&mut self, definition: Vec<shirabe_php_shim::PhpMixed>) -> &mut Self {
         self.inner.set_definition(definition);
         self
     }
 
-    pub fn set_help(&mut self, help: &str) -> &mut Self {
+    fn set_help(&mut self, help: &str) -> &mut Self {
         self.inner.set_help(help);
         self
     }
 
-    pub(crate) fn do_execute(
+    fn do_execute(
         &mut self,
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
@@ -309,7 +306,7 @@ impl BaseDependencyCommand {
         Ok(r#return)
     }
 
-    pub(crate) fn print_table(&self, output: &dyn OutputInterface, results: Vec<DependentsEntry>) {
+    fn print_table(&self, output: &dyn OutputInterface, results: Vec<DependentsEntry>) {
         let mut table: Vec<Vec<String>> = vec![];
         let mut doubles: IndexMap<String, bool> = IndexMap::new();
         let mut results = results;
@@ -362,28 +359,28 @@ impl BaseDependencyCommand {
         self.inner.render_table(table, output);
     }
 
-    pub(crate) fn init_styles(&mut self, output: &dyn OutputInterface) {
-        self.colors = vec![
+    fn init_styles(&mut self, output: &dyn OutputInterface) {
+        *self.colors_mut() = vec![
             "green".to_string(),
             "yellow".to_string(),
             "cyan".to_string(),
             "magenta".to_string(),
             "blue".to_string(),
         ];
-        for color in &self.colors {
+        for color in &self.colors() {
             let style = OutputFormatterStyle::new(color.clone());
             output.get_formatter().set_style(color, style);
         }
     }
 
-    pub(crate) fn print_tree(&self, results: &[DependentsEntry], prefix: &str, level: i64) {
+    fn print_tree(&self, results: &[DependentsEntry], prefix: &str, level: i64) {
         let count = results.len() as i64;
         let mut idx: i64 = 0;
-        let colors_len = self.colors.len() as i64;
+        let colors_len = self.colors().len() as i64;
         for result in results {
             let DependentsEntry(package, link, children) = result;
-            let color = &self.colors[(level % colors_len) as usize];
-            let prev_color = &self.colors[((level - 1) % colors_len) as usize];
+            let color = &self.colors()[(level % colors_len) as usize];
+            let prev_color = &self.colors()[((level - 1) % colors_len) as usize];
             idx += 1;
             let is_last = idx == count;
             let version_text =

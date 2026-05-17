@@ -12,26 +12,27 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_merge, in_array, json_encode_ex,
 };
 
-#[derive(Debug)]
-pub struct BaseIO {
-    pub(crate) authentications: IndexMap<String, IndexMap<String, Option<String>>>,
-}
+// TODO(phase-b): default implementations in a subtrait cannot override supertrait methods in Rust;
+// write/write_error etc. from IOInterface are called through the supertrait and must be provided
+// by concrete types implementing both BaseIO and IOInterface.
+pub trait BaseIO: IOInterface {
+    fn authentications(&self) -> &IndexMap<String, IndexMap<String, Option<String>>>;
+    fn authentications_mut(&mut self) -> &mut IndexMap<String, IndexMap<String, Option<String>>>;
 
-impl BaseIO {
-    pub fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
-        self.authentications.clone()
+    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+        self.authentications().clone()
     }
 
-    pub fn reset_authentications(&mut self) {
-        self.authentications = IndexMap::new();
+    fn reset_authentications(&mut self) {
+        *self.authentications_mut() = IndexMap::new();
     }
 
-    pub fn has_authentication(&self, repository_name: &str) -> bool {
-        self.authentications.contains_key(repository_name)
+    fn has_authentication(&self, repository_name: &str) -> bool {
+        self.authentications().contains_key(repository_name)
     }
 
-    pub fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
-        if let Some(auth) = self.authentications.get(repository_name) {
+    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+        if let Some(auth) = self.authentications().get(repository_name) {
             return auth.clone();
         }
         let mut result = IndexMap::new();
@@ -40,7 +41,7 @@ impl BaseIO {
         result
     }
 
-    pub fn set_authentication(
+    fn set_authentication(
         &mut self,
         repository_name: String,
         username: String,
@@ -49,18 +50,18 @@ impl BaseIO {
         let mut auth = IndexMap::new();
         auth.insert("username".to_string(), Some(username));
         auth.insert("password".to_string(), password);
-        self.authentications.insert(repository_name, auth);
+        self.authentications_mut().insert(repository_name, auth);
     }
 
-    pub fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+    fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
         self.write(messages, newline, verbosity);
     }
 
-    pub fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+    fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
         self.write_error(messages, newline, verbosity);
     }
 
-    pub(crate) fn check_and_set_authentication(
+    fn check_and_set_authentication(
         &mut self,
         repository_name: String,
         username: String,
@@ -85,7 +86,7 @@ impl BaseIO {
         self.set_authentication(repository_name, username, password);
     }
 
-    pub fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
         let bitbucket_oauth = config.get("bitbucket-oauth");
         let github_oauth = config.get("github-oauth");
         let gitlab_oauth = config.get("gitlab-oauth");
@@ -383,7 +384,7 @@ impl BaseIO {
         Ok(())
     }
 
-    pub fn emergency(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn emergency(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::EMERGENCY.to_string()),
             message,
@@ -391,7 +392,7 @@ impl BaseIO {
         );
     }
 
-    pub fn alert(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn alert(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::ALERT.to_string()),
             message,
@@ -399,7 +400,7 @@ impl BaseIO {
         );
     }
 
-    pub fn critical(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn critical(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::CRITICAL.to_string()),
             message,
@@ -407,7 +408,7 @@ impl BaseIO {
         );
     }
 
-    pub fn error(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn error(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::ERROR.to_string()),
             message,
@@ -415,7 +416,7 @@ impl BaseIO {
         );
     }
 
-    pub fn warning(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn warning(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::WARNING.to_string()),
             message,
@@ -423,7 +424,7 @@ impl BaseIO {
         );
     }
 
-    pub fn notice(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn notice(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::NOTICE.to_string()),
             message,
@@ -431,7 +432,7 @@ impl BaseIO {
         );
     }
 
-    pub fn info(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn info(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::INFO.to_string()),
             message,
@@ -439,7 +440,7 @@ impl BaseIO {
         );
     }
 
-    pub fn debug(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn debug(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
         self.log(
             PhpMixed::String(LogLevel::DEBUG.to_string()),
             message,
@@ -447,7 +448,7 @@ impl BaseIO {
         );
     }
 
-    pub fn log(
+    fn log(
         &mut self,
         level: PhpMixed,
         message: PhpMixed,

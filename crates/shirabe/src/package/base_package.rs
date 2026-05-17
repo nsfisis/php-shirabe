@@ -58,55 +58,43 @@ pub static SUPPORTED_LINK_TYPES: LazyLock<IndexMap<&'static str, SupportedLinkTy
 
 pub static STABILITIES: LazyLock<IndexMap<&'static str, i64>> = LazyLock::new(|| {
     let mut m = IndexMap::new();
-    m.insert("stable", BasePackage::STABILITY_STABLE);
-    m.insert("RC", BasePackage::STABILITY_RC);
-    m.insert("beta", BasePackage::STABILITY_BETA);
-    m.insert("alpha", BasePackage::STABILITY_ALPHA);
-    m.insert("dev", BasePackage::STABILITY_DEV);
+    m.insert("stable", 0i64);
+    m.insert("RC", 5i64);
+    m.insert("beta", 10i64);
+    m.insert("alpha", 15i64);
+    m.insert("dev", 20i64);
     m
 });
 
-#[derive(Debug)]
-pub struct BasePackage {
-    pub id: i64,
-    pub(crate) name: String,
-    pub(crate) pretty_name: String,
-    pub(crate) repository: Option<Box<dyn RepositoryInterface>>,
-}
+pub trait BasePackage: PackageInterface + std::fmt::Display {
+    const STABILITY_STABLE: i64 = 0;
+    const STABILITY_RC: i64 = 5;
+    const STABILITY_BETA: i64 = 10;
+    const STABILITY_ALPHA: i64 = 15;
+    const STABILITY_DEV: i64 = 20;
 
-impl std::fmt::Display for BasePackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_unique_name())
-    }
-}
+    fn id(&self) -> i64;
+    fn id_mut(&mut self) -> &mut i64;
+    fn name(&self) -> &str;
+    fn name_mut(&mut self) -> &mut String;
+    fn pretty_name(&self) -> &str;
+    fn pretty_name_mut(&mut self) -> &mut String;
+    fn repository_opt(&self) -> Option<&dyn RepositoryInterface>;
+    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>);
+    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>>;
 
-impl BasePackage {
-    pub const STABILITY_STABLE: i64 = 0;
-    pub const STABILITY_RC: i64 = 5;
-    pub const STABILITY_BETA: i64 = 10;
-    pub const STABILITY_ALPHA: i64 = 15;
-    pub const STABILITY_DEV: i64 = 20;
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn clone_box(&self) -> Box<dyn BasePackage>;
 
-    pub fn new(name: String) -> Self {
-        let pretty_name = name.clone();
-        let name = name.to_lowercase();
-        Self {
-            id: -1,
-            name,
-            pretty_name,
-            repository: None,
-        }
+    fn get_name(&self) -> &str {
+        self.name()
     }
 
-    pub fn get_name(&self) -> &str {
-        &self.name
+    fn get_pretty_name(&self) -> &str {
+        self.pretty_name()
     }
 
-    pub fn get_pretty_name(&self) -> &str {
-        &self.pretty_name
-    }
-
-    pub fn get_names(&self, provides: bool) -> Vec<String> {
+    fn get_names(&self, provides: bool) -> Vec<String> {
         let mut names: IndexMap<String, bool> = IndexMap::new();
         names.insert(self.get_name().to_string(), true);
 
@@ -123,19 +111,16 @@ impl BasePackage {
         names.into_keys().collect()
     }
 
-    pub fn set_id(&mut self, id: i64) {
-        self.id = id;
+    fn set_id(&mut self, id: i64) {
+        *self.id_mut() = id;
     }
 
-    pub fn get_id(&self) -> i64 {
-        self.id
+    fn get_id(&self) -> i64 {
+        self.id()
     }
 
-    pub fn set_repository(
-        &mut self,
-        repository: Box<dyn RepositoryInterface>,
-    ) -> anyhow::Result<()> {
-        if let Some(ref existing) = self.repository {
+    fn set_repository(&mut self, repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
+        if let Some(existing) = self.repository_opt() {
             // TODO(phase-b): proper reference identity check before raising error
             return Err(anyhow::anyhow!(LogicException {
                 message: format!(
@@ -147,40 +132,35 @@ impl BasePackage {
                 code: 0,
             }));
         }
-        self.repository = Some(repository);
+        self.set_repository_box(repository);
         Ok(())
     }
 
-    pub fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository.as_deref()
+    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
+        self.repository_opt()
     }
 
-    pub fn is_platform(&self) -> bool {
-        self.repository
-            .as_ref()
+    fn is_platform(&self) -> bool {
+        self.repository_opt()
             .and_then(|r| r.as_any().downcast_ref::<PlatformRepository>())
             .is_some()
     }
 
-    pub fn get_unique_name(&self) -> String {
+    fn get_unique_name(&self) -> String {
         format!("{}-{}", self.get_name(), self.get_version())
     }
 
-    pub fn equals(&self, _package: &dyn PackageInterface) -> bool {
+    fn equals(&self, _package: &dyn PackageInterface) -> bool {
         // TODO(phase-b): implement via reference identity (requires Rc/Arc)
         // PHP uses === which is reference equality; unwraps AliasPackage on both sides
         todo!("equals requires reference identity which needs Rc/Arc")
     }
 
-    pub fn get_pretty_string(&self) -> String {
+    fn get_pretty_string(&self) -> String {
         format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
     }
 
-    pub fn get_full_pretty_version(
-        &self,
-        truncate: bool,
-        display_mode: i64,
-    ) -> anyhow::Result<String> {
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> anyhow::Result<String> {
         const DISPLAY_SOURCE_REF_IF_DEV: i64 = PackageInterface::DISPLAY_SOURCE_REF_IF_DEV;
         const DISPLAY_SOURCE_REF: i64 = PackageInterface::DISPLAY_SOURCE_REF;
         const DISPLAY_DIST_REF: i64 = PackageInterface::DISPLAY_DIST_REF;
@@ -224,75 +204,33 @@ impl BasePackage {
         Ok(format!("{} {}", self.get_pretty_version(), reference))
     }
 
-    pub fn get_stability_priority(&self) -> i64 {
+    fn get_stability_priority(&self) -> i64 {
         *STABILITIES
             .get(self.get_stability())
             .unwrap_or(&Self::STABILITY_STABLE)
     }
 
-    pub fn php_clone(&mut self) {
-        self.repository = None;
-        self.id = -1;
+    fn php_clone(&mut self) {
+        self.take_repository();
+        *self.id_mut() = -1;
     }
 
-    pub fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String {
+    fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String
+    where
+        Self: Sized,
+    {
         let cleaned = preg_quote(allow_pattern, None).replace("\\*", ".*");
         wrap.replace("%s", &cleaned)
     }
 
-    pub fn package_names_to_regexp(package_names: &[String], wrap: &str) -> String {
+    fn package_names_to_regexp(package_names: &[String], wrap: &str) -> String
+    where
+        Self: Sized,
+    {
         let patterns: Vec<String> = package_names
             .iter()
             .map(|name| Self::package_name_to_regexp(name, "%s"))
             .collect();
         wrap.replace("%s", &patterns.join("|"))
-    }
-
-    // Methods below are defined in Package/CompletePackage subclasses in PHP.
-    // Called via $this polymorphism from BasePackage methods.
-    // TODO(phase-b): resolve via trait dispatch or field access in concrete types.
-
-    pub fn get_provides(&self) -> IndexMap<String, Link> {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_replaces(&self) -> IndexMap<String, Link> {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_version(&self) -> &str {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_pretty_version(&self) -> &str {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn is_dev(&self) -> bool {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_source_type(&self) -> Option<&str> {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_source_reference(&self) -> Option<&str> {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_dist_reference(&self) -> Option<&str> {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn get_stability(&self) -> &str {
-        todo!("defined in Package subclass")
-    }
-
-    pub fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    pub fn clone_box(&self) -> Box<BasePackage> {
-        todo!("clone_box needs resolution in Phase B")
     }
 }
