@@ -462,32 +462,6 @@ impl BaseCommand for RepositoryCommand {
         self.composer.as_ref()
     }
 
-    fn composer_mut(&mut self) -> Option<&mut Composer> {
-        self.composer.as_mut()
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_ref()
-    }
-
-    fn io_mut(&mut self) -> Option<&mut dyn IOInterface> {
-        self.io.as_mut()
-    }
-}
-
-impl BaseCommand for RepositoryCommand {
-    fn inner(&self) -> &Command {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut Command {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
     fn composer_mut(&mut self) -> &mut Option<Composer> {
         &mut self.composer
     }
