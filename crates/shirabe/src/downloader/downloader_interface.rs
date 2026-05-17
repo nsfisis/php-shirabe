@@ -12,6 +12,7 @@ pub trait DownloaderInterface {
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
+        output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
 
     fn prepare(
@@ -26,6 +27,7 @@ pub trait DownloaderInterface {
         &self,
         package: &dyn PackageInterface,
         path: &str,
+        output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
 
     fn update(
@@ -39,6 +41,7 @@ pub trait DownloaderInterface {
         &self,
         package: &dyn PackageInterface,
         path: &str,
+        output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
 
     fn cleanup(

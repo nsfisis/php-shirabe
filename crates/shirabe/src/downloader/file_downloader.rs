@@ -116,13 +116,13 @@ impl FileDownloader {
 
 impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
-    fn get_installation_source(&self) -> &str {
-        "dist"
+    fn get_installation_source(&self) -> String {
+        "dist".to_owned()
     }
 
     /// @inheritDoc
     fn download(
-        &mut self,
+        &self,
         package: &dyn PackageInterface,
         path: &str,
         _prev_package: Option<&dyn PackageInterface>,
@@ -184,7 +184,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     fn prepare(
-        &mut self,
+        &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
@@ -195,7 +195,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     fn cleanup(
-        &mut self,
+        &self,
         _type: &str,
         package: &dyn PackageInterface,
         path: &str,
@@ -249,7 +249,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     fn install(
-        &mut self,
+        &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
@@ -308,7 +308,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     fn update(
-        &mut self,
+        &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
@@ -327,7 +327,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     fn remove(
-        &mut self,
+        &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
@@ -348,7 +348,7 @@ impl ChangeReportInterface for FileDownloader {
     /// @inheritDoc
     /// @throws \RuntimeException
     fn get_local_changes(
-        &mut self,
+        &self,
         package: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<String>> {

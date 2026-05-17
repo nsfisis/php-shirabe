@@ -65,7 +65,7 @@ impl RootPackageInterface for RootPackage {
         self.aliases = aliases;
     }
 
-    fn get_aliases(&self) -> &Vec<IndexMap<String, String>> {
+    fn get_aliases(&self) -> &[IndexMap<String, String>] {
         &self.aliases
     }
 }
