@@ -1,7 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule2Literals.php
 
+use shirabe_php_shim::PhpMixed;
+
 use crate::dependency_resolver::generic_rule::RuleLiterals;
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::request::Request;
+use crate::dependency_resolver::rule::{ReasonData, Rule};
 
 #[derive(Debug)]
 pub struct Rule2Literals {

@@ -14,6 +14,8 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::multi_constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
 
+use shirabe_external_packages::symfony::component::console::command::command::Command;
+
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
 use crate::command::bump_command::BumpCommand;

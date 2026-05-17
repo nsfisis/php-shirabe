@@ -1,6 +1,11 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php
 
+use shirabe_external_packages::symfony::component::console::command::command::Command;
+
+use crate::command::base_command::BaseCommand;
 use crate::command::base_dependency_command::BaseDependencyCommand;
+use crate::composer::Composer;
+use crate::io::io_interface::IOInterface;
 use crate::command::completion_trait::CompletionTrait;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
