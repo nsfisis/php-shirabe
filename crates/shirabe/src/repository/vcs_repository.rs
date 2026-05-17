@@ -973,7 +973,7 @@ impl VcsRepository {
 enum CachedPackageResult {
     None,
     Missing,
-    Package(Box<BasePackage>),
+    Package(Box<dyn BasePackage>),
 }
 
 #[derive(Debug)]

@@ -23,7 +23,7 @@ pub struct SuggestsCommand {
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
-    completion_trait: CompletionTrait,
+    completion_trait: Box<dyn CompletionTrait>,
 }
 
 impl SuggestsCommand {

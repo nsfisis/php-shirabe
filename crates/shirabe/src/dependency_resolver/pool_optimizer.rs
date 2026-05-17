@@ -39,7 +39,7 @@ pub struct PoolOptimizer {
     packages_to_remove: IndexMap<i64, bool>,
 
     /// @var array<int, BasePackage[]>
-    aliases_per_package: IndexMap<i64, Vec<Box<BasePackage>>>,
+    aliases_per_package: IndexMap<i64, Vec<Box<dyn BasePackage>>>,
 
     /// @var array<string, array<string, string>>
     removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
@@ -171,7 +171,7 @@ impl PoolOptimizer {
         }
     }
 
-    fn mark_package_irremovable(&mut self, package: &BasePackage) {
+    fn mark_package_irremovable(&mut self, package: &dyn BasePackage) {
         self.irremovable_packages.insert(package.id, true);
         if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
@@ -191,7 +191,7 @@ impl PoolOptimizer {
 
     /// @return Pool Optimized pool
     fn apply_removals_to_pool(&self, pool: &Pool) -> Pool {
-        let mut packages: Vec<Box<BasePackage>> = vec![];
+        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         let mut removed_versions: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
         for package in pool.get_packages() {
             if !self.packages_to_remove.contains_key(&package.id) {
@@ -225,7 +225,7 @@ impl PoolOptimizer {
     ) -> Result<()> {
         let mut identical_definitions_per_package: IndexMap<
             String,
-            IndexMap<String, IndexMap<String, Vec<Box<BasePackage>>>>,
+            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
         > = IndexMap::new();
         let mut package_identical_definition_lookup: IndexMap<
             i64,
@@ -361,7 +361,7 @@ impl PoolOptimizer {
         Ok(())
     }
 
-    fn calculate_dependency_hash(&self, package: &BasePackage) -> String {
+    fn calculate_dependency_hash(&self, package: &dyn BasePackage) -> String {
         let mut hash = String::new();
 
         let hash_relevant_links: Vec<(&str, Vec<crate::package::link::Link>)> = vec![
@@ -425,10 +425,10 @@ impl PoolOptimizer {
     /// @param array<int, array<string, array{groupHash: string, dependencyHash: string}>> $packageIdenticalDefinitionLookup
     fn keep_package(
         &mut self,
-        package: &BasePackage,
+        package: &dyn BasePackage,
         identical_definitions_per_package: &IndexMap<
             String,
-            IndexMap<String, IndexMap<String, Vec<Box<BasePackage>>>>,
+            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
         >,
         package_identical_definition_lookup: &IndexMap<
             i64,
@@ -542,7 +542,8 @@ impl PoolOptimizer {
             return;
         }
 
-        let mut package_index: IndexMap<String, IndexMap<i64, Box<BasePackage>>> = IndexMap::new();
+        let mut package_index: IndexMap<String, IndexMap<i64, Box<dyn BasePackage>>> =
+            IndexMap::new();
 
         for package in pool.get_packages() {
             let id = package.id;

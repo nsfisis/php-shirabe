@@ -14,7 +14,7 @@ pub enum FindPackageConstraint {
 
 pub struct LoadPackagesResult {
     pub names_found: Vec<String>,
-    pub packages: Vec<Box<BasePackage>>,
+    pub packages: Vec<Box<dyn BasePackage>>,
 }
 
 pub enum AbandonedInfo {
@@ -46,15 +46,15 @@ pub trait RepositoryInterface: Countable {
         &self,
         name: String,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<BasePackage>>;
+    ) -> Option<Box<dyn BasePackage>>;
 
     fn find_packages(
         &self,
         name: String,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<BasePackage>>;
+    ) -> Vec<Box<dyn BasePackage>>;
 
-    fn get_packages(&self) -> Vec<Box<BasePackage>>;
+    fn get_packages(&self) -> Vec<Box<dyn BasePackage>>;
 
     fn load_packages(
         &self,

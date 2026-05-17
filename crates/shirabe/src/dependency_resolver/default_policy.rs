@@ -45,8 +45,8 @@ impl DefaultPolicy {
     pub fn compare_by_priority(
         &self,
         pool: &Pool,
-        a: &BasePackage,
-        b: &BasePackage,
+        a: &dyn BasePackage,
+        b: &dyn BasePackage,
         required_package: Option<String>,
         ignore_replace: bool,
     ) -> i64 {
@@ -169,7 +169,7 @@ impl DefaultPolicy {
         selected
     }
 
-    pub(crate) fn replaces(&self, source: &BasePackage, target: &BasePackage) -> bool {
+    pub(crate) fn replaces(&self, source: &dyn BasePackage, target: &dyn BasePackage) -> bool {
         for link in source.get_replaces().values() {
             if link.get_target() == target.get_name() {
                 return true;

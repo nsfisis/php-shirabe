@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 /// Implements PHP \Iterator over a grouped rule set.
 #[derive(Debug)]
 pub struct RuleSetIterator {
-    pub(crate) rules: IndexMap<i64, Vec<Rule>>,
+    pub(crate) rules: IndexMap<i64, Vec<Box<dyn Rule>>>,
     pub(crate) types: Vec<i64>,
     pub(crate) current_offset: i64,
     pub(crate) current_type: i64,
@@ -14,7 +14,7 @@ pub struct RuleSetIterator {
 }
 
 impl RuleSetIterator {
-    pub fn new(rules: IndexMap<i64, Vec<Rule>>) -> Self {
+    pub fn new(rules: IndexMap<i64, Vec<Box<dyn Rule>>>) -> Self {
         let mut types: Vec<i64> = rules.keys().copied().collect();
         types.sort();
         let mut iter = Self {
@@ -28,8 +28,8 @@ impl RuleSetIterator {
         iter
     }
 
-    pub fn current(&self) -> &Rule {
-        &self.rules[&self.current_type][self.current_offset as usize]
+    pub fn current(&self) -> &dyn Rule {
+        &*self.rules[&self.current_type][self.current_offset as usize]
     }
 
     pub fn key(&self) -> i64 {

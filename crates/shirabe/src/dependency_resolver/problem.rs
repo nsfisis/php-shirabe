@@ -35,7 +35,7 @@ pub struct Problem {
     pub(crate) reason_seen: IndexMap<String, bool>,
 
     /// A set of reasons for the problem, each is a rule or a root require and a rule
-    pub(crate) reasons: IndexMap<i64, Vec<Rule>>,
+    pub(crate) reasons: IndexMap<i64, Vec<Box<dyn Rule>>>,
 
     pub(crate) section: i64,
 }
@@ -50,13 +50,13 @@ impl Problem {
     }
 
     /// Add a rule as a reason
-    pub fn add_rule(&mut self, rule: Rule) {
+    pub fn add_rule(&mut self, rule: Box<dyn Rule>) {
         let id = spl_object_hash(&rule);
         self.add_reason(id, rule);
     }
 
     /// Retrieve all reasons for this problem
-    pub fn get_reasons(&self) -> &IndexMap<i64, Vec<Rule>> {
+    pub fn get_reasons(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
         &self.reasons
     }
 
@@ -67,11 +67,11 @@ impl Problem {
         request: &Request,
         pool: &Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, BasePackage>,
-        learned_pool: &Vec<Vec<Rule>>,
+        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        learned_pool: &Vec<Vec<Box<dyn Rule>>>,
     ) -> anyhow::Result<String> {
         // TODO doesn't this entirely defeat the purpose of the problem sections? what's the point of sections?
-        let mut reasons: Vec<Rule> = Vec::new();
+        let mut reasons: Vec<Box<dyn Rule>> = Vec::new();
         for section_rules in self.reasons.values().rev() {
             for rule in section_rules {
                 reasons.push(rule.clone());
@@ -132,7 +132,7 @@ impl Problem {
         ))
     }
 
-    fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> String {
+    fn get_sortable_string(&self, pool: &Pool, rule: &dyn Rule) -> String {
         match rule.get_reason() {
             Rule::RULE_ROOT_REQUIRE => rule.get_reason_data().as_array().unwrap()["packageName"]
                 .as_string()
@@ -170,7 +170,7 @@ impl Problem {
         }
     }
 
-    fn get_rule_priority(&self, rule: &Rule) -> i64 {
+    fn get_rule_priority(&self, rule: &dyn Rule) -> i64 {
         match rule.get_reason() {
             Rule::RULE_FIXED => 3,
             Rule::RULE_ROOT_REQUIRE => 2,
@@ -188,14 +188,14 @@ impl Problem {
 
     /// @internal
     pub fn format_deduplicated_rules(
-        rules: &Vec<Rule>,
+        rules: &Vec<Box<dyn Rule>>,
         indent: &str,
         repository_set: &RepositorySet,
         request: &Request,
         pool: &Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, BasePackage>,
-        learned_pool: &Vec<Vec<Rule>>,
+        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        learned_pool: &Vec<Vec<Box<dyn Rule>>>,
     ) -> String {
         let mut messages: Vec<String> = Vec::new();
         let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
@@ -350,7 +350,7 @@ impl Problem {
     }
 
     /// Store a reason descriptor but ignore duplicates
-    pub(crate) fn add_reason(&mut self, id: String, reason: Rule) {
+    pub(crate) fn add_reason(&mut self, id: String, reason: Box<dyn Rule>) {
         // TODO: if a rule is part of a problem description in two sections, isn't this going to remove a message
         // that is important to understand the issue?
 

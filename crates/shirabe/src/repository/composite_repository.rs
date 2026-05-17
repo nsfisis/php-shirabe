@@ -80,7 +80,7 @@ impl RepositoryInterface for CompositeRepository {
         &self,
         name: String,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<BasePackage>> {
+    ) -> Option<Box<dyn BasePackage>> {
         for repository in &self.repositories {
             let package = repository.find_package(name.clone(), constraint.clone());
             if package.is_some() {
@@ -94,7 +94,7 @@ impl RepositoryInterface for CompositeRepository {
         &self,
         name: String,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<BasePackage>> {
+    ) -> Vec<Box<dyn BasePackage>> {
         let mut packages = vec![];
         for repository in &self.repositories {
             packages.extend(repository.find_packages(name.clone(), constraint.clone()));
@@ -102,7 +102,7 @@ impl RepositoryInterface for CompositeRepository {
         packages
     }
 
-    fn get_packages(&self) -> Vec<Box<BasePackage>> {
+    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
         let mut packages = vec![];
         for repository in &self.repositories {
             packages.extend(repository.get_packages());

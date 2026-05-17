@@ -20,7 +20,7 @@ impl JsonLoader {
         Self { loader }
     }
 
-    pub fn load(&self, json: JsonLoaderInput) -> Result<Box<BasePackage>> {
+    pub fn load(&self, json: JsonLoaderInput) -> Result<Box<dyn BasePackage>> {
         let config = match json {
             JsonLoaderInput::File(json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {

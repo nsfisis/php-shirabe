@@ -133,7 +133,10 @@ impl ArtifactRepository {
         Ok(())
     }
 
-    fn get_composer_information(&self, file: &Path) -> anyhow::Result<Option<Box<BasePackage>>> {
+    fn get_composer_information(
+        &self,
+        file: &Path,
+    ) -> anyhow::Result<Option<Box<dyn BasePackage>>> {
         let mut json: Option<String> = None;
         let file_extension = file
             .extension()

@@ -209,7 +209,7 @@ impl Locker {
             false
         };
         if has_name {
-            let mut package_by_name: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+            let mut package_by_name: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
             if let PhpMixed::List(list) = locked_packages {
                 for info in list {
                     if let PhpMixed::Array(m) = info.as_ref() {

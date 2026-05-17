@@ -5,5 +5,5 @@ use crate::command::base_command::BaseCommand;
 use crate::plugin::capability::capability::Capability;
 
 pub trait CommandProvider: Capability {
-    fn get_commands(&self) -> Vec<Box<BaseCommand>>;
+    fn get_commands(&self) -> Vec<Box<dyn BaseCommand>>;
 }

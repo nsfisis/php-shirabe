@@ -65,7 +65,7 @@ impl ValidatingArrayLoader {
         &mut self,
         config: IndexMap<String, Box<PhpMixed>>,
         class: &str,
-    ) -> anyhow::Result<Box<BasePackage>> {
+    ) -> anyhow::Result<Box<dyn BasePackage>> {
         self.errors = Vec::new();
         self.warnings = Vec::new();
         self.config = config.clone();

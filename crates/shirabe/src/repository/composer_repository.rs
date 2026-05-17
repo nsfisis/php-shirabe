@@ -119,21 +119,21 @@ pub struct ComposerRepository {
 
 #[derive(Debug)]
 pub enum FindPackageReturn {
-    Package(Box<BasePackage>),
-    Packages(Vec<Box<BasePackage>>),
+    Package(Box<dyn BasePackage>),
+    Packages(Vec<Box<dyn BasePackage>>),
     None,
 }
 
 #[derive(Debug)]
 pub struct LoadPackagesResult {
     pub names_found: Vec<String>,
-    pub packages: IndexMap<String, Box<BasePackage>>,
+    pub packages: IndexMap<String, Box<dyn BasePackage>>,
 }
 
 #[derive(Debug)]
 pub struct LoadAsyncPackagesResult {
     pub names_found: IndexMap<String, bool>,
-    pub packages: IndexMap<String, Box<BasePackage>>,
+    pub packages: IndexMap<String, Box<dyn BasePackage>>,
 }
 
 impl ConfigurableRepositoryInterface for ComposerRepository {
@@ -326,7 +326,7 @@ impl ComposerRepository {
         &mut self,
         name: String,
         constraint: PhpMixed,
-    ) -> anyhow::Result<Option<Box<BasePackage>>> {
+    ) -> anyhow::Result<Option<Box<dyn BasePackage>>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
@@ -347,7 +347,7 @@ impl ComposerRepository {
                     .map_or(false, |m| m.contains_key(&name))
             {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<Box<BasePackage>> = packages.into_values().collect();
+                let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                 return Ok(
                     match self.filter_packages(packages_vec, Some(&*constraint), true) {
                         FindPackageReturn::Package(p) => Some(p),
@@ -376,7 +376,7 @@ impl ComposerRepository {
                 if name == provider_name {
                     let packages =
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<Box<BasePackage>> = packages.into_values().collect();
+                    let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                     return Ok(
                         match self.filter_packages(packages_vec, Some(&*constraint), true) {
                             FindPackageReturn::Package(p) => Some(p),
@@ -397,7 +397,7 @@ impl ComposerRepository {
         &mut self,
         name: String,
         constraint: Option<PhpMixed>,
-    ) -> anyhow::Result<Vec<Box<BasePackage>>> {
+    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
@@ -416,7 +416,7 @@ impl ComposerRepository {
                     .map_or(false, |m| m.contains_key(&name))
             {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<Box<BasePackage>> = packages.into_values().collect();
+                let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                 return Ok(
                     match self.filter_packages(packages_vec, constraint.as_deref(), false) {
                         FindPackageReturn::Packages(v) => v,
@@ -441,7 +441,7 @@ impl ComposerRepository {
                 if name == provider_name {
                     let packages =
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<Box<BasePackage>> = packages.into_values().collect();
+                    let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                     return Ok(
                         match self.filter_packages(packages_vec, constraint.as_deref(), false) {
                             FindPackageReturn::Packages(v) => v,
@@ -459,7 +459,7 @@ impl ComposerRepository {
 
     fn filter_packages(
         &self,
-        packages: Vec<Box<BasePackage>>,
+        packages: Vec<Box<dyn BasePackage>>,
         constraint: Option<&dyn ConstraintInterface>,
         return_first_match: bool,
     ) -> FindPackageReturn {
@@ -475,7 +475,7 @@ impl ComposerRepository {
         }
         let constraint = constraint.unwrap();
 
-        let mut filtered_packages: Vec<Box<BasePackage>> = Vec::new();
+        let mut filtered_packages: Vec<Box<dyn BasePackage>> = Vec::new();
 
         for package in packages.into_iter() {
             let pkg_constraint = Constraint::new("==", package.get_version().to_string());
@@ -496,7 +496,7 @@ impl ComposerRepository {
         FindPackageReturn::Packages(filtered_packages)
     }
 
-    pub fn get_packages(&mut self) -> anyhow::Result<Vec<Box<BasePackage>>> {
+    pub fn get_packages(&mut self) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
         let has_providers = self.has_providers()?;
 
         if self.lazy_providers_url.is_some() {
@@ -723,13 +723,13 @@ impl ComposerRepository {
             );
         }
 
-        let mut packages: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+        let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         if has_providers || self.has_partial_packages()? {
             let names: Vec<String> = package_name_map.keys().cloned().collect();
             for name in names {
-                let mut matches: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+                let mut matches: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
 
                 // if a repo has no providers but only partial packages and the partial packages are missing
                 // then we don't want to call whatProvides as it would try to load from the providers and fail
@@ -1383,7 +1383,7 @@ impl ComposerRepository {
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
-    ) -> anyhow::Result<IndexMap<String, Box<BasePackage>>> {
+    ) -> anyhow::Result<IndexMap<String, Box<dyn BasePackage>>> {
         let mut packages_source: Option<String> = None;
         let packages: IndexMap<String, PhpMixed>;
         let loading_partial_package: bool;
@@ -1600,7 +1600,7 @@ impl ComposerRepository {
             loading_partial_package = true;
         }
 
-        let mut result: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+        let mut result: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut versions_to_load: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
         let packages_inner = packages
             .get("packages")
@@ -1749,7 +1749,7 @@ impl ComposerRepository {
     }
 
     /// Adds a new package to the repository
-    pub fn add_package(&mut self, mut package: Box<BasePackage>) {
+    pub fn add_package(&mut self, mut package: Box<dyn BasePackage>) {
         // configurePackageTransportOptions(*package);
         self.configure_package_transport_options(&mut *package);
         self.inner.add_package(package);
@@ -1765,7 +1765,7 @@ impl ComposerRepository {
     ) -> anyhow::Result<LoadAsyncPackagesResult> {
         self.load_root_server_file(None)?;
 
-        let mut packages: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+        let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
         let mut promises: Vec<Box<dyn PromiseInterface>> = Vec::new();
 
@@ -1952,7 +1952,7 @@ impl ComposerRepository {
                             }
                         }
 
-                        let loaded_packages: Vec<Box<BasePackage>> =
+                        let loaded_packages: Vec<Box<dyn BasePackage>> =
                             ComposerRepository::create_packages_static(
                                 versions_to_load,
                                 packages_source,
@@ -2708,13 +2708,13 @@ impl ComposerRepository {
         &mut self,
         packages: Vec<IndexMap<String, PhpMixed>>,
         source: Option<String>,
-    ) -> anyhow::Result<Vec<Box<BasePackage>>> {
+    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
         if packages.is_empty() {
             return Ok(vec![]);
         }
 
         let mut packages = packages;
-        let result = (|| -> anyhow::Result<Vec<Box<BasePackage>>> {
+        let result = (|| -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
             for data in packages.iter_mut() {
                 if !data.contains_key("notification-url") {
                     data.insert(
@@ -2729,7 +2729,7 @@ impl ComposerRepository {
 
             let package_instances = self.loader.load_packages(packages.clone())?;
 
-            let mut results: Vec<Box<BasePackage>> = Vec::new();
+            let mut results: Vec<Box<dyn BasePackage>> = Vec::new();
             for mut package in package_instances.into_iter() {
                 if let Some(src_type) = package.get_source_type() {
                     if let Some(mirrors) =
@@ -2768,7 +2768,7 @@ impl ComposerRepository {
     fn create_packages_static(
         packages: Vec<IndexMap<String, PhpMixed>>,
         _source: Option<String>,
-    ) -> anyhow::Result<Vec<Box<BasePackage>>> {
+    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
         if packages.is_empty() {
             return Ok(vec![]);
         }
@@ -3448,7 +3448,7 @@ fn clone_root_data(rd: &RootData) -> RootData {
     }
 }
 
-fn dyn_clone_box(_pkg: &BasePackage) -> Box<BasePackage> {
+fn dyn_clone_box(_pkg: &dyn BasePackage) -> Box<dyn BasePackage> {
     todo!()
 }
 

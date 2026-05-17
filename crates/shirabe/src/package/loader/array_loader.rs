@@ -51,7 +51,7 @@ impl LoaderInterface for ArrayLoader {
         &self,
         mut config: IndexMap<String, PhpMixed>,
         class: Option<String>,
-    ) -> Result<Box<BasePackage>> {
+    ) -> Result<Box<dyn BasePackage>> {
         let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
 
         if class != "Composer\\Package\\CompletePackage"
@@ -104,8 +104,8 @@ impl ArrayLoader {
     pub fn load_packages(
         &self,
         versions: Vec<IndexMap<String, PhpMixed>>,
-    ) -> Result<Vec<Box<BasePackage>>> {
-        let mut packages: Vec<Box<BasePackage>> = vec![];
+    ) -> Result<Vec<Box<dyn BasePackage>>> {
+        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         let mut link_cache: IndexMap<
             String,
             IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
@@ -226,7 +226,7 @@ impl ArrayLoader {
         &self,
         mut package: Box<CompletePackage>,
         config: &mut IndexMap<String, PhpMixed>,
-    ) -> Result<Box<BasePackage>> {
+    ) -> Result<Box<dyn BasePackage>> {
         // PHP: if (!$package instanceof CompletePackage) — true by construction in Rust
         // (create_object always returns Box<CompletePackage>); kept as a no-op for parity.
         let _ = LogicException {

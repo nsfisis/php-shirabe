@@ -11,10 +11,10 @@ use crate::repository::repository_set::RepositorySet;
 
 #[derive(Debug)]
 pub struct RuleSet {
-    pub rule_by_id: IndexMap<i64, Rule>,
-    pub(crate) rules: IndexMap<i64, Vec<Rule>>,
+    pub rule_by_id: IndexMap<i64, Box<dyn Rule>>,
+    pub(crate) rules: IndexMap<i64, Vec<Box<dyn Rule>>>,
     pub(crate) next_rule_id: i64,
-    pub(crate) rules_by_hash: IndexMap<String, Vec<Rule>>,
+    pub(crate) rules_by_hash: IndexMap<String, Vec<Box<dyn Rule>>>,
 }
 
 impl RuleSet {
@@ -47,7 +47,7 @@ impl RuleSet {
         Self::types().into_keys().collect()
     }
 
-    pub fn add(&mut self, rule: Rule, r#type: i64) -> anyhow::Result<()> {
+    pub fn add(&mut self, rule: Box<dyn Rule>, r#type: i64) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
             return Err(OutOfBoundsException {
@@ -88,11 +88,11 @@ impl RuleSet {
         self.next_rule_id
     }
 
-    pub fn rule_by_id(&self, id: i64) -> &Rule {
-        &self.rule_by_id[&id]
+    pub fn rule_by_id(&self, id: i64) -> &dyn Rule {
+        &*self.rule_by_id[&id]
     }
 
-    pub fn get_rules(&self) -> &IndexMap<i64, Vec<Rule>> {
+    pub fn get_rules(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
         &self.rules
     }
 

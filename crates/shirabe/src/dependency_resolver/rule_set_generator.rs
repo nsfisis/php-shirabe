@@ -118,7 +118,7 @@ impl RuleSetGenerator {
         packages: &[Box<dyn PackageInterface>],
         reason: i64,
         reason_data: PhpMixed,
-    ) -> Rule {
+    ) -> Box<dyn Rule> {
         let literals: Vec<i64> = packages.iter().map(|p| -p.get_id()).collect();
 
         if literals.len() == 2 {
@@ -140,7 +140,7 @@ impl RuleSetGenerator {
     ///
     /// To be able to directly pass in the result of one of the rule creation
     /// methods null is allowed which will not insert a rule.
-    fn add_rule(&mut self, r#type: i64, new_rule: Option<Rule>) {
+    fn add_rule(&mut self, r#type: i64, new_rule: Option<Box<dyn Rule>>) {
         if let Some(rule) = new_rule {
             self.rules.add(rule, r#type).ok();
         }

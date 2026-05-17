@@ -37,13 +37,13 @@ pub struct Solver {
 
     pub(crate) watch_graph: RuleWatchGraph,
     pub(crate) decisions: Decisions,
-    pub(crate) fixed_map: IndexMap<i64, Box<BasePackage>>,
+    pub(crate) fixed_map: IndexMap<i64, Box<dyn BasePackage>>,
 
     pub(crate) propagate_index: i64,
     /// Pairs of `(literals, level)` — PHP indexes into these with the BRANCH_* constants.
     pub(crate) branches: Vec<(Vec<i64>, i64)>,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Rule>>,
+    pub(crate) learned_pool: Vec<Vec<Box<dyn Rule>>>,
     pub(crate) learned_why: IndexMap<String, i64>,
 
     pub test_flag_learned_positive_literal: bool,
@@ -292,7 +292,7 @@ impl Solver {
     /// If we find unit rules we make new decisions based on them
     ///
     /// Returns a `Rule` on conflict, otherwise `None`.
-    fn propagate(&mut self, level: i64) -> Option<Rule> {
+    fn propagate(&mut self, level: i64) -> Option<Box<dyn Rule>> {
         while self.decisions.valid_offset(self.propagate_index) {
             let decision = self
                 .decisions
@@ -349,7 +349,12 @@ impl Solver {
     /// rule (always unit) and re-propagate.
     ///
     /// returns the new solver level or 0 if unsolvable
-    fn set_propagate_learn(&mut self, level: i64, literal: i64, rule: Rule) -> anyhow::Result<i64> {
+    fn set_propagate_learn(
+        &mut self,
+        level: i64,
+        literal: i64,
+        rule: Box<dyn Rule>,
+    ) -> anyhow::Result<i64> {
         let mut level = level + 1;
 
         self.decisions.decide(literal, level, rule);
@@ -401,7 +406,7 @@ impl Solver {
         &mut self,
         level: i64,
         decision_queue: Vec<i64>,
-        rule: Rule,
+        rule: Box<dyn Rule>,
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
         let mut literals = self.policy.select_preferred_packages(
@@ -420,7 +425,11 @@ impl Solver {
         self.set_propagate_learn(level, selected_literal, rule)
     }
 
-    fn analyze(&mut self, level: i64, rule: Rule) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
+    fn analyze(
+        &mut self,
+        level: i64,
+        rule: Box<dyn Rule>,
+    ) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
         let analyzed_rule = rule.clone();
         let mut rule = rule;
         let mut rule_level = 1_i64;
@@ -591,7 +600,7 @@ impl Solver {
     fn analyze_unsolvable_rule(
         &self,
         problem: &mut Problem,
-        conflict_rule: &Rule,
+        conflict_rule: &dyn Rule,
         rule_seen: &mut IndexMap<String, bool>,
     ) {
         let why = spl_object_hash(conflict_rule);
@@ -619,7 +628,7 @@ impl Solver {
         problem.add_rule(conflict_rule.clone());
     }
 
-    fn analyze_unsolvable(&mut self, conflict_rule: &Rule) {
+    fn analyze_unsolvable(&mut self, conflict_rule: &dyn Rule) {
         let mut problem = Problem::new();
         problem.add_rule(conflict_rule.clone());
 

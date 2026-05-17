@@ -27,7 +27,7 @@ use crate::repository::repository_set::RepositorySet;
 #[derive(Debug)]
 pub enum ReasonData {
     Link(Link),
-    BasePackage(Box<BasePackage>),
+    BasePackage(Box<dyn BasePackage>),
     String(String),
     Int(i64),
     RootRequire {
@@ -35,7 +35,7 @@ pub enum ReasonData {
         constraint: Box<dyn ConstraintInterface>,
     },
     Fixed {
-        package: Box<BasePackage>,
+        package: Box<dyn BasePackage>,
     },
 }
 
@@ -151,7 +151,7 @@ pub trait Rule: std::fmt::Display {
                 // TODO(phase-b): Request::get_locked_repository() signature
                 if let Some(locked_repo) = todo!("request.get_locked_repository()") {
                     for package in todo!("locked_repo.get_packages()") {
-                        let p: &BasePackage = todo!("package as BasePackage reference");
+                        let p: &dyn BasePackage = todo!("package as BasePackage reference");
                         if p.get_name() == link.get_target() {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
@@ -186,7 +186,7 @@ pub trait Rule: std::fmt::Display {
                 // TODO(phase-b): Request::get_locked_repository() signature
                 if let Some(locked_repo) = todo!("request.get_locked_repository()") {
                     for package in todo!("locked_repo.get_packages()") {
-                        let p: &BasePackage = todo!("package as BasePackage reference");
+                        let p: &dyn BasePackage = todo!("package as BasePackage reference");
                         if p.get_name() == package_name {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
@@ -205,7 +205,7 @@ pub trait Rule: std::fmt::Display {
     }
 
     /// @internal
-    fn get_source_package(&self, pool: &Pool) -> Result<Box<BasePackage>> {
+    fn get_source_package(&self, pool: &Pool) -> Result<Box<dyn BasePackage>> {
         let literals = self.get_literals();
 
         match self.get_reason() {
@@ -250,7 +250,7 @@ pub trait Rule: std::fmt::Display {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: IndexMap<i64, Box<BasePackage>>,
+        installed_map: IndexMap<i64, Box<dyn BasePackage>>,
         _learned_pool: IndexMap<i64, Vec<Box<dyn Rule>>>,
     ) -> String {
         let mut literals = self.get_literals();
@@ -277,7 +277,7 @@ pub trait Rule: std::fmt::Display {
                 }
 
                 // PHP: array_values(array_filter($packages, fn ($p) => !($p instanceof AliasPackage)))
-                let packages_non_alias: Vec<Box<BasePackage>> = packages
+                let packages_non_alias: Vec<Box<dyn BasePackage>> = packages
                     .iter()
                     .filter(|p| {
                         (p.as_any() as &dyn Any)
@@ -409,7 +409,7 @@ pub trait Rule: std::fmt::Display {
                     _ => return String::new(),
                 };
 
-                let mut requires: Vec<Box<BasePackage>> = vec![];
+                let mut requires: Vec<Box<dyn BasePackage>> = vec![];
                 for literal in &literals {
                     requires.push(pool.literal_to_package(*literal));
                 }
@@ -479,8 +479,8 @@ pub trait Rule: std::fmt::Display {
                         reason_str
                     };
 
-                    let mut installed_packages: Vec<Box<BasePackage>> = vec![];
-                    let mut removable_packages: Vec<Box<BasePackage>> = vec![];
+                    let mut installed_packages: Vec<Box<dyn BasePackage>> = vec![];
+                    let mut removable_packages: Vec<Box<dyn BasePackage>> = vec![];
                     for literal in &literals {
                         if installed_map.contains_key(&abs(*literal)) {
                             installed_packages.push(pool.literal_to_package(*literal));
@@ -534,7 +534,7 @@ pub trait Rule: std::fmt::Display {
                 let rule_text = if literals.len() == 1 {
                     pool.literal_to_pretty_string(literals[0], &installed_map)
                 } else {
-                    let mut groups: IndexMap<String, Vec<Box<BasePackage>>> = IndexMap::new();
+                    let mut groups: IndexMap<String, Vec<Box<dyn BasePackage>>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
                         let group = if installed_map.contains_key(&package.id) {
@@ -624,12 +624,12 @@ pub trait Rule: std::fmt::Display {
     fn format_packages_unique(
         &self,
         pool: &Pool,
-        literals_or_packages: Vec<Box<BasePackage>>,
+        literals_or_packages: Vec<Box<dyn BasePackage>>,
         is_verbose: bool,
         constraint: Option<&dyn ConstraintInterface>,
         use_removed_version_group: bool,
     ) -> String {
-        let mut packages: Vec<Box<BasePackage>> = vec![];
+        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         for package in literals_or_packages {
             // PHP: \is_object($package) ? $package : $pool->literalToPackage($package);
             // In Rust we already have BasePackage, so no conversion needed.
@@ -654,7 +654,7 @@ pub trait Rule: std::fmt::Display {
         constraint: Option<&dyn ConstraintInterface>,
         use_removed_version_group: bool,
     ) -> String {
-        let mut packages: Vec<Box<BasePackage>> = vec![];
+        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         for literal in literals {
             packages.push(pool.literal_to_package(*literal).clone_box());
         }
@@ -667,7 +667,10 @@ pub trait Rule: std::fmt::Display {
         )
     }
 
-    fn deduplicate_default_branch_alias(&self, package: Box<BasePackage>) -> Box<BasePackage> {
+    fn deduplicate_default_branch_alias(
+        &self,
+        package: Box<dyn BasePackage>,
+    ) -> Box<dyn BasePackage> {
         if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                 return alias_pkg.get_alias_of().clone_box();

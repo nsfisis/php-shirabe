@@ -33,7 +33,7 @@ pub struct AliasPackage {
     pub(crate) has_self_version_requires: bool,
 
     /// @var BasePackage
-    pub(crate) alias_of: Box<BasePackage>,
+    pub(crate) alias_of: Box<dyn BasePackage>,
     /// @var Link[]
     pub(crate) requires: IndexMap<String, Link>,
     /// @var Link[]
@@ -52,7 +52,7 @@ impl AliasPackage {
     /// @param BasePackage $aliasOf       The package this package is an alias of
     /// @param string      $version       The version the alias must report
     /// @param string      $prettyVersion The alias's non-normalized version
-    pub fn new(alias_of: Box<BasePackage>, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: Box<dyn BasePackage>, version: String, pretty_version: String) -> Self {
         let inner = BasePackage::new(alias_of.get_name().to_string());
 
         let stability = VersionParser::parse_stability(&version);
@@ -111,7 +111,7 @@ impl AliasPackage {
         this
     }
 
-    pub fn get_alias_of(&self) -> &BasePackage {
+    pub fn get_alias_of(&self) -> &dyn BasePackage {
         &self.alias_of
     }
 

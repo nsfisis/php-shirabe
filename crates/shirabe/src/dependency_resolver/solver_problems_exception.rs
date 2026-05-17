@@ -13,13 +13,13 @@ use crate::util::ini_helper::IniHelper;
 pub struct SolverProblemsException {
     inner: RuntimeException,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Rule>>,
+    pub(crate) learned_pool: Vec<Vec<Box<dyn Rule>>>,
 }
 
 impl SolverProblemsException {
     pub const ERROR_DEPENDENCY_RESOLUTION_FAILED: i64 = 2;
 
-    pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Rule>>) -> Self {
+    pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Box<dyn Rule>>>) -> Self {
         let message = format!(
             "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",
             problems.len()
@@ -143,7 +143,7 @@ impl SolverProblemsException {
         text
     }
 
-    fn get_extension_problems(&self, reason_sets: Vec<Vec<Rule>>) -> Vec<String> {
+    fn get_extension_problems(&self, reason_sets: Vec<Vec<Box<dyn Rule>>>) -> Vec<String> {
         let mut missing_extensions: indexmap::IndexMap<String, i64> = indexmap::IndexMap::new();
         for reason_set in reason_sets {
             for rule in reason_set {

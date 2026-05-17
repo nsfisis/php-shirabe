@@ -16,8 +16,8 @@ pub struct PrePoolCreateEvent {
     stability_flags: IndexMap<String, i64>,
     root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
     root_references: IndexMap<String, String>,
-    packages: Vec<BasePackage>,
-    unacceptable_fixed_packages: Vec<BasePackage>,
+    packages: Vec<Box<dyn BasePackage>>,
+    unacceptable_fixed_packages: Vec<Box<dyn BasePackage>>,
 }
 
 impl PrePoolCreateEvent {
@@ -30,8 +30,8 @@ impl PrePoolCreateEvent {
         stability_flags: IndexMap<String, i64>,
         root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
         root_references: IndexMap<String, String>,
-        packages: Vec<BasePackage>,
-        unacceptable_fixed_packages: Vec<BasePackage>,
+        packages: Vec<Box<dyn BasePackage>>,
+        unacceptable_fixed_packages: Vec<Box<dyn BasePackage>>,
     ) -> Self {
         Self {
             inner: Event::new(name, vec![], IndexMap::new()),
@@ -72,19 +72,19 @@ impl PrePoolCreateEvent {
         &self.root_references
     }
 
-    pub fn get_packages(&self) -> &Vec<BasePackage> {
+    pub fn get_packages(&self) -> &Vec<Box<dyn BasePackage>> {
         &self.packages
     }
 
-    pub fn get_unacceptable_fixed_packages(&self) -> &Vec<BasePackage> {
+    pub fn get_unacceptable_fixed_packages(&self) -> &Vec<Box<dyn BasePackage>> {
         &self.unacceptable_fixed_packages
     }
 
-    pub fn set_packages(&mut self, packages: Vec<BasePackage>) {
+    pub fn set_packages(&mut self, packages: Vec<Box<dyn BasePackage>>) {
         self.packages = packages;
     }
 
-    pub fn set_unacceptable_fixed_packages(&mut self, packages: Vec<BasePackage>) {
+    pub fn set_unacceptable_fixed_packages(&mut self, packages: Vec<Box<dyn BasePackage>>) {
         self.unacceptable_fixed_packages = packages;
     }
 }

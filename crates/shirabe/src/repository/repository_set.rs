@@ -211,11 +211,11 @@ impl RepositorySet {
         name: &str,
         constraint: Option<Box<dyn ConstraintInterface>>,
         flags: i64,
-    ) -> Vec<Box<BasePackage>> {
+    ) -> Vec<Box<dyn BasePackage>> {
         let ignore_stability = (flags & Self::ALLOW_UNACCEPTABLE_STABILITIES) != 0;
         let load_from_all_repos = (flags & Self::ALLOW_SHADOWED_REPOSITORIES) != 0;
 
-        let mut packages: Vec<Vec<Box<BasePackage>>> = vec![];
+        let mut packages: Vec<Vec<Box<dyn BasePackage>>> = vec![];
         if load_from_all_repos {
             for repository in &self.repositories {
                 // PHP: $repository->findPackages($name, $constraint) ?: []
@@ -262,7 +262,7 @@ impl RepositorySet {
         }
 
         // PHP: $candidates = $packages ? array_merge(...$packages) : [];
-        let candidates: Vec<Box<BasePackage>> = if !packages.is_empty() {
+        let candidates: Vec<Box<dyn BasePackage>> = if !packages.is_empty() {
             packages.into_iter().flatten().collect()
         } else {
             vec![]
@@ -273,7 +273,7 @@ impl RepositorySet {
             return candidates;
         }
 
-        let mut result: Vec<Box<BasePackage>> = vec![];
+        let mut result: Vec<Box<dyn BasePackage>> = vec![];
         for candidate in candidates {
             if self.is_package_acceptable(&candidate.get_names(true), candidate.get_stability()) {
                 result.push(candidate);
@@ -518,7 +518,7 @@ impl RepositorySet {
 
         self.locked = true;
 
-        let mut packages: Vec<Box<BasePackage>> = vec![];
+        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         for repository in &self.repositories {
             for mut package in repository.get_packages() {
                 let name = package.get_name().to_string();
@@ -532,7 +532,7 @@ impl RepositorySet {
                         {
                             package = alias_pkg.get_alias_of().clone_box();
                         }
-                        let alias_package: Box<BasePackage> = if (package.as_any() as &dyn Any)
+                        let alias_package: Box<dyn BasePackage> = if (package.as_any() as &dyn Any)
                             .downcast_ref::<CompletePackage>()
                             .is_some()
                         {

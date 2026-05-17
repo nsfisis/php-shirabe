@@ -9,5 +9,5 @@ pub trait LoaderInterface {
         &self,
         config: IndexMap<String, PhpMixed>,
         class: Option<String>,
-    ) -> anyhow::Result<Box<BasePackage>>;
+    ) -> anyhow::Result<Box<dyn BasePackage>>;
 }

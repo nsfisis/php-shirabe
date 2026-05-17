@@ -31,10 +31,10 @@ use crate::repository::repository_interface::{
 pub struct ArrayRepository {
     /// @var ?array<BasePackage>
     // TODO(phase-b): RefCell models PHP's lazy init via getPackages()/count() under &self
-    pub(crate) packages: RefCell<Option<Vec<Box<BasePackage>>>>,
+    pub(crate) packages: RefCell<Option<Vec<Box<dyn BasePackage>>>>,
 
     /// @var ?array<BasePackage> indexed by package unique name and used to cache hasPackage calls
-    pub(crate) package_map: RefCell<Option<IndexMap<String, Box<BasePackage>>>>,
+    pub(crate) package_map: RefCell<Option<IndexMap<String, Box<dyn BasePackage>>>>,
 }
 
 impl ArrayRepository {
@@ -63,9 +63,9 @@ impl ArrayRepository {
             }
             .into());
         }
-        // TODO(phase-b): convert Box<dyn PackageInterface> to Box<BasePackage>
-        let mut package: Box<BasePackage> =
-            todo!("downcast Box<dyn PackageInterface> to Box<BasePackage>");
+        // TODO(phase-b): convert Box<dyn PackageInterface> to Box<dyn BasePackage>
+        let mut package: Box<dyn BasePackage> =
+            todo!("downcast Box<dyn PackageInterface> to Box<dyn BasePackage>");
 
         if self.packages.borrow().is_none() {
             self.initialize();
@@ -73,7 +73,7 @@ impl ArrayRepository {
         // TODO(phase-b): pass a reference to self, not a clone
         package.set_repository(todo!("self as Box<dyn RepositoryInterface>"))?;
 
-        let aliased_package: Option<Box<BasePackage>> =
+        let aliased_package: Option<Box<dyn BasePackage>> =
             if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
                 Some(alias.get_alias_of().clone_box())
             } else {
@@ -97,10 +97,10 @@ impl ArrayRepository {
     /// @return AliasPackage|CompleteAliasPackage
     pub(crate) fn create_alias_package(
         &self,
-        mut package: Box<BasePackage>,
+        mut package: Box<dyn BasePackage>,
         alias: String,
         pretty_alias: String,
-    ) -> Box<BasePackage> {
+    ) -> Box<dyn BasePackage> {
         while let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
             package = alias_pkg.get_alias_of().clone_box();
         }
@@ -173,7 +173,7 @@ impl RepositoryInterface for ArrayRepository {
     ) -> LoadPackagesResult {
         let packages = self.get_packages();
 
-        let mut result: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+        let mut result: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
         for package in &packages {
             if package_name_map.contains_key(package.get_name()) {
@@ -231,7 +231,7 @@ impl RepositoryInterface for ArrayRepository {
         &self,
         name: String,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<BasePackage>> {
+    ) -> Option<Box<dyn BasePackage>> {
         let name = strtolower(&name);
 
         let constraint: Box<dyn ConstraintInterface> = match constraint {
@@ -259,7 +259,7 @@ impl RepositoryInterface for ArrayRepository {
         &self,
         name: String,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<BasePackage>> {
+    ) -> Vec<Box<dyn BasePackage>> {
         // normalize name
         let name = strtolower(&name);
         let mut packages = vec![];
@@ -377,7 +377,7 @@ impl RepositoryInterface for ArrayRepository {
 
     fn has_package(&self, package: &dyn PackageInterface) -> bool {
         if self.package_map.borrow().is_none() {
-            let mut map: IndexMap<String, Box<BasePackage>> = IndexMap::new();
+            let mut map: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
             for repo_package in self.get_packages() {
                 map.insert(repo_package.get_unique_name(), repo_package);
             }
@@ -419,7 +419,7 @@ impl RepositoryInterface for ArrayRepository {
         result
     }
 
-    fn get_packages(&self) -> Vec<Box<BasePackage>> {
+    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }

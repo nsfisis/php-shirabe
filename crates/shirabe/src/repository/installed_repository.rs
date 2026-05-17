@@ -26,7 +26,7 @@ pub enum NeedleInput {
 }
 
 pub struct DependentsEntry(
-    pub Box<BasePackage>,
+    pub Box<dyn BasePackage>,
     pub Link,
     pub Option<Vec<DependentsEntry>>,
 );
@@ -51,7 +51,7 @@ impl InstalledRepository {
         &self,
         name: String,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<BasePackage>> {
+    ) -> Vec<Box<dyn BasePackage>> {
         let name = name.to_lowercase();
 
         let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
@@ -117,7 +117,7 @@ impl InstalledRepository {
 
         let mut packages_found = packages_found.unwrap_or_else(|| needles.clone());
 
-        let mut root_package: Option<Box<BasePackage>> = None;
+        let mut root_package: Option<Box<dyn BasePackage>> = None;
         for package in self.inner.get_packages() {
             if package.as_any().is::<dyn RootPackageInterface>() {
                 root_package = Some(package);
@@ -422,7 +422,7 @@ impl RepositoryInterface for InstalledRepository {
         &self,
         name: String,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<BasePackage>> {
+    ) -> Option<Box<dyn BasePackage>> {
         self.inner.find_package(name, constraint)
     }
 
@@ -430,11 +430,11 @@ impl RepositoryInterface for InstalledRepository {
         &self,
         name: String,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<BasePackage>> {
+    ) -> Vec<Box<dyn BasePackage>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<BasePackage>> {
+    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
         self.inner.get_packages()
     }
 
