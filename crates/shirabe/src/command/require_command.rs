@@ -64,8 +64,52 @@ pub struct RequireCommand {
     dependency_resolution_completed: bool,
 }
 
-impl CompletionTrait for RequireCommand {}
-impl PackageDiscoveryTrait for RequireCommand {}
+impl CompletionTrait for RequireCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
+
+impl PackageDiscoveryTrait for RequireCommand {
+    fn get_repos_mut(&mut self) -> &mut Option<CompositeRepository> {
+        todo!()
+    }
+
+    fn get_repository_sets_mut(&mut self) -> &mut IndexMap<String, RepositorySet> {
+        todo!()
+    }
+
+    fn get_io(&self) -> &dyn IOInterface {
+        todo!()
+    }
+
+    fn try_composer(&self) -> Option<Composer> {
+        todo!()
+    }
+
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+
+    fn get_platform_requirement_filter(
+        &self,
+        input: &dyn InputInterface,
+    ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>{
+        todo!()
+    }
+
+    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>> {
+        todo!()
+    }
+}
 
 impl RequireCommand {
     pub fn configure(&mut self) {

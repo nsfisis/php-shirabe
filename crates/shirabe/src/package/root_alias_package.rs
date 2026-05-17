@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::package::complete_alias_package::CompleteAliasPackage;
+use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::link::Link;
 use crate::package::root_package::RootPackage;
 use crate::package::root_package_interface::RootPackageInterface;
@@ -115,5 +116,107 @@ impl RootPackageInterface for RootAliasPackage {
 
     fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
         self.alias_of.set_extra(extra);
+    }
+}
+
+impl CompletePackageInterface for RootAliasPackage {
+    fn get_scripts(&self) -> IndexMap<String, Vec<String>> {
+        todo!()
+    }
+
+    fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
+        todo!()
+    }
+
+    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>> {
+        todo!()
+    }
+
+    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>) {
+        todo!()
+    }
+
+    fn get_license(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn set_license(&mut self, license: Vec<String>) {
+        todo!()
+    }
+
+    fn get_keywords(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn set_keywords(&mut self, keywords: Vec<String>) {
+        todo!()
+    }
+
+    fn get_description(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn set_description(&mut self, description: String) {
+        todo!()
+    }
+
+    fn get_homepage(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn set_homepage(&mut self, homepage: String) {
+        todo!()
+    }
+
+    fn get_authors(&self) -> Vec<IndexMap<String, String>> {
+        todo!()
+    }
+
+    fn set_authors(&mut self, authors: Vec<IndexMap<String, String>>) {
+        todo!()
+    }
+
+    fn get_support(&self) -> IndexMap<String, String> {
+        todo!()
+    }
+
+    fn set_support(&mut self, support: IndexMap<String, String>) {
+        todo!()
+    }
+
+    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
+        todo!()
+    }
+
+    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
+        todo!()
+    }
+
+    fn is_abandoned(&self) -> bool {
+        todo!()
+    }
+
+    fn get_replacement_package(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn set_abandoned(&mut self, abandoned: PhpMixed) {
+        todo!()
+    }
+
+    fn get_archive_name(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn set_archive_name(&mut self, name: String) {
+        todo!()
+    }
+
+    fn get_archive_excludes(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn set_archive_excludes(&mut self, excludes: Vec<String>) {
+        todo!()
     }
 }

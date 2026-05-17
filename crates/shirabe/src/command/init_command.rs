@@ -45,8 +45,54 @@ pub struct InitCommand {
     git_config: Option<IndexMap<String, String>>,
 }
 
-impl CompletionTrait for InitCommand {}
-impl PackageDiscoveryTrait for InitCommand {}
+impl CompletionTrait for InitCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
+
+impl PackageDiscoveryTrait for InitCommand {
+    fn get_repos_mut(&mut self) -> &mut Option<CompositeRepository> {
+        todo!()
+    }
+
+    fn get_repository_sets_mut(
+        &mut self,
+    ) -> &mut IndexMap<String, crate::repository::repository_set::RepositorySet> {
+        todo!()
+    }
+
+    fn get_io(&self) -> &dyn IOInterface {
+        todo!()
+    }
+
+    fn try_composer(&self) -> Option<Composer> {
+        todo!()
+    }
+
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+
+    fn get_platform_requirement_filter(
+        &self,
+        input: &dyn InputInterface,
+    ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>{
+        todo!()
+    }
+
+    fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>> {
+        todo!()
+    }
+}
 
 impl InitCommand {
     pub fn configure(&mut self) {

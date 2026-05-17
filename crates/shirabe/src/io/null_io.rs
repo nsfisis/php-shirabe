@@ -2,6 +2,7 @@
 
 use crate::io::base_io::BaseIO;
 use crate::io::io_interface::IOInterface;
+use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -129,5 +130,43 @@ impl BaseIO for NullIO {
         &mut self,
     ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
         &mut self.authentications
+    }
+}
+
+impl LoggerInterface for NullIO {
+    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn alert(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn critical(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn error(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn notice(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn info(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
+        todo!()
     }
 }

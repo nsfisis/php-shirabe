@@ -8,7 +8,11 @@ pub struct LockArrayRepository {
     inner: ArrayRepository,
 }
 
-impl CanonicalPackagesTrait for LockArrayRepository {}
+impl CanonicalPackagesTrait for LockArrayRepository {
+    fn get_packages(&self) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+        todo!()
+    }
+}
 
 impl LockArrayRepository {
     pub fn get_repo_name(&self) -> &str {

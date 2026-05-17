@@ -158,4 +158,8 @@ impl RepositoryInterface for CompositeRepository {
         }
         results
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        todo!()
+    }
 }

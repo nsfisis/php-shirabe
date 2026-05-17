@@ -2,6 +2,7 @@
 
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::package::Package;
+use crate::package::package_interface::PackageInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -128,5 +129,224 @@ impl CompletePackageInterface for CompletePackage {
 
     fn get_archive_excludes(&self) -> Vec<String> {
         self.archive_excludes.clone()
+    }
+}
+
+impl PackageInterface for CompletePackage {
+    fn get_name(&self) -> &str {
+        todo!()
+    }
+
+    fn get_pretty_name(&self) -> &str {
+        todo!()
+    }
+
+    fn get_names(&self, provides: bool) -> Vec<String> {
+        todo!()
+    }
+
+    fn set_id(&mut self, id: i64) {
+        todo!()
+    }
+
+    fn get_id(&self) -> i64 {
+        todo!()
+    }
+
+    fn is_dev(&self) -> bool {
+        todo!()
+    }
+
+    fn get_type(&self) -> &str {
+        todo!()
+    }
+
+    fn get_target_dir(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+
+    fn set_installation_source(&mut self, r#type: Option<String>) {
+        todo!()
+    }
+
+    fn get_installation_source(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_source_type(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_source_url(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_source_urls(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn get_source_reference(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+        todo!()
+    }
+
+    fn set_source_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+        todo!()
+    }
+
+    fn get_dist_type(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_dist_url(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_dist_urls(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn get_dist_reference(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_dist_sha1_checksum(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+        todo!()
+    }
+
+    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+        todo!()
+    }
+
+    fn get_version(&self) -> &str {
+        todo!()
+    }
+
+    fn get_pretty_version(&self) -> &str {
+        todo!()
+    }
+
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
+        todo!()
+    }
+
+    fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        todo!()
+    }
+
+    fn get_stability(&self) -> &str {
+        todo!()
+    }
+
+    fn get_requires(&self) -> IndexMap<String, super::link::Link> {
+        todo!()
+    }
+
+    fn get_conflicts(&self) -> Vec<super::link::Link> {
+        todo!()
+    }
+
+    fn get_provides(&self) -> Vec<super::link::Link> {
+        todo!()
+    }
+
+    fn get_replaces(&self) -> Vec<super::link::Link> {
+        todo!()
+    }
+
+    fn get_dev_requires(&self) -> IndexMap<String, super::link::Link> {
+        todo!()
+    }
+
+    fn get_suggests(&self) -> IndexMap<String, String> {
+        todo!()
+    }
+
+    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+
+    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+
+    fn get_include_paths(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+        todo!()
+    }
+
+    fn set_repository(
+        &mut self,
+        repository: Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn get_repository(
+        &self,
+    ) -> Option<&dyn crate::repository::repository_interface::RepositoryInterface> {
+        todo!()
+    }
+
+    fn get_binaries(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn get_unique_name(&self) -> String {
+        todo!()
+    }
+
+    fn get_notification_url(&self) -> Option<&str> {
+        todo!()
+    }
+
+    fn get_pretty_string(&self) -> String {
+        todo!()
+    }
+
+    fn is_default_branch(&self) -> bool {
+        todo!()
+    }
+
+    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+
+    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+        todo!()
+    }
+
+    fn set_source_reference(&mut self, reference: Option<String>) {
+        todo!()
+    }
+
+    fn set_dist_url(&mut self, url: Option<String>) {
+        todo!()
+    }
+
+    fn set_dist_type(&mut self, r#type: Option<String>) {
+        todo!()
+    }
+
+    fn set_dist_reference(&mut self, reference: Option<String>) {
+        todo!()
+    }
+
+    fn set_source_dist_references(&mut self, reference: &str) {
+        todo!()
     }
 }

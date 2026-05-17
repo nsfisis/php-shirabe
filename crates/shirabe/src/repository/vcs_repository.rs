@@ -73,7 +73,11 @@ pub struct VcsRepository {
     _dispatcher: Option<EventDispatcher>,
 }
 
-impl ConfigurableRepositoryInterface for VcsRepository {}
+impl ConfigurableRepositoryInterface for VcsRepository {
+    fn get_repo_config(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+}
 
 impl VcsRepository {
     /// @param array{url: string, type?: string}&array<string, mixed> $repoConfig
