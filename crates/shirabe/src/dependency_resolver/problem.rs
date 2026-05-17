@@ -16,7 +16,7 @@ use shirabe_semver::constraint::multi_constraint::MultiConstraint;
 use crate::advisory::security_advisory::SecurityAdvisory;
 use crate::dependency_resolver::pool::Pool;
 use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::rule::{self, Rule};
 use crate::package::alias_package::AliasPackage;
 use crate::package::base_package::BasePackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
@@ -81,7 +81,7 @@ impl Problem {
         if reasons.len() == 1 {
             let rule = reasons[0].clone();
 
-            if rule.get_reason() != Rule::RULE_ROOT_REQUIRE {
+            if rule.get_reason() != rule::RULE_ROOT_REQUIRE {
                 return Err(LogicException {
                     message: "Single reason problems must contain a root require rule.".to_string(),
                     code: 0,
@@ -134,16 +134,16 @@ impl Problem {
 
     fn get_sortable_string(&self, pool: &Pool, rule: &dyn Rule) -> String {
         match rule.get_reason() {
-            Rule::RULE_ROOT_REQUIRE => rule.get_reason_data().as_array().unwrap()["packageName"]
+            rule::RULE_ROOT_REQUIRE => rule.get_reason_data().as_array().unwrap()["packageName"]
                 .as_string()
                 .unwrap()
                 .to_string(),
-            Rule::RULE_FIXED => {
+            rule::RULE_FIXED => {
                 // TODO(phase-b): reason_data for RULE_FIXED is `array{package: BasePackage}`.
                 // PHP: (string) $rule->getReasonData()['package']
                 php_to_string(rule.get_reason_data().as_array().unwrap()["package"].as_ref())
             }
-            Rule::RULE_PACKAGE_CONFLICT | Rule::RULE_PACKAGE_REQUIRES => {
+            rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => {
                 // TODO(phase-b): reason_data is a Link.
                 let source = rule.get_source_package(pool);
                 format!(
@@ -152,10 +152,10 @@ impl Problem {
                     rule.get_reason_data_as_link().get_pretty_string(&source)
                 )
             }
-            Rule::RULE_PACKAGE_SAME_NAME
-            | Rule::RULE_PACKAGE_ALIAS
-            | Rule::RULE_PACKAGE_INVERSE_ALIAS => php_to_string(&rule.get_reason_data()),
-            Rule::RULE_LEARNED => implode(
+            rule::RULE_PACKAGE_SAME_NAME
+            | rule::RULE_PACKAGE_ALIAS
+            | rule::RULE_PACKAGE_INVERSE_ALIAS => php_to_string(&rule.get_reason_data()),
+            rule::RULE_LEARNED => implode(
                 "-",
                 &rule
                     .get_literals()
@@ -172,13 +172,13 @@ impl Problem {
 
     fn get_rule_priority(&self, rule: &dyn Rule) -> i64 {
         match rule.get_reason() {
-            Rule::RULE_FIXED => 3,
-            Rule::RULE_ROOT_REQUIRE => 2,
-            Rule::RULE_PACKAGE_CONFLICT | Rule::RULE_PACKAGE_REQUIRES => 1,
-            Rule::RULE_PACKAGE_SAME_NAME
-            | Rule::RULE_LEARNED
-            | Rule::RULE_PACKAGE_ALIAS
-            | Rule::RULE_PACKAGE_INVERSE_ALIAS => 0,
+            rule::RULE_FIXED => 3,
+            rule::RULE_ROOT_REQUIRE => 2,
+            rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => 1,
+            rule::RULE_PACKAGE_SAME_NAME
+            | rule::RULE_LEARNED
+            | rule::RULE_PACKAGE_ALIAS
+            | rule::RULE_PACKAGE_INVERSE_ALIAS => 0,
             _ => {
                 // @phpstan-ignore deadCode.unreachable
                 panic!("Unknown rule type: {}", rule.get_reason());
@@ -202,7 +202,7 @@ impl Problem {
             IndexMap::new();
         let parser = VersionParser::new();
         let deduplicatable_rule_types =
-            vec![Rule::RULE_PACKAGE_REQUIRES, Rule::RULE_PACKAGE_CONFLICT];
+            vec![rule::RULE_PACKAGE_REQUIRES, rule::RULE_PACKAGE_CONFLICT];
         for rule in rules {
             let mut message = rule.get_pretty_string(
                 repository_set,

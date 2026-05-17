@@ -39,22 +39,22 @@ pub enum ReasonData {
     },
 }
 
+// reason constants and // their reason data contents
+pub const RULE_ROOT_REQUIRE: i64 = 2;
+pub const RULE_FIXED: i64 = 3;
+pub const RULE_PACKAGE_CONFLICT: i64 = 6;
+pub const RULE_PACKAGE_REQUIRES: i64 = 7;
+pub const RULE_PACKAGE_SAME_NAME: i64 = 10;
+pub const RULE_LEARNED: i64 = 12;
+pub const RULE_PACKAGE_ALIAS: i64 = 13;
+pub const RULE_PACKAGE_INVERSE_ALIAS: i64 = 14;
+
+// bitfield defs
+pub const BITFIELD_TYPE: i64 = 0;
+pub const BITFIELD_REASON: i64 = 8;
+pub const BITFIELD_DISABLED: i64 = 16;
+
 pub trait Rule: std::fmt::Display {
-    // reason constants and // their reason data contents
-    const RULE_ROOT_REQUIRE: i64 = 2;
-    const RULE_FIXED: i64 = 3;
-    const RULE_PACKAGE_CONFLICT: i64 = 6;
-    const RULE_PACKAGE_REQUIRES: i64 = 7;
-    const RULE_PACKAGE_SAME_NAME: i64 = 10;
-    const RULE_LEARNED: i64 = 12;
-    const RULE_PACKAGE_ALIAS: i64 = 13;
-    const RULE_PACKAGE_INVERSE_ALIAS: i64 = 14;
-
-    // bitfield defs
-    const BITFIELD_TYPE: i64 = 0;
-    const BITFIELD_REASON: i64 = 8;
-    const BITFIELD_DISABLED: i64 = 16;
-
     fn bitfield(&self) -> i64;
     fn bitfield_mut(&mut self) -> &mut i64;
     fn request(&self) -> Option<&Request>;

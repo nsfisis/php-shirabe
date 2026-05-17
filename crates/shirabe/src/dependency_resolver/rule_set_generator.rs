@@ -11,7 +11,7 @@ use crate::dependency_resolver::multi_conflict_rule::MultiConflictRule;
 use crate::dependency_resolver::policy_interface::PolicyInterface;
 use crate::dependency_resolver::pool::Pool;
 use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::rule_set::RuleSet;
 use crate::dependency_resolver::rule2_literals::Rule2Literals;
 use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
@@ -182,7 +182,7 @@ impl RuleSetGenerator {
                 let rule = self.create_require_rule(
                     &*package,
                     &[alias_of.clone_box()],
-                    Rule::RULE_PACKAGE_ALIAS,
+                    rule::RULE_PACKAGE_ALIAS,
                     PhpMixed::Null, // reasonData: $package (BasePackage)
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
@@ -191,7 +191,7 @@ impl RuleSetGenerator {
                 let inverse_rule = self.create_require_rule(
                     alias_of,
                     &[package.clone_box()],
-                    Rule::RULE_PACKAGE_INVERSE_ALIAS,
+                    rule::RULE_PACKAGE_INVERSE_ALIAS,
                     PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, inverse_rule.map(Rule::from));
@@ -220,7 +220,7 @@ impl RuleSetGenerator {
                 let rule = self.create_require_rule(
                     &*package,
                     &possible_requires,
-                    Rule::RULE_PACKAGE_REQUIRES,
+                    rule::RULE_PACKAGE_REQUIRES,
                     PhpMixed::Null, // reasonData: $link (Link)
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
@@ -271,7 +271,7 @@ impl RuleSetGenerator {
                         let rule = self.create_rule2_literals(
                             &**package,
                             &**conflict,
-                            Rule::RULE_PACKAGE_CONFLICT,
+                            rule::RULE_PACKAGE_CONFLICT,
                             PhpMixed::Null, // reasonData: $link (Link)
                         );
                         self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
@@ -288,7 +288,7 @@ impl RuleSetGenerator {
 
         for (name, packages) in names_packages {
             if packages.len() > 1 {
-                let reason = Rule::RULE_PACKAGE_SAME_NAME;
+                let reason = rule::RULE_PACKAGE_SAME_NAME;
                 let rule =
                     self.create_multi_conflict_rule(&packages, reason, PhpMixed::String(name));
                 self.add_rule(RuleSet::TYPE_PACKAGE, Some(rule));
@@ -327,7 +327,7 @@ impl RuleSetGenerator {
             );
             let rule = self.create_install_one_of_rule(
                 &[package.clone_box()],
-                Rule::RULE_FIXED,
+                rule::RULE_FIXED,
                 PhpMixed::Array(reason_data),
             );
             self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::from(rule)));
@@ -362,7 +362,7 @@ impl RuleSetGenerator {
                 );
                 let rule = self.create_install_one_of_rule(
                     &packages,
-                    Rule::RULE_ROOT_REQUIRE,
+                    rule::RULE_ROOT_REQUIRE,
                     PhpMixed::Array(reason_data),
                 );
                 self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::from(rule)));

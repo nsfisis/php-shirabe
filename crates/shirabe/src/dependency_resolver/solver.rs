@@ -15,7 +15,7 @@ use crate::dependency_resolver::policy_interface::PolicyInterface;
 use crate::dependency_resolver::pool::Pool;
 use crate::dependency_resolver::problem::Problem;
 use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::rule::{self, Rule};
 use crate::dependency_resolver::rule_set::RuleSet;
 use crate::dependency_resolver::rule_set_generator::RuleSetGenerator;
 use crate::dependency_resolver::rule_watch_graph::RuleWatchGraph;
@@ -206,7 +206,7 @@ impl Solver {
                 reason_data.insert("constraint".to_string(), PhpMixed::Null);
                 problem.add_rule(Rule::generic(GenericRule::new(
                     Vec::new(),
-                    PhpMixed::Int(Rule::RULE_ROOT_REQUIRE),
+                    PhpMixed::Int(rule::RULE_ROOT_REQUIRE),
                     PhpMixed::Array(
                         reason_data
                             .into_iter()
@@ -590,7 +590,7 @@ impl Solver {
         array_unshift::<i64>(&mut other_learned_literals, learned_literal);
         let new_rule = GenericRule::new(
             other_learned_literals,
-            PhpMixed::Int(Rule::RULE_LEARNED),
+            PhpMixed::Int(rule::RULE_LEARNED),
             PhpMixed::Int(why),
         );
 

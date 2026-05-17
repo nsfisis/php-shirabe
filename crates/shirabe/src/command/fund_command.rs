@@ -18,7 +18,7 @@ use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_package::CompletePackage;
 use crate::repository::composite_repository::CompositeRepository;
 
@@ -73,7 +73,7 @@ impl FundCommand {
         // load all packages dev versions in parallel
         let result = remote_repos.load_packages(
             &packages_to_load,
-            &IndexMap::from([("dev".to_string(), BasePackage::STABILITY_DEV)]),
+            &IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
             &IndexMap::new(),
         )?;
 

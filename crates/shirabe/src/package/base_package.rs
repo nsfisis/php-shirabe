@@ -66,13 +66,13 @@ pub static STABILITIES: LazyLock<IndexMap<&'static str, i64>> = LazyLock::new(||
     m
 });
 
-pub trait BasePackage: PackageInterface + std::fmt::Display {
-    const STABILITY_STABLE: i64 = 0;
-    const STABILITY_RC: i64 = 5;
-    const STABILITY_BETA: i64 = 10;
-    const STABILITY_ALPHA: i64 = 15;
-    const STABILITY_DEV: i64 = 20;
+pub const STABILITY_STABLE: i64 = 0;
+pub const STABILITY_RC: i64 = 5;
+pub const STABILITY_BETA: i64 = 10;
+pub const STABILITY_ALPHA: i64 = 15;
+pub const STABILITY_DEV: i64 = 20;
 
+pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn id(&self) -> i64;
     fn id_mut(&mut self) -> &mut i64;
     fn name(&self) -> &str;
