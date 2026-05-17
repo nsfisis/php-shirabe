@@ -38,8 +38,9 @@ static CAN_GET_VENDORS: Mutex<Option<bool>> = Mutex::new(None);
 
 /// @var array[]
 /// @psalm-var array<string, array{...}>
-static INSTALLED_BY_VENDOR: Mutex<IndexMap<String, IndexMap<String, PhpMixed>>> =
-    Mutex::new(IndexMap::new());
+static INSTALLED_BY_VENDOR: std::sync::LazyLock<
+    Mutex<IndexMap<String, IndexMap<String, PhpMixed>>>,
+> = std::sync::LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 impl InstalledVersions {
     /// Returns a list of all package names which are present, either by being installed, replaced or provided
