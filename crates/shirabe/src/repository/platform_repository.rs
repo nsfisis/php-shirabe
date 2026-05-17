@@ -22,7 +22,7 @@ use crate::package::version::version_parser::VersionParser;
 use crate::platform::hhvm_detector::HhvmDetector;
 use crate::platform::runtime::Runtime;
 use crate::platform::version::Version;
-use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::array_repository::ArrayRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::util::silencer::Silencer;

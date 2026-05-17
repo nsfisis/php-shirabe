@@ -80,7 +80,7 @@ impl HgDriver {
                     self.inner.io.write_error(
                         format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.get_error_output()).into(),
                         true,
-                        crate::io::io_interface::io_interface::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
                 }
             } else {
