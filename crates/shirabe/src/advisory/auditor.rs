@@ -16,7 +16,7 @@ use crate::advisory::security_advisory::SecurityAdvisory;
 use crate::io::console_io::ConsoleIO;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::repository_set::RepositorySet;
@@ -318,7 +318,7 @@ impl Auditor {
     ) -> Vec<Box<dyn CompletePackageInterface>> {
         let mut filter: Option<String> = None;
         if ignore_abandoned.len() != 0 {
-            filter = Some(BasePackage::package_names_to_regexp(
+            filter = Some(base_package::package_names_to_regexp(
                 &array_keys(ignore_abandoned),
                 "{^(?:%s)$}iD",
             ));

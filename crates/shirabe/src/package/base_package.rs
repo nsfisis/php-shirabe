@@ -214,23 +214,17 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
         self.take_repository();
         *self.id_mut() = -1;
     }
+}
 
-    fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String
-    where
-        Self: Sized,
-    {
-        let cleaned = preg_quote(allow_pattern, None).replace("\\*", ".*");
-        wrap.replace("%s", &cleaned)
-    }
+pub fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String {
+    let cleaned = preg_quote(allow_pattern, None).replace("\\*", ".*");
+    wrap.replace("%s", &cleaned)
+}
 
-    fn package_names_to_regexp(package_names: &[String], wrap: &str) -> String
-    where
-        Self: Sized,
-    {
-        let patterns: Vec<String> = package_names
-            .iter()
-            .map(|name| Self::package_name_to_regexp(name, "%s"))
-            .collect();
-        wrap.replace("%s", &patterns.join("|"))
-    }
+pub fn package_names_to_regexp(package_names: &[String], wrap: &str) -> String {
+    let patterns: Vec<String> = package_names
+        .iter()
+        .map(|name| package_name_to_regexp(name, "%s"))
+        .collect();
+    wrap.replace("%s", &patterns.join("|"))
 }

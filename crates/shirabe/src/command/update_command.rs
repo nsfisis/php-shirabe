@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php
 
 use crate::io::io_interface;
+use crate::package::base_package;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -514,8 +515,8 @@ impl UpdateCommand {
         );
 
         let filter: Option<String> = if packages.len() > 0 {
-            // TODO(phase-b): BasePackage::package_names_to_regexp signature
-            Some(BasePackage::package_names_to_regexp(&packages, "%s"))
+            // TODO(phase-b): base_package::package_names_to_regexp signature
+            Some(base_package::package_names_to_regexp(&packages, "%s"))
         } else {
             None
         };

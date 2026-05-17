@@ -23,7 +23,7 @@ use crate::downloader::transport_exception::TransportException;
 use crate::event_dispatcher::event_dispatcher::EventDispatcher;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::version::stability_filter::StabilityFilter;
@@ -562,7 +562,7 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         let package_filter_regex: Option<String> = match package_filter {
-            Some(p) if !p.is_empty() => Some(BasePackage::package_name_to_regexp(p)),
+            Some(p) if !p.is_empty() => Some(base_package::package_name_to_regexp(p)),
             _ => None,
         };
         let filter_results = |results: Vec<String>| -> anyhow::Result<Vec<String>> {
@@ -2396,7 +2396,7 @@ impl ComposerRepository {
                     let mapped: Vec<String> = patterns
                         .iter()
                         .filter_map(|v| v.as_string())
-                        .map(|p| BasePackage::package_name_to_regexp(p))
+                        .map(|p| base_package::package_name_to_regexp(p))
                         .collect();
                     self.available_package_patterns = Some(mapped);
                     self.has_available_package_list = true;

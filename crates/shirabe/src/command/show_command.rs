@@ -26,6 +26,7 @@ use crate::dependency_resolver::default_policy::DefaultPolicy;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
+use crate::package::base_package;
 use crate::package::base_package::BasePackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::link::Link;
@@ -741,7 +742,7 @@ impl ShowCommand {
         let show_major_only = input.get_option("major-only").as_bool() == Some(true);
         let show_minor_only = input.get_option("minor-only").as_bool() == Some(true);
         let show_patch_only = input.get_option("patch-only").as_bool() == Some(true);
-        let ignored_packages_regex = BasePackage::package_names_to_regexp(
+        let ignored_packages_regex = base_package::package_names_to_regexp(
             input
                 .get_option("ignore")
                 .as_list()

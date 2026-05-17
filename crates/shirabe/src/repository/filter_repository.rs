@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::package_interface::PackageInterface;
 use crate::repository::advisory_provider_interface::{
     AdvisoryProviderInterface, SecurityAdvisoryResult,
@@ -44,7 +44,7 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    only = Some(BasePackage::package_names_to_regexp(&names));
+                    only = Some(base_package::package_names_to_regexp(&names));
                 }
                 _ => {
                     return Err(InvalidArgumentException {
@@ -71,7 +71,7 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    exclude = Some(BasePackage::package_names_to_regexp(&names));
+                    exclude = Some(base_package::package_names_to_regexp(&names));
                 }
                 _ => {
                     return Err(InvalidArgumentException {

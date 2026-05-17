@@ -21,6 +21,7 @@ use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
+use crate::package::base_package;
 use crate::package::base_package::BasePackage;
 
 #[derive(Debug)]
@@ -416,7 +417,7 @@ impl RemoveCommand {
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
                 let matches_in_type =
-                    Preg::grep(&BasePackage::package_name_to_regexp(package), &type_keys)
+                    Preg::grep(&base_package::package_name_to_regexp(package), &type_keys)
                         .unwrap_or_default();
 
                 let alt_type_keys: Vec<String> = composer_data
@@ -426,7 +427,7 @@ impl RemoveCommand {
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
                 let matches_in_alt_type = Preg::grep(
-                    &BasePackage::package_name_to_regexp(package),
+                    &base_package::package_name_to_regexp(package),
                     &alt_type_keys,
                 )
                 .unwrap_or_default();

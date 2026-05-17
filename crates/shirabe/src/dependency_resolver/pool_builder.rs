@@ -22,7 +22,7 @@ use crate::dependency_resolver::security_advisory_pool_filter::SecurityAdvisoryP
 use crate::event_dispatcher::event_dispatcher::EventDispatcher;
 use crate::io::io_interface::IOInterface;
 use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_alias_package::CompleteAliasPackage;
 use crate::package::complete_package::CompletePackage;
 use crate::package::package_interface::PackageInterface;
@@ -755,7 +755,7 @@ impl PoolBuilder {
     /// Checks whether the update allow list allows this package in the lock file to be updated
     fn is_update_allowed(&self, package: &dyn BasePackage) -> bool {
         for pattern in &self.update_allow_list {
-            let pattern_regexp = BasePackage::package_name_to_regexp(pattern);
+            let pattern_regexp = base_package::package_name_to_regexp(pattern);
             if Preg::is_match(&pattern_regexp, package.get_name(), None).unwrap_or(false) {
                 return true;
             }
@@ -776,7 +776,7 @@ impl PoolBuilder {
         'outer: for pattern in &self.update_allow_list {
             let mut matched_platform_package = false;
 
-            let pattern_regexp = BasePackage::package_name_to_regexp(pattern);
+            let pattern_regexp = base_package::package_name_to_regexp(pattern);
             // update pattern matches a locked package? => all good
             for package in request.get_locked_repository().unwrap().get_packages() {
                 if Preg::is_match(&pattern_regexp, package.get_name(), None).unwrap_or(false) {

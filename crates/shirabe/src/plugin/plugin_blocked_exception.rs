@@ -3,6 +3,7 @@
 use shirabe_php_shim::UnexpectedValueException;
 
 // TODO(plugin): PluginBlockedException is a part of Plugin API.
+#[derive(Debug)]
 pub struct PluginBlockedException(pub UnexpectedValueException);
 
 impl std::fmt::Display for PluginBlockedException {

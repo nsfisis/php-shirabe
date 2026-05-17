@@ -19,7 +19,7 @@ use crate::composer::Composer;
 use crate::event_dispatcher::event_subscriber_interface::EventSubscriberInterface;
 use crate::installer::installer_interface::InstallerInterface;
 use crate::io::io_interface::IOInterface;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_package::CompletePackage;
 use crate::package::link::Link;
 use crate::package::locker::Locker;
@@ -700,7 +700,7 @@ impl PluginManager {
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
                 rules.insert(
-                    BasePackage::package_name_to_regexp(pattern),
+                    base_package::package_name_to_regexp(pattern),
                     allow.as_bool().unwrap_or(false),
                 );
             }
@@ -807,7 +807,7 @@ impl PluginManager {
                         rules
                             .as_mut()
                             .unwrap()
-                            .insert(BasePackage::package_name_to_regexp(package), allow);
+                            .insert(base_package::package_name_to_regexp(package), allow);
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == "y" || answer_str == "n" {

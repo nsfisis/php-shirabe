@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php
 
 use crate::io::io_interface;
+use crate::package::base_package;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
@@ -232,7 +233,7 @@ impl BumpCommand {
                 .collect::<std::collections::HashSet<_>>()
                 .into_iter()
                 .collect();
-            let pattern = BasePackage::package_names_to_regexp(&unique_lower);
+            let pattern = base_package::package_names_to_regexp(&unique_lower);
             for (key, reqs) in tasks.iter_mut() {
                 reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name).unwrap_or(false));
             }

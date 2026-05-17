@@ -9,7 +9,7 @@ use shirabe_semver::interval::Interval;
 use shirabe_semver::intervals::Intervals;
 
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::repository::platform_repository::PlatformRepository;
 
 #[derive(Debug)]
@@ -29,8 +29,8 @@ impl IgnoreListPlatformRequirementFilter {
                 ignore_all.push(req);
             }
         }
-        let ignore_regex = BasePackage::package_names_to_regexp(&ignore_all);
-        let ignore_upper_bound_regex = BasePackage::package_names_to_regexp(&ignore_upper_bound);
+        let ignore_regex = base_package::package_names_to_regexp(&ignore_all);
+        let ignore_upper_bound_regex = base_package::package_names_to_regexp(&ignore_upper_bound);
         Ok(Self {
             ignore_regex,
             ignore_upper_bound_regex,

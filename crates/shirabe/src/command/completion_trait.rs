@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Command/CompletionTrait.php
 
 use crate::composer::Composer;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::package_interface::PackageInterface;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::installed_repository::InstalledRepository;
@@ -263,7 +263,7 @@ pub trait CompletionTrait {
             );
 
             let pattern =
-                BasePackage::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
+                base_package::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
 
             repos
                 .get_packages()
