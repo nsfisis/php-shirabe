@@ -2,7 +2,6 @@
 
 use crate::config::Config;
 use crate::io::io_interface;
-use crate::io::io_interface;
 use crate::io::io_interface::IOInterface;
 use crate::util::process_executor::ProcessExecutor;
 use crate::util::silencer::Silencer;

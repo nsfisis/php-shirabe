@@ -15,7 +15,7 @@ pub struct Composer {
     locker: Option<Locker>,
     download_manager: Option<DownloadManager>,
     // TODO(plugin): plugin_manager is part of the plugin API
-    plugin_manager: Option<PluginManager>,
+    plugin_manager: Option<Box<PluginManager>>,
     autoload_generator: Option<AutoloadGenerator>,
     archive_manager: Option<ArchiveManager>,
 }
@@ -66,7 +66,7 @@ impl Composer {
 
     // TODO(plugin): set_plugin_manager is part of the plugin API
     pub fn set_plugin_manager(&mut self, manager: PluginManager) {
-        self.plugin_manager = Some(manager);
+        self.plugin_manager = Some(Box::new(manager));
     }
 
     // TODO(plugin): get_plugin_manager is part of the plugin API
