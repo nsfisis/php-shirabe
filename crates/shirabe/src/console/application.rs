@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
 use shirabe_external_packages::symfony::component::console::application::Application as BaseApplication;
-use shirabe_external_packages::symfony::component::console::command::command::Command as SymfonyCommand;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::exception::command_not_found_exception::CommandNotFoundException;
 use shirabe_external_packages::symfony::component::console::exception::exception_interface::ExceptionInterface;
 use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
@@ -617,7 +617,7 @@ impl Application {
 
                                     // if the command is not an array of commands, and points to a valid Command subclass, import its details directly
                                     let dummy_str = dummy.as_string().unwrap_or("");
-                                    let cmd: Box<dyn SymfonyCommand> = if is_string(dummy)
+                                    let cmd: Box<dyn Command> = if is_string(dummy)
                                         && shirabe_php_shim::class_exists(dummy_str)
                                         && is_subclass_of(
                                             dummy_str,
@@ -630,7 +630,7 @@ impl Application {
                                             io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
                                         let mut cmd = shirabe_php_shim::instantiate_class::<
-                                            Box<dyn SymfonyCommand>,
+                                            Box<dyn Command>,
                                         >(
                                             dummy_str,
                                             vec![PhpMixed::String(script.clone())],
@@ -984,9 +984,9 @@ impl Application {
     }
 
     /// Initializes all the composer commands.
-    pub(crate) fn get_default_commands(&self) -> Vec<Box<dyn SymfonyCommand>> {
+    pub(crate) fn get_default_commands(&self) -> Vec<Box<dyn Command>> {
         let mut cmds = self.inner.get_default_commands();
-        let extras: Vec<Box<dyn SymfonyCommand>> = vec![
+        let extras: Vec<Box<dyn Command>> = vec![
             Box::new(AboutCommand::new()),
             Box::new(ConfigCommand::new()),
             Box::new(DependsCommand::new()),
@@ -1101,9 +1101,9 @@ impl Application {
         definition
     }
 
-    fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn SymfonyCommand>>> {
+    fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn Command>>> {
         // TODO(plugin): plugin command discovery is part of the plugin API
-        let mut commands: Vec<Box<dyn SymfonyCommand>> = vec![];
+        let mut commands: Vec<Box<dyn Command>> = vec![];
 
         let composer = self.get_composer(false, Some(false), None)?.cloned();
         let composer = match composer {

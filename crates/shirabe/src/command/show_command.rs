@@ -5,6 +5,7 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::semver::semver::Semver;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
@@ -51,7 +52,7 @@ const _INPUT_OPTION_REF: i64 = InputOption::VALUE_NONE;
 
 #[derive(Debug)]
 pub struct ShowCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -2653,11 +2654,11 @@ impl CompletionTrait for ShowCommand {
 }
 
 impl BaseCommand for ShowCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -2693,3 +2694,5 @@ struct ViewMetaData {
     write_latest: bool,
     write_release_date: bool,
 }
+
+impl Command for ShowCommand {}

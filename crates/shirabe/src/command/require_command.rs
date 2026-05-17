@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
@@ -48,7 +49,7 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct RequireCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -1184,11 +1185,11 @@ impl RequireCommand {
 }
 
 impl BaseCommand for RequireCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -1208,3 +1209,5 @@ impl BaseCommand for RequireCommand {
         &mut self.io
     }
 }
+
+impl Command for RequireCommand {}

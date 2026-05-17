@@ -15,6 +15,7 @@ use shirabe_semver::constraint::multi_constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
 
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
@@ -40,7 +41,7 @@ use crate::util::http_downloader::HttpDownloader;
 
 #[derive(Debug)]
 pub struct UpdateCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -638,11 +639,11 @@ impl UpdateCommand {
 }
 
 impl BaseCommand for UpdateCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -662,3 +663,5 @@ impl BaseCommand for UpdateCommand {
         &mut self.io
     }
 }
+
+impl Command for UpdateCommand {}

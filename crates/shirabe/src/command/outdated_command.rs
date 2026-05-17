@@ -9,6 +9,7 @@ use crate::io::io_interface::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -16,7 +17,7 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -148,11 +149,11 @@ impl OutdatedCommand {
 }
 
 impl BaseCommand for OutdatedCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -172,3 +173,5 @@ impl BaseCommand for OutdatedCommand {
         &mut self.io
     }
 }
+
+impl Command for OutdatedCommand {}

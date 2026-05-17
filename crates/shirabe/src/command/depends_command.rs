@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php
 
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 
 use crate::command::base_command::BaseCommand;
 use crate::command::base_dependency_command::BaseDependencyCommand;
@@ -12,8 +13,9 @@ use crate::io::io_interface::IOInterface;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
+#[derive(Debug)]
 pub struct DependsCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -77,11 +79,11 @@ impl DependsCommand {
 }
 
 impl BaseCommand for DependsCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -111,3 +113,5 @@ impl BaseDependencyCommand for DependsCommand {
         &mut self.colors
     }
 }
+
+impl Command for DependsCommand {}

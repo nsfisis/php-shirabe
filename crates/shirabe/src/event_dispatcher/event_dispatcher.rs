@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::application::Application;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
@@ -595,7 +595,7 @@ impl EventDispatcher {
                         }
                         app.set_auto_exit(false);
                         // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
-                        let cmd = Command::new(event.get_name().to_string());
+                        let cmd = CommandBase::new(None); // TODO(plugin): pass event name
                         if method_exists(&PhpMixed::String("Application".to_string()), "addCommand")
                         {
                             app.add_command(cmd.clone());

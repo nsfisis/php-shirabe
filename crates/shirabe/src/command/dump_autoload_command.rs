@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
@@ -15,7 +16,7 @@ use crate::plugin::plugin_events::PluginEvents;
 
 #[derive(Debug)]
 pub struct DumpAutoloadCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -204,11 +205,11 @@ impl DumpAutoloadCommand {
 }
 
 impl BaseCommand for DumpAutoloadCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -228,3 +229,5 @@ impl BaseCommand for DumpAutoloadCommand {
         &mut self.io
     }
 }
+
+impl Command for DumpAutoloadCommand {}

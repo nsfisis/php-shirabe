@@ -8,12 +8,14 @@ use crate::{command::base_command::BaseCommand, composer::Composer};
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
 
+#[derive(Debug)]
 pub struct ScriptAliasCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -132,11 +134,11 @@ impl ScriptAliasCommand {
 }
 
 impl BaseCommand for ScriptAliasCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -156,3 +158,5 @@ impl BaseCommand for ScriptAliasCommand {
         &mut self.io
     }
 }
+
+impl Command for ScriptAliasCommand {}

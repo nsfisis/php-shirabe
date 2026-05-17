@@ -1,12 +1,37 @@
+use crate::symfony::component::console::completion::completion_input::CompletionInput;
+use crate::symfony::component::console::completion::completion_suggestions::CompletionSuggestions;
 use crate::symfony::component::console::input::input_definition::InputDefinition;
 use crate::symfony::component::console::input::input_interface::InputInterface;
 use crate::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
-#[derive(Debug)]
-pub struct Command;
+pub trait Command {
+    fn get_name(&self) -> String {
+        todo!()
+    }
+    fn set_name(&mut self, _name: &str) {
+        todo!()
+    }
+    fn get_description(&self) -> String {
+        todo!()
+    }
+    fn set_description(&mut self, _description: &str) {
+        todo!()
+    }
+    fn get_definition(&self) -> &InputDefinition {
+        todo!()
+    }
+    fn complete(&self, _input: &CompletionInput, _suggestions: &mut CompletionSuggestions) {
+        todo!()
+    }
+}
 
-impl Command {
+#[derive(Debug)]
+pub struct CommandBase;
+
+impl Command for CommandBase {}
+
+impl CommandBase {
     pub fn new(_name: Option<&str>) -> Self {
         todo!()
     }

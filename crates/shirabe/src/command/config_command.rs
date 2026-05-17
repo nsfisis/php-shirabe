@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
@@ -36,7 +37,7 @@ use shirabe_semver::version_parser::VersionParser;
 
 #[derive(Debug)]
 pub struct ConfigCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -2183,11 +2184,11 @@ fn key_first_key(value: &PhpMixed) -> Option<String> {
 }
 
 impl BaseCommand for ConfigCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -2233,3 +2234,5 @@ impl BaseConfigCommand for ConfigCommand {
         self.config_source.as_mut()
     }
 }
+
+impl Command for ConfigCommand {}

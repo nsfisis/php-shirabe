@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
@@ -19,7 +20,7 @@ use crate::util::filesystem::Filesystem;
 
 #[derive(Debug)]
 pub struct ValidateCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -336,11 +337,11 @@ impl ValidateCommand {
 }
 
 impl BaseCommand for ValidateCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -360,3 +361,5 @@ impl BaseCommand for ValidateCommand {
         &mut self.io
     }
 }
+
+impl Command for ValidateCommand {}

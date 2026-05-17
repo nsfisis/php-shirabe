@@ -5,6 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
@@ -22,7 +23,7 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -164,11 +165,11 @@ impl GlobalCommand {
 }
 
 impl BaseCommand for GlobalCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -188,3 +189,5 @@ impl BaseCommand for GlobalCommand {
         &mut self.io
     }
 }
+
+impl Command for GlobalCommand {}

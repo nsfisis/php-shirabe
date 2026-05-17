@@ -5,6 +5,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
@@ -53,7 +54,7 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -1371,11 +1372,11 @@ impl DiagnoseCommand {
 }
 
 impl BaseCommand for DiagnoseCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -1395,3 +1396,5 @@ impl BaseCommand for DiagnoseCommand {
         &mut self.io
     }
 }
+
+impl Command for DiagnoseCommand {}

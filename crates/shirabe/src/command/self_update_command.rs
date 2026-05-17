@@ -4,6 +4,7 @@ use crate::io::io_interface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
@@ -34,7 +35,7 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct SelfUpdateCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -1184,11 +1185,11 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 }
 
 impl BaseCommand for SelfUpdateCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -1208,3 +1209,5 @@ impl BaseCommand for SelfUpdateCommand {
         &mut self.io
     }
 }
+
+impl Command for SelfUpdateCommand {}

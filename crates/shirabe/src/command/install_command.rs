@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
@@ -20,7 +21,7 @@ use crate::util::http_downloader::HttpDownloader;
 
 #[derive(Debug)]
 pub struct InstallCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -189,11 +190,11 @@ impl InstallCommand {
 }
 
 impl BaseCommand for InstallCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -213,3 +214,5 @@ impl BaseCommand for InstallCommand {
         &mut self.io
     }
 }
+
+impl Command for InstallCommand {}

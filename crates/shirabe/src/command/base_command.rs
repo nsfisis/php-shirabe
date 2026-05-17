@@ -3,6 +3,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::component::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::component::console::helper::table::Table;
@@ -35,8 +36,8 @@ use crate::util::platform::Platform;
 
 /// Base class for Composer commands
 pub trait BaseCommand {
-    fn inner(&self) -> &Command;
-    fn inner_mut(&mut self) -> &mut Command;
+    fn inner(&self) -> &CommandBase;
+    fn inner_mut(&mut self) -> &mut CommandBase;
     fn composer(&self) -> Option<&Composer>;
     fn composer_mut(&mut self) -> &mut Option<Composer>;
     fn io(&self) -> Option<&dyn IOInterface>;

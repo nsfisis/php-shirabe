@@ -11,6 +11,7 @@ use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::repository_set::RepositorySet;
 use crate::repository::repository_utils::RepositoryUtils;
 use anyhow::Result;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::{
     component::console::command::command::Command, console::input::input_interface::InputInterface,
@@ -22,7 +23,7 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct AuditCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -161,11 +162,11 @@ impl AuditCommand {
 }
 
 impl BaseCommand for AuditCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -185,3 +186,5 @@ impl BaseCommand for AuditCommand {
         &mut self.io
     }
 }
+
+impl Command for AuditCommand {}

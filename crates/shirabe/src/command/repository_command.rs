@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
+use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -23,7 +24,7 @@ use crate::json::json_file::JsonFile;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
-    inner: Command,
+    inner: CommandBase,
     composer: Option<Composer>,
     io: Option<Box<dyn IOInterface>>,
 
@@ -450,11 +451,11 @@ impl RepositoryCommand {
 }
 
 impl BaseCommand for RepositoryCommand {
-    fn inner(&self) -> &Command {
+    fn inner(&self) -> &CommandBase {
         &self.inner
     }
 
-    fn inner_mut(&mut self) -> &mut Command {
+    fn inner_mut(&mut self) -> &mut CommandBase {
         &mut self.inner
     }
 
@@ -500,3 +501,5 @@ impl BaseConfigCommand for RepositoryCommand {
         self.config_source.as_mut()
     }
 }
+
+impl Command for RepositoryCommand {}
