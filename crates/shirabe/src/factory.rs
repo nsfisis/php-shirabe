@@ -14,6 +14,7 @@ use shirabe_php_shim::{
 };
 
 use crate::autoload::autoload_generator::AutoloadGenerator;
+use crate::cache::Cache;
 use crate::composer::Composer;
 use crate::config::Config;
 use crate::config::json_config_source::JsonConfigSource;
@@ -59,7 +60,6 @@ use crate::repository::installed_filesystem_repository::InstalledFilesystemRepos
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
 use crate::repository::repository_factory::RepositoryFactory;
 use crate::repository::repository_manager::RepositoryManager;
-use crate::util::cache::Cache;
 use crate::util::filesystem::Filesystem;
 use crate::util::http_downloader::HttpDownloader;
 use crate::util::r#loop::Loop;

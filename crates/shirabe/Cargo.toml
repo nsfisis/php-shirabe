@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+shirabe-class-map-generator.workspace = true
 shirabe-external-packages.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true

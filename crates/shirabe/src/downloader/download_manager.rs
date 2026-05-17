@@ -11,7 +11,7 @@ use shirabe_php_shim::{
 };
 
 use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::irrecoverable_download_exception::IrrecoverableDownloadException;
+use crate::exception::irrecoverable_download_exception::IrrecoverableDownloadException;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::util::filesystem::Filesystem;

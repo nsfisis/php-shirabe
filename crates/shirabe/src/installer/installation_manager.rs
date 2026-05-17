@@ -27,7 +27,7 @@ use crate::io::io_interface::IOInterface;
 use crate::package::alias_package::AliasPackage;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::util::loop_::Loop;
+use crate::util::r#loop::Loop;
 use crate::util::platform::Platform;
 
 /// Package operation manager.

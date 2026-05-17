@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Config/JsonConfigSource.php
 
+use crate::util::silencer::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, array_unshift, call_user_func_array, chmod, explode,
     file_get_contents, file_put_contents, implode, is_writable, sprintf,
 };
-use crate::util::silencer::Silencer;
 
 use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::json::json_file::JsonFile;

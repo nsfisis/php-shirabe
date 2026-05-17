@@ -4,6 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
+use crate::util::silencer::Silencer;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_external_packages::react::promise::resolve as react_promise_resolve;
 use shirabe_php_shim::{
@@ -12,7 +13,6 @@ use shirabe_php_shim::{
     file_exists, filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url,
     pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
-use crate::util::silencer::Silencer;
 
 use crate::cache::Cache;
 use crate::config::Config;

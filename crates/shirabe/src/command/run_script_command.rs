@@ -8,7 +8,7 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 use crate::command::base_command::BaseCommand;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
-use crate::script::event::ScriptEvent;
+use crate::script::event::Event as ScriptEvent;
 use crate::script::script_events::ScriptEvents;
 use crate::util::platform::Platform;
 use crate::util::process_executor::ProcessExecutor;

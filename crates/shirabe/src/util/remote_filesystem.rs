@@ -11,13 +11,13 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::downloader::http_downloader::HttpDownloader;
 use crate::downloader::max_file_size_exceeded_exception::MaxFileSizeExceededException;
 use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::util::auth_helper::AuthHelper;
 use crate::util::http::proxy_manager::ProxyManager;
 use crate::util::http::response::Response;
+use crate::util::http_downloader::HttpDownloader;
 use crate::util::platform::Platform;
 use crate::util::stream_context_factory::StreamContextFactory;
 use crate::util::url::Url;

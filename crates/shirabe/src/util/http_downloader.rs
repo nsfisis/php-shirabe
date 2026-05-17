@@ -3,6 +3,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 
+use crate::util::silencer::Silencer;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise::Promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -11,7 +12,6 @@ use shirabe_php_shim::{
     extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
     rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
-use crate::util::silencer::Silencer;
 use shirabe_semver::constraint::constraint::Constraint;
 
 use crate::composer::Composer;

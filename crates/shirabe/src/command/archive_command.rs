@@ -27,7 +27,7 @@ use crate::repository::repository_factory::RepositoryFactory;
 use crate::repository::repository_set::RepositorySet;
 use crate::script::script_events::ScriptEvents;
 use crate::util::filesystem::Filesystem;
-use crate::util::loop_::Loop;
+use crate::util::r#loop::Loop;
 use crate::util::platform::Platform;
 use crate::util::process_executor::ProcessExecutor;
 

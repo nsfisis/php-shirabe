@@ -10,6 +10,7 @@ use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -44,7 +45,7 @@ impl SearchCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let platform_repo = PlatformRepository;
+        let platform_repo = PlatformRepository::new(vec![], IndexMap::new(), None, None)?;
         let io = self.inner.get_io();
 
         let format = input

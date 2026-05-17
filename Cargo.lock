@@ -892,6 +892,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1 0.10.6",
+ "shirabe-class-map-generator",
  "shirabe-external-packages",
  "shirabe-php-shim",
  "shirabe-semver",

@@ -2,6 +2,7 @@
 
 use std::any::Any;
 
+use crate::util::silencer::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -11,7 +12,6 @@ use shirabe_php_shim::{
     is_int, is_null, is_string, ksort, php_dir, realpath, sort, sort_with_flags, str_repeat, strtr,
     trim, usort, var_export,
 };
-use crate::util::silencer::Silencer;
 
 use crate::installed_versions::InstalledVersions;
 use crate::installer::installation_manager::InstallationManager;
