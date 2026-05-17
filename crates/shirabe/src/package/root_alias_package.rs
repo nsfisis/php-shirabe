@@ -1,13 +1,16 @@
 //! ref: composer/src/Composer/Package/RootAliasPackage.php
 
+use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::package::complete_alias_package::CompleteAliasPackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::link::Link;
+use crate::package::package_interface::PackageInterface;
 use crate::package::root_package::RootPackage;
 use crate::package::root_package_interface::RootPackageInterface;
+use crate::repository::repository_interface::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct RootAliasPackage {
@@ -217,6 +220,174 @@ impl CompletePackageInterface for RootAliasPackage {
     }
 
     fn set_archive_excludes(&mut self, excludes: Vec<String>) {
+        todo!()
+    }
+}
+
+impl std::fmt::Display for RootAliasPackage {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl PackageInterface for RootAliasPackage {
+    fn get_name(&self) -> &str {
+        todo!()
+    }
+    fn get_pretty_name(&self) -> &str {
+        todo!()
+    }
+    fn get_names(&self, _provides: bool) -> Vec<String> {
+        todo!()
+    }
+    fn set_id(&mut self, _id: i64) {
+        todo!()
+    }
+    fn get_id(&self) -> i64 {
+        todo!()
+    }
+    fn is_dev(&self) -> bool {
+        todo!()
+    }
+    fn get_type(&self) -> &str {
+        todo!()
+    }
+    fn get_target_dir(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+    fn set_installation_source(&mut self, _type: Option<String>) {
+        todo!()
+    }
+    fn get_installation_source(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_source_type(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_source_url(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_source_urls(&self) -> Vec<String> {
+        todo!()
+    }
+    fn get_source_reference(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+        todo!()
+    }
+    fn set_source_mirrors(&mut self, _mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+        todo!()
+    }
+    fn get_dist_type(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_dist_url(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_dist_urls(&self) -> Vec<String> {
+        todo!()
+    }
+    fn get_dist_reference(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_dist_sha1_checksum(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+        todo!()
+    }
+    fn set_dist_mirrors(&mut self, _mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+        todo!()
+    }
+    fn get_version(&self) -> &str {
+        todo!()
+    }
+    fn get_pretty_version(&self) -> &str {
+        todo!()
+    }
+    fn get_full_pretty_version(&self, _truncate: bool, _display_mode: i64) -> String {
+        todo!()
+    }
+    fn get_release_date(&self) -> Option<DateTime<Utc>> {
+        todo!()
+    }
+    fn get_stability(&self) -> &str {
+        todo!()
+    }
+    fn get_requires(&self) -> IndexMap<String, Link> {
+        todo!()
+    }
+    fn get_conflicts(&self) -> Vec<Link> {
+        todo!()
+    }
+    fn get_provides(&self) -> Vec<Link> {
+        todo!()
+    }
+    fn get_replaces(&self) -> Vec<Link> {
+        todo!()
+    }
+    fn get_dev_requires(&self) -> IndexMap<String, Link> {
+        todo!()
+    }
+    fn get_suggests(&self) -> IndexMap<String, String> {
+        todo!()
+    }
+    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+    fn get_include_paths(&self) -> Vec<String> {
+        todo!()
+    }
+    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+        todo!()
+    }
+    fn set_repository(&mut self, _repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
+        todo!()
+    }
+    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
+        todo!()
+    }
+    fn get_binaries(&self) -> Vec<String> {
+        todo!()
+    }
+    fn get_unique_name(&self) -> String {
+        todo!()
+    }
+    fn get_notification_url(&self) -> Option<&str> {
+        todo!()
+    }
+    fn get_pretty_string(&self) -> String {
+        todo!()
+    }
+    fn is_default_branch(&self) -> bool {
+        todo!()
+    }
+    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+        todo!()
+    }
+    fn set_transport_options(&mut self, _options: IndexMap<String, PhpMixed>) {
+        todo!()
+    }
+    fn set_source_reference(&mut self, _reference: Option<String>) {
+        todo!()
+    }
+    fn set_dist_url(&mut self, _url: Option<String>) {
+        todo!()
+    }
+    fn set_dist_type(&mut self, _type: Option<String>) {
+        todo!()
+    }
+    fn set_dist_reference(&mut self, _reference: Option<String>) {
+        todo!()
+    }
+    fn set_source_dist_references(&mut self, _reference: &str) {
         todo!()
     }
 }

@@ -502,10 +502,10 @@ impl Installer {
         let platform_repo = self.create_platform_repo(true);
         let aliases = self.get_root_aliases(true);
 
-        let mut locked_repository: Option<Box<dyn LockArrayRepository>> = None;
+        let mut locked_repository: Option<Box<LockArrayRepository>> = None;
 
         let try_load_locked =
-            || -> anyhow::Result<Result<Option<Box<dyn LockArrayRepository>>, ParsingException>> {
+            || -> anyhow::Result<Result<Option<Box<LockArrayRepository>>, ParsingException>> {
                 if self.locker.is_locked() {
                     match self.locker.get_locked_repository(true) {
                         Ok(r) => Ok(Ok(Some(r))),
@@ -842,7 +842,7 @@ impl Installer {
         platform_repo: &PlatformRepository,
         aliases: &Vec<IndexMap<String, String>>,
         policy: &dyn PolicyInterface,
-        locked_repository: Option<&dyn LockArrayRepository>,
+        locked_repository: Option<&LockArrayRepository>,
     ) -> anyhow::Result<i64> {
         if self.package.get_dev_requires().is_empty() {
             return Ok(0);
@@ -1296,7 +1296,7 @@ impl Installer {
     fn create_policy(
         &self,
         for_update: bool,
-        locked_repo: Option<&dyn LockArrayRepository>,
+        locked_repo: Option<&LockArrayRepository>,
     ) -> DefaultPolicy {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
@@ -1343,7 +1343,7 @@ impl Installer {
         &self,
         root_package: &dyn RootPackageInterface,
         platform_repo: &PlatformRepository,
-        locked_repository: Option<&dyn LockArrayRepository>,
+        locked_repository: Option<&LockArrayRepository>,
     ) -> Request {
         let mut request = Request::new(locked_repository);
 
@@ -1389,7 +1389,7 @@ impl Installer {
     fn require_packages_for_update(
         &self,
         request: &mut Request,
-        locked_repository: Option<&dyn LockArrayRepository>,
+        locked_repository: Option<&LockArrayRepository>,
         include_dev_requires: bool,
     ) {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
