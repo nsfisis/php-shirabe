@@ -65,6 +65,14 @@ pub struct Exception {
     pub code: i64,
 }
 
+impl std::fmt::Display for Exception {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for Exception {}
+
 #[derive(Debug)]
 pub struct RuntimeException {
     pub message: String,
@@ -76,6 +84,8 @@ impl std::fmt::Display for RuntimeException {
         todo!()
     }
 }
+
+impl std::error::Error for RuntimeException {}
 
 #[derive(Debug)]
 pub struct UnexpectedValueException {
@@ -89,6 +99,8 @@ impl std::fmt::Display for UnexpectedValueException {
     }
 }
 
+impl std::error::Error for UnexpectedValueException {}
+
 #[derive(Debug)]
 pub struct InvalidArgumentException {
     pub message: String,
@@ -100,6 +112,8 @@ impl std::fmt::Display for InvalidArgumentException {
         todo!()
     }
 }
+
+impl std::error::Error for InvalidArgumentException {}
 
 #[derive(Debug)]
 pub struct LogicException {
@@ -113,6 +127,8 @@ impl std::fmt::Display for LogicException {
     }
 }
 
+impl std::error::Error for LogicException {}
+
 #[derive(Debug)]
 pub struct BadMethodCallException {
     pub message: String,
@@ -125,6 +141,8 @@ impl std::fmt::Display for BadMethodCallException {
     }
 }
 
+impl std::error::Error for BadMethodCallException {}
+
 #[derive(Debug)]
 pub struct OutOfBoundsException {
     pub message: String,
@@ -136,6 +154,8 @@ impl std::fmt::Display for OutOfBoundsException {
         todo!()
     }
 }
+
+impl std::error::Error for OutOfBoundsException {}
 
 #[derive(Debug)]
 pub struct ErrorException {
@@ -151,6 +171,8 @@ impl std::fmt::Display for ErrorException {
         todo!()
     }
 }
+
+impl std::error::Error for ErrorException {}
 
 pub fn is_bool(_value: &PhpMixed) -> bool {
     todo!()

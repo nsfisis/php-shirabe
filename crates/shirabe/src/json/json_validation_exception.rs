@@ -20,3 +20,11 @@ impl JsonValidationException {
         &self.errors
     }
 }
+
+impl std::fmt::Display for JsonValidationException {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for JsonValidationException {}

@@ -56,3 +56,11 @@ impl TransportException {
         self.response_info = response_info;
     }
 }
+
+impl std::fmt::Display for TransportException {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for TransportException {}
