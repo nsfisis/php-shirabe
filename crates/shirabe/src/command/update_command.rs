@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -119,7 +120,7 @@ impl UpdateCommand {
                     "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
         if input.get_option("no-suggest").as_bool().unwrap_or(false) {
@@ -128,7 +129,7 @@ impl UpdateCommand {
                     "<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -140,7 +141,7 @@ impl UpdateCommand {
                     "<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -228,7 +229,7 @@ impl UpdateCommand {
                             todo!("root_requirements[package].get_pretty_constraint()"),
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     io.write(
                         PhpMixed::String(format!(
@@ -236,7 +237,7 @@ impl UpdateCommand {
                             package, package, constraint,
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
 
                     return Ok(BaseCommand::FAILURE);
@@ -339,7 +340,7 @@ impl UpdateCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(-1);
@@ -449,7 +450,7 @@ impl UpdateCommand {
                 io.write_error(
                     PhpMixed::String("<info>Bumping dependencies</info>".to_string()),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 let mut bump_command = BumpCommand::new();
                 bump_command.set_composer(composer.clone());
@@ -511,7 +512,7 @@ impl UpdateCommand {
         io.write_error(
             PhpMixed::String("<info>Loading packages that can be updated...</info>".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
         let installed_packages = if composer.get_locker().is_locked() {

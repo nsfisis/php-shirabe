@@ -24,7 +24,7 @@ use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_package_interface::RootPackageInterface;
 use crate::package::version::version_parser::VersionParser;
-use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::lock_array_repository::LockArrayRepository;
 use crate::repository::platform_repository::PlatformRepository;
@@ -584,7 +584,7 @@ impl Locker {
         }
         lock.insert(
             "plugin-api-version".to_string(),
-            PhpMixed::String(PluginInterface::PLUGIN_API_VERSION.to_string()),
+            PhpMixed::String(plugin_interface::PLUGIN_API_VERSION.to_string()),
         );
 
         let lock = self.fixup_json_data_type(lock);

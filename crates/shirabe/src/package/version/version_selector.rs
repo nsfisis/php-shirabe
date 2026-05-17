@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Package/Version/VersionSelector.php
 
+use crate::io::io_interface;
 use std::any::Any;
 
 use indexmap::IndexMap;
@@ -190,9 +191,9 @@ impl VersionSelector {
                                 )),
                                 true,
                                 if is_first_warning {
-                                    IOInterface::NORMAL
+                                    io_interface::NORMAL
                                 } else {
-                                    IOInterface::VERBOSE
+                                    io_interface::VERBOSE
                                 },
                             );
                         }

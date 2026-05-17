@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php
 
+use crate::io::io_interface;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
@@ -65,7 +66,7 @@ impl BinaryInstaller {
                         package.get_name(),
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 continue;
             }
@@ -77,7 +78,7 @@ impl BinaryInstaller {
                         package.get_name(),
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 continue;
             }
@@ -100,7 +101,7 @@ impl BinaryInstaller {
                                 package.get_name(),
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     continue;
@@ -200,7 +201,7 @@ impl BinaryInstaller {
                         package.get_name(),
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         }

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/VcsDownloader.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -138,7 +139,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     } else if count(&PhpMixed::List(
                         urls.iter()
@@ -149,7 +150,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     if count(&PhpMixed::List(
@@ -232,7 +233,7 @@ pub trait VcsDownloader:
                 InstallOperation::format(package, false)
             )),
             false,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut urls = self.prepare_urls(package.get_source_urls());
@@ -252,7 +253,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     } else if count(&PhpMixed::List(
                         urls.iter()
@@ -263,7 +264,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     if count(&PhpMixed::List(
@@ -304,7 +305,7 @@ pub trait VcsDownloader:
                 UpdateOperation::format(initial, target, false),
             )),
             false,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut urls = self.prepare_urls(target.get_source_urls());
@@ -330,7 +331,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     } else if count(&PhpMixed::List(
                         urls.iter()
@@ -341,7 +342,7 @@ pub trait VcsDownloader:
                         self.io_mut().write_error(
                             PhpMixed::String("    Failed, trying the next URL".to_string()),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     exception = Some(e);
@@ -381,10 +382,10 @@ pub trait VcsDownloader:
                 self.io_mut().write_error(
                     PhpMixed::String(format!("    {}", message)),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 self.io_mut()
-                    .write_error(PhpMixed::String(logs), true, IOInterface::NORMAL);
+                    .write_error(PhpMixed::String(logs), true, io_interface::NORMAL);
             }
         }
 
@@ -408,7 +409,7 @@ pub trait VcsDownloader:
                 UninstallOperation::format(package, false)
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let promise = self.filesystem_mut().remove_directory_async(path);

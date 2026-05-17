@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/InitCommand.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -271,7 +272,7 @@ impl InitCommand {
                     Box::new(PhpMixed::String(String::new())),
                 ]),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             if !io.ask_confirmation(
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
@@ -280,7 +281,7 @@ impl InitCommand {
                 io.write_error(
                     PhpMixed::String("<error>Command aborted</error>".to_string()),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
 
                 return Ok(1);
@@ -289,7 +290,7 @@ impl InitCommand {
             io.write_error(
                 PhpMixed::String(format!("Writing {}", file_obj.get_path())),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -303,7 +304,7 @@ impl InitCommand {
                         "<error>Schema validation error, aborting</error>".to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 let errors = format!(
                     " - {}",
@@ -312,7 +313,7 @@ impl InitCommand {
                 io.write_error(
                     PhpMixed::String(format!("{}:{}{}", json_err.message, PHP_EOL, errors)),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 Silencer::call(
                     "unlink",
@@ -376,7 +377,7 @@ impl InitCommand {
                     autoload_path.as_deref().unwrap_or("")
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             io.write_error(
                 PhpMixed::String(
@@ -384,7 +385,7 @@ impl InitCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -493,7 +494,7 @@ impl InitCommand {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         // namespace
@@ -507,7 +508,7 @@ impl InitCommand {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut name = input
@@ -709,7 +710,7 @@ impl InitCommand {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         // prepare to resolve dependencies
@@ -1024,7 +1025,7 @@ impl InitCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
     }
@@ -1040,7 +1041,7 @@ impl InitCommand {
             self.inner.get_io().write_error(
                 PhpMixed::String("Could not run dump-autoload.".to_string()),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
     }

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -178,7 +179,7 @@ impl Auditor {
                     JsonFile::INDENT_DEFAULT,
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(audit_bitmask);
@@ -225,7 +226,7 @@ impl Auditor {
                             ],
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
@@ -237,7 +238,7 @@ impl Auditor {
                         "Run \"composer audit\" for a full list of advisories.".to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         } else {
@@ -246,7 +247,7 @@ impl Auditor {
                     "<info>No security vulnerability advisories found.</info>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -256,13 +257,13 @@ impl Auditor {
                     "<warning>The following repositories were unreachable:</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             for repo in &unreachable_repos {
                 io.write_error(
                     PhpMixed::String(format!("  - {}", repo)),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         }
@@ -603,7 +604,7 @@ impl Auditor {
                     .collect(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
     }
 
@@ -628,7 +629,7 @@ impl Auditor {
                 ],
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         if format == Self::FORMAT_PLAIN {
@@ -647,7 +648,7 @@ impl Auditor {
                         ],
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 

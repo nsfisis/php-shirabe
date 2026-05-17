@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/SvnDownloader.php
 
+use crate::io::io_interface;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -70,7 +71,7 @@ impl SvnDownloader {
         self.inner.io.write_error(
             PhpMixed::String(format!(" Checking out {}", package.get_source_reference())),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.execute(
             package,
@@ -119,7 +120,7 @@ impl SvnDownloader {
         self.inner.io.write_error(
             PhpMixed::String(format!(" Checking out {}", r#ref)),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let mut command = vec!["svn".to_string(), "switch".to_string()];
         command.extend(flags);
@@ -214,7 +215,7 @@ impl SvnDownloader {
                 if count_changes == 1 { "" } else { "s" }
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
         self.inner.io.write_error(
@@ -225,7 +226,7 @@ impl SvnDownloader {
                     .collect(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
@@ -236,7 +237,7 @@ impl SvnDownloader {
                     if remaining_changes == 1 { "" } else { "s" }
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -270,7 +271,7 @@ impl SvnDownloader {
                                 .collect(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
                 _ => {
@@ -288,7 +289,7 @@ impl SvnDownloader {
                             Box::new(PhpMixed::String("    ? - print help".to_string())),
                         ]),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
             }

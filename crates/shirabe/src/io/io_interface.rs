@@ -5,13 +5,13 @@ use indexmap::IndexMap;
 use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
 use shirabe_php_shim::PhpMixed;
 
-pub trait IOInterface: LoggerInterface {
-    const QUIET: i64 = 1;
-    const NORMAL: i64 = 2;
-    const VERBOSE: i64 = 4;
-    const VERY_VERBOSE: i64 = 8;
-    const DEBUG: i64 = 16;
+pub const QUIET: i64 = 1;
+pub const NORMAL: i64 = 2;
+pub const VERBOSE: i64 = 4;
+pub const VERY_VERBOSE: i64 = 8;
+pub const DEBUG: i64 = 16;
 
+pub trait IOInterface: LoggerInterface {
     fn is_interactive(&self) -> bool;
 
     fn is_verbose(&self) -> bool;
@@ -65,11 +65,11 @@ pub trait IOInterface: LoggerInterface {
     fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>>;
 
     fn set_authentication(
-        &self,
+        &mut self,
         repository_name: String,
         username: String,
         password: Option<String>,
     );
 
-    fn load_configuration(&self, config: &Config);
+    fn load_configuration(&mut self, config: &Config);
 }

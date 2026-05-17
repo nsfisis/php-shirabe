@@ -1,6 +1,8 @@
 //! ref: composer/src/Composer/IO/BaseIO.php
 
 use crate::config::Config;
+use crate::io::io_interface;
+use crate::io::io_interface;
 use crate::io::io_interface::IOInterface;
 use crate::util::process_executor::ProcessExecutor;
 use crate::util::silencer::Silencer;
@@ -80,7 +82,7 @@ pub trait BaseIO: IOInterface {
                     repository_name
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
         self.set_authentication(repository_name, username, password);
@@ -363,7 +365,7 @@ pub trait BaseIO: IOInterface {
                                 domain
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                         continue;
                     }
@@ -483,28 +485,28 @@ pub trait BaseIO: IOInterface {
             self.write_error(
                 PhpMixed::String(format!("<error>{}</error>", message_str)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else if level_str == LogLevel::WARNING {
             self.write_error(
                 PhpMixed::String(format!("<warning>{}</warning>", message_str)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else if level_str == LogLevel::NOTICE {
             self.write_error(
                 PhpMixed::String(format!("<info>{}</info>", message_str)),
                 true,
-                IOInterface::VERBOSE,
+                io_interface::VERBOSE,
             );
         } else if level_str == LogLevel::INFO {
             self.write_error(
                 PhpMixed::String(format!("<info>{}</info>", message_str)),
                 true,
-                IOInterface::VERY_VERBOSE,
+                io_interface::VERY_VERBOSE,
             );
         } else {
-            self.write_error(PhpMixed::String(message_str), true, IOInterface::DEBUG);
+            self.write_error(PhpMixed::String(message_str), true, io_interface::DEBUG);
         }
     }
 }

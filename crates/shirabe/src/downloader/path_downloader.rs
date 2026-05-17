@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/PathDownloader.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -123,7 +124,7 @@ impl PathDownloader {
                         appendix
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -149,7 +150,7 @@ impl PathDownloader {
                     InstallOperation::format(package, false)
                 )),
                 false,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -162,7 +163,7 @@ impl PathDownloader {
                         self.inner.io.write_error(
                             PhpMixed::String(format!("Junctioning from {}", url)),
                             false,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     Ok(self.inner.filesystem.junction(&real_url, &path))
@@ -172,7 +173,7 @@ impl PathDownloader {
                         self.inner.io.write_error(
                             PhpMixed::String(format!("Symlinking from {}", url)),
                             false,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     if transport_options
@@ -211,7 +212,7 @@ impl PathDownloader {
                             self.inner.io.write_error(
                                 PhpMixed::String("".to_string()),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
                             self.inner.io.write_error(
                                 PhpMixed::String(
@@ -219,7 +220,7 @@ impl PathDownloader {
                                         .to_string(),
                                 ),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
                         }
                         current_strategy = Self::STRATEGY_MIRROR;
@@ -250,7 +251,7 @@ impl PathDownloader {
                         url
                     )),
                     false,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
             let iterator = ArchivableFilesFinder::new(&real_url, vec![]);
@@ -260,7 +261,7 @@ impl PathDownloader {
         if output {
             self.inner
                 .io
-                .write_error(PhpMixed::String("".to_string()), true, IOInterface::NORMAL);
+                .write_error(PhpMixed::String("".to_string()), true, io_interface::NORMAL);
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -290,7 +291,7 @@ impl PathDownloader {
                         path
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
             if !self.inner.filesystem.remove_junction(&path) {
@@ -300,7 +301,7 @@ impl PathDownloader {
                         path
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 return Err(RuntimeException {
                     message: format!(
@@ -347,7 +348,7 @@ impl PathDownloader {
                         path
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 

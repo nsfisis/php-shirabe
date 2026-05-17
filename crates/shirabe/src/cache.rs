@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Cache.php
 
+use crate::io::io_interface;
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -89,7 +90,7 @@ impl Cache {
                         self.root,
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 self.enabled = Some(false);
             }
@@ -111,7 +112,7 @@ impl Cache {
                 self.io.write_error(
                     PhpMixed::String(format!("Reading {} from cache", full_path)),
                     true,
-                    IOInterface::DEBUG,
+                    io_interface::DEBUG,
                 );
 
                 return file_get_contents(&full_path);
@@ -130,7 +131,7 @@ impl Cache {
             self.io.write_error(
                 PhpMixed::String(format!("Writing {}{} into cache", self.root, file)),
                 true,
-                IOInterface::DEBUG,
+                io_interface::DEBUG,
             );
 
             let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)),);
@@ -161,7 +162,7 @@ impl Cache {
                             e,
                         )),
                         true,
-                        IOInterface::DEBUG,
+                        io_interface::DEBUG,
                     );
                     let message_match = Preg::is_match_with_indexed_captures(
                         r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}",
@@ -192,7 +193,7 @@ impl Cache {
                         );
 
                         self.io
-                            .write_error(PhpMixed::String(message), true, IOInterface::NORMAL);
+                            .write_error(PhpMixed::String(message), true, io_interface::NORMAL);
 
                         return Ok(false);
                     }
@@ -220,13 +221,13 @@ impl Cache {
                         source,
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             } else if self.io.is_debug() {
                 self.io.write_error(
                     PhpMixed::String(format!("Writing {} into cache from {}", full_path, source,)),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -262,7 +263,7 @@ impl Cache {
                 self.io.write_error(
                     PhpMixed::String(format!("Reading {} from cache", full_path)),
                     true,
-                    IOInterface::DEBUG,
+                    io_interface::DEBUG,
                 );
 
                 return Ok(self.filesystem.copy(&full_path, target));

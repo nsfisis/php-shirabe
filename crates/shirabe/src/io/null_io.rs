@@ -78,6 +78,44 @@ impl IOInterface for NullIO {
     ) -> PhpMixed {
         default
     }
+
+    fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        <Self as BaseIO>::write_raw(self, messages, newline, verbosity)
+    }
+
+    fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        <Self as BaseIO>::write_error_raw(self, messages, newline, verbosity)
+    }
+
+    fn get_authentications(
+        &self,
+    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+        <Self as BaseIO>::get_authentications(self)
+    }
+
+    fn has_authentication(&self, repository_name: &str) -> bool {
+        <Self as BaseIO>::has_authentication(self, repository_name)
+    }
+
+    fn get_authentication(
+        &self,
+        repository_name: &str,
+    ) -> indexmap::IndexMap<String, Option<String>> {
+        <Self as BaseIO>::get_authentication(self, repository_name)
+    }
+
+    fn set_authentication(
+        &mut self,
+        repository_name: String,
+        username: String,
+        password: Option<String>,
+    ) {
+        <Self as BaseIO>::set_authentication(self, repository_name, username, password)
+    }
+
+    fn load_configuration(&mut self, config: &crate::config::Config) {
+        <Self as BaseIO>::load_configuration(self, config)
+    }
 }
 
 impl BaseIO for NullIO {

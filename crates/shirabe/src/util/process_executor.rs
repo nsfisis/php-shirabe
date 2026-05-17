@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
@@ -361,13 +362,13 @@ impl ProcessExecutor {
             self.io.as_ref().unwrap().write_error_raw(
                 PhpMixed::String(buffer.to_string()),
                 false,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else {
             self.io.as_ref().unwrap().write_raw(
                 PhpMixed::String(buffer.to_string()),
                 false,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
     }

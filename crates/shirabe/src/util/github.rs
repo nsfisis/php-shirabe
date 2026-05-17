@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/GitHub.php
 
+use crate::io::io_interface;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
@@ -80,8 +81,11 @@ impl GitHub {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io
-                .write_error(PhpMixed::String(msg.to_string()), true, IOInterface::NORMAL);
+            self.io.write_error(
+                PhpMixed::String(msg.to_string()),
+                true,
+                io_interface::NORMAL,
+            );
         }
 
         let mut note = "Composer".to_string();
@@ -127,7 +131,7 @@ impl GitHub {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let encoded_note = shirabe_php_shim::rawurlencode(&note).replace("%20", "+");
@@ -149,7 +153,7 @@ impl GitHub {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         self.io.write_error(
@@ -170,7 +174,7 @@ impl GitHub {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         self.io.write_error(
@@ -194,7 +198,7 @@ impl GitHub {
                 Box::new(PhpMixed::String(String::new())),
             ]),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         self.io.write_error(
@@ -202,7 +206,7 @@ impl GitHub {
                 "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth".to_string(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut store_in_local_auth_config = false;
@@ -225,14 +229,14 @@ impl GitHub {
             self.io.write_error(
                 PhpMixed::String("<warning>No token given, aborting.</warning>".to_string()),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             self.io.write_error(
                 PhpMixed::String(
                     "You can also add it manually later by using \"composer config --global --auth github-oauth.github.com <token>\"".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             return Ok(false);
         }
@@ -266,14 +270,14 @@ impl GitHub {
                     self.io.write_error(
                         PhpMixed::String("<error>Invalid token provided.</error>".to_string()),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io.write_error(
                         PhpMixed::String(
                             "You can also add it manually later by using \"composer config --global --auth github-oauth.github.com <token>\"".to_string(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     return Ok(false);
                 }
@@ -307,7 +311,7 @@ impl GitHub {
         self.io.write_error(
             PhpMixed::String("<info>Token stored successfully.</info>".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         Ok(true)

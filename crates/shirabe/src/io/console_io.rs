@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/IO/ConsoleIO.php
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
@@ -50,14 +51,14 @@ impl ConsoleIO {
         helper_set: HelperSet,
     ) -> Self {
         let mut verbosity_map = IndexMap::new();
-        verbosity_map.insert(IOInterface::QUIET, OutputInterface::VERBOSITY_QUIET);
-        verbosity_map.insert(IOInterface::NORMAL, OutputInterface::VERBOSITY_NORMAL);
-        verbosity_map.insert(IOInterface::VERBOSE, OutputInterface::VERBOSITY_VERBOSE);
+        verbosity_map.insert(io_interface::QUIET, OutputInterface::VERBOSITY_QUIET);
+        verbosity_map.insert(io_interface::NORMAL, OutputInterface::VERBOSITY_NORMAL);
+        verbosity_map.insert(io_interface::VERBOSE, OutputInterface::VERBOSITY_VERBOSE);
         verbosity_map.insert(
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
             OutputInterface::VERBOSITY_VERY_VERBOSE,
         );
-        verbosity_map.insert(IOInterface::DEBUG, OutputInterface::VERBOSITY_DEBUG);
+        verbosity_map.insert(io_interface::DEBUG, OutputInterface::VERBOSITY_DEBUG);
         Self {
             inner: BaseIO {
                 authentications: IndexMap::new(),

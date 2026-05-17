@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/PackageDiscoveryTrait.php
 
+use crate::io::io_interface;
 use std::any::Any;
 
 use anyhow::Result;
@@ -167,7 +168,7 @@ pub trait PackageDiscoveryTrait {
                             requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
 
@@ -198,7 +199,7 @@ pub trait PackageDiscoveryTrait {
                                 ],
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     } else {
                         requirement.insert("version".to_string(), "guess".to_string());
@@ -331,7 +332,7 @@ pub trait PackageDiscoveryTrait {
                             Box::new(PhpMixed::String(String::new())),
                         ]),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
 
                     io.write_error(
@@ -342,9 +343,9 @@ pub trait PackageDiscoveryTrait {
                                 .collect(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
-                    io.write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
+                    io.write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
@@ -440,7 +441,7 @@ pub trait PackageDiscoveryTrait {
                                     ],
                                 )),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
 
                             c

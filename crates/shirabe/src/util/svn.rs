@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/Svn.php
 
+use crate::io::io_interface;
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -142,7 +143,7 @@ impl Svn {
             // PHP: $output .= $buffer;
             output.get_or_insert_with(String::new).push_str(buffer);
             if verbose {
-                // self.io.write_error(PhpMixed::String(buffer.to_string()), false, IOInterface::NORMAL);
+                // self.io.write_error(PhpMixed::String(buffer.to_string()), false, io_interface::NORMAL);
             }
             None
         };
@@ -216,7 +217,7 @@ impl Svn {
                 self.url,
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         self.has_auth = Some(true);

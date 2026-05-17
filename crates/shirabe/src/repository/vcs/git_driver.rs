@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitDriver.php
 
+use crate::io::io_interface;
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -117,7 +118,7 @@ impl GitDriver {
                         self.inner.url
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 

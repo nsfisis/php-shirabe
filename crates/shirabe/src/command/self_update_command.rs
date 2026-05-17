@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/SelfUpdateCommand.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
@@ -89,21 +90,21 @@ impl SelfUpdateCommand {
                         "<error>This instance of Composer does not have the self-update command.</error>"
                             .to_string(),
                     ),
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 output.writeln(
                     PhpMixed::String(format!(
                         "<comment>You are running Composer installed as a package in your current project (\"{}\").</comment>",
                         proj_dir
                     )),
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 output.writeln(
                     PhpMixed::String(
                         "<comment>To update Composer, download a composer.phar from https://getcomposer.org and then run `composer.phar update composer/composer` in your project.</comment>"
                             .to_string(),
                     ),
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             } else {
                 output.writeln(
@@ -111,14 +112,14 @@ impl SelfUpdateCommand {
                         "<error>This instance of Composer does not have the self-update command.</error>"
                             .to_string(),
                     ),
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 output.writeln(
                     PhpMixed::String(
                         "<comment>This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.</comment>"
                             .to_string(),
                     ),
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -245,7 +246,7 @@ impl SelfUpdateCommand {
                             composer_user_name, home, home_owner_name
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
             }
@@ -312,7 +313,7 @@ impl SelfUpdateCommand {
                         skipped_version, update_major_version, update_major_version
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             } else if version_compare(&current_major_version, &preview_major_version, "<") {
                 // promote next major version if available in preview
@@ -322,7 +323,7 @@ impl SelfUpdateCommand {
                         latest_preview.get("version").and_then(|v| v.as_string()).unwrap_or("")
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         }
@@ -348,7 +349,7 @@ impl SelfUpdateCommand {
                     latest_stable.get("version").and_then(|v| v.as_string()).unwrap_or("")
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
         if latest.contains_key("eol") {
@@ -359,7 +360,7 @@ impl SelfUpdateCommand {
                     latest_stable.get("version").and_then(|v| v.as_string()).unwrap_or("")
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -372,7 +373,7 @@ impl SelfUpdateCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(1);
@@ -393,7 +394,7 @@ impl SelfUpdateCommand {
                     ],
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             // remove all backups except for the most recent, if any
@@ -437,7 +438,7 @@ impl SelfUpdateCommand {
                 ],
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let remote_filename = format!(
             "{}{}",
@@ -467,10 +468,10 @@ impl SelfUpdateCommand {
         io.write_error(
             PhpMixed::String("   ".to_string()),
             false,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         http_downloader.copy(&remote_filename, &temp_filename)?;
-        io.write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
+        io.write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
 
         if !file_exists(&temp_filename) || signature.is_none() || signature.as_deref() == Some("") {
             io.write_error(
@@ -479,7 +480,7 @@ impl SelfUpdateCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(1);
@@ -494,7 +495,7 @@ impl SelfUpdateCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else {
             if !extension_loaded("openssl") {
@@ -644,7 +645,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                     &[PhpMixed::String(Composer::VERSION.to_string())],
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else {
             io.write_error(
@@ -653,7 +654,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                     backup_file
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -676,7 +677,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                     .to_string(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         // TODO(phase-b): closure captures none; PHP throws inside the closure on bad input
@@ -741,7 +742,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 Keys::fingerprint(&key_path)?
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut tags_key = String::new();
@@ -788,7 +789,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 Keys::fingerprint(&key_path)?
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         io.write(
@@ -797,7 +798,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 config.get("home").as_string().unwrap_or("")
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         Ok(())
@@ -862,7 +863,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 &[PhpMixed::String(rollback_version.clone())],
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         if !self.set_local_phar(local_filename, &old_file, None)? {
             return Ok(1);
@@ -899,7 +900,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                     error.unwrap_or_default()
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             if backup_target.is_some() {
@@ -909,7 +910,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                             .to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -981,7 +982,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             io.write_error(
                 PhpMixed::String(format!("<info>Removing: {}</info>", file_str)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             fs.remove(&file_str);
         }
@@ -1077,7 +1078,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 local_filename
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let help_message = "Please run the self-update command as an Administrator.";
         let question =
@@ -1090,7 +1091,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                     help_message
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return false;
@@ -1103,7 +1104,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 io.write_error(
                     PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
 
                 return false;
@@ -1168,13 +1169,13 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             io.write_error(
                 PhpMixed::String("<info>Operation succeeded.</info>".to_string()),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         } else {
             io.write_error(
                 PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/FileDownloader.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
@@ -102,7 +103,7 @@ impl FileDownloader {
         };
 
         if this.cache.is_some() && this.cache.as_ref().unwrap().gc_is_necessary() {
-            // PHP: writeError('Running cache garbage collection', true, IOInterface::VERY_VERBOSE)
+            // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
             this.io.write_error("Running cache garbage collection");
             this.cache.as_mut().unwrap().gc(
                 this.config.get("cache-files-ttl").as_int().unwrap_or(0),

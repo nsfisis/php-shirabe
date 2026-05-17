@@ -8,7 +8,7 @@ use crate::plugin::command_event::CommandEvent;
 use crate::plugin::plugin_events::PluginEvents;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::repository::repository_interface::{self, RepositoryInterface};
 use crate::{command::base_command::BaseCommand, composer::Composer};
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -98,7 +98,7 @@ impl SearchCommand {
             .get_event_dispatcher()
             .dispatch(command_event.get_name(), &command_event);
 
-        let mut mode: i64 = RepositoryInterface::SEARCH_FULLTEXT;
+        let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
         if input.get_option("only-name").as_bool().unwrap_or(false) {
             if input.get_option("only-vendor").as_bool().unwrap_or(false) {
                 return Err(InvalidArgumentException {
@@ -107,9 +107,9 @@ impl SearchCommand {
                 }
                 .into());
             }
-            mode = RepositoryInterface::SEARCH_NAME;
+            mode = repository_interface::SEARCH_NAME;
         } else if input.get_option("only-vendor").as_bool().unwrap_or(false) {
-            mode = RepositoryInterface::SEARCH_VENDOR;
+            mode = repository_interface::SEARCH_VENDOR;
         }
 
         let r#type = input
@@ -127,7 +127,7 @@ impl SearchCommand {
             })
             .unwrap_or_default();
         let mut query = implode(" ", &token_strings);
-        if mode != RepositoryInterface::SEARCH_FULLTEXT {
+        if mode != repository_interface::SEARCH_FULLTEXT {
             query = preg_quote(&query, None);
         }
 

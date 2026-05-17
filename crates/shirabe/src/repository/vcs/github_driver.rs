@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitHubDriver.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -628,7 +629,7 @@ impl GitHubDriver {
                                 item_url
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                         keys_to_remove.push(key_idx);
                     }
@@ -901,7 +902,7 @@ impl GitHubDriver {
                     url
                 )),
                 true,
-                IOInterface::VERBOSE,
+                io_interface::VERBOSE,
             );
 
             return false;
@@ -1062,7 +1063,7 @@ impl GitHubDriver {
                                         self.inner.url
                                     )),
                                     true,
-                                    IOInterface::NORMAL,
+                                    io_interface::NORMAL,
                                 );
                                 return Err(e);
                             }
@@ -1091,7 +1092,7 @@ impl GitHubDriver {
                                     ],
                                 )),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
                         }
 
@@ -1211,7 +1212,7 @@ impl GitHubDriver {
                         self.generate_ssh_url()
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 Err(setup_err)
             }

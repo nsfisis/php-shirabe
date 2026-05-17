@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/ForgejoDriver.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -489,7 +490,7 @@ impl ForgejoDriver {
                     url
                 )),
                 true,
-                IOInterface::VERBOSE,
+                io_interface::VERBOSE,
             );
 
             return false;
@@ -655,7 +656,7 @@ impl ForgejoDriver {
                         ssh_url
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 Err(e)
             }

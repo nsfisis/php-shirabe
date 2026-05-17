@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::command::command::Command;
@@ -109,7 +110,7 @@ impl BumpCommand {
                     composer_json_path
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             return Ok(Self::ERROR_GENERIC);
         }
@@ -124,7 +125,7 @@ impl BumpCommand {
                         composer_json_path
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 return Ok(Self::ERROR_GENERIC);
             }
@@ -144,7 +145,7 @@ impl BumpCommand {
                     composer_json_path
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             return Ok(Self::ERROR_GENERIC);
         }
@@ -161,7 +162,7 @@ impl BumpCommand {
                         "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>".to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
@@ -176,7 +177,7 @@ impl BumpCommand {
                     "<warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             let contents_data = composer_json.read()?;
@@ -186,7 +187,7 @@ impl BumpCommand {
                         "If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".".to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 io.write_error(
                     PhpMixed::String(format!(
@@ -194,7 +195,7 @@ impl BumpCommand {
                         dev_only_flag_hint
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         }
@@ -286,7 +287,7 @@ impl BumpCommand {
                         composer_json_path
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
@@ -296,7 +297,7 @@ impl BumpCommand {
                                 require_type, package, version
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                 }
@@ -307,7 +308,7 @@ impl BumpCommand {
                         composer_json_path, change_count
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         } else {
@@ -317,7 +318,7 @@ impl BumpCommand {
                     composer_json_path
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
+use crate::io::io_interface;
 use crate::util::silencer::Silencer;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -122,7 +123,7 @@ impl JsonFile {
                         io.write_error(
                             PhpMixed::String(format!("Reading {}{}", self.path, realpath_info)),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                 }

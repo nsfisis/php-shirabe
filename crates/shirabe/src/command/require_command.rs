@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/RequireCommand.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -136,7 +137,7 @@ impl RequireCommand {
                         .to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -148,7 +149,7 @@ impl RequireCommand {
                     self.file
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(1);
@@ -157,7 +158,7 @@ impl RequireCommand {
             io.write_error(
                 PhpMixed::String(format!("<error>{} is not readable.</error>", self.file)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(1);
@@ -186,7 +187,7 @@ impl RequireCommand {
                 SignalHandler::SIGHUP,
             ],
             Box::new(move |signal: String, handler: &SignalHandler| {
-                // TODO(phase-b): self.get_io().write_error('Received '.$signal.', aborting', true, IOInterface::DEBUG);
+                // TODO(phase-b): self.get_io().write_error('Received '.$signal.', aborting', true, io_interface::DEBUG);
                 // TODO(phase-b): self.revert_composer_file();
                 let _ = signal;
                 handler.exit_with_last_signal();
@@ -209,7 +210,7 @@ impl RequireCommand {
             io.write_error(
                 PhpMixed::String(format!("<error>{} is not writable.</error>", self.file)),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(1);
@@ -236,7 +237,7 @@ impl RequireCommand {
                             .to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
 
                 if !config.contains_key("type") {
@@ -246,7 +247,7 @@ impl RequireCommand {
                                 .to_string(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
 
@@ -425,7 +426,7 @@ impl RequireCommand {
                         &[PhpMixed::String(package.clone())],
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
 
                 return Ok(1);
@@ -544,7 +545,7 @@ impl RequireCommand {
                 }
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         if input.get_option("no-update").as_bool().unwrap_or(false) {
@@ -817,7 +818,7 @@ impl RequireCommand {
                 flags,
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "require", input, output);
@@ -888,7 +889,7 @@ impl RequireCommand {
                                 req.get("name").cloned().unwrap_or_default(),
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                         break;
                     }
@@ -955,7 +956,7 @@ impl RequireCommand {
                     ],
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             if Preg::is_match(
@@ -1107,7 +1108,7 @@ impl RequireCommand {
                     self.file
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             unlink(self.json.as_ref().unwrap().get_path());
             if file_exists(&self.lock) {
@@ -1125,7 +1126,7 @@ impl RequireCommand {
                     self.file, msg
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             file_put_contents(
                 self.json.as_ref().unwrap().get_path(),

@@ -4,6 +4,7 @@ use crate::dependency_resolver::operation::install_operation::InstallOperation;
 use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
 use crate::dependency_resolver::operation::update_operation::UpdateOperation;
 use crate::installer::installer_interface::InstallerInterface;
+use crate::io::io_interface;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
@@ -75,7 +76,7 @@ impl InstallerInterface for MetapackageInstaller {
         self.io.write_error(
             &format!("  - {}", InstallOperation::format(package, false)),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         repo.add_package(package.clone_box());
@@ -102,7 +103,7 @@ impl InstallerInterface for MetapackageInstaller {
         self.io.write_error(
             &format!("  - {}", UpdateOperation::format(initial, target, false)),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         repo.remove_package(initial);
@@ -129,7 +130,7 @@ impl InstallerInterface for MetapackageInstaller {
         self.io.write_error(
             &format!("  - {}", UninstallOperation::format(package, false)),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         repo.remove_package(package);

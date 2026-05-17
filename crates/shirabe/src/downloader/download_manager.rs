@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/DownloadManager.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -222,7 +223,7 @@ impl DownloadManager {
                         source,
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
             // TODO(phase-b): &mut on shared package — PHP mutates by reference
@@ -257,7 +258,7 @@ impl DownloadManager {
                                 e,
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
 
                         retry_state = true;
@@ -364,7 +365,7 @@ impl DownloadManager {
                     self.io.write_error(
                         PhpMixed::String(format!("<error>    Update failed ({})</error>", e,)),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     if !self.io.ask_confirmation(
                         "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ".to_string(),

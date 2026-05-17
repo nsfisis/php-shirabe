@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -483,7 +484,7 @@ impl ConfigCommand {
             self.inner.inner.get_io().write(
                 &format!("{}{}", value_str, source_of_config_value),
                 true,
-                IOInterface::QUIET,
+                io_interface::QUIET,
             );
 
             return Ok(0);
@@ -1364,7 +1365,7 @@ impl ConfigCommand {
                         source
                     ),
                     true,
-                    IOInterface::QUIET,
+                    io_interface::QUIET,
                 );
             } else {
                 io.write(
@@ -1377,7 +1378,7 @@ impl ConfigCommand {
                         source
                     ),
                     true,
-                    IOInterface::QUIET,
+                    io_interface::QUIET,
                 );
             }
         }

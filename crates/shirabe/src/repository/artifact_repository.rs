@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/ArtifactRepository.php
 
+use crate::io::io_interface;
 use std::path::Path;
 
 use indexmap::IndexMap;
@@ -111,7 +112,7 @@ impl ArtifactRepository {
                             basename
                         ),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                 }
                 Some(package) => {
@@ -123,7 +124,7 @@ impl ArtifactRepository {
                             basename,
                         ),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                     self.inner.add_package(package);
                 }
@@ -168,7 +169,7 @@ impl ArtifactRepository {
                 self.io.write(
                     &format!("Failed loading package {}: {}", pathname, exception),
                     false,
-                    IOInterface::VERBOSE,
+                    io_interface::VERBOSE,
                 );
             }
         }

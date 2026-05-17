@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/VcsRepository.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -397,7 +398,7 @@ impl VcsRepository {
                     PhpMixed::String(msg.clone()),
                     false,
                     None,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -556,7 +557,7 @@ impl VcsRepository {
                 PhpMixed::String(String::new()),
                 false,
                 None,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -592,7 +593,7 @@ impl VcsRepository {
                     PhpMixed::String(msg.clone()),
                     false,
                     None,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 
@@ -738,7 +739,7 @@ impl VcsRepository {
                 PhpMixed::String(String::new()),
                 false,
                 None,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -910,7 +911,7 @@ impl VcsRepository {
                     PhpMixed::String(msg.clone()),
                     false,
                     None,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
 

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitBitbucketDriver.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -843,8 +844,8 @@ impl GitBitbucketDriver {
                     url
                 ),
             );
-            // PHP: writeError(..., true, IOInterface::VERBOSE)
-            // TODO(phase-b): IOInterface::VERBOSE verbosity argument
+            // PHP: writeError(..., true, io_interface::VERBOSE)
+            // TODO(phase-b): io_interface::VERBOSE verbosity argument
 
             return false;
         }

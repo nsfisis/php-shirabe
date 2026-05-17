@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/Bitbucket.php
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, time};
 
@@ -117,33 +118,33 @@ impl Bitbucket {
                             "<error>Invalid OAuth consumer provided.</error>".to_string(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io.write_error(
                         PhpMixed::String("This can have three reasons:".to_string()),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io.write_error(
                             PhpMixed::String(
                                 "1. You are authenticating with a bitbucket username/password combination".to_string(),
                             ),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     self.io.write_error(
                             PhpMixed::String(
                                 "2. You are using an OAuth consumer, but didn't configure a (dummy) callback url".to_string(),
                             ),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     self.io.write_error(
                             PhpMixed::String(
                                 "3. You are using an OAuth consumer, but didn't configure it as private consumer".to_string(),
                             ),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     return Ok(false);
                 }
@@ -153,14 +154,14 @@ impl Bitbucket {
                             "<error>Invalid OAuth consumer provided.</error>".to_string(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io.write_error(
                             PhpMixed::String(
                                 "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"".to_string(),
                             ),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     return Ok(false);
                 }
@@ -203,8 +204,11 @@ impl Bitbucket {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io
-                .write_error(PhpMixed::String(msg.to_string()), true, IOInterface::NORMAL);
+            self.io.write_error(
+                PhpMixed::String(msg.to_string()),
+                true,
+                io_interface::NORMAL,
+            );
         }
 
         let local_auth_config = self.config.get_local_auth_config_source();
@@ -213,10 +217,13 @@ impl Bitbucket {
         self.io.write_error(
             PhpMixed::String("Follow the instructions here:".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
-        self.io
-            .write_error(PhpMixed::String(url.to_string()), true, IOInterface::NORMAL);
+        self.io.write_error(
+            PhpMixed::String(url.to_string()),
+            true,
+            io_interface::NORMAL,
+        );
         let auth_config_source_name = self.config.get_auth_config_source().get_name();
         let local_name_prefix = local_auth_config
             .as_ref()
@@ -228,14 +235,14 @@ impl Bitbucket {
                 local_name_prefix + &auth_config_source_name
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String(
                 "Ensure you enter a \"Callback URL\" (http://example.com is fine) or it will not be possible to create an Access Token (this callback url will not be used by composer)".to_string(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut store_in_local_auth_config = false;
@@ -258,14 +265,14 @@ impl Bitbucket {
             self.io.write_error(
                 PhpMixed::String("<warning>No consumer key given, aborting.</warning>".to_string()),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             self.io.write_error(
                 PhpMixed::String(
                     "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             return Ok(false);
         }
@@ -283,14 +290,14 @@ impl Bitbucket {
                     "<warning>No consumer secret given, aborting.</warning>".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             self.io.write_error(
                 PhpMixed::String(
                     "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"".to_string(),
                 ),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             return Ok(false);
         }
@@ -332,7 +339,7 @@ impl Bitbucket {
         self.io.write_error(
             PhpMixed::String("<info>Consumer stored successfully.</info>".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         Ok(true)

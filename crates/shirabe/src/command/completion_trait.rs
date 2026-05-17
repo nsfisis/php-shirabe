@@ -6,7 +6,7 @@ use crate::package::package_interface::PackageInterface;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::repository::repository_interface::{self, RepositoryInterface};
 use crate::repository::root_package_repository::RootPackageRepository;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
@@ -179,7 +179,7 @@ pub trait CompletionTrait {
             if !input.get_completion_value().contains('/') {
                 let search_results = repos.search(
                     format!("^{}", preg_quote(input.get_completion_value(), None)),
-                    RepositoryInterface::SEARCH_VENDOR,
+                    repository_interface::SEARCH_VENDOR,
                     None,
                 );
                 results = search_results.iter().map(|r| r.name.clone()).collect();
@@ -192,7 +192,7 @@ pub trait CompletionTrait {
             if results.len() <= 1 {
                 let search_results = repos.search(
                     format!("^{}", preg_quote(input.get_completion_value(), None)),
-                    RepositoryInterface::SEARCH_NAME,
+                    repository_interface::SEARCH_NAME,
                     None,
                 );
                 results = search_results.iter().map(|r| r.name.clone()).collect();

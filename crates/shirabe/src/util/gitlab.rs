@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/GitLab.php
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException, http_build_query, json_decode, time};
@@ -167,8 +168,11 @@ impl GitLab {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io
-                .write_error(PhpMixed::String(msg.to_string()), true, IOInterface::NORMAL);
+            self.io.write_error(
+                PhpMixed::String(msg.to_string()),
+                true,
+                io_interface::NORMAL,
+            );
         }
 
         let local_auth_config = self.config.get_local_auth_config_source();
@@ -187,44 +191,44 @@ impl GitLab {
                     + &self.config.get_auth_config_source().get_name()
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String("To revoke access to this token you can visit:".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String(revoke_link.clone()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String(
                 "Alternatively you can setup an personal access token on:".to_string(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String(personal_access_token_link.clone()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String("and store it under \"gitlab-token\" see https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token for more details.".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String("https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             PhpMixed::String("for more details.".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut store_in_local_auth_config = false;
@@ -260,32 +264,32 @@ impl GitLab {
                                     self.io.write_error(
                                         PhpMixed::String("Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token".to_string()),
                                         true,
-                                        IOInterface::NORMAL,
+                                        io_interface::NORMAL,
                                     );
                                 } else {
                                     self.io.write_error(
                                         PhpMixed::String("Bad credentials.".to_string()),
                                         true,
-                                        IOInterface::NORMAL,
+                                        io_interface::NORMAL,
                                     );
                                 }
                             } else {
                                 self.io.write_error(
                                     PhpMixed::String("Maximum number of login attempts exceeded. Please try again later.".to_string()),
                                     true,
-                                    IOInterface::NORMAL,
+                                    io_interface::NORMAL,
                                 );
                             }
 
                             self.io.write_error(
                                 PhpMixed::String("You can also manually create a personal access token enabling the \"read_api\" scope at:".to_string()),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
                             self.io.write_error(
                                 PhpMixed::String(personal_access_token_link.clone()),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
                             self.io.write_error(
                                 PhpMixed::String(format!(
@@ -293,7 +297,7 @@ impl GitLab {
                                     origin_url
                                 )),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
 
                             continue;
@@ -374,7 +378,7 @@ impl GitLab {
                     self.io.write_error(
                         PhpMixed::String(format!("Couldn't refresh access token: {}", te.message)),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     return Ok(false);
                 }
@@ -459,7 +463,7 @@ impl GitLab {
         self.io.write_error(
             PhpMixed::String("Token successfully created".to_string()),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         Ok(token)
@@ -548,7 +552,7 @@ impl GitLab {
         self.io.write_error(
             PhpMixed::String("GitLab token successfully refreshed".to_string()),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
         self.io.write_error(
             PhpMixed::String(format!(
@@ -556,7 +560,7 @@ impl GitLab {
                 scheme, origin_url
             )),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
 
         Ok(token)

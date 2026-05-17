@@ -30,7 +30,7 @@ use crate::partial_composer::PartialComposer;
 use crate::plugin::capability::capability::Capability;
 use crate::plugin::capable::Capable;
 use crate::plugin::plugin_blocked_exception::PluginBlockedException;
-use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::repository_utils::RepositoryUtils;
@@ -347,7 +347,7 @@ impl PluginManager {
 
     /// Returns the version of the internal composer-plugin-api package.
     pub(crate) fn get_plugin_api_version(&self) -> String {
-        PluginInterface::PLUGIN_API_VERSION.to_string()
+        plugin_interface::PLUGIN_API_VERSION.to_string()
     }
 
     /// Adds a plugin, activates it and registers it with the event dispatcher

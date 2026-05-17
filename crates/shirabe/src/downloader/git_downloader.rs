@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Downloader/GitDownloader.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -89,7 +90,7 @@ impl GitDownloader {
                     package.get_full_pretty_version(),
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             self.inner.io.write_error(
                 PhpMixed::String(sprintf(
@@ -97,7 +98,7 @@ impl GitDownloader {
                     &[PhpMixed::String(cache_path.clone())],
                 )),
                 true,
-                IOInterface::DEBUG,
+                io_interface::DEBUG,
             );
             let r#ref = package.get_source_reference();
             if self.git_util.fetch_ref_or_sync_mirror(
@@ -251,7 +252,7 @@ impl GitDownloader {
 
         self.inner
             .io
-            .write_error(PhpMixed::String(msg), true, IOInterface::NORMAL);
+            .write_error(PhpMixed::String(msg), true, io_interface::NORMAL);
 
         self.git_util.run_commands(commands, url, &path, true);
 
@@ -335,7 +336,7 @@ impl GitDownloader {
 
         self.inner
             .io
-            .write_error(PhpMixed::String(msg), true, IOInterface::NORMAL);
+            .write_error(PhpMixed::String(msg), true, io_interface::NORMAL);
 
         let mut output = String::new();
         if self.inner.process.execute(
@@ -694,7 +695,7 @@ impl GitDownloader {
                 package.get_pretty_name()
             )),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
         self.inner.io.write_error(
@@ -705,7 +706,7 @@ impl GitDownloader {
                     .collect(),
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         if (changes.len() as i64) > 10 {
             self.inner.io.write_error(
@@ -714,7 +715,7 @@ impl GitDownloader {
                     changes.len() as i64 - 10
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
         }
 
@@ -762,7 +763,7 @@ impl GitDownloader {
                                 .collect(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
                 Some("d") => {
@@ -792,7 +793,7 @@ impl GitDownloader {
                         )),
                     ]),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 if update {
                     self.inner.io.write_error(
@@ -801,13 +802,13 @@ impl GitDownloader {
                                 .to_string(),
                         ),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
                 self.inner.io.write_error(
                     PhpMixed::String("    ? - print help".to_string()),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         }
@@ -827,7 +828,7 @@ impl GitDownloader {
             self.inner.io.write_error(
                 PhpMixed::String("    <info>Re-applying stashed changes</info>".to_string()),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             let mut output = String::new();
             if self.inner.process.execute(
@@ -1058,7 +1059,7 @@ impl GitDownloader {
                     reference
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             exception_extra = format!(
                 "\nIt looks like the commit hash is not available in the repository, maybe {}? Run \"composer update {}\" to resolve this.",
@@ -1249,7 +1250,7 @@ impl GitDownloader {
 
         self.inner
             .io
-            .write_error(PhpMixed::String(output), true, IOInterface::NORMAL);
+            .write_error(PhpMixed::String(output), true, io_interface::NORMAL);
     }
 
     pub(crate) fn normalize_path(&self, path: &str) -> String {

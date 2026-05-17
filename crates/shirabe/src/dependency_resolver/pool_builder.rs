@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolBuilder.php
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -1042,7 +1043,7 @@ impl PoolBuilder {
                 &[(microtime(true) - before).into()],
             ),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
         self.io.write_with_verbosity(
             &sprintf(
@@ -1054,7 +1055,7 @@ impl PoolBuilder {
                 ],
             ),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
 
         pool
@@ -1093,7 +1094,7 @@ impl PoolBuilder {
                 &[(microtime(true) - before).into()],
             ),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
         self.io.write_with_verbosity(
             &sprintf(
@@ -1105,7 +1106,7 @@ impl PoolBuilder {
                 ],
             ),
             true,
-            IOInterface::VERY_VERBOSE,
+            io_interface::VERY_VERBOSE,
         );
 
         pool

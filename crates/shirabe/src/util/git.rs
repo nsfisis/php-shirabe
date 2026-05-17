@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/Git.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::Mutex;
@@ -75,7 +76,7 @@ impl Git {
                     io.write_error(
                         PhpMixed::String(format!("<warning>{}</warning>", msg)),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
             }
@@ -540,7 +541,7 @@ impl Git {
                             .to_string(),
                     ),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 if run_commands_inline(
                     &ssh_url,
@@ -679,12 +680,12 @@ impl Git {
                             m2
                         )),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io.write_error(
                         PhpMixed::String(format!("<warning>{}</warning>", trim(&error_msg, None))),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                     let mut auth_map: IndexMap<String, Option<String>> = IndexMap::new();
                     auth_map.insert(
@@ -792,7 +793,7 @@ impl Git {
                     url
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
 
             return Ok(false);
@@ -857,7 +858,7 @@ impl Git {
                 self.io.write_error(
                     PhpMixed::String(format!("<error>Sync mirror failed: {}</error>", e)),
                     true,
-                    IOInterface::DEBUG,
+                    io_interface::DEBUG,
                 );
 
                 return Ok(false);
@@ -1173,7 +1174,7 @@ impl Git {
                         e
                     )),
                     true,
-                    IOInterface::DEBUG,
+                    io_interface::DEBUG,
                 );
                 None
             }

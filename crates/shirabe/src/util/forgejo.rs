@@ -2,6 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
+use crate::io::io_interface;
 use crate::io::io_interface::IOInterface;
 use crate::util::http_downloader::HttpDownloader;
 
@@ -28,16 +29,16 @@ impl Forgejo {
         message: Option<&str>,
     ) -> anyhow::Result<Result<bool, TransportException>> {
         if let Some(message) = message {
-            self.io.write_error(message, true, IOInterface::NORMAL);
+            self.io.write_error(message, true, io_interface::NORMAL);
         }
 
         let url = format!("https://{}/user/settings/applications", origin_url);
         self.io.write_error(
             "Setup a personal access token with repository:read permissions on:",
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
-        self.io.write_error(&url, true, IOInterface::NORMAL);
+        self.io.write_error(&url, true, io_interface::NORMAL);
         let local_auth_config = self.config.get_local_auth_config_source();
         self.io.write_error(
             &format!(
@@ -49,12 +50,12 @@ impl Forgejo {
                     + self.config.get_auth_config_source().get_name()
             ),
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
         self.io.write_error(
             "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#forgejo-token",
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         let mut store_in_local_auth_config = false;
@@ -80,10 +81,10 @@ impl Forgejo {
             self.io.write_error(
                 "<warning>No username/token given, aborting.</warning>",
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             self.io
-                .write_error(&add_token_manually, true, IOInterface::NORMAL);
+                .write_error(&add_token_manually, true, io_interface::NORMAL);
 
             return Ok(Ok(false));
         }
@@ -103,10 +104,10 @@ impl Forgejo {
                     self.io.write_error(
                         "<error>Invalid access token provided.</error>",
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                     self.io
-                        .write_error(&add_token_manually, true, IOInterface::NORMAL);
+                        .write_error(&add_token_manually, true, io_interface::NORMAL);
 
                     return Ok(Ok(false));
                 }
@@ -138,7 +139,7 @@ impl Forgejo {
         self.io.write_error(
             "<info>Token stored successfully.</info>",
             true,
-            IOInterface::NORMAL,
+            io_interface::NORMAL,
         );
 
         Ok(Ok(true))

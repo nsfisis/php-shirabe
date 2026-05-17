@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/FossilDriver.php
 
+use crate::io::io_interface;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -133,7 +134,7 @@ impl FossilDriver {
                         self.inner.process.get_error_output()
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
             }
         } else {

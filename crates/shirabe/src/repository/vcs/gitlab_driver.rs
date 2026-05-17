@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/GitLabDriver.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
@@ -684,7 +685,7 @@ impl GitLabDriver {
                         url
                     )),
                     true,
-                    IOInterface::NORMAL,
+                    io_interface::NORMAL,
                 );
                 Err(e)
             }
@@ -785,7 +786,7 @@ impl GitLabDriver {
                                         .to_string(),
                                 ),
                                 true,
-                                IOInterface::NORMAL,
+                                io_interface::NORMAL,
                             );
 
                             self.attempt_clone_fallback()
@@ -887,7 +888,7 @@ impl GitLabDriver {
                                 self.namespace, self.repository, e.message
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                         git_lab_util.authorize_oauth_interactively(
                             &self.scheme,
@@ -969,7 +970,7 @@ impl GitLabDriver {
                     url
                 )),
                 true,
-                IOInterface::VERBOSE,
+                io_interface::VERBOSE,
             );
 
             return false;

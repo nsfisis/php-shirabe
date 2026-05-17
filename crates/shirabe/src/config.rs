@@ -3,6 +3,7 @@
 pub mod config_source_interface;
 pub mod json_config_source;
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -1170,7 +1171,7 @@ impl Config {
                                 scheme.as_deref().unwrap_or("")
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                     }
                     self.warned_hosts.insert(hostname.clone(), true);
@@ -1212,7 +1213,7 @@ impl Config {
                                 hostname, w
                             )),
                             true,
-                            IOInterface::NORMAL,
+                            io_interface::NORMAL,
                         );
                         self.ssl_verify_warned_hosts.insert(hostname.clone(), true);
                     }

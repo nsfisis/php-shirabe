@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Installer/InstallationManager.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise;
@@ -414,7 +415,7 @@ impl InstallationManager {
                     self.io.write_error(
                         PhpMixed::String(format!("  - {}", operation.show(false))),
                         true,
-                        IOInterface::NORMAL,
+                        io_interface::NORMAL,
                     );
                 }
                 // PHP: $this->{$opType}($repo, $operation);
@@ -532,7 +533,7 @@ impl InstallationManager {
             // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
             if !self.io.is_decorated() {
                 self.io
-                    .write_error(PhpMixed::String(String::new()), true, IOInterface::NORMAL);
+                    .write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
             }
         }
     }

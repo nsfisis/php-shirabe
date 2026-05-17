@@ -15,6 +15,7 @@ pub mod plugin_installer;
 pub mod project_installer;
 pub mod suggested_packages_reporter;
 
+use crate::io::io_interface;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
@@ -542,7 +543,7 @@ impl Installer {
                     }
                 ),
                 true,
-                IOInterface::QUIET,
+                io_interface::QUIET,
             );
 
             return Ok(Self::ERROR_NO_LOCK_FILE_FOR_PARTIAL_UPDATE);
@@ -618,14 +619,14 @@ impl Installer {
                     self.io.write_error(
                         &format!("<error>{}</error>", err),
                         true,
-                        IOInterface::QUIET,
+                        io_interface::QUIET,
                     );
                     self.io.write_error(&pretty_problem);
                     if !self.dev_mode {
                         self.io.write_error(
                             "<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>",
                             true,
-                            IOInterface::QUIET,
+                            io_interface::QUIET,
                         );
                     }
 
@@ -645,12 +646,12 @@ impl Installer {
                 count(&pool.as_ref().unwrap())
             ),
             true,
-            IOInterface::VERBOSE,
+            io_interface::VERBOSE,
         );
         self.io.write_error(
             &format!("Analyzed {} rules to resolve dependencies", rule_set_size),
             true,
-            IOInterface::VERBOSE,
+            io_interface::VERBOSE,
         );
 
         pool = None;
@@ -735,21 +736,21 @@ impl Installer {
                     self.io.write_error(
                         &format!("Installs: {}", implode(", ", &install_names)),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
                     self.io.write_error(
                         &format!("Updates: {}", implode(", ", &update_names)),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error(
                         &format!("Removals: {}", implode(", ", &uninstall_names)),
                         true,
-                        IOInterface::VERBOSE,
+                        io_interface::VERBOSE,
                     );
                 }
             }
@@ -890,7 +891,7 @@ impl Installer {
                     self.io.write_error(
                         &format!("<error>{}</error>", err),
                         true,
-                        IOInterface::QUIET,
+                        io_interface::QUIET,
                     );
                     self.io.write_error("Your requirements can be resolved successfully when require-dev packages are present.");
                     self.io.write_error("You may need to move packages from require-dev or some of their dependencies to require.");
@@ -960,7 +961,7 @@ impl Installer {
                 self.io.write_error(
                     "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.</warning>",
                     true,
-                    IOInterface::QUIET,
+                    io_interface::QUIET,
                 );
             }
 
@@ -1028,7 +1029,7 @@ impl Installer {
                         self.io.write_error(
                             "<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>",
                             true,
-                            IOInterface::QUIET,
+                            io_interface::QUIET,
                         );
 
                         return Ok(Self::ERROR_LOCK_FILE_INVALID);
@@ -1048,7 +1049,7 @@ impl Installer {
                         self.io.write_error(
                             &format!("<error>{}</error>", err),
                             true,
-                            IOInterface::QUIET,
+                            io_interface::QUIET,
                         );
                         self.io.write_error(&pretty_problem);
 
@@ -1111,21 +1112,21 @@ impl Installer {
                 self.io.write_error(
                     &format!("Installs: {}", implode(", ", &installs)),
                     true,
-                    IOInterface::VERBOSE,
+                    io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error(
                     &format!("Updates: {}", implode(", ", &updates)),
                     true,
-                    IOInterface::VERBOSE,
+                    io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error(
                     &format!("Removals: {}", implode(", ", &uninstalls)),
                     true,
-                    IOInterface::VERBOSE,
+                    io_interface::VERBOSE,
                 );
             }
         }
@@ -1489,7 +1490,7 @@ impl Installer {
             self.io.write(
                 "Pool Optimizer was disabled for debugging purposes.",
                 true,
-                IOInterface::DEBUG,
+                io_interface::DEBUG,
             );
 
             return None;

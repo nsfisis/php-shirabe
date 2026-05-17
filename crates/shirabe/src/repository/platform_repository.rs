@@ -160,7 +160,7 @@ impl PlatformRepository {
         composer.set_description("Composer package".to_string());
         self.add_package(Box::new(composer))?;
 
-        pretty_version = <dyn PluginInterface>::PLUGIN_API_VERSION.to_string();
+        pretty_version = plugin_interface::PLUGIN_API_VERSION.to_string();
         version = self
             .version_parser
             .as_ref()

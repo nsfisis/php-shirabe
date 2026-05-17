@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/AuthHelper.php
 
+use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -157,7 +158,7 @@ impl AuthHelper {
                     sso_url,
                 );
                 self.io
-                    .write_error(PhpMixed::String(message), true, IOInterface::NORMAL);
+                    .write_error(PhpMixed::String(message), true, io_interface::NORMAL);
                 if !self.io.is_interactive() {
                     return Err(TransportException::new(
                         format!("Could not authenticate against {}", origin),
@@ -448,7 +449,7 @@ impl AuthHelper {
                     origin,
                 )),
                 true,
-                IOInterface::NORMAL,
+                io_interface::NORMAL,
             );
             let username = self.io.ask("      Username: ".to_string(), PhpMixed::Null);
             let password = self.io.ask_and_hide_answer("      Password: ".to_string());
@@ -671,7 +672,7 @@ impl AuthHelper {
                     self.io.write_error(
                         PhpMixed::String(display_message.clone()),
                         true,
-                        IOInterface::DEBUG,
+                        io_interface::DEBUG,
                     );
                     self.displayed_origin_authentications
                         .insert(origin.to_string(), display_message.clone());
