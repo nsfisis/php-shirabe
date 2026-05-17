@@ -2642,7 +2642,15 @@ impl ShowCommand {
     }
 }
 
-impl CompletionTrait for ShowCommand {}
+impl CompletionTrait for ShowCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl BaseCommand for ShowCommand {
     fn inner(&self) -> &Command {

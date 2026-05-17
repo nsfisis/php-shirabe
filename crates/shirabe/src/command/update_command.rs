@@ -45,7 +45,15 @@ pub struct UpdateCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for UpdateCommand {}
+impl CompletionTrait for UpdateCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl UpdateCommand {
     pub fn configure(&mut self) {

@@ -25,7 +25,15 @@ pub struct InstallCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for InstallCommand {}
+impl CompletionTrait for InstallCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl InstallCommand {
     pub fn configure(&mut self) {

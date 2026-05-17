@@ -32,7 +32,15 @@ pub struct ReinstallCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for ReinstallCommand {}
+impl CompletionTrait for ReinstallCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl ReinstallCommand {
     pub fn configure(&mut self) {

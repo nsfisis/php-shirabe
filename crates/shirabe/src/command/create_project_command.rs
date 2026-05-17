@@ -57,7 +57,15 @@ pub struct CreateProjectCommand {
     pub(crate) suggested_packages_reporter: Option<SuggestedPackagesReporter>,
 }
 
-impl CompletionTrait for CreateProjectCommand {}
+impl CompletionTrait for CreateProjectCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl CreateProjectCommand {
     fn configure(&mut self) {

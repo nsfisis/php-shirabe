@@ -13,10 +13,22 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct ProhibitsCommand {
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     colors: Vec<String>,
 }
 
-impl CompletionTrait for ProhibitsCommand {}
+impl CompletionTrait for ProhibitsCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl ProhibitsCommand {
     pub fn configure(&mut self) {

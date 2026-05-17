@@ -21,7 +21,15 @@ pub struct OutdatedCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for OutdatedCommand {}
+impl CompletionTrait for OutdatedCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl OutdatedCommand {
     pub fn configure(&mut self) {

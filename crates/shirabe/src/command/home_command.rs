@@ -26,7 +26,15 @@ pub struct HomeCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for HomeCommand {}
+impl CompletionTrait for HomeCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl HomeCommand {
     pub fn configure(&mut self) {

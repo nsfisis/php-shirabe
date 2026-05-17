@@ -31,7 +31,15 @@ pub struct BumpCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for BumpCommand {}
+impl CompletionTrait for BumpCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl BumpCommand {
     const ERROR_GENERIC: i64 = 1;

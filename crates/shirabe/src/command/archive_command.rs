@@ -39,7 +39,15 @@ pub struct ArchiveCommand {
     io: Option<Box<dyn IOInterface>>,
 }
 
-impl CompletionTrait for ArchiveCommand {}
+impl CompletionTrait for ArchiveCommand {
+    fn require_composer(
+        &self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Composer {
+        todo!()
+    }
+}
 
 impl ArchiveCommand {
     const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
