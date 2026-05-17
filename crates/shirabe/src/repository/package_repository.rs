@@ -12,7 +12,7 @@ use crate::repository::array_repository::ArrayRepository;
 use crate::repository::invalid_repository_exception::InvalidRepositoryException;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_php_shim::{Exception, PhpMixed};
+use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 #[derive(Debug)]

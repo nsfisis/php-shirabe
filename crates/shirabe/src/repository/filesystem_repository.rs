@@ -6,11 +6,12 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL, Silencer,
-    UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
-    get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir, realpath, sort,
-    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
+    InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL, UnexpectedValueException,
+    array_flip, dirname, r#eval, file_get_contents, get_class, get_debug_type, in_array, is_array,
+    is_int, is_null, is_string, ksort, php_dir, realpath, sort, sort_with_flags, str_repeat, strtr,
+    trim, usort, var_export,
 };
+use crate::util::silencer::Silencer;
 
 use crate::installed_versions::InstalledVersions;
 use crate::installer::installation_manager::InstallationManager;

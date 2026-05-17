@@ -8,11 +8,12 @@ use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingExcept
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_ERROR_CTRL_CHAR, JSON_ERROR_DEPTH, JSON_ERROR_NONE,
     JSON_ERROR_STATE_MISMATCH, JSON_ERROR_UTF8, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
-    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, Silencer, UnexpectedValueException,
-    defined, dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file,
-    json_decode, json_encode_ex, json_last_error, mkdir, php_dir, realpath, str_contains,
-    str_ends_with, str_repeat, strlen, strpos, usleep,
+    JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, UnexpectedValueException, defined, dirname,
+    file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode, json_encode_ex,
+    json_last_error, mkdir, php_dir, realpath, str_contains, str_ends_with, str_repeat, strlen,
+    strpos, usleep,
 };
+use crate::util::silencer::Silencer;
 
 use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;

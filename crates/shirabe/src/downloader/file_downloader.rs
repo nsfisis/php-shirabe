@@ -8,11 +8,11 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 use shirabe_external_packages::react::promise::resolve as react_promise_resolve;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
-    PHP_URL_PATH, PhpMixed, RuntimeException, Silencer, UnexpectedValueException, array_search,
-    array_shift, file_exists, filesize, get_class, hash, hash_file, in_array, is_dir,
-    is_executable, parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr,
-    trim, umask, usleep,
+    PHP_URL_PATH, PhpMixed, RuntimeException, UnexpectedValueException, array_search, array_shift,
+    file_exists, filesize, get_class, hash, hash_file, in_array, is_dir, is_executable, parse_url,
+    pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
+use crate::util::silencer::Silencer;
 
 use crate::cache::Cache;
 use crate::config::Config;

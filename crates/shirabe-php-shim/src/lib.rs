@@ -1780,3 +1780,256 @@ pub fn is_readable(path: &str) -> bool {
 pub fn stream_get_wrappers() -> Vec<String> {
     todo!()
 }
+
+pub fn php_require(file: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn intval(value: &PhpMixed) -> i64 {
+    todo!()
+}
+
+#[derive(Debug)]
+pub struct RecursiveDirectoryIterator;
+
+impl RecursiveDirectoryIterator {
+    pub const SKIP_DOTS: i64 = 4096;
+    pub const FOLLOW_SYMLINKS: i64 = 512;
+}
+
+#[derive(Debug)]
+pub struct RecursiveIteratorIterator;
+
+impl RecursiveIteratorIterator {
+    pub const SELF_FIRST: i64 = 0;
+    pub const CHILD_FIRST: i64 = 16;
+}
+
+pub fn recursive_directory_iterator(path: &str, flags: i64) -> RecursiveDirectoryIterator {
+    todo!()
+}
+
+pub fn recursive_iterator_iterator(
+    iter: RecursiveDirectoryIterator,
+    mode: i64,
+) -> RecursiveIteratorIterator {
+    todo!()
+}
+
+pub fn globals_get(name: &str) -> PhpMixed {
+    todo!()
+}
+
+pub fn globals_set(name: &str, value: PhpMixed) {
+    todo!()
+}
+
+pub fn clone<T: Clone>(value: T) -> T {
+    todo!()
+}
+
+pub fn date_default_timezone_get() -> String {
+    todo!()
+}
+
+pub fn date_default_timezone_set(tz: &str) -> bool {
+    todo!()
+}
+
+pub fn getmypid() -> i64 {
+    todo!()
+}
+
+pub fn ini_set(varname: &str, value: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn is_subclass_of(object_or_class: &PhpMixed, class_name: &str, allow_string: bool) -> bool {
+    todo!()
+}
+
+pub fn memory_get_peak_usage(real_usage: bool) -> i64 {
+    todo!()
+}
+
+pub fn register_shutdown_function(callback: Box<dyn Fn()>) {
+    todo!()
+}
+
+pub fn round(value: f64, precision: i64) -> f64 {
+    todo!()
+}
+
+pub fn stdin_handle() -> PhpMixed {
+    todo!()
+}
+
+pub fn composer_dev_warning_time() -> i64 {
+    todo!()
+}
+
+pub fn instantiate_class(class: &str, args: Vec<PhpMixed>) -> PhpMixed {
+    todo!()
+}
+
+pub fn array_filter_use_key(
+    array: &IndexMap<String, PhpMixed>,
+    callback: Box<dyn Fn(&str) -> bool>,
+) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+
+pub fn escapeshellcmd(command: &str) -> String {
+    todo!()
+}
+
+pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
+    todo!()
+}
+
+pub fn array_chunk<T: Clone>(array: &[T], size: i64, preserve_keys: bool) -> Vec<Vec<T>> {
+    todo!()
+}
+
+pub fn number_format(
+    number: f64,
+    decimals: i64,
+    decimal_separator: &str,
+    thousands_separator: &str,
+) -> String {
+    todo!()
+}
+
+pub fn is_executable(path: &str) -> bool {
+    todo!()
+}
+
+pub fn gc_collect_cycles() -> i64 {
+    todo!()
+}
+
+pub fn gc_disable() {
+    todo!()
+}
+
+pub fn gc_enable() {
+    todo!()
+}
+
+pub fn addcslashes(string: &str, charlist: &str) -> String {
+    todo!()
+}
+
+pub fn strnatcmp(s1: &str, s2: &str) -> i64 {
+    todo!()
+}
+
+pub fn uksort<V, F>(array: &mut IndexMap<String, V>, callback: F)
+where
+    F: FnMut(&str, &str) -> i64,
+{
+    todo!()
+}
+
+pub fn end<V: Clone>(array: &[V]) -> Option<V> {
+    todo!()
+}
+
+pub fn fileatime(filename: &str) -> Option<i64> {
+    todo!()
+}
+
+pub fn fread(handle: PhpMixed, length: i64) -> Option<String> {
+    todo!()
+}
+
+pub fn lstat(filename: &str) -> Option<IndexMap<String, Box<PhpMixed>>> {
+    todo!()
+}
+
+pub fn react_promise_resolve(value: PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn symlink(target: &str, link: &str) -> bool {
+    todo!()
+}
+
+pub fn array_diff_key(
+    array1: IndexMap<String, PhpMixed>,
+    array2: &IndexMap<String, PhpMixed>,
+) -> IndexMap<String, PhpMixed> {
+    todo!()
+}
+
+pub fn min(a: i64, b: i64) -> i64 {
+    todo!()
+}
+
+pub fn escapeshellarg(arg: &str) -> String {
+    todo!()
+}
+
+pub fn strcspn(string: &str, characters: &str) -> usize {
+    todo!()
+}
+
+pub fn strstr(haystack: &str, needle: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn ioncube_loader_iversion() -> i64 {
+    todo!()
+}
+
+pub fn ioncube_loader_version() -> String {
+    todo!()
+}
+
+pub fn phpinfo(what: i64) {
+    todo!()
+}
+
+pub fn opendir(path: &str) -> Option<PhpMixed> {
+    todo!()
+}
+
+pub fn stream_copy_to_stream(source: PhpMixed, dest: PhpMixed) -> Option<i64> {
+    todo!()
+}
+
+pub const SKIP_DOTS: i64 = 4096;
+pub const CHILD_FIRST: i64 = 16;
+pub const SELF_FIRST: i64 = 0;
+pub const CURL_VERSION_ZSTD: i64 = 8388608;
+pub const INFO_GENERAL: i64 = 1;
+pub const OPENSSL_VERSION_NUMBER: i64 = 0;
+pub const OPENSSL_VERSION_TEXT: &str = "";
+pub const PHP_BINARY: &str = "";
+pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
+pub const DATE_RFC3339: &str = "Y-m-d\\TH:i:sP";
+pub const PREG_BACKTRACK_LIMIT_ERROR: i64 = 2;
+
+#[derive(Debug)]
+pub struct ArrayObject {
+    data: IndexMap<String, Box<PhpMixed>>,
+}
+
+impl ArrayObject {
+    pub fn new(array: Option<PhpMixed>) -> Self {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct JsonObject {
+    data: IndexMap<String, Box<PhpMixed>>,
+}
+
+#[derive(Debug)]
+pub struct StdClass {
+    pub data: IndexMap<String, Box<PhpMixed>>,
+}
+
+#[derive(Debug)]
+pub struct PhpResource;
