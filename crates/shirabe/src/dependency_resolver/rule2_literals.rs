@@ -4,10 +4,11 @@ use shirabe_php_shim::PhpMixed;
 
 use crate::dependency_resolver::generic_rule::RuleLiterals;
 use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::{ReasonData, Rule};
+use crate::dependency_resolver::rule::{ReasonData, Rule, RuleBase};
 
 #[derive(Debug)]
 pub struct Rule2Literals {
+    inner: RuleBase,
     pub(crate) literal1: i64,
     pub(crate) literal2: i64,
     literals: Vec<i64>,
@@ -27,7 +28,7 @@ impl Rule2Literals {
         };
 
         Self {
-            inner: Rule::new(reason, reason_data),
+            inner: RuleBase::new(reason, reason_data),
             literal1,
             literal2,
             literals: vec![literal1, literal2],

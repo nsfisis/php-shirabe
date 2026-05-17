@@ -1,18 +1,19 @@
 //! ref: composer/src/Composer/DependencyResolver/GenericRule.php
 
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::rule::{Rule, RuleBase};
 use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, implode, unpack};
 
 use super::{request::Request, rule::ReasonData};
 
 pub struct GenericRule {
+    inner: RuleBase,
     pub(crate) literals: Vec<i64>,
 }
 
 impl GenericRule {
     pub fn new(mut literals: Vec<i64>, reason: PhpMixed, reason_data: PhpMixed) -> Self {
-        let inner = Rule::new(reason, reason_data);
+        let inner = RuleBase::new(reason, reason_data);
         literals.sort();
         Self { inner, literals }
     }

@@ -4,12 +4,13 @@ use shirabe_php_shim::PhpMixed;
 
 use crate::dependency_resolver::generic_rule::RuleLiterals;
 use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::{ReasonData, Rule};
+use crate::dependency_resolver::rule::{ReasonData, Rule, RuleBase};
 use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
+    inner: RuleBase,
     pub(crate) literals: Vec<i64>,
 }
 
@@ -31,7 +32,7 @@ impl MultiConflictRule {
         literals.sort();
 
         Ok(Self {
-            inner: Rule::new(reason, reason_data),
+            inner: RuleBase::new(reason, reason_data),
             literals,
         })
     }

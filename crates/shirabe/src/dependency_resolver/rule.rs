@@ -67,21 +67,6 @@ pub trait Rule: std::fmt::Display {
     fn equals(&self, rule: &dyn Rule) -> bool;
     fn is_assertion(&self) -> bool;
 
-    /// @param self::RULE_* $reason     A RULE_* constant describing the reason for generating this rule
-    /// @param mixed        $reasonData
-    ///
-    /// @phpstan-param ReasonData $reasonData
-    fn new(reason: i64, reason_data: ReasonData) -> Self {
-        let bitfield = (0i64 << Self::BITFIELD_DISABLED)
-            | (reason << Self::BITFIELD_REASON)
-            | (255i64 << Self::BITFIELD_TYPE);
-        Self {
-            bitfield,
-            request: None,
-            reason_data,
-        }
-    }
-
     /// @return self::RULE_*
     fn get_reason(&self) -> i64 {
         (self.bitfield & (255 << Self::BITFIELD_REASON)) >> Self::BITFIELD_REASON
@@ -678,5 +663,24 @@ pub trait Rule: std::fmt::Display {
         }
 
         package
+    }
+}
+
+pub struct RuleBase {
+    bitfield: i64,
+    request: Option<Request>,
+    reason_data: Option<ReasonData>,
+}
+
+impl RuleBase {
+    fn new(reason: i64, reason_data: ReasonData) -> Self {
+        let bitfield = (0i64 << Self::BITFIELD_DISABLED)
+            | (reason << Self::BITFIELD_REASON)
+            | (255i64 << Self::BITFIELD_TYPE);
+        Self {
+            bitfield,
+            request: None,
+            reason_data: Some(reason_data),
+        }
     }
 }
