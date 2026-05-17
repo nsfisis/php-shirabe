@@ -64,7 +64,6 @@ pub trait Rule: std::fmt::Display {
 
     fn get_literals(&self) -> Vec<i64>;
     fn get_hash(&self) -> PhpMixed;
-    fn to_string(&self) -> String;
     fn equals(&self, rule: &dyn Rule) -> bool;
     fn is_assertion(&self) -> bool;
 

@@ -4,11 +4,11 @@ use shirabe_external_packages::symfony::component::console::command::command::Co
 
 use crate::command::base_command::BaseCommand;
 use crate::command::base_dependency_command::BaseDependencyCommand;
-use crate::composer::Composer;
-use crate::io::io_interface::IOInterface;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
+use crate::io::io_interface::IOInterface;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 

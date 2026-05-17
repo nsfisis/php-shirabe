@@ -90,25 +90,6 @@ impl MultiConflictRule {
             code: 0,
         }.into())
     }
-
-    pub fn to_string(&self) -> String {
-        let mut result = if self.inner.is_disabled() {
-            "disabled(multi(".to_string()
-        } else {
-            "(multi(".to_string()
-        };
-
-        // TODO multi conflict?
-        for (i, literal) in self.literals.iter().enumerate() {
-            if i != 0 {
-                result.push('|');
-            }
-            result.push_str(&literal.to_string());
-        }
-
-        result.push_str("))");
-        result
-    }
 }
 
 impl RuleLiterals for MultiConflictRule {
@@ -164,5 +145,28 @@ impl Rule for MultiConflictRule {
 
     fn is_assertion(&self) -> bool {
         todo!()
+    }
+}
+
+impl std::fmt::Display for MultiConflictRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO multi conflict?
+        write!(
+            f,
+            "{}",
+            if self.inner.is_disabled() {
+                "disabled(multi("
+            } else {
+                "(multi("
+            }
+        )?;
+
+        for (i, literal) in self.literals.iter().enumerate() {
+            if i != 0 {
+                write!(f, "|")?;
+            }
+            write!(f, "{}", literal)?;
+        }
+        write!(f, "))")
     }
 }

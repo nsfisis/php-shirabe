@@ -57,15 +57,6 @@ impl Rule2Literals {
     pub fn is_assertion(&self) -> bool {
         false
     }
-
-    pub fn to_string(&self) -> String {
-        let prefix = if self.inner.is_disabled() {
-            "disabled("
-        } else {
-            "("
-        };
-        format!("{}{}|{})", prefix, self.literal1, self.literal2)
-    }
 }
 
 impl RuleLiterals for Rule2Literals {
@@ -117,5 +108,21 @@ impl Rule for Rule2Literals {
 
     fn is_assertion(&self) -> bool {
         todo!()
+    }
+}
+
+impl std::fmt::Display for Rule2Literals {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            if self.inner.is_disabled() {
+                "disabled("
+            } else {
+                "("
+            }
+        )?;
+
+        write!(f, "{}|{})", self.literal1, self.literal2)
     }
 }

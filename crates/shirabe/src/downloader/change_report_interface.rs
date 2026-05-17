@@ -3,5 +3,5 @@
 use crate::package::package_interface::PackageInterface;
 
 pub trait ChangeReportInterface {
-    fn get_local_changes(&self, package: &dyn PackageInterface, path: String) -> Option<String>;
+    fn get_local_changes(&self, package: &dyn PackageInterface, path: &str) -> Option<String>;
 }

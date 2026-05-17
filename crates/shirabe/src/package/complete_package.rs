@@ -350,3 +350,9 @@ impl PackageInterface for CompletePackage {
         todo!()
     }
 }
+
+impl std::fmt::Display for CompletePackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_unique_name())
+    }
+}

@@ -62,23 +62,6 @@ impl GenericRule {
     pub fn is_assertion(&self) -> bool {
         self.literals.len() == 1
     }
-
-    pub fn to_string(&self) -> String {
-        let prefix = if self.inner.is_disabled() {
-            "disabled("
-        } else {
-            "("
-        };
-        let mut result = prefix.to_string();
-        for (i, literal) in self.literals.iter().enumerate() {
-            if i != 0 {
-                result.push('|');
-            }
-            result.push_str(&literal.to_string());
-        }
-        result.push(')');
-        result
-    }
 }
 
 pub trait RuleLiterals {
@@ -137,5 +120,27 @@ impl Rule for GenericRule {
 
     fn is_assertion(&self) -> bool {
         todo!()
+    }
+}
+
+impl std::fmt::Display for GenericRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            if self.inner.is_disabled() {
+                "disabled("
+            } else {
+                "("
+            }
+        )?;
+
+        for (i, literal) in self.literals.iter().enumerate() {
+            if i != 0 {
+                write!(f, "|")?;
+            }
+            write!(f, "{}", literal)?;
+        }
+        write!(f, ")")
     }
 }
