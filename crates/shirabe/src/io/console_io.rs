@@ -1,8 +1,11 @@
 //! ref: composer/src/Composer/IO/ConsoleIO.php
 
+use crate::config::Config;
 use crate::io::io_interface;
 use indexmap::IndexMap;
+use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
 use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
 use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
 use shirabe_external_packages::symfony::component::console::helper::table::Table;
@@ -25,7 +28,7 @@ use crate::util::silencer::Silencer;
 /// The Input/Output helper.
 #[derive(Debug)]
 pub struct ConsoleIO {
-    authentications: index::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 
     pub(crate) input: Box<dyn InputInterface>,
     pub(crate) output: Box<dyn OutputInterface>,
@@ -60,9 +63,7 @@ impl ConsoleIO {
         );
         verbosity_map.insert(io_interface::DEBUG, OutputInterface::VERBOSITY_DEBUG);
         Self {
-            inner: BaseIO {
-                authentications: IndexMap::new(),
-            },
+            authentications: indexmap![],
             input,
             output,
             helper_set,
@@ -75,46 +76,6 @@ impl ConsoleIO {
 
     pub fn enable_debugging(&mut self, start_time: f64) {
         self.start_time = Some(start_time);
-    }
-
-    pub fn is_interactive(&self) -> bool {
-        self.input.is_interactive()
-    }
-
-    pub fn is_decorated(&self) -> bool {
-        self.output.is_decorated()
-    }
-
-    pub fn is_verbose(&self) -> bool {
-        self.output.is_verbose()
-    }
-
-    pub fn is_very_verbose(&self) -> bool {
-        self.output.is_very_verbose()
-    }
-
-    pub fn is_debug(&self) -> bool {
-        self.output.is_debug()
-    }
-
-    pub fn write(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        let messages = Self::sanitize(messages, true);
-
-        self.do_write(messages, newline, false, verbosity, false);
-    }
-
-    pub fn write_error(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        let messages = Self::sanitize(messages, true);
-
-        self.do_write(messages, newline, true, verbosity, false);
-    }
-
-    pub fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.do_write(messages, newline, false, verbosity, true);
-    }
-
-    pub fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.do_write(messages, newline, true, verbosity, true);
     }
 
     /// @param string[]|string $messages
@@ -191,26 +152,6 @@ impl ConsoleIO {
             if newline { "\n" } else { "" },
             &Self::to_string_list(&messages),
         );
-    }
-
-    pub fn overwrite(
-        &mut self,
-        messages: PhpMixed,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
-        self.do_overwrite(messages, newline, size, false, verbosity);
-    }
-
-    pub fn overwrite_error(
-        &mut self,
-        messages: PhpMixed,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
-        self.do_overwrite(messages, newline, size, true, verbosity);
     }
 
     /// @param string[]|string $messages
@@ -297,156 +238,6 @@ impl ConsoleIO {
 
     pub fn get_progress_bar(&self, max: i64) -> ProgressBar {
         ProgressBar::new(self.get_error_output(), max)
-    }
-
-    pub fn ask(&mut self, question: PhpMixed, default: PhpMixed) -> PhpMixed {
-        // PHP: $helper = $this->helperSet->get('question');
-        let helper = self.helper_set.get("question");
-        let question = Question::new(
-            Self::sanitize(question, true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
-        );
-
-        helper.ask(&*self.input, self.get_error_output(), &question)
-    }
-
-    pub fn ask_confirmation(&mut self, question: PhpMixed, default: bool) -> bool {
-        let helper = self.helper_set.get("question");
-        let default_mixed = PhpMixed::Bool(default);
-        let question = StrictConfirmationQuestion::new(
-            Self::sanitize(question, true),
-            if is_string(&default_mixed) {
-                Self::sanitize(default_mixed, true)
-            } else {
-                default_mixed
-            },
-        );
-
-        helper
-            .ask(&*self.input, self.get_error_output(), &question)
-            .as_bool()
-            .unwrap_or(false)
-    }
-
-    pub fn ask_and_validate(
-        &mut self,
-        question: PhpMixed,
-        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
-        attempts: Option<i64>,
-        default: PhpMixed,
-    ) -> PhpMixed {
-        let helper = self.helper_set.get("question");
-        let mut question = Question::new(
-            Self::sanitize(question, true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
-        );
-        question.set_validator(validator);
-        question.set_max_attempts(attempts);
-
-        helper.ask(&*self.input, self.get_error_output(), &question)
-    }
-
-    pub fn ask_and_hide_answer(&mut self, question: PhpMixed) -> Option<String> {
-        let helper = self.helper_set.get("question");
-        let mut question = Question::new(Self::sanitize(question, true), PhpMixed::Null);
-        question.set_hidden(true);
-
-        helper
-            .ask(&*self.input, self.get_error_output(), &question)
-            .as_string()
-            .map(|s| s.to_string())
-    }
-
-    pub fn select(
-        &mut self,
-        question: PhpMixed,
-        choices: PhpMixed,
-        default: PhpMixed,
-        // PHP: int|false attempts
-        attempts: PhpMixed,
-        error_message: String,
-        multiselect: bool,
-    ) -> PhpMixed {
-        let helper = self.helper_set.get("question");
-        let mut question = ChoiceQuestion::new(
-            Self::sanitize(question, true),
-            Self::sanitize(choices.clone(), true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
-        );
-        // PHP: IOInterface requires false, and Question requires null or int
-        let max_attempts = match attempts {
-            PhpMixed::Bool(false) => None,
-            PhpMixed::Int(i) => Some(i),
-            _ => None,
-        };
-        question.set_max_attempts(max_attempts);
-        question.set_error_message(&error_message);
-        question.set_multiselect(multiselect);
-
-        let result = helper.ask(&*self.input, self.get_error_output(), &question);
-
-        // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
-        let choice_keys: Vec<String> = match &choices {
-            PhpMixed::Array(a) => a.keys().cloned().collect(),
-            PhpMixed::List(_) => vec![],
-            _ => vec![],
-        };
-        let is_assoc =
-            !choice_keys.is_empty() && choice_keys.iter().any(|k| !k.parse::<i64>().is_ok());
-        if is_assoc {
-            return result;
-        }
-
-        if !is_array(&result) {
-            // PHP: (string) array_search($result, $choices, true)
-            // TODO(phase-b): array_search signature requires IndexMap<String, String>
-            let result_str = result.as_string().unwrap_or("").to_string();
-            let haystack: IndexMap<String, String> = match &choices {
-                PhpMixed::List(l) => l
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
-                    .collect(),
-                _ => IndexMap::new(),
-            };
-            return PhpMixed::String(array_search(&result_str, &haystack).unwrap_or_default());
-        }
-
-        let mut results: Vec<String> = vec![];
-        let result_list = result.as_list().cloned().unwrap_or_default();
-        let choice_list: Vec<(String, PhpMixed)> = match &choices {
-            PhpMixed::List(l) => l
-                .iter()
-                .enumerate()
-                .map(|(i, v)| (i.to_string(), (**v).clone()))
-                .collect(),
-            PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
-            _ => vec![],
-        };
-        for (index, choice) in &choice_list {
-            if in_array(choice.clone(), &PhpMixed::List(result_list.clone()), true) {
-                results.push(index.clone());
-            }
-        }
-
-        PhpMixed::List(
-            results
-                .into_iter()
-                .map(|s| Box::new(PhpMixed::String(s)))
-                .collect(),
-        )
     }
 
     pub fn get_table(&self) -> Table {
@@ -567,6 +358,275 @@ impl ConsoleIO {
                 .collect(),
             _ => vec![],
         }
+    }
+}
+
+impl LoggerInterface for ConsoleIO {
+    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::emergency(self, message, context)
+    }
+
+    fn alert(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::alert(self, message, context)
+    }
+
+    fn critical(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::critical(self, message, context)
+    }
+
+    fn error(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::error(self, message, context)
+    }
+
+    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::warning(self, message, context)
+    }
+
+    fn notice(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::notice(self, message, context)
+    }
+
+    fn info(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::info(self, message, context)
+    }
+
+    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::debug(self, message, context)
+    }
+
+    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::log(self, level, message, context)
+    }
+}
+
+impl IOInterface for ConsoleIO {
+    fn is_interactive(&self) -> bool {
+        self.input.is_interactive()
+    }
+
+    fn is_verbose(&self) -> bool {
+        self.output.is_verbose()
+    }
+
+    fn is_very_verbose(&self) -> bool {
+        self.output.is_very_verbose()
+    }
+
+    fn is_debug(&self) -> bool {
+        self.output.is_debug()
+    }
+
+    fn is_decorated(&self) -> bool {
+        self.output.is_decorated()
+    }
+
+    fn write(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        let messages = Self::sanitize(messages, true);
+
+        self.do_write(messages, newline, false, verbosity, false);
+    }
+
+    fn write_error(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        let messages = Self::sanitize(messages, true);
+
+        self.do_write(messages, newline, true, verbosity, false);
+    }
+
+    fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        self.do_write(messages, newline, false, verbosity, true);
+    }
+
+    fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
+        self.do_write(messages, newline, true, verbosity, true);
+    }
+
+    fn overwrite(&mut self, messages: PhpMixed, newline: bool, size: Option<i64>, verbosity: i64) {
+        self.do_overwrite(messages, newline, size, false, verbosity);
+    }
+
+    fn overwrite_error(
+        &mut self,
+        messages: PhpMixed,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.do_overwrite(messages, newline, size, true, verbosity);
+    }
+
+    fn ask(&mut self, question: PhpMixed, default: PhpMixed) -> PhpMixed {
+        // PHP: $helper = $this->helperSet->get('question');
+        let helper = self.helper_set.get("question");
+        let question = Question::new(
+            Self::sanitize(question, true),
+            if is_string(&default) {
+                Self::sanitize(default, true)
+            } else {
+                default
+            },
+        );
+
+        helper.ask(&*self.input, self.get_error_output(), &question)
+    }
+
+    fn ask_confirmation(&mut self, question: PhpMixed, default: bool) -> bool {
+        let helper = self.helper_set.get("question");
+        let default_mixed = PhpMixed::Bool(default);
+        let question = StrictConfirmationQuestion::new(
+            Self::sanitize(question, true),
+            if is_string(&default_mixed) {
+                Self::sanitize(default_mixed, true)
+            } else {
+                default_mixed
+            },
+        );
+
+        helper
+            .ask(&*self.input, self.get_error_output(), &question)
+            .as_bool()
+            .unwrap_or(false)
+    }
+
+    fn ask_and_validate(
+        &mut self,
+        question: PhpMixed,
+        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        attempts: Option<i64>,
+        default: PhpMixed,
+    ) -> PhpMixed {
+        let helper = self.helper_set.get("question");
+        let mut question = Question::new(
+            Self::sanitize(question, true),
+            if is_string(&default) {
+                Self::sanitize(default, true)
+            } else {
+                default
+            },
+        );
+        question.set_validator(validator);
+        question.set_max_attempts(attempts);
+
+        helper.ask(&*self.input, self.get_error_output(), &question)
+    }
+
+    fn ask_and_hide_answer(&mut self, question: PhpMixed) -> Option<String> {
+        let helper = self.helper_set.get("question");
+        let mut question = Question::new(Self::sanitize(question, true), PhpMixed::Null);
+        question.set_hidden(true);
+
+        helper
+            .ask(&*self.input, self.get_error_output(), &question)
+            .as_string()
+            .map(|s| s.to_string())
+    }
+
+    fn select(
+        &mut self,
+        question: PhpMixed,
+        choices: PhpMixed,
+        default: PhpMixed,
+        // PHP: int|false attempts
+        attempts: PhpMixed,
+        error_message: String,
+        multiselect: bool,
+    ) -> PhpMixed {
+        let helper = self.helper_set.get("question");
+        let mut question = ChoiceQuestion::new(
+            Self::sanitize(question, true),
+            Self::sanitize(choices.clone(), true),
+            if is_string(&default) {
+                Self::sanitize(default, true)
+            } else {
+                default
+            },
+        );
+        // PHP: IOInterface requires false, and Question requires null or int
+        let max_attempts = match attempts {
+            PhpMixed::Bool(false) => None,
+            PhpMixed::Int(i) => Some(i),
+            _ => None,
+        };
+        question.set_max_attempts(max_attempts);
+        question.set_error_message(&error_message);
+        question.set_multiselect(multiselect);
+
+        let result = helper.ask(&*self.input, self.get_error_output(), &question);
+
+        // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
+        let choice_keys: Vec<String> = match &choices {
+            PhpMixed::Array(a) => a.keys().cloned().collect(),
+            PhpMixed::List(_) => vec![],
+            _ => vec![],
+        };
+        let is_assoc =
+            !choice_keys.is_empty() && choice_keys.iter().any(|k| !k.parse::<i64>().is_ok());
+        if is_assoc {
+            return result;
+        }
+
+        if !is_array(&result) {
+            // PHP: (string) array_search($result, $choices, true)
+            // TODO(phase-b): array_search signature requires IndexMap<String, String>
+            let result_str = result.as_string().unwrap_or("").to_string();
+            let haystack: IndexMap<String, String> = match &choices {
+                PhpMixed::List(l) => l
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
+                    .collect(),
+                _ => IndexMap::new(),
+            };
+            return PhpMixed::String(array_search(&result_str, &haystack).unwrap_or_default());
+        }
+
+        let mut results: Vec<String> = vec![];
+        let result_list = result.as_list().cloned().unwrap_or_default();
+        let choice_list: Vec<(String, PhpMixed)> = match &choices {
+            PhpMixed::List(l) => l
+                .iter()
+                .enumerate()
+                .map(|(i, v)| (i.to_string(), (**v).clone()))
+                .collect(),
+            PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+            _ => vec![],
+        };
+        for (index, choice) in &choice_list {
+            if in_array(choice.clone(), &PhpMixed::List(result_list.clone()), true) {
+                results.push(index.clone());
+            }
+        }
+
+        PhpMixed::List(
+            results
+                .into_iter()
+                .map(|s| Box::new(PhpMixed::String(s)))
+                .collect(),
+        )
+    }
+
+    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+        <Self as BaseIO>::get_authentications(self)
+    }
+
+    fn has_authentication(&self, repository_name: &str) -> bool {
+        <Self as BaseIO>::has_authentication(self, repository_name)
+    }
+
+    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+        <Self as BaseIO>::get_authentication(self, repository_name)
+    }
+
+    fn set_authentication(
+        &mut self,
+        repository_name: String,
+        username: String,
+        password: Option<String>,
+    ) {
+        <Self as BaseIO>::set_authentication(self, repository_name, username, password)
+    }
+
+    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
+        <Self as BaseIO>::load_configuration(self, config)
     }
 }
 

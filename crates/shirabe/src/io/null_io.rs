@@ -6,7 +6,7 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct NullIO {
-    authentications: index::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 }
 
 impl IOInterface for NullIO {

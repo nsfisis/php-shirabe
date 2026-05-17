@@ -71,5 +71,5 @@ pub trait IOInterface: LoggerInterface {
         password: Option<String>,
     );
 
-    fn load_configuration(&mut self, config: &Config);
+    fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()>;
 }
