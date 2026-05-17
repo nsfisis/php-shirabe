@@ -454,11 +454,11 @@ impl IOInterface for ConsoleIO {
         self.do_overwrite(messages, newline, size, true, verbosity);
     }
 
-    fn ask(&mut self, question: PhpMixed, default: PhpMixed) -> PhpMixed {
+    fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed {
         // PHP: $helper = $this->helperSet->get('question');
         let helper = self.helper_set.get("question");
         let question = Question::new(
-            Self::sanitize(question, true),
+            Self::sanitize(PhpMixed::String(question), true),
             if is_string(&default) {
                 Self::sanitize(default, true)
             } else {
@@ -469,11 +469,11 @@ impl IOInterface for ConsoleIO {
         helper.ask(&*self.input, self.get_error_output(), &question)
     }
 
-    fn ask_confirmation(&mut self, question: PhpMixed, default: bool) -> bool {
+    fn ask_confirmation(&mut self, question: String, default: bool) -> bool {
         let helper = self.helper_set.get("question");
         let default_mixed = PhpMixed::Bool(default);
         let question = StrictConfirmationQuestion::new(
-            Self::sanitize(question, true),
+            Self::sanitize(PhpMixed::String(question), true),
             if is_string(&default_mixed) {
                 Self::sanitize(default_mixed, true)
             } else {
@@ -489,14 +489,14 @@ impl IOInterface for ConsoleIO {
 
     fn ask_and_validate(
         &mut self,
-        question: PhpMixed,
+        question: String,
         validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> PhpMixed {
         let helper = self.helper_set.get("question");
         let mut question = Question::new(
-            Self::sanitize(question, true),
+            Self::sanitize(PhpMixed::String(question), true),
             if is_string(&default) {
                 Self::sanitize(default, true)
             } else {
@@ -509,9 +509,12 @@ impl IOInterface for ConsoleIO {
         helper.ask(&*self.input, self.get_error_output(), &question)
     }
 
-    fn ask_and_hide_answer(&mut self, question: PhpMixed) -> Option<String> {
+    fn ask_and_hide_answer(&mut self, question: String) -> Option<String> {
         let helper = self.helper_set.get("question");
-        let mut question = Question::new(Self::sanitize(question, true), PhpMixed::Null);
+        let mut question = Question::new(
+            Self::sanitize(PhpMixed::String(question), true),
+            PhpMixed::Null,
+        );
         question.set_hidden(true);
 
         helper
@@ -522,17 +525,23 @@ impl IOInterface for ConsoleIO {
 
     fn select(
         &mut self,
-        question: PhpMixed,
-        choices: PhpMixed,
+        question: String,
+        choices: Vec<String>,
         default: PhpMixed,
         // PHP: int|false attempts
         attempts: PhpMixed,
         error_message: String,
         multiselect: bool,
     ) -> PhpMixed {
+        let choices: PhpMixed = PhpMixed::List(
+            choices
+                .into_iter()
+                .map(|s| Box::new(PhpMixed::String(s)))
+                .collect(),
+        );
         let helper = self.helper_set.get("question");
         let mut question = ChoiceQuestion::new(
-            Self::sanitize(question, true),
+            Self::sanitize(PhpMixed::String(question), true),
             Self::sanitize(choices.clone(), true),
             if is_string(&default) {
                 Self::sanitize(default, true)

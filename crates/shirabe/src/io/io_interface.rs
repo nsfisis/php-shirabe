@@ -22,34 +22,40 @@ pub trait IOInterface: LoggerInterface {
 
     fn is_decorated(&self) -> bool;
 
-    fn write(&self, messages: PhpMixed, newline: bool, verbosity: i64);
+    fn write(&mut self, messages: PhpMixed, newline: bool, verbosity: i64);
 
-    fn write_error(&self, messages: PhpMixed, newline: bool, verbosity: i64);
+    fn write_error(&mut self, messages: PhpMixed, newline: bool, verbosity: i64);
 
-    fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64);
+    fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64);
 
-    fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64);
+    fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64);
 
-    fn overwrite(&self, messages: PhpMixed, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite(&mut self, messages: PhpMixed, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn overwrite_error(&self, messages: PhpMixed, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_error(
+        &mut self,
+        messages: PhpMixed,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    );
 
-    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed;
+    fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed;
 
-    fn ask_confirmation(&self, question: String, default: bool) -> bool;
+    fn ask_confirmation(&mut self, question: String, default: bool) -> bool;
 
     fn ask_and_validate(
-        &self,
+        &mut self,
         question: String,
         validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> PhpMixed;
 
-    fn ask_and_hide_answer(&self, question: String) -> Option<String>;
+    fn ask_and_hide_answer(&mut self, question: String) -> Option<String>;
 
     fn select(
-        &self,
+        &mut self,
         question: String,
         choices: Vec<String>,
         default: PhpMixed,

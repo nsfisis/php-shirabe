@@ -31,14 +31,12 @@ impl IOInterface for NullIO {
         false
     }
 
-    fn write(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
+    fn write(&mut self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
 
-    fn write_error(&self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
+    fn write_error(&mut self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
 
-    fn overwrite(&self, _messages: PhpMixed, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
-
-    fn overwrite_error(
-        &self,
+    fn overwrite(
+        &mut self,
         _messages: PhpMixed,
         _newline: bool,
         _size: Option<i64>,
@@ -46,16 +44,25 @@ impl IOInterface for NullIO {
     ) {
     }
 
-    fn ask(&self, _question: String, default: PhpMixed) -> PhpMixed {
+    fn overwrite_error(
+        &mut self,
+        _messages: PhpMixed,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
+    }
+
+    fn ask(&mut self, _question: String, default: PhpMixed) -> PhpMixed {
         default
     }
 
-    fn ask_confirmation(&self, _question: String, default: bool) -> bool {
+    fn ask_confirmation(&mut self, _question: String, default: bool) -> bool {
         default
     }
 
     fn ask_and_validate(
-        &self,
+        &mut self,
         _question: String,
         _validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         _attempts: Option<i64>,
@@ -64,12 +71,12 @@ impl IOInterface for NullIO {
         default
     }
 
-    fn ask_and_hide_answer(&self, _question: String) -> Option<String> {
+    fn ask_and_hide_answer(&mut self, _question: String) -> Option<String> {
         None
     }
 
     fn select(
-        &self,
+        &mut self,
         _question: String,
         _choices: Vec<String>,
         default: PhpMixed,
@@ -80,11 +87,11 @@ impl IOInterface for NullIO {
         default
     }
 
-    fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+    fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
         <Self as BaseIO>::write_raw(self, messages, newline, verbosity)
     }
 
-    fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
+    fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
         <Self as BaseIO>::write_error_raw(self, messages, newline, verbosity)
     }
 
@@ -114,7 +121,7 @@ impl IOInterface for NullIO {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
 
-    fn load_configuration(&mut self, config: &crate::config::Config) {
+    fn load_configuration(&mut self, config: &mut crate::config::Config) -> anyhow::Result<()> {
         <Self as BaseIO>::load_configuration(self, config)
     }
 }
