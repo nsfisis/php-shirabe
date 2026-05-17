@@ -16,14 +16,14 @@ use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
 use crate::util::bitbucket::Bitbucket;
 use crate::util::http::response::Response;
 
 #[derive(Debug)]
 pub struct GitBitbucketDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     /// @var string
     pub(crate) owner: String,
     /// @var string

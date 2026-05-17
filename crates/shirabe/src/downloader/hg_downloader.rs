@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/HgDownloader.php
 
-use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::package::package_interface::PackageInterface;
 use crate::util::hg::Hg as HgUtils;
 use anyhow::Result;
@@ -9,7 +9,7 @@ use shirabe_php_shim::RuntimeException;
 
 #[derive(Debug)]
 pub struct HgDownloader {
-    inner: VcsDownloader,
+    inner: VcsDownloaderBase,
 }
 
 impl HgDownloader {

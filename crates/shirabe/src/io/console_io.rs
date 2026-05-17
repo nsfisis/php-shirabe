@@ -24,7 +24,8 @@ use crate::util::silencer::Silencer;
 /// The Input/Output helper.
 #[derive(Debug)]
 pub struct ConsoleIO {
-    pub(crate) inner: BaseIO,
+    authentications: index::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+
     pub(crate) input: Box<dyn InputInterface>,
     pub(crate) output: Box<dyn OutputInterface>,
     pub(crate) helper_set: HelperSet,
@@ -565,5 +566,19 @@ impl ConsoleIO {
                 .collect(),
             _ => vec![],
         }
+    }
+}
+
+impl BaseIO for ConsoleIO {
+    fn authentications(
+        &self,
+    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+        &self.authentications
+    }
+
+    fn authentications_mut(
+        &mut self,
+    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+        &mut self.authentications
     }
 }

@@ -38,9 +38,9 @@ pub trait BaseCommand {
     fn inner(&self) -> &Command;
     fn inner_mut(&mut self) -> &mut Command;
     fn composer(&self) -> Option<&Composer>;
-    fn composer_mut(&mut self) -> Option<&mut Composer>;
+    fn composer_mut(&mut self) -> &mut Option<Composer>;
     fn io(&self) -> Option<&dyn IOInterface>;
-    fn io_mut(&mut self) -> Option<&mut dyn IOInterface>;
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>>;
 
     /// Gets the application instance for this command.
     fn get_application(&self) -> Result<Application> {

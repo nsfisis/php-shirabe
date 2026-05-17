@@ -17,6 +17,67 @@ use crate::util::http::response::Response;
 use crate::util::http_downloader::HttpDownloader;
 use crate::util::process_executor::ProcessExecutor;
 
+#[derive(Debug)]
+pub struct VcsDriverBase {
+    pub url: String,
+    pub origin_url: String,
+    pub repo_config: IndexMap<String, PhpMixed>,
+    pub io: Box<dyn IOInterface>,
+    pub config: Config,
+    pub process: ProcessExecutor,
+    pub http_downloader: HttpDownloader,
+    pub info_cache: IndexMap<String, Option<IndexMap<String, PhpMixed>>>,
+    pub cache: Option<Cache>,
+}
+
+impl VcsDriverBase {
+    pub fn new(
+        repo_config: IndexMap<String, PhpMixed>,
+        io: Box<dyn IOInterface>,
+        config: Config,
+        http_downloader: HttpDownloader,
+        process: ProcessExecutor,
+    ) -> Self {
+        let url = repo_config
+            .get("url")
+            .and_then(|v| v.as_string())
+            .unwrap_or("")
+            .to_string();
+        let origin_url = url.clone();
+        Self {
+            url,
+            origin_url,
+            repo_config,
+            io,
+            config,
+            process,
+            http_downloader,
+            info_cache: IndexMap::new(),
+            cache: None,
+        }
+    }
+
+    pub fn should_cache(&self, identifier: &str) -> bool {
+        self.cache.is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier).unwrap_or(false)
+    }
+
+    pub fn get_scheme(&self) -> &str {
+        if extension_loaded("openssl") {
+            return "https";
+        }
+        "http"
+    }
+
+    pub fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
+        let options = self
+            .repo_config
+            .get("options")
+            .cloned()
+            .unwrap_or(PhpMixed::Array(IndexMap::new()));
+        self.http_downloader.get(url, &options)
+    }
+}
+
 // TODO(phase-b): the constructor is `final` in PHP; concrete implementations must replicate the
 // initialization logic (local-path normalization etc.) from the original new() body.
 pub trait VcsDriver: VcsDriverInterface {

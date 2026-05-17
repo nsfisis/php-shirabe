@@ -2,19 +2,16 @@
 
 use crate::dependency_resolver::rule::Rule;
 use anyhow::Result;
-use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw, implode, unpack};
+use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, implode, unpack};
+
+use super::{request::Request, rule::ReasonData};
 
 pub struct GenericRule {
-    inner: Rule,
     pub(crate) literals: Vec<i64>,
 }
 
 impl GenericRule {
-    pub fn new(
-        mut literals: Vec<i64>,
-        reason: shirabe_php_shim::PhpMixed,
-        reason_data: shirabe_php_shim::PhpMixed,
-    ) -> Self {
+    pub fn new(mut literals: Vec<i64>, reason: PhpMixed, reason_data: PhpMixed) -> Self {
         let inner = Rule::new(reason, reason_data);
         literals.sort();
         Self { inner, literals }
@@ -94,5 +91,51 @@ pub trait RuleLiterals {
 impl RuleLiterals for GenericRule {
     fn get_literals(&self) -> &Vec<i64> {
         &self.literals
+    }
+}
+
+impl Rule for GenericRule {
+    fn bitfield(&self) -> i64 {
+        todo!()
+    }
+
+    fn bitfield_mut(&mut self) -> &mut i64 {
+        todo!()
+    }
+
+    fn request(&self) -> Option<&Request> {
+        todo!()
+    }
+
+    fn request_mut(&mut self) -> Option<&mut Request> {
+        todo!()
+    }
+
+    fn reason_data(&self) -> Option<&ReasonData> {
+        todo!()
+    }
+
+    fn reason_data_mut(&mut self) -> Option<&mut ReasonData> {
+        todo!()
+    }
+
+    fn get_literals(&self) -> Vec<i64> {
+        todo!()
+    }
+
+    fn get_hash(&self) -> PhpMixed {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        todo!()
+    }
+
+    fn equals(&self, rule: &dyn Rule) -> bool {
+        todo!()
+    }
+
+    fn is_assertion(&self) -> bool {
+        todo!()
     }
 }

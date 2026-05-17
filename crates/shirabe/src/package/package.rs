@@ -9,6 +9,7 @@ use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, strpos, trigger_error};
 use crate::package::base_package::BasePackage;
 use crate::package::link::Link;
 use crate::package::version::version_parser::VersionParser;
+use crate::repository::repository_interface::RepositoryInterface;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
@@ -20,7 +21,11 @@ pub struct Mirror {
 /// Core package definitions that are needed to resolve dependencies and install packages
 #[derive(Debug)]
 pub struct Package {
-    pub(crate) inner: BasePackage,
+    id: i64,
+    name: String,
+    pretty_name: String,
+    repository: Option<Box<dyn RepositoryInterface>>,
+
     pub(crate) r#type: Option<String>,
     pub(crate) target_dir: Option<String>,
     /// `'source'` | `'dist'` | `null`
@@ -521,5 +526,51 @@ impl Package {
         }
 
         new_links
+    }
+}
+
+impl BasePackage for Package {
+    fn id(&self) -> i64 {
+        self.id
+    }
+
+    fn id_mut(&mut self) -> &mut i64 {
+        &mut self.id
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    fn pretty_name(&self) -> &str {
+        &self.pretty_name
+    }
+
+    fn pretty_name_mut(&mut self) -> &mut String {
+        &mut self.pretty_name
+    }
+
+    fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
+        self.repository.as_ref()
+    }
+
+    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {
+        todo!()
+    }
+
+    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        todo!()
+    }
+
+    fn clone_box(&self) -> Box<dyn BasePackage> {
+        todo!()
     }
 }

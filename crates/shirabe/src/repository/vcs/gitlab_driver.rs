@@ -16,7 +16,7 @@ use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::gitlab::GitLab;
 use crate::util::http::response::Response;
 use crate::util::http_downloader::HttpDownloader;
@@ -24,7 +24,7 @@ use crate::util::http_downloader::HttpDownloader;
 /// Driver for GitLab API, use the Git driver for local checkouts.
 #[derive(Debug)]
 pub struct GitLabDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     /// @phpstan-var 'https'|'http'
     scheme: String,
     namespace: String,

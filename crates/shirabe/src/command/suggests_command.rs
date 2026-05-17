@@ -2,20 +2,27 @@
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
+use crate::io::io_interface::IOInterface;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::root_package_repository::RootPackageRepository;
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::{
+    component::console::command::command::Command, console::input::input_interface::InputInterface,
+};
 use shirabe_php_shim::{PhpMixed, empty, in_array};
 
 #[derive(Debug)]
 pub struct SuggestsCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     completion_trait: CompletionTrait,
 }
 
@@ -110,5 +117,31 @@ impl SuggestsCommand {
         );
 
         Ok(0)
+    }
+}
+
+impl BaseCommand for SuggestsCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

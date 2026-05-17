@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
@@ -25,6 +26,7 @@ use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
 use crate::factory::Factory;
 use crate::io::buffer_io::BufferIO;
+use crate::io::io_interface::IOInterface;
 use crate::io::null_io::NullIO;
 use crate::json::json_file::JsonFile;
 use crate::json::json_validation_exception::JsonValidationException;
@@ -51,7 +53,10 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     pub(crate) http_downloader: Option<HttpDownloader>,
     pub(crate) process: Option<ProcessExecutor>,
     pub(crate) exit_code: i64,
@@ -1362,5 +1367,31 @@ impl DiagnoseCommand {
         }
 
         PhpMixed::Bool(true)
+    }
+}
+
+impl BaseCommand for DiagnoseCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

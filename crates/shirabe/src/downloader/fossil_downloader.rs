@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/FossilDownloader.php
 
-use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::package::package_interface::PackageInterface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
@@ -9,7 +9,7 @@ use shirabe_php_shim::RuntimeException;
 
 #[derive(Debug)]
 pub struct FossilDownloader {
-    inner: VcsDownloader,
+    inner: VcsDownloaderBase,
 }
 
 impl FossilDownloader {

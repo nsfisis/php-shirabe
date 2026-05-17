@@ -1,14 +1,17 @@
 //! ref: composer/src/Composer/Downloader/TarDownloader.php
 
 use crate::downloader::archive_downloader::ArchiveDownloader;
+use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::PharData;
 
 #[derive(Debug)]
 pub struct TarDownloader {
-    inner: ArchiveDownloader,
+    inner: FileDownloader,
+    cleanup_executed: IndexMap<String, bool>,
 }
 
 impl TarDownloader {

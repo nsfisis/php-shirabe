@@ -1,13 +1,16 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php
 
 use anyhow::Result;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 
 use crate::command::base_command::BaseCommand;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
+use crate::io::io_interface::IOInterface;
 use crate::script::event::Event as ScriptEvent;
 use crate::script::script_events::ScriptEvents;
 use crate::util::platform::Platform;
@@ -15,7 +18,10 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct RunScriptCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     script_events: Vec<&'static str>,
 }
 
@@ -247,5 +253,31 @@ impl RunScriptCommand {
         }
 
         Ok(result)
+    }
+}
+
+impl BaseCommand for RunScriptCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

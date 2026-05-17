@@ -7,14 +7,14 @@ use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException};
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::http::response::Response;
 use crate::util::perforce::Perforce;
 use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct PerforceDriver {
-    inner: VcsDriver,
+    inner: VcsDriverBase,
     pub(crate) depot: String,
     pub(crate) branch: String,
     pub(crate) perforce: Option<Perforce>,

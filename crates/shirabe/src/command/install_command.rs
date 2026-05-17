@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
 use anyhow::Result;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
@@ -8,16 +9,20 @@ use shirabe_php_shim::PhpMixed;
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::installer::Installer;
+use crate::io::io_interface::IOInterface;
 use crate::plugin::command_event::CommandEvent;
 use crate::plugin::plugin_events::PluginEvents;
 use crate::util::http_downloader::HttpDownloader;
 
 #[derive(Debug)]
 pub struct InstallCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl CompletionTrait for InstallCommand {}
@@ -172,5 +177,31 @@ impl InstallCommand {
         }
 
         install.run()
+    }
+}
+
+impl BaseCommand for InstallCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

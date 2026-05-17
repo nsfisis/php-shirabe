@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
@@ -12,14 +13,18 @@ use shirabe_external_packages::symfony::console::output::output_interface::Outpu
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
 use crate::command::base_command::BaseCommand;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::factory::Factory;
+use crate::io::io_interface::IOInterface;
 use crate::util::filesystem::Filesystem;
 use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl GlobalCommand {
@@ -155,5 +160,31 @@ impl GlobalCommand {
 
     pub fn is_proxy_command(&self) -> bool {
         true
+    }
+}
+
+impl BaseCommand for GlobalCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

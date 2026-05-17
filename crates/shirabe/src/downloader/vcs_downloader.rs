@@ -23,6 +23,34 @@ use crate::package::version::version_parser::VersionParser;
 use crate::util::filesystem::Filesystem;
 use crate::util::process_executor::ProcessExecutor;
 
+#[derive(Debug)]
+pub struct VcsDownloaderBase {
+    pub io: Box<dyn IOInterface>,
+    pub config: Config,
+    pub process: ProcessExecutor,
+    pub filesystem: Filesystem,
+    pub has_cleaned_changes: IndexMap<String, bool>,
+}
+
+impl VcsDownloaderBase {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: Config,
+        process: Option<ProcessExecutor>,
+        fs: Option<Filesystem>,
+    ) -> Self {
+        let process = process.unwrap_or_else(|| ProcessExecutor::new(None, None));
+        let filesystem = fs.unwrap_or_else(|| Filesystem::new(None));
+        Self {
+            io,
+            config,
+            process,
+            filesystem,
+            has_cleaned_changes: IndexMap::new(),
+        }
+    }
+}
+
 pub trait VcsDownloader:
     DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
 {

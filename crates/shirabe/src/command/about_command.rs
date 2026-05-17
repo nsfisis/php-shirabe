@@ -2,11 +2,15 @@
 
 use crate::command::base_command::BaseCommand;
 use crate::composer::Composer;
+use crate::io::io_interface::IOInterface;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct AboutCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl AboutCommand {
@@ -27,5 +31,31 @@ impl AboutCommand {
         ));
 
         0
+    }
+}
+
+impl BaseCommand for AboutCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

@@ -13,7 +13,7 @@ use shirabe_php_shim::{
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::dvcs_downloader_interface::DvcsDownloaderInterface;
-use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::util::filesystem::Filesystem;
@@ -24,7 +24,7 @@ use crate::util::url::Url;
 
 #[derive(Debug)]
 pub struct GitDownloader {
-    inner: VcsDownloader,
+    inner: VcsDownloaderBase,
     /// @var array<string, bool>
     has_stashed_changes: IndexMap<String, bool>,
     /// @var array<string, bool>
@@ -41,7 +41,7 @@ impl GitDownloader {
         process: Option<ProcessExecutor>,
         fs: Option<Filesystem>,
     ) -> Self {
-        let inner = VcsDownloader::new(io, config, process, fs);
+        let inner = VcsDownloaderBase::new(io, config, process, fs);
         let git_util = GitUtil::new(&*inner.io, &inner.config, &inner.process, &inner.filesystem);
         Self {
             inner,

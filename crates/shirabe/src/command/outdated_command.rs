@@ -2,10 +2,13 @@
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
+use crate::io::io_interface::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -13,7 +16,9 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl CompletionTrait for OutdatedCommand {}
@@ -131,5 +136,31 @@ impl OutdatedCommand {
 
     pub fn is_proxy_command(&self) -> bool {
         true
+    }
+}
+
+impl BaseCommand for OutdatedCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

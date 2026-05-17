@@ -5,7 +5,6 @@ use crate::dependency_resolver::rule::Rule;
 
 #[derive(Debug)]
 pub struct Rule2Literals {
-    inner: Rule,
     pub(crate) literal1: i64,
     pub(crate) literal2: i64,
     literals: Vec<i64>,
@@ -69,5 +68,51 @@ impl Rule2Literals {
 impl RuleLiterals for Rule2Literals {
     fn get_literals(&self) -> &Vec<i64> {
         &self.literals
+    }
+}
+
+impl Rule for Rule2Literals {
+    fn bitfield(&self) -> i64 {
+        todo!()
+    }
+
+    fn bitfield_mut(&mut self) -> &mut i64 {
+        todo!()
+    }
+
+    fn request(&self) -> Option<&Request> {
+        todo!()
+    }
+
+    fn request_mut(&mut self) -> Option<&mut Request> {
+        todo!()
+    }
+
+    fn reason_data(&self) -> Option<&ReasonData> {
+        todo!()
+    }
+
+    fn reason_data_mut(&mut self) -> Option<&mut ReasonData> {
+        todo!()
+    }
+
+    fn get_literals(&self) -> Vec<i64> {
+        todo!()
+    }
+
+    fn get_hash(&self) -> PhpMixed {
+        todo!()
+    }
+
+    fn to_string(&self) -> String {
+        todo!()
+    }
+
+    fn equals(&self, rule: &dyn Rule) -> bool {
+        todo!()
+    }
+
+    fn is_assertion(&self) -> bool {
+        todo!()
     }
 }

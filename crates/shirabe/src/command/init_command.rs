@@ -4,6 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::helper::formatter_helper::FormatterHelper;
 use shirabe_external_packages::symfony::component::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
@@ -19,6 +20,7 @@ use shirabe_php_shim::{
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
 use crate::command::package_discovery_trait::PackageDiscoveryTrait;
+use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
@@ -34,7 +36,10 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct InitCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     /// @var array<string, string>
     git_config: Option<IndexMap<String, String>>,
 }
@@ -1150,5 +1155,31 @@ impl InitCommand {
         }
 
         None
+    }
+}
+
+impl BaseCommand for InitCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

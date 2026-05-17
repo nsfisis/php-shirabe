@@ -24,7 +24,8 @@ static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 
 #[derive(Debug)]
 pub struct ZipDownloader {
-    inner: ArchiveDownloader,
+    inner: FileDownloader,
+    cleanup_executed: IndexMap<String, bool>,
     // @phpstan-ignore property.onlyRead (helper property that is set via reflection for testing purposes)
     zip_archive_object: Option<ZipArchive>,
 }

@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
 use anyhow::Result;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 use crate::command::base_command::BaseCommand;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::factory::Factory;
@@ -17,7 +19,9 @@ use crate::util::filesystem::Filesystem;
 
 #[derive(Debug)]
 pub struct ValidateCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl ValidateCommand {
@@ -328,5 +332,31 @@ impl ValidateCommand {
                 io.write_error(msg);
             }
         }
+    }
+}
+
+impl BaseCommand for ValidateCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

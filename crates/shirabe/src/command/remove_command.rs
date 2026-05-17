@@ -2,6 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::exception::invalid_argument_exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
@@ -10,18 +11,22 @@ use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower
 use crate::advisory::auditor::Auditor;
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::dependency_resolver::request::Request;
 use crate::factory::Factory;
 use crate::installer::Installer;
+use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::package::base_package::BasePackage;
 
 #[derive(Debug)]
 pub struct RemoveCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl RemoveCommand {
@@ -670,5 +675,31 @@ impl RemoveCommand {
         }
 
         Ok(status)
+    }
+}
+
+impl BaseCommand for RemoveCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

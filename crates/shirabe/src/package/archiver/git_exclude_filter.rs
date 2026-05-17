@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
-use crate::package::archiver::base_exclude_filter::BaseExcludeFilter;
+use crate::package::archiver::base_exclude_filter::BaseExcludeFilterBase;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use std::path::Path;
 
 pub struct GitExcludeFilter {
-    inner: BaseExcludeFilter,
+    inner: BaseExcludeFilterBase,
 }
 
 impl GitExcludeFilter {
     pub fn new(source_path: String) -> Self {
-        let inner = BaseExcludeFilter::new(source_path.clone());
+        let inner = BaseExcludeFilterBase::new(source_path.clone());
         let mut filter = Self { inner };
 
         let gitattributes_path = format!("{}/.gitattributes", source_path);
@@ -37,11 +37,11 @@ impl GitExcludeFilter {
         let parts = Preg::split(r"\s+", line);
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
-            return BaseExcludeFilter::generate_pattern(&parts[0]);
+            return Some(BaseExcludeFilterBase::generate_pattern(&parts[0]));
         }
 
         if parts.len() == 2 && parts[1] == "-export-ignore" {
-            return BaseExcludeFilter::generate_pattern(&format!("!{}", parts[0]));
+            return BaseExcludeFilterBase::generate_pattern(&format!("!{}", parts[0]));
         }
 
         None

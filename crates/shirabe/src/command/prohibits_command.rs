@@ -8,7 +8,7 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct ProhibitsCommand {
-    inner: BaseDependencyCommand,
+    colors: Vec<String>,
 }
 
 impl CompletionTrait for ProhibitsCommand {}
@@ -63,5 +63,41 @@ impl ProhibitsCommand {
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
         self.inner.do_execute(input, output, true)
+    }
+}
+
+impl BaseCommand for ProhibitsCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
+    }
+}
+
+impl BaseDependencyCommand for ProhibitsCommand {
+    fn colors(&self) -> &[String] {
+        &self.colors
+    }
+
+    fn colors_mut(&mut self) -> &mut [String] {
+        &mut self.colors
     }
 }

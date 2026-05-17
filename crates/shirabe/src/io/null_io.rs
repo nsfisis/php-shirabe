@@ -6,7 +6,7 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct NullIO {
-    inner: BaseIO,
+    authentications: index::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 }
 
 impl IOInterface for NullIO {
@@ -77,5 +77,19 @@ impl IOInterface for NullIO {
         _multiselect: bool,
     ) -> PhpMixed {
         default
+    }
+}
+
+impl BaseIO for NullIO {
+    fn authentications(
+        &self,
+    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+        &self.authentications
+    }
+
+    fn authentications_mut(
+        &mut self,
+    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+        &mut self.authentications
     }
 }

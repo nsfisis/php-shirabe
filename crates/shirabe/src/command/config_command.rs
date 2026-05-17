@@ -3,6 +3,7 @@
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
@@ -17,7 +18,9 @@ use shirabe_php_shim::{
 };
 
 use crate::advisory::auditor::Auditor;
+use crate::command::base_command::BaseCommand;
 use crate::command::base_config_command::BaseConfigCommand;
+use crate::composer::Composer;
 use crate::config::Config;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
@@ -32,7 +35,14 @@ use shirabe_semver::version_parser::VersionParser;
 
 #[derive(Debug)]
 pub struct ConfigCommand {
-    inner: BaseConfigCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
+    config: Option<Config>,
+    config_file: Option<JsonFile>,
+    config_source: Option<JsonConfigSource>,
+
     pub(crate) auth_config_file: Option<JsonFile>,
     pub(crate) auth_config_source: Option<JsonConfigSource>,
 }
@@ -2169,4 +2179,82 @@ fn key_first_key(value: &PhpMixed) -> Option<String> {
         }
     }
     None
+}
+
+impl BaseCommand for ConfigCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> Option<&mut Composer> {
+        self.composer.as_mut()
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_ref()
+    }
+
+    fn io_mut(&mut self) -> Option<&mut dyn IOInterface> {
+        self.io.as_mut()
+    }
+}
+
+impl BaseCommand for ConfigCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
+    }
+}
+
+impl BaseConfigCommand for ConfigCommand {
+    fn config(&self) -> Option<&Config> {
+        self.config.as_ref()
+    }
+
+    fn config_mut(&mut self) -> Option<&mut Config> {
+        self.config.as_mut()
+    }
+
+    fn config_file(&self) -> Option<&JsonFile> {
+        self.config_file.as_ref()
+    }
+
+    fn config_file_mut(&mut self) -> Option<&mut JsonFile> {
+        self.config_file.as_mut()
+    }
+
+    fn config_source(&self) -> Option<&JsonConfigSource> {
+        self.config_source.as_ref()
+    }
+
+    fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource> {
+        self.config_source.as_mut()
+    }
 }

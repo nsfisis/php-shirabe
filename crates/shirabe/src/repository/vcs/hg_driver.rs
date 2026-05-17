@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::filesystem::Filesystem;
 use crate::util::hg::Hg as HgUtils;
 use crate::util::url::Url;
@@ -14,7 +14,7 @@ use shirabe_php_shim::{RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
 pub struct HgDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     pub(crate) tags: Option<IndexMap<String, String>>,
     pub(crate) branches: Option<IndexMap<String, String>>,
     pub(crate) root_identifier: Option<String>,

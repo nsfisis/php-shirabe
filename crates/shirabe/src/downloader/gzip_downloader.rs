@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Downloader/GzipDownloader.php
 
 use crate::downloader::archive_downloader::ArchiveDownloader;
+use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::platform::Platform;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, RuntimeException, extension_loaded,
@@ -11,7 +13,8 @@ use shirabe_php_shim::{
 };
 
 pub struct GzipDownloader {
-    inner: ArchiveDownloader,
+    inner: FileDownloader,
+    cleanup_executed: IndexMap<String, bool>,
 }
 
 impl GzipDownloader {

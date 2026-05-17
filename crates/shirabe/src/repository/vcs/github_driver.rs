@@ -16,13 +16,13 @@ use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::github::GitHub;
 use crate::util::http::response::Response;
 
 #[derive(Debug)]
 pub struct GitHubDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     pub(crate) owner: String,
     pub(crate) repository: String,
     /// @var array<int|string, string> Map of tag name to identifier

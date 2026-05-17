@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/PerforceDownloader.php
 
-use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::vcs_repository::VcsRepository;
 use crate::util::perforce::Perforce;
@@ -12,7 +12,7 @@ use std::any::Any;
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
-    inner: VcsDownloader,
+    inner: VcsDownloaderBase,
     pub(crate) perforce: Option<Perforce>,
 }
 

@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::semver::semver::Semver;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
@@ -50,7 +51,10 @@ const _INPUT_OPTION_REF: i64 = InputOption::VALUE_NONE;
 
 #[derive(Debug)]
 pub struct ShowCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     pub(crate) version_parser: VersionParser,
     pub(crate) colors: Vec<String>,
     repository_set: Option<RepositorySet>,
@@ -2639,6 +2643,32 @@ impl ShowCommand {
 }
 
 impl CompletionTrait for ShowCommand {}
+
+impl BaseCommand for ShowCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
+    }
+}
 
 #[derive(Debug)]
 pub enum PackageOrName {

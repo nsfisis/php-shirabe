@@ -2,11 +2,14 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 use crate::command::base_command::BaseCommand;
+use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
+use crate::io::io_interface::IOInterface;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::version::version_guesser::VersionGuesser;
 use crate::package::version::version_parser::VersionParser;
@@ -17,7 +20,9 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct StatusCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl StatusCommand {
@@ -299,5 +304,31 @@ impl StatusCommand {
         });
 
         Ok(exit_code)
+    }
+}
+
+impl BaseCommand for StatusCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

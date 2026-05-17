@@ -8,7 +8,7 @@ use shirabe_external_packages::symfony::console::input::input_interface::InputIn
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
 pub struct DependsCommand {
-    inner: BaseDependencyCommand,
+    colors: Vec<String>,
 }
 
 impl CompletionTrait for DependsCommand {}
@@ -56,5 +56,41 @@ impl DependsCommand {
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
         self.inner.do_execute(input, output)
+    }
+}
+
+impl BaseCommand for DependsCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
+    }
+}
+
+impl BaseDependencyCommand for DependsCommand {
+    fn colors(&self) -> &[String] {
+        &self.colors
+    }
+
+    fn colors_mut(&mut self) -> &mut [String] {
+        &mut self.colors
     }
 }

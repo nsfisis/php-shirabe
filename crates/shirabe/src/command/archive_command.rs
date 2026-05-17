@@ -4,6 +4,7 @@ use std::any::Any;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{LogicException, get_debug_type};
@@ -33,7 +34,9 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl CompletionTrait for ArchiveCommand {}
@@ -317,5 +320,31 @@ impl ArchiveCommand {
         }
 
         Ok(Some(package.into_complete()))
+    }
+}
+
+impl BaseCommand for ArchiveCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

@@ -2,12 +2,14 @@
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
 use crate::command::base_command::BaseCommand;
 use crate::command::completion_trait::CompletionTrait;
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::factory::Factory;
@@ -23,7 +25,9 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct BumpCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl CompletionTrait for BumpCommand {}
@@ -366,5 +370,31 @@ impl BumpCommand {
             }
             .into()),
         }
+    }
+}
+
+impl BaseCommand for BumpCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

@@ -13,7 +13,7 @@ use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::forgejo::Forgejo;
 use crate::util::forgejo_repository_data::ForgejoRepositoryData;
 use crate::util::forgejo_url::ForgejoUrl;
@@ -21,7 +21,7 @@ use crate::util::http::response::Response;
 
 #[derive(Debug)]
 pub struct ForgejoDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     pub(crate) forgejo_url: Option<ForgejoUrl>,
     pub(crate) repository_data: Option<ForgejoRepositoryData>,
     pub(crate) git_driver: Option<GitDriver>,
@@ -500,7 +500,7 @@ impl ForgejoDriver {
 
     fn setup_git_driver(&mut self, url: &str) -> Result<()> {
         let mut git_driver = GitDriver {
-            inner: VcsDriver::new(
+            inner: VcsDriverBase::new(
                 {
                     let mut m = IndexMap::new();
                     m.insert("url".to_string(), PhpMixed::String(url.to_string()));

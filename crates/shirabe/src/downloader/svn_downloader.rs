@@ -5,7 +5,7 @@ use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
-use crate::downloader::vcs_downloader::VcsDownloader;
+use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::vcs_repository::VcsRepository;
@@ -13,7 +13,7 @@ use crate::util::svn::Svn as SvnUtil;
 
 #[derive(Debug)]
 pub struct SvnDownloader {
-    inner: VcsDownloader,
+    inner: VcsDownloaderBase,
     pub(crate) cache_credentials: bool,
 }
 

@@ -3,6 +3,7 @@
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
+use shirabe_external_packages::symfony::component::console::command::command::Command;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
@@ -48,7 +49,10 @@ use crate::util::process_executor::ProcessExecutor;
 /// Install a package as new project into new directory.
 #[derive(Debug)]
 pub struct CreateProjectCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
+
     /// @var SuggestedPackagesReporter
     pub(crate) suggested_packages_reporter: Option<SuggestedPackagesReporter>,
 }
@@ -893,5 +897,31 @@ impl CreateProjectCommand {
         input: &dyn InputInterface,
     ) -> Result<crate::advisory::audit_config::AuditConfig> {
         self.inner.create_audit_config(config, input)
+    }
+}
+
+impl BaseCommand for CreateProjectCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }

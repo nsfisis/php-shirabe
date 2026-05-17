@@ -14,7 +14,7 @@ use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
-use crate::repository::vcs::vcs_driver::VcsDriver;
+use crate::repository::vcs::vcs_driver::VcsDriverBase;
 use crate::util::filesystem::Filesystem;
 use crate::util::process_executor::ProcessExecutor;
 use crate::util::svn::Svn as SvnUtil;
@@ -22,7 +22,7 @@ use crate::util::url::Url;
 
 #[derive(Debug)]
 pub struct SvnDriver {
-    pub(crate) inner: VcsDriver,
+    pub(crate) inner: VcsDriverBase,
     /// @var string
     pub(crate) base_url: String,
     /// @var array<int|string, string> Map of tag name to identifier

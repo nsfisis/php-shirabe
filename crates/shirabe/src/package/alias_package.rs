@@ -13,7 +13,11 @@ use crate::repository::repository_interface::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct AliasPackage {
-    pub(crate) inner: BasePackage,
+    id: i64,
+    name: String,
+    pretty_name: String,
+    repository: Option<Box<dyn RepositoryInterface>>,
+
     /// @var string
     pub(crate) version: String,
     /// @var string
@@ -425,5 +429,51 @@ impl PackageInterface for AliasPackage {
 
     fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
         self.inner.get_repository()
+    }
+}
+
+impl BasePackage for AliasPackage {
+    fn id(&self) -> i64 {
+        self.id
+    }
+
+    fn id_mut(&mut self) -> &mut i64 {
+        &mut self.id
+    }
+
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    fn pretty_name(&self) -> &str {
+        &self.pretty_name
+    }
+
+    fn pretty_name_mut(&mut self) -> &mut String {
+        &mut self.pretty_name
+    }
+
+    fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
+        self.repository.as_ref()
+    }
+
+    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {
+        todo!()
+    }
+
+    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
+        todo!()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        todo!()
+    }
+
+    fn clone_box(&self) -> Box<dyn BasePackage> {
+        todo!()
     }
 }

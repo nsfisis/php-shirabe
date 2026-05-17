@@ -37,7 +37,9 @@ use crate::util::http_downloader::HttpDownloader;
 
 #[derive(Debug)]
 pub struct UpdateCommand {
-    inner: BaseCommand,
+    inner: Command,
+    composer: Option<Composer>,
+    io: Option<Box<dyn IOInterface>>,
 }
 
 impl CompletionTrait for UpdateCommand {}
@@ -621,5 +623,31 @@ impl UpdateCommand {
         ))));
 
         VersionSelector::new(repository_set)
+    }
+}
+
+impl BaseCommand for UpdateCommand {
+    fn inner(&self) -> &Command {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut Command {
+        &mut self.inner
+    }
+
+    fn composer(&self) -> Option<&Composer> {
+        self.composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.io
     }
 }
