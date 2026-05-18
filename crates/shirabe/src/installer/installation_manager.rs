@@ -40,7 +40,7 @@ pub struct InstallationManager {
     cache: IndexMap<String, Box<dyn InstallerInterface>>,
     /// @var array<string, array<PackageInterface>>
     notifiable_packages: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
-    loop_: Loop,
+    loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: Box<dyn IOInterface>,
     event_dispatcher: Option<EventDispatcher>,
     output_progress: bool,
@@ -48,7 +48,7 @@ pub struct InstallationManager {
 
 impl InstallationManager {
     pub fn new(
-        loop_: Loop,
+        loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: Box<dyn IOInterface>,
         event_dispatcher: Option<EventDispatcher>,
     ) -> Self {
@@ -527,13 +527,12 @@ impl InstallationManager {
             // TODO(phase-b): progress = self.io.get_progress_bar();
             progress = Some(());
         }
-        self.loop_.wait(promises, progress);
+        let _ = self.loop_.borrow_mut().wait(promises, progress);
         if progress.is_some() {
             // progress.clear();
             // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
             if !self.io.is_decorated() {
-                self.io
-                    .write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
+                self.io.write_error3("", true, io_interface::NORMAL);
             }
         }
     }
@@ -628,7 +627,7 @@ impl InstallationManager {
         let package = operation.get_package();
 
         if !repo.has_package(package) {
-            repo.add_package(package.clone_box());
+            repo.add_package(package.clone_package_box());
         }
     }
 
@@ -697,7 +696,7 @@ impl InstallationManager {
                             ),
                         );
 
-                        promises.push(self.loop_.get_http_downloader().add(
+                        promises.push(self.loop_.borrow().get_http_downloader().add(
                             &url,
                             &PhpMixed::Array(
                                 opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
@@ -768,13 +767,13 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 );
 
-                promises.push(self.loop_.get_http_downloader().add(
+                promises.push(self.loop_.borrow().get_http_downloader().add(
                     repo_url,
                     &PhpMixed::Array(opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 ));
             }
 
-            self.loop_.wait(promises, None);
+            let _ = self.loop_.borrow_mut().wait(promises, None);
 
             Ok(())
         })();
@@ -789,7 +788,7 @@ impl InstallationManager {
             self.notifiable_packages
                 .entry(notification_url.to_string())
                 .or_insert_with(Vec::new)
-                .push(package.clone_box());
+                .push(package.clone_package_box());
         }
     }
 
@@ -800,7 +799,7 @@ impl InstallationManager {
     ) {
         let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
 
-        self.loop_.abort_jobs();
+        self.loop_.borrow().abort_jobs();
 
         for (_, cleanup) in cleanup_promises {
             // TODO(phase-b): React\Promise\Promise constructor with executor; emulate by wrapping cleanup()
@@ -813,7 +812,7 @@ impl InstallationManager {
         }
 
         if (promises.len() as i64) > 0 {
-            self.loop_.wait(promises, None);
+            let _ = self.loop_.borrow_mut().wait(promises, None);
         }
     }
 }

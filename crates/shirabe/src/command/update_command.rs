@@ -15,13 +15,9 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::multi_constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
 
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
-
 use crate::advisory::auditor::Auditor;
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::command::bump_command::BumpCommand;
-use crate::command::completion_trait::CompletionTrait;
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -34,6 +30,7 @@ use crate::package::version::version_parser::VersionParser;
 use crate::package::version::version_selector::VersionSelector;
 use crate::plugin::command_event::CommandEvent;
 use crate::plugin::plugin_events::PluginEvents;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::RepositoryInterface;
@@ -42,64 +39,18 @@ use crate::util::http_downloader::HttpDownloader;
 
 #[derive(Debug)]
 pub struct UpdateCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for UpdateCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl UpdateCommand {
     pub fn configure(&mut self) {
-        let suggest_installed_package = self.suggest_installed_package(false, true);
-        let suggest_prefer_install = self.suggest_prefer_install();
-        self.inner
+        // TODO(cli-completion): suggest_installed_package(false, true) / suggest_prefer_install
+        self
             .set_name("update")
-            .set_aliases(vec!["u".to_string(), "upgrade".to_string()])
+            .set_aliases(&["u".to_string(), "upgrade".to_string()])
             .set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file")
-            .set_definition(vec![
-                // TODO(phase-b): InputArgument/InputOption constructors and types
-                todo!("Box<dyn InputDefinitionEntry> for InputArgument::new(\"packages\", IS_ARRAY|OPTIONAL, ..., suggest_installed_package)"),
-                todo!("InputOption::new(\"with\", ..., VALUE_IS_ARRAY|VALUE_REQUIRED, ...)"),
-                todo!("InputOption::new(\"prefer-source\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"prefer-dist\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"prefer-install\", ..., VALUE_REQUIRED, ..., suggest_prefer_install)"),
-                todo!("InputOption::new(\"dry-run\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"dev\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-dev\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"lock\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-install\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-audit\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"audit-format\", ..., VALUE_REQUIRED, ..., Auditor::FORMAT_SUMMARY, Auditor::FORMATS)"),
-                todo!("InputOption::new(\"no-security-blocking\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-autoloader\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-suggest\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"no-progress\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"with-dependencies\", \"w\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"with-all-dependencies\", \"W\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"verbose\", \"v|vv|vvv\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"optimize-autoloader\", \"o\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"classmap-authoritative\", \"a\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"apcu-autoloader\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"apcu-autoloader-prefix\", ..., VALUE_REQUIRED, ...)"),
-                todo!("InputOption::new(\"ignore-platform-req\", ..., VALUE_REQUIRED|VALUE_IS_ARRAY, ...)"),
-                todo!("InputOption::new(\"ignore-platform-reqs\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"prefer-stable\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"prefer-lowest\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"minimal-changes\", \"m\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"patch-only\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"interactive\", \"i\", VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"root-reqs\", ..., VALUE_NONE, ...)"),
-                todo!("InputOption::new(\"bump-after-update\", ..., VALUE_OPTIONAL, ..., false, ['dev', 'no-dev', 'all'])"),
-            ])
+            // TODO(phase-b): set_definition with InputArgument/InputOption (see PHP UpdateCommand)
+            .set_definition(vec![])
             .set_help(
                 "The <info>update</info> command reads the composer.json file from the\n\
                 current directory, processes it, and updates, removes or installs all the\n\
@@ -125,7 +76,7 @@ impl UpdateCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error(
                 PhpMixed::String(
@@ -166,7 +117,7 @@ impl UpdateCommand {
                     .collect()
             })
             .unwrap_or_default();
-        let mut reqs: IndexMap<String, String> = self.inner.format_requirements(
+        let mut reqs: IndexMap<String, String> = self.format_requirements(
             input
                 .get_option("with")
                 .as_list()
@@ -435,14 +386,11 @@ impl UpdateCommand {
             .set_update_mirrors(update_mirrors)
             .set_update_allow_list(packages.clone())
             .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)
-            .set_platform_requirement_filter(self.inner.get_platform_requirement_filter(input))
+            .set_platform_requirement_filter(self.get_platform_requirement_filter(input))
             .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
             .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
             .set_temporary_constraints(temporary_constraints)
-            .set_audit_config(
-                self.inner
-                    .create_audit_config(composer.get_config(), input)?,
-            )
+            .set_audit_config(self.create_audit_config(composer.get_config(), input)?)
             .set_minimal_update(minimal_changes);
 
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {
@@ -506,7 +454,7 @@ impl UpdateCommand {
             .into());
         }
 
-        let platform_req_filter = self.inner.get_platform_requirement_filter(input);
+        let platform_req_filter = self.get_platform_requirement_filter(input);
         let stability_flags = composer.get_package().get_stability_flags();
         let requires = array_merge(
             // TODO(phase-b): array_merge for IndexMap<String, Link>
@@ -639,30 +587,12 @@ impl UpdateCommand {
     }
 }
 
-impl BaseCommand for UpdateCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for UpdateCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for UpdateCommand {}

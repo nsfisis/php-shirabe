@@ -5,15 +5,13 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
@@ -21,19 +19,17 @@ use crate::json::json_file::JsonFile;
 use crate::package::alias_package::AliasPackage;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_package::CompletePackage;
+use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::repository::composite_repository::CompositeRepository;
 
 #[derive(Debug)]
 pub struct FundCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl FundCommand {
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("fund")
+        self.set_name("fund")
             .set_description("Discover how to help fund the maintenance of your dependencies")
             .set_definition(vec![InputOption::new(
                 "format",
@@ -41,7 +37,6 @@ impl FundCommand {
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(PhpMixed::String("text".to_string())),
-                vec!["text".to_string(), "json".to_string()],
             )]);
     }
 
@@ -50,7 +45,7 @@ impl FundCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         let repo = composer.get_repository_manager().get_local_repository();
         let remote_repos =
@@ -120,7 +115,7 @@ impl FundCommand {
 
         fundings.sort_keys();
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         let format = input
             .get_option("format")
@@ -163,7 +158,7 @@ impl FundCommand {
             );
             io.write("Thank you!");
         } else if format == "json" {
-            io.write(&JsonFile::encode(&fundings));
+            io.write(&JsonFile::encode(&fundings, 448));
         } else {
             io.write("No funding links were found in your package dependencies. This doesn't mean they don't need your support!");
         }
@@ -208,30 +203,12 @@ impl FundCommand {
     }
 }
 
-impl BaseCommand for FundCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for FundCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for FundCommand {}

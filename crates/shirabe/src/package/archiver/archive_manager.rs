@@ -19,8 +19,8 @@ use crate::util::r#loop::Loop;
 use crate::util::sync_helper::SyncHelper;
 
 pub struct ArchiveManager {
-    pub(crate) download_manager: DownloadManager,
-    pub(crate) r#loop: Loop,
+    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+    pub(crate) r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     pub(crate) archivers: Vec<Box<dyn ArchiverInterface>>,
     pub(crate) overwrite_files: bool,
 }
@@ -34,7 +34,10 @@ impl std::fmt::Debug for ArchiveManager {
 }
 
 impl ArchiveManager {
-    pub fn new(download_manager: DownloadManager, r#loop: Loop) -> Self {
+    pub fn new(
+        download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
+    ) -> Self {
         Self {
             download_manager,
             r#loop,
@@ -144,7 +147,7 @@ impl ArchiveManager {
             }
         };
 
-        let filesystem = Filesystem::new();
+        let filesystem = Filesystem::new(None);
 
         let is_root = package.as_any().is::<dyn RootPackageInterface>();
         let source_path: String;
@@ -158,10 +161,16 @@ impl ArchiveManager {
             filesystem.ensure_directory_exists(&source_path)?;
 
             let download_result = (|| -> anyhow::Result<()> {
-                let promise = self.download_manager.download(package, &source_path)?;
-                SyncHelper::r#await(&self.r#loop, promise)?;
-                let promise = self.download_manager.install(package, &source_path)?;
-                SyncHelper::r#await(&self.r#loop, promise)?;
+                let promise =
+                    self.download_manager
+                        .borrow()
+                        .download(package, &source_path, None)?;
+                SyncHelper::r#await(&self.r#loop, Some(promise))?;
+                let promise = self
+                    .download_manager
+                    .borrow()
+                    .install(package, &source_path)?;
+                SyncHelper::r#await(&self.r#loop, Some(promise))?;
                 Ok(())
             })();
 
@@ -172,7 +181,7 @@ impl ArchiveManager {
 
             let composer_json_path = format!("{}/composer.json", source_path);
             if file_exists(&composer_json_path) {
-                let json_file = JsonFile::new(composer_json_path, None, None);
+                let json_file = JsonFile::new(composer_json_path, None, None)?;
                 let json_data = json_file.read()?;
                 if let Some(archive) = json_data.get("archive") {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_str()) {

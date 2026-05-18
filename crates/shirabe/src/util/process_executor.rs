@@ -118,7 +118,7 @@ impl ProcessExecutor {
 
     /// runs a process on the commandline in TTY mode
     pub fn execute_tty(&mut self, command: PhpMixed, cwd: Option<&str>) -> Result<i64> {
-        if Platform::is_tty() {
+        if Platform::is_tty(None) {
             return self.do_execute(command, cwd, true, None);
         }
 
@@ -448,7 +448,7 @@ impl ProcessExecutor {
                 1,
                 min(
                     50,
-                    max_jobs_env.as_string().unwrap_or("0").parse().unwrap_or(0),
+                    max_jobs_env.as_deref().unwrap_or("0").parse().unwrap_or(0),
                 ),
             );
         } else {

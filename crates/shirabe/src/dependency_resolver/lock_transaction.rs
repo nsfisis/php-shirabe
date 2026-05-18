@@ -39,8 +39,11 @@ impl LockTransaction {
         };
         this.set_result_packages(pool, decisions);
         let all = this.result_packages.get("all").cloned().unwrap_or_default();
-        let present: Vec<Box<dyn PackageInterface>> =
-            this.present_map.values().map(|p| p.clone_box()).collect();
+        let present: Vec<Box<dyn PackageInterface>> = this
+            .present_map
+            .values()
+            .map(|p| p.clone_package_box())
+            .collect();
         this.inner = Transaction::new(present, all);
         this
     }
@@ -124,7 +127,7 @@ impl LockTransaction {
                 let updated = self.update_mirror_and_urls(package.as_ref());
                 packages.push(updated);
             } else {
-                packages.push(package.clone_box());
+                packages.push(package.clone_package_box());
             }
         }
 
@@ -157,7 +160,7 @@ impl LockTransaction {
             }
 
             if present_package.get_dist_type() != package.get_dist_type() {
-                return present_package.clone_box();
+                return present_package.clone_package_box();
             }
 
             if package.get_dist_url().is_some()
@@ -174,10 +177,10 @@ impl LockTransaction {
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());
 
-            return present_package.clone_box();
+            return present_package.clone_package_box();
         }
 
-        package.clone_box()
+        package.clone_package_box()
     }
 
     pub fn get_aliases(

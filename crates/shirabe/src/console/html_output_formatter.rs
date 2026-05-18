@@ -42,13 +42,15 @@ impl HtmlOutputFormatter {
     ];
 
     pub fn new(styles: IndexMap<String, OutputFormatterStyle>) -> Self {
+        // TODO(phase-b): styles dropped until base OutputFormatter::new accepts a style map
+        let _ = styles;
         Self {
-            inner: OutputFormatter::new(true, styles),
+            inner: OutputFormatter::new(true),
         }
     }
 
     pub fn format(&self, message: Option<&str>) -> Option<String> {
-        let formatted = self.inner.format(message)?;
+        let formatted = self.inner.format(message.unwrap_or(""));
 
         let clear_escape_codes = "(?:39|49|0|22|24|25|27|28)";
         let pattern = format!(

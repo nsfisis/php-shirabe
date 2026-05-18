@@ -385,7 +385,7 @@ pub trait VcsDownloader:
                     io_interface::NORMAL,
                 );
                 self.io_mut()
-                    .write_error(PhpMixed::String(logs), true, io_interface::NORMAL);
+                    .write_error3(&logs, true, io_interface::NORMAL);
             }
         }
 

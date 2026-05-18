@@ -70,7 +70,7 @@ impl Auditor {
     /// @throws InvalidArgumentException If no packages are passed in
     pub fn audit(
         &self,
-        io: &dyn IOInterface,
+        io: &mut dyn IOInterface,
         repo_set: &RepositorySet,
         packages: Vec<Box<dyn PackageInterface>>,
         format: &str,
@@ -170,17 +170,13 @@ impl Auditor {
                 ),
             );
 
-            io.write(
-                PhpMixed::String(JsonFile::encode(
-                    &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                    shirabe_php_shim::JSON_UNESCAPED_SLASHES
-                        | shirabe_php_shim::JSON_PRETTY_PRINT
-                        | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
-                    JsonFile::INDENT_DEFAULT,
-                )),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write(&JsonFile::encode_with_indent(
+                &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                shirabe_php_shim::JSON_UNESCAPED_SLASHES
+                    | shirabe_php_shim::JSON_PRETTY_PRINT
+                    | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
+                JsonFile::INDENT_DEFAULT,
+            ));
 
             return Ok(audit_bitmask);
         }
@@ -214,57 +210,31 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(
-                        PhpMixed::String(sprintf(
-                            &message,
-                            &[
-                                PhpMixed::Int(total_advisory_count),
-                                PhpMixed::String(plurality.to_string()),
-                                PhpMixed::Int(pkg_count),
-                                PhpMixed::String(pkg_plurality.to_string()),
-                                PhpMixed::String(punctuation.to_string()),
-                            ],
-                        )),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write_error(&sprintf(
+                        &message,
+                        &[
+                            PhpMixed::Int(total_advisory_count),
+                            PhpMixed::String(plurality.to_string()),
+                            PhpMixed::Int(pkg_count),
+                            PhpMixed::String(pkg_plurality.to_string()),
+                            PhpMixed::String(punctuation.to_string()),
+                        ],
+                    ));
                     self.output_advisories(io, advisories_to_output, format)?;
                 }
             }
 
             if format == Self::FORMAT_SUMMARY {
-                io.write_error(
-                    PhpMixed::String(
-                        "Run \"composer audit\" for a full list of advisories.".to_string(),
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error("Run \"composer audit\" for a full list of advisories.");
             }
         } else {
-            io.write_error(
-                PhpMixed::String(
-                    "<info>No security vulnerability advisories found.</info>".to_string(),
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error("<info>No security vulnerability advisories found.</info>");
         }
 
         if !unreachable_repos.is_empty() {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>The following repositories were unreachable:</warning>".to_string(),
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error("<warning>The following repositories were unreachable:</warning>");
             for repo in &unreachable_repos {
-                io.write_error(
-                    PhpMixed::String(format!("  - {}", repo)),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(&format!("  - {}", repo));
             }
         }
 
@@ -458,7 +428,7 @@ impl Auditor {
     /// @param self::FORMAT_* $format The format that will be used to output audit results.
     fn output_advisories(
         &self,
-        io: &dyn IOInterface,
+        io: &mut dyn IOInterface,
         advisories: &IndexMap<String, Vec<PartialSecurityAdvisory>>,
         format: &str,
     ) -> Result<()> {
@@ -534,8 +504,8 @@ impl Auditor {
                 }
                 let _ = row;
                 io.get_table()
-                    .set_horizontal()
-                    .set_headers(headers)
+                    .set_horizontal(true)
+                    .set_headers(headers.into_iter().map(|h| h.into()).collect())
                     .add_row(ConsoleIO::sanitize(PhpMixed::Null, false))
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
@@ -547,7 +517,7 @@ impl Auditor {
     /// @param array<string, array<SecurityAdvisory>> $advisories
     fn output_advisories_plain(
         &self,
-        io: &dyn IOInterface,
+        io: &mut dyn IOInterface,
         advisories: &IndexMap<String, Vec<PartialSecurityAdvisory>>,
     ) {
         let mut error: Vec<String> = vec![];
@@ -596,41 +566,30 @@ impl Auditor {
                 first_advisory = false;
             }
         }
-        io.write_error(
-            PhpMixed::List(
-                error
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        for line in &error {
+            io.write_error(line);
+        }
     }
 
     /// @param array<CompletePackageInterface> $packages
     /// @param self::FORMAT_PLAIN|self::FORMAT_TABLE $format
     fn output_abandoned_packages(
         &self,
-        io: &dyn IOInterface,
+        io: &mut dyn IOInterface,
         packages: &[Box<dyn CompletePackageInterface>],
         format: &str,
     ) -> Result<()> {
-        io.write_error(
-            PhpMixed::String(sprintf(
-                "<error>Found %d abandoned package%s:</error>",
-                &[
-                    PhpMixed::Int(packages.len() as i64),
-                    PhpMixed::String(if packages.len() > 1 {
-                        "s".to_string()
-                    } else {
-                        String::new()
-                    }),
-                ],
-            )),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write_error(&sprintf(
+            "<error>Found %d abandoned package%s:</error>",
+            &[
+                PhpMixed::Int(packages.len() as i64),
+                PhpMixed::String(if packages.len() > 1 {
+                    "s".to_string()
+                } else {
+                    String::new()
+                }),
+            ],
+        ));
 
         if format == Self::FORMAT_PLAIN {
             for pkg in packages {
@@ -639,17 +598,13 @@ impl Auditor {
                 } else {
                     "No replacement was suggested".to_string()
                 };
-                io.write_error(
-                    PhpMixed::String(sprintf(
-                        "%s is abandoned. %s.",
-                        &[
-                            PhpMixed::String(self.get_package_name_with_link_for_complete(pkg)),
-                            PhpMixed::String(replacement),
-                        ],
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error(&sprintf(
+                    "%s is abandoned. %s.",
+                    &[
+                        PhpMixed::String(self.get_package_name_with_link_for_complete(pkg)),
+                        PhpMixed::String(replacement),
+                    ],
+                ));
             }
 
             return Ok(());
@@ -672,8 +627,8 @@ impl Auditor {
             .unwrap()
             .get_table()
             .set_headers(vec![
-                "Abandoned Package".to_string(),
-                "Suggested Replacement".to_string(),
+                "Abandoned Package".to_string().into(),
+                "Suggested Replacement".to_string().into(),
             ])
             .set_column_width(1, 80)
             .set_column_max_width(1, 80);

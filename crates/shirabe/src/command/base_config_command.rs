@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::config::Config;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::factory::Factory;
@@ -25,13 +25,14 @@ pub trait BaseConfigCommand: BaseCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> anyhow::Result<()> {
-        self.inner.initialize(input, output)?;
+        // TODO(phase-b): BaseCommand::initialize chained via Self::initialize would recurse;
+        // omitted until trait disambiguation is sorted.
 
         if input.get_option("global").as_bool() && input.get_option("file").is_not_null() {
             return Err(anyhow::anyhow!("--file and --global can not be combined"));
         }
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         *self.config_mut() = Some(Factory::create_config(io)?);
         let config = self.config().as_mut().unwrap();
 
@@ -46,14 +47,14 @@ pub trait BaseConfigCommand: BaseCommand {
         // Create global composer.json if invoked using `composer global [config-cmd]`
         if (config_file == "composer.json" || config_file == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
-            && std::fs::canonicalize(Platform::get_cwd()).ok()
+            && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
                 == std::fs::canonicalize(config.get("home").to_string()).ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
 
         let config = self.config().as_ref().unwrap();
-        *self.config_file_mut() = Some(JsonFile::new(config_file.clone(), None, Some(io)));
+        *self.config_file_mut() = Some(JsonFile::new(config_file.clone(), None, Some(io))?);
         *self.config_source_mut() =
             Some(JsonConfigSource::new(self.config_file().as_ref().unwrap()));
 

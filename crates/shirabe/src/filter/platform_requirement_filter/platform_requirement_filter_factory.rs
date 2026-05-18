@@ -23,9 +23,20 @@ impl PlatformRequirementFilterFactory {
                     Ok(Self::ignore_nothing())
                 }
             }
-            list_or_array @ (PhpMixed::List(_) | PhpMixed::Array(_)) => Ok(Box::new(
-                IgnoreListPlatformRequirementFilter::new(list_or_array),
-            )),
+            list_or_array @ (PhpMixed::List(_) | PhpMixed::Array(_)) => {
+                let list: Vec<String> = match list_or_array {
+                    PhpMixed::List(items) => items
+                        .into_iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect(),
+                    PhpMixed::Array(map) => map
+                        .into_iter()
+                        .filter_map(|(_, v)| v.as_string().map(|s| s.to_string()))
+                        .collect(),
+                    _ => unreachable!(),
+                };
+                Ok(Box::new(IgnoreListPlatformRequirementFilter::new(list)?))
+            }
             other => Err(anyhow::anyhow!(InvalidArgumentException {
                 message: format!(
                     "PlatformRequirementFilter: Unknown $boolOrList parameter {}. Please report at https://github.com/composer/composer/issues/new.",

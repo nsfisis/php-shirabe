@@ -65,7 +65,7 @@ impl Comparer {
         let mut source: IndexMap<String, IndexMap<String, Option<String>>> = IndexMap::new();
         let mut destination: IndexMap<String, IndexMap<String, Option<String>>> = IndexMap::new();
         self.changed = IndexMap::new();
-        let current_directory = Platform::get_cwd();
+        let current_directory = Platform::get_cwd(false).unwrap_or_default();
         shirabe_php_shim::chdir(&self.source);
         if !Self::do_tree(".", &mut source) {
             return;

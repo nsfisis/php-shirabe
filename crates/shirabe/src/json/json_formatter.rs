@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Json/JsonFormatter.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, function_exists, mb_convert_encoding, pack};
 
 pub struct JsonFormatter;
@@ -44,27 +44,40 @@ impl JsonFormatter {
                 if unescape_unicode && function_exists("mb_convert_encoding") {
                     buffer = Preg::replace_callback(
                         r"/(\\+)u([0-9a-f]{4})/i",
-                        |matches: &[String]| -> String {
-                            let l = matches[1].len();
+                        |matches: &indexmap::IndexMap<CaptureKey, String>| -> String {
+                            let m0 = matches
+                                .get(&CaptureKey::ByIndex(0))
+                                .cloned()
+                                .unwrap_or_default();
+                            let m1 = matches
+                                .get(&CaptureKey::ByIndex(1))
+                                .cloned()
+                                .unwrap_or_default();
+                            let m2 = matches
+                                .get(&CaptureKey::ByIndex(2))
+                                .cloned()
+                                .unwrap_or_default();
+                            let l = m1.len();
 
                             if l % 2 != 0 {
-                                let code = i64::from_str_radix(&matches[2], 16).unwrap_or(0);
+                                let code = i64::from_str_radix(&m2, 16).unwrap_or(0);
                                 if code >= 0xD800 && code <= 0xDFFF {
-                                    return matches[0].clone();
+                                    return m0;
                                 }
 
                                 return "\\".repeat(l - 1)
                                     + &mb_convert_encoding(
-                                        pack("H*", &[PhpMixed::String(matches[2].clone())]),
+                                        pack("H*", &[PhpMixed::String(m2)]),
                                         "UTF-8",
                                         "UCS-2BE",
                                     );
                             }
 
-                            matches[0].clone()
+                            m0
                         },
                         &buffer,
-                    );
+                    )
+                    .unwrap_or(buffer);
                 }
 
                 result.push_str(&buffer);

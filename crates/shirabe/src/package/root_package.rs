@@ -24,6 +24,21 @@ pub struct RootPackage {
 
 impl RootPackage {
     pub const DEFAULT_PRETTY_VERSION: &'static str = "1.0.0+no-version-set";
+
+    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+        // TODO(phase-b): CompletePackage::new signature is not yet pinned down
+        let inner: CompletePackage = todo!();
+        let _ = (name, version, pretty_version);
+        Self {
+            inner,
+            minimum_stability: "stable".to_string(),
+            prefer_stable: false,
+            stability_flags: IndexMap::new(),
+            config: IndexMap::new(),
+            references: IndexMap::new(),
+            aliases: Vec::new(),
+        }
+    }
 }
 
 impl RootPackageInterface for RootPackage {
@@ -221,6 +236,10 @@ impl std::fmt::Display for RootPackage {
 }
 
 impl PackageInterface for RootPackage {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         todo!()
     }
@@ -311,13 +330,13 @@ impl PackageInterface for RootPackage {
     fn get_requires(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_conflicts(&self) -> Vec<Link> {
+    fn get_conflicts(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_provides(&self) -> Vec<Link> {
+    fn get_provides(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_replaces(&self) -> Vec<Link> {
+    fn get_replaces(&self) -> IndexMap<String, Link> {
         todo!()
     }
     fn get_dev_requires(&self) -> IndexMap<String, Link> {

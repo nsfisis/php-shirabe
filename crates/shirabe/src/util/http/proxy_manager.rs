@@ -67,7 +67,7 @@ impl ProxyManager {
             return Ok(RequestProxy::no_proxy());
         }
 
-        Ok(proxy.unwrap().to_request_proxy(&scheme))
+        Ok(proxy.unwrap().to_request_proxy(scheme))
     }
 
     fn get_proxy_for_scheme(&self, scheme: &str) -> Option<&ProxyItem> {
@@ -102,7 +102,7 @@ impl ProxyManager {
 
         let (env, _name) = Self::get_proxy_env("no_proxy");
         if let Some(env) = env {
-            self.no_proxy_handler = Some(NoProxyPattern::new(env));
+            self.no_proxy_handler = Some(NoProxyPattern::new(&env));
         }
 
         Ok(())

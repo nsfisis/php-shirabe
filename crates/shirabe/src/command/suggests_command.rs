@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -11,35 +10,28 @@ use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::root_package_repository::RootPackageRepository;
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
+use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::{
-    component::console::command::command::Command, console::input::input_interface::InputInterface,
-};
 use shirabe_php_shim::{PhpMixed, empty, in_array};
 
 #[derive(Debug)]
 pub struct SuggestsCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-
-    completion_trait: Box<dyn CompletionTrait>,
+    base_command_data: BaseCommandData,
 }
 
 impl SuggestsCommand {
     pub fn configure(&mut self) {
-        let suggest_installed_package = self.completion_trait.suggest_installed_package();
-        self.inner
+        // TODO(cli-completion): suggest_installed_package() for `packages` argument
+        self
             .set_name("suggests")
             .set_description("Shows package suggestions")
             .set_definition(vec![
-                InputOption::new("by-package", None, Some(InputOption::VALUE_NONE), "Groups output by suggesting package (default)", None, vec![]),
-                InputOption::new("by-suggestion", None, Some(InputOption::VALUE_NONE), "Groups output by suggested package", None, vec![]),
-                InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show suggestions from all dependencies, including transitive ones", None, vec![]),
-                InputOption::new("list", None, Some(InputOption::VALUE_NONE), "Show only list of suggested package names", None, vec![]),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Exclude suggestions from require-dev packages", None, vec![]),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that you want to list suggestions from.", None, suggest_installed_package),
+                InputOption::new("by-package", None, Some(InputOption::VALUE_NONE), "Groups output by suggesting package (default)", None),
+                InputOption::new("by-suggestion", None, Some(InputOption::VALUE_NONE), "Groups output by suggested package", None),
+                InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show suggestions from all dependencies, including transitive ones", None),
+                InputOption::new("list", None, Some(InputOption::VALUE_NONE), "Show only list of suggested package names", None),
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Exclude suggestions from require-dev packages", None),
+                InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that you want to list suggestions from.", None),
             ])
             .set_help(
                 "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests",
@@ -51,7 +43,7 @@ impl SuggestsCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         let mut installed_repos = vec![Box::new(RootPackageRepository::new(
             composer.get_package().clone(),
@@ -77,7 +69,7 @@ impl SuggestsCommand {
         }
 
         let installed_repo = InstalledRepository::new(installed_repos);
-        let mut reporter = SuggestedPackagesReporter::new(self.inner.get_io());
+        let mut reporter = SuggestedPackagesReporter::new(self.get_io());
 
         let filter = input.get_argument("packages");
         let mut packages = installed_repo.get_packages();
@@ -121,30 +113,12 @@ impl SuggestsCommand {
     }
 }
 
-impl BaseCommand for SuggestsCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for SuggestsCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for SuggestsCommand {}

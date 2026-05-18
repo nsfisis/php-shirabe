@@ -363,6 +363,14 @@ impl Preg {
         todo!()
     }
 
+    pub fn is_match_named(
+        _pattern: &str,
+        _subject: &str,
+        _matches: &mut indexmap::IndexMap<String, String>,
+    ) -> anyhow::Result<bool> {
+        todo!()
+    }
+
     pub fn is_match_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
         todo!()
     }

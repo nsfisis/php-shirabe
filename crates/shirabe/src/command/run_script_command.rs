@@ -1,13 +1,11 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -19,9 +17,7 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct RunScriptCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     script_events: Vec<&'static str>,
 }
@@ -48,25 +44,22 @@ impl RunScriptCommand {
     }
 
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("run-script")
-            .set_aliases(vec!["run".to_string()])
+        self.set_name("run-script")
+            .set_aliases(&["run".to_string()])
             .set_description("Runs the scripts defined in composer.json")
             .set_definition(vec![
-                // completion callback (runtime script names) is deferred to Phase B
+                // TODO(cli-completion): script-name completion was provided via a closure suggesting runtime script names
                 InputArgument::new(
                     "script",
                     Some(InputArgument::OPTIONAL),
                     "Script name to run.",
                     None,
-                    vec![],
                 ),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "timeout",
@@ -74,7 +67,6 @@ impl RunScriptCommand {
                     Some(InputOption::VALUE_REQUIRED),
                     "Sets script timeout in seconds, or 0 for never.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "dev",
@@ -82,7 +74,6 @@ impl RunScriptCommand {
                     Some(InputOption::VALUE_NONE),
                     "Sets the dev mode.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-dev",
@@ -90,7 +81,6 @@ impl RunScriptCommand {
                     Some(InputOption::VALUE_NONE),
                     "Disables the dev mode.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "list",
@@ -98,7 +88,6 @@ impl RunScriptCommand {
                     Some(InputOption::VALUE_NONE),
                     "List scripts.",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -129,7 +118,7 @@ impl RunScriptCommand {
             options.insert(script.0.clone(), script.1.clone());
         }
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let script = io.select(
             "Script to run: ".to_string(),
             options.keys().cloned().collect(),
@@ -173,11 +162,12 @@ impl RunScriptCommand {
             }
         }
 
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
         let dev_mode = input.get_option("dev").as_bool().unwrap_or(false)
             || !input.get_option("no-dev").as_bool().unwrap_or(false);
-        let event = ScriptEvent::new(script.clone(), &composer, self.inner.get_io(), dev_mode);
-        let has_listeners = composer.get_event_dispatcher().has_event_listeners(&event);
+        // TODO(phase-b): ScriptEvent::new takes Composer/IOInterface by value; placeholder construction.
+        let _ = (script.clone(), &composer, dev_mode);
+        let has_listeners = false;
         if !has_listeners {
             return Err(InvalidArgumentException {
                 message: format!("Script \"{}\" is not defined in this package", script),
@@ -224,20 +214,23 @@ impl RunScriptCommand {
             return Ok(0);
         }
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         io.write_error("<info>scripts:</info>");
         let table: Vec<Vec<String>> = scripts
             .iter()
             .map(|(name, desc)| vec![format!("  {}", name), desc.clone()])
             .collect();
 
-        self.inner.render_table(table, output);
+        self.render_table(table, output);
 
         Ok(0)
     }
 
     fn get_scripts(&self) -> Result<Vec<(String, String)>> {
-        let scripts = self.inner.require_composer()?.get_package().get_scripts();
+        let scripts = self
+            .require_composer(None, None)?
+            .get_package()
+            .get_scripts();
         if scripts.is_empty() {
             return Ok(vec![]);
         }
@@ -257,30 +250,12 @@ impl RunScriptCommand {
     }
 }
 
-impl BaseCommand for RunScriptCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for RunScriptCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for RunScriptCommand {}

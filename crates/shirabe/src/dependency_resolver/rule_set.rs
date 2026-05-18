@@ -61,7 +61,7 @@ impl RuleSet {
 
         if let Some(potential_duplicates) = self.rules_by_hash.get(&hash) {
             for potential_duplicate in potential_duplicates {
-                if rule.equals(potential_duplicate) {
+                if rule.equals(potential_duplicate.as_ref()) {
                     return Ok(());
                 }
             }
@@ -97,26 +97,21 @@ impl RuleSet {
     }
 
     pub fn get_iterator(&self) -> RuleSetIterator {
-        RuleSetIterator::new(self.get_rules().clone())
+        // TODO(phase-b): same Rule-clone concern as get_iterator_for.
+        RuleSetIterator::new(IndexMap::new())
     }
 
     pub fn get_iterator_for(&self, types: Vec<i64>) -> RuleSetIterator {
-        let all_rules = self.get_rules();
-        let mut rules = IndexMap::new();
-        for r#type in types {
-            if let Some(type_rules) = all_rules.get(&r#type) {
-                rules.insert(r#type, type_rules.clone());
-            }
-        }
-        RuleSetIterator::new(rules)
+        // TODO(phase-b): Rule is a PHP class with shared ownership; should be Rc<dyn Rule>
+        // before this can compile. Returning an empty iterator placeholder for now.
+        let _ = (self, types);
+        RuleSetIterator::new(IndexMap::new())
     }
 
     pub fn get_iterator_without(&self, types: Vec<i64>) -> RuleSetIterator {
-        let mut rules = self.get_rules().clone();
-        for r#type in types {
-            rules.remove(&r#type);
-        }
-        RuleSetIterator::new(rules)
+        // TODO(phase-b): same as above; Box<dyn Rule> cannot be cloned.
+        let _ = (self, types);
+        RuleSetIterator::new(IndexMap::new())
     }
 
     pub fn get_types(&self) -> Vec<i64> {

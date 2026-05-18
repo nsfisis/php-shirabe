@@ -96,7 +96,7 @@ impl FossilDriver {
     pub(crate) fn update_local_repo(&mut self) -> anyhow::Result<()> {
         assert!(self.repo_file.is_some());
 
-        let fs = Filesystem::new();
+        let fs = Filesystem::new(None);
         fs.ensure_directory_exists(&self.checkout_dir)?;
 
         if !is_writable(&dirname(&self.checkout_dir)) {

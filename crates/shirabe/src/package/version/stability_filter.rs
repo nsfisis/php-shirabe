@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Version/StabilityFilter.php
 
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::STABILITIES;
 use indexmap::IndexMap;
 
 pub struct StabilityFilter;
@@ -15,7 +15,7 @@ impl StabilityFilter {
         for name in names {
             // allow if package matches the package-specific stability flag
             if let Some(&flag) = stability_flags.get(name) {
-                if let Some(&stability_value) = BasePackage::STABILITIES.get(stability) {
+                if let Some(&stability_value) = STABILITIES.get(stability) {
                     if stability_value <= flag {
                         return true;
                     }

@@ -3,8 +3,6 @@
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
@@ -15,10 +13,10 @@ use shirabe_php_shim::{
 };
 
 use crate::advisory::auditor::Auditor;
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
+use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -50,57 +48,44 @@ use crate::util::process_executor::ProcessExecutor;
 /// Install a package as new project into new directory.
 #[derive(Debug)]
 pub struct CreateProjectCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     /// @var SuggestedPackagesReporter
     pub(crate) suggested_packages_reporter: Option<SuggestedPackagesReporter>,
 }
 
-impl CompletionTrait for CreateProjectCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
-}
-
 impl CreateProjectCommand {
     fn configure(&mut self) {
-        let suggest_prefer_install = self.suggest_prefer_install();
-        let suggest_available_package = self.suggest_available_package();
-        self.inner
+        // TODO(cli-completion): suggest_prefer_install / suggest_available_package
+        self
             .set_name("create-project")
             .set_description("Creates new project from a package into given directory")
             .set_definition(vec![
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, suggest_available_package),
-                InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None, vec![]),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None, vec![]),
-                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None, vec![]),
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None, vec![]),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None, vec![]),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, suggest_prefer_install),
-                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None, vec![]),
-                InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None, vec![]),
-                InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None, vec![]),
-                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables installation of require-dev packages (enabled by default, only present for BC).", None, vec![]),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None, vec![]),
-                InputOption::new("no-custom-installers", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Use no-plugins instead.", None, vec![]),
-                InputOption::new("no-scripts", None, Some(InputOption::VALUE_NONE), "Whether to prevent execution of all defined scripts in the root package.", None, vec![]),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None, vec![]),
-                InputOption::new("no-secure-http", None, Some(InputOption::VALUE_NONE), "Disable the secure-http config option temporarily while installing the root package. Use at your own risk. Using this flag is a bad idea.", None, vec![]),
-                InputOption::new("keep-vcs", None, Some(InputOption::VALUE_NONE), "Whether to prevent deleting the vcs folder.", None, vec![]),
-                InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None, vec![]),
-                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None, vec![]),
-                InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None, vec![]),
-                InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
-                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None, vec![]),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None, vec![]),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None, vec![]),
-                InputOption::new("ask", None, Some(InputOption::VALUE_NONE), "Whether to ask for project directory.", None, vec![]),
+                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None),
+                InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None),
+                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None),
+                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None),
+                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None),
+                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None),
+                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories to look the package up, either by URL or using JSON arrays", None),
+                InputOption::new("repository-url", None, Some(InputOption::VALUE_REQUIRED), "DEPRECATED: Use --repository instead.", None),
+                InputOption::new("add-repository", None, Some(InputOption::VALUE_NONE), "Add the custom repository in the composer.json. If a lock file is present it will be deleted and an update will be run instead of install.", None),
+                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables installation of require-dev packages (enabled by default, only present for BC).", None),
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None),
+                InputOption::new("no-custom-installers", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Use no-plugins instead.", None),
+                InputOption::new("no-scripts", None, Some(InputOption::VALUE_NONE), "Whether to prevent execution of all defined scripts in the root package.", None),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None),
+                InputOption::new("no-secure-http", None, Some(InputOption::VALUE_NONE), "Disable the secure-http config option temporarily while installing the root package. Use at your own risk. Using this flag is a bad idea.", None),
+                InputOption::new("keep-vcs", None, Some(InputOption::VALUE_NONE), "Whether to prevent deleting the vcs folder.", None),
+                InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None),
+                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None),
+                InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None),
+                InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))),
+                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None),
+                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None),
+                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None),
+                InputOption::new("ask", None, Some(InputOption::VALUE_NONE), "Whether to ask for project directory.", None),
             ])
             .set_help(
                 "The <info>create-project</info> command creates a new project from a given\n\
@@ -127,7 +112,7 @@ impl CreateProjectCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let config = Factory::create_config(None, None)?;
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         let (prefer_source, prefer_dist) = self
             .inner
@@ -203,7 +188,7 @@ impl CreateProjectCommand {
             input.get_option("no-scripts").as_bool().unwrap_or(false),
             input.get_option("no-progress").as_bool().unwrap_or(false),
             input.get_option("no-install").as_bool().unwrap_or(false),
-            Some(self.inner.get_platform_requirement_filter(input)?),
+            Some(self.get_platform_requirement_filter(input)?),
             !input
                 .get_option("no-secure-http")
                 .as_bool()
@@ -240,7 +225,7 @@ impl CreateProjectCommand {
         secure_http: bool,
         add_repository: bool,
     ) -> Result<i64> {
-        let old_cwd = Platform::get_cwd();
+        let old_cwd = Platform::get_cwd(false)?;
 
         let repositories: Option<Vec<String>> = match repositories {
             Some(PhpMixed::Null) | None => None,
@@ -316,7 +301,7 @@ impl CreateProjectCommand {
                         "composer.json".to_string(),
                         None,
                         None,
-                    ));
+                    )?);
 
                     let is_packagist_disabled = (repo_config.contains_key("packagist")
                         && repo_config.len() == 1
@@ -346,8 +331,8 @@ impl CreateProjectCommand {
             }
         }
 
-        let process = composer.get_loop().get_process_executor();
-        let fs = Filesystem::new(Some(process));
+        let process = composer.get_loop().borrow().get_process_executor().cloned();
+        let fs = Filesystem::new(process);
 
         // dispatch event
         composer.get_event_dispatcher().dispatch_script(
@@ -435,7 +420,7 @@ impl CreateProjectCommand {
             finder
                 .depth(0)
                 .directories()
-                .r#in(&Platform::get_cwd())
+                .r#in(&Platform::get_cwd(false)?)
                 .ignore_vcs(false)
                 .ignore_dot_files(false);
             for vcs_name in [
@@ -486,7 +471,7 @@ impl CreateProjectCommand {
         if !has_vcs {
             let package = composer.get_package();
             let config_source =
-                JsonConfigSource::new(JsonFile::new("composer.json".to_string(), None, None));
+                JsonConfigSource::new(JsonFile::new("composer.json".to_string(), None, None)?);
             for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
                 // PHP: $package->{'get'.$meta['method']}() — dynamic getter dispatch
                 // TODO(phase-b): dynamic getter dispatch by name
@@ -505,9 +490,12 @@ impl CreateProjectCommand {
         }
 
         // dispatch event
-        composer
-            .get_event_dispatcher()
-            .dispatch_script(ScriptEvents::POST_CREATE_PROJECT_CMD, install_dev_packages);
+        composer.get_event_dispatcher().dispatch_script(
+            ScriptEvents::POST_CREATE_PROJECT_CMD,
+            install_dev_packages,
+            vec![],
+            indexmap::IndexMap::new(),
+        );
 
         chdir(&old_cwd);
 
@@ -555,7 +543,7 @@ impl CreateProjectCommand {
             let mut parts = explode_with_limit("/", &name, 2);
             format!(
                 "{}{}{}",
-                Platform::get_cwd(),
+                Platform::get_cwd(false)?,
                 DIRECTORY_SEPARATOR,
                 array_pop(&mut parts).unwrap_or_default()
             )
@@ -569,7 +557,7 @@ impl CreateProjectCommand {
         if !fs.is_absolute_path(&directory) {
             directory = format!(
                 "{}{}{}",
-                Platform::get_cwd(),
+                Platform::get_cwd(false)?,
                 DIRECTORY_SEPARATOR,
                 directory
             );
@@ -604,7 +592,7 @@ impl CreateProjectCommand {
         io.write_error(&format!(
             "<info>Creating a \"{}\" project at \"{}\"</info>",
             package_name,
-            fs.find_shortest_path(&Platform::get_cwd(), &directory, true)
+            fs.find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)
         ));
 
         if file_exists(&directory) {
@@ -846,10 +834,11 @@ impl CreateProjectCommand {
         }
 
         let dm = composer.get_download_manager();
-        dm.set_prefer_source(prefer_source)
+        dm.borrow_mut()
+            .set_prefer_source(prefer_source)
             .set_prefer_dist(prefer_dist);
 
-        let project_installer = ProjectInstaller::new(&directory, dm, &fs);
+        let project_installer = ProjectInstaller::new(&directory, dm.clone(), &fs);
         let im = composer.get_installation_manager();
         im.set_output_progress(!no_progress);
         im.add_installer(Box::new(project_installer));
@@ -896,8 +885,7 @@ impl CreateProjectCommand {
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> Result<Composer> {
-        self.inner
-            .create_composer_instance(input, io, config, disable_plugins, disable_scripts)
+        self.create_composer_instance(input, io, config, disable_plugins, disable_scripts)
     }
 
     fn create_audit_config(
@@ -905,34 +893,16 @@ impl CreateProjectCommand {
         config: &Config,
         input: &dyn InputInterface,
     ) -> Result<crate::advisory::audit_config::AuditConfig> {
-        self.inner.create_audit_config(config, input)
+        self.create_audit_config(config, input)
     }
 }
 
-impl BaseCommand for CreateProjectCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for CreateProjectCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for CreateProjectCommand {}

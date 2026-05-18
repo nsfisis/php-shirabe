@@ -134,7 +134,6 @@ impl Locker {
                         .collect(),
                 ),
                 0,
-                JsonFile::INDENT_DEFAULT,
             ),
         ))
     }
@@ -616,13 +615,13 @@ impl Locker {
             } else {
                 self.virtual_file_written = true;
                 self.lock_data_cache = Some(JsonFile::parse_json(
-                    &JsonFile::encode(
+                    Some(&JsonFile::encode_with_indent(
                         &PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                         shirabe_php_shim::JSON_UNESCAPED_SLASHES
                             | shirabe_php_shim::JSON_PRETTY_PRINT
                             | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
                         JsonFile::INDENT_DEFAULT,
-                    ),
+                    )),
                     None,
                 )?);
             }

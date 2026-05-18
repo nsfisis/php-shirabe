@@ -4,14 +4,11 @@ use std::any::Any;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::InvalidArgumentException;
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -29,43 +26,29 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct ReinstallCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for ReinstallCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl ReinstallCommand {
     pub fn configure(&mut self) {
-        let suggest_prefer_install = self.suggest_prefer_install();
-        let suggest_installed_package_types = self.suggest_installed_package_types(false);
-        let suggest_installed_package = self.suggest_installed_package(false);
-        self.inner
+        // TODO(cli-completion): suggest_prefer_install / suggest_installed_package_types / suggest_installed_package
+        self
             .set_name("reinstall")
             .set_description("Uninstalls and reinstalls the given package names")
             .set_definition(vec![
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None, vec![]),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None, vec![]),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, suggest_prefer_install),
-                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None, vec![]),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None, vec![]),
-                InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None, vec![]),
-                InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None, vec![]),
-                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None, vec![]),
-                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None, vec![]),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None, vec![]),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None, vec![]),
-                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None, suggest_installed_package_types),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None, suggest_installed_package),
+                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None),
+                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None),
+                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None),
+                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None),
+                InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None),
+                InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None),
+                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None),
+                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None),
+                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None),
+                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None),
+                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None),
+                InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None),
             ])
             .set_help(
                 "The <info>reinstall</info> command looks up installed packages by name,\n\
@@ -78,9 +61,9 @@ impl ReinstallCommand {
     }
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         let local_repo = composer.get_repository_manager().get_local_repository();
         let mut packages_to_reinstall: Vec<
@@ -198,17 +181,16 @@ impl ReinstallCommand {
         let command_event = CommandEvent::new(
             PluginEvents::COMMAND.to_string(),
             "reinstall".to_string(),
-            Box::new(input),
-            Box::new(output),
+            input,
+            output,
             vec![],
             vec![],
         );
         let event_dispatcher = composer.get_event_dispatcher();
-        event_dispatcher.dispatch(command_event.get_name(), &command_event);
+        event_dispatcher.dispatch(Some(command_event.get_name()), None);
 
         let config = composer.get_config();
-        let (prefer_source, prefer_dist) =
-            self.inner.get_preferred_install_options(config, input)?;
+        let (prefer_source, prefer_dist) = self.get_preferred_install_options(config, input)?;
 
         let installation_manager = composer.get_installation_manager();
         let download_manager = composer.get_download_manager();
@@ -220,13 +202,20 @@ impl ReinstallCommand {
             installation_manager.disable_plugins();
         }
 
-        download_manager.set_prefer_source(prefer_source);
-        download_manager.set_prefer_dist(prefer_dist);
+        download_manager
+            .borrow_mut()
+            .set_prefer_source(prefer_source);
+        download_manager.borrow_mut().set_prefer_dist(prefer_dist);
 
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
-        event_dispatcher.dispatch_script(ScriptEvents::PRE_INSTALL_CMD, dev_mode);
+        event_dispatcher.dispatch_script(
+            ScriptEvents::PRE_INSTALL_CMD,
+            dev_mode,
+            vec![],
+            indexmap::IndexMap::new(),
+        );
 
         installation_manager.execute(local_repo, uninstall_operations, dev_mode);
         installation_manager.execute(local_repo, install_operations, dev_mode);
@@ -259,9 +248,7 @@ impl ReinstallCommand {
             let generator = composer.get_autoload_generator();
             generator.set_class_map_authoritative(authoritative);
             generator.set_apcu(apcu, apcu_prefix.as_deref());
-            generator.set_platform_requirement_filter(
-                self.inner.get_platform_requirement_filter(input)?,
-            );
+            generator.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
             generator.dump(
                 config,
                 local_repo,
@@ -274,36 +261,23 @@ impl ReinstallCommand {
             );
         }
 
-        event_dispatcher.dispatch_script(ScriptEvents::POST_INSTALL_CMD, dev_mode);
+        event_dispatcher.dispatch_script(
+            ScriptEvents::POST_INSTALL_CMD,
+            dev_mode,
+            vec![],
+            indexmap::IndexMap::new(),
+        );
 
         Ok(0)
     }
 }
 
-impl BaseCommand for ReinstallCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for ReinstallCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for ReinstallCommand {}

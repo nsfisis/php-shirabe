@@ -13,7 +13,7 @@ use crate::plugin::plugin_manager::PluginManager;
 pub struct Composer {
     inner: PartialComposer,
     locker: Option<Locker>,
-    download_manager: Option<DownloadManager>,
+    download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
     // TODO(plugin): plugin_manager is part of the plugin API
     plugin_manager: Option<Box<PluginManager>>,
     autoload_generator: Option<AutoloadGenerator>,
@@ -48,11 +48,14 @@ impl Composer {
         self.locker.as_ref().unwrap()
     }
 
-    pub fn set_download_manager(&mut self, manager: DownloadManager) {
+    pub fn set_download_manager(
+        &mut self,
+        manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+    ) {
         self.download_manager = Some(manager);
     }
 
-    pub fn get_download_manager(&self) -> &DownloadManager {
+    pub fn get_download_manager(&self) -> &std::rc::Rc<std::cell::RefCell<DownloadManager>> {
         self.download_manager.as_ref().unwrap()
     }
 
@@ -80,5 +83,39 @@ impl Composer {
 
     pub fn get_autoload_generator(&self) -> &AutoloadGenerator {
         self.autoload_generator.as_ref().unwrap()
+    }
+
+    pub fn get_package(&self) -> &dyn crate::package::root_package_interface::RootPackageInterface {
+        self.inner.get_package()
+    }
+
+    pub fn get_config(&self) -> &crate::config::Config {
+        self.inner.get_config()
+    }
+
+    pub fn get_repository_manager(
+        &self,
+    ) -> &crate::repository::repository_manager::RepositoryManager {
+        self.inner.get_repository_manager()
+    }
+
+    pub fn get_event_dispatcher(
+        &self,
+    ) -> &crate::event_dispatcher::event_dispatcher::EventDispatcher {
+        self.inner.get_event_dispatcher()
+    }
+
+    pub fn get_installation_manager(
+        &self,
+    ) -> &crate::installer::installation_manager::InstallationManager {
+        self.inner.get_installation_manager()
+    }
+
+    pub fn get_loop(&self) -> &std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>> {
+        self.inner.get_loop()
+    }
+
+    pub fn is_global(&self) -> bool {
+        self.inner.is_global()
     }
 }

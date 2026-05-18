@@ -17,4 +17,8 @@ pub trait PolicyInterface {
         literals: Vec<i64>,
         required_package: Option<String>,
     ) -> Vec<i64>;
+
+    fn clone_box(&self) -> Box<dyn PolicyInterface> {
+        todo!()
+    }
 }

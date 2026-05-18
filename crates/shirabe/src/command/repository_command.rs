@@ -2,19 +2,17 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
 };
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::command::base_config_command::BaseConfigCommand;
 use crate::composer::Composer;
 use crate::config::Config;
+use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -24,9 +22,7 @@ use crate::json::json_file::JsonFile;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     config: Option<Config>,
     config_file: Option<JsonFile>,
@@ -35,24 +31,21 @@ pub struct RepositoryCommand {
 
 impl RepositoryCommand {
     pub fn configure(&mut self) {
-        let suggest_repo_names_before = self.suggest_repo_names();
-        let suggest_repo_names_after = self.suggest_repo_names();
-        let suggest_repo_names_name = self.suggest_repo_names();
-        let suggest_type_for_add = Self::suggest_type_for_add();
-        self.inner.inner
+        // TODO(cli-completion): suggest_repo_names() / suggest_type_for_add()
+        self
             .set_name("repository")
-            .set_aliases(vec!["repo".to_string()])
+            .set_aliases(&["repo".to_string()])
             .set_description("Manages repositories")
             .set_definition(vec![
-                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None, vec![]),
-                InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None, vec![]),
-                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lower priority) instead of prepending it", None, vec![]),
-                InputOption::new("before", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it before the given repository name", None, suggest_repo_names_before),
-                InputOption::new("after", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it after the given repository name", None, suggest_repo_names_after),
-                InputArgument::new("action", Some(InputArgument::OPTIONAL), "Action to perform: list, add, remove, set-url, get-url, enable, disable", Some(PhpMixed::String("list".to_string())), vec!["list", "add", "remove", "set-url", "get-url", "enable", "disable"]),
-                InputArgument::new("name", Some(InputArgument::OPTIONAL), "Repository name (or special name packagist.org for enable/disable)", None, suggest_repo_names_name),
-                InputArgument::new("arg1", Some(InputArgument::OPTIONAL), "Type for add, or new URL for set-url, or JSON config for add", None, suggest_type_for_add),
-                InputArgument::new("arg2", Some(InputArgument::OPTIONAL), "URL for add (if not using JSON)", None, vec![]),
+                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None),
+                InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None),
+                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lower priority) instead of prepending it", None),
+                InputOption::new("before", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it before the given repository name", None),
+                InputOption::new("after", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it after the given repository name", None),
+                InputArgument::new("action", Some(InputArgument::OPTIONAL), "Action to perform: list, add, remove, set-url, get-url, enable, disable", Some(PhpMixed::String("list".to_string()))),
+                InputArgument::new("name", Some(InputArgument::OPTIONAL), "Repository name (or special name packagist.org for enable/disable)", None),
+                InputArgument::new("arg1", Some(InputArgument::OPTIONAL), "Type for add, or new URL for set-url, or JSON config for add", None),
+                InputArgument::new("arg2", Some(InputArgument::OPTIONAL), "URL for add (if not using JSON)", None),
             ])
             .set_help(
                 "This command lets you manage repositories in your composer.json.\n\n\
@@ -98,7 +91,7 @@ impl RepositoryCommand {
             .as_string()
             .map(|s| s.to_string());
 
-        let config_data = self.inner.config_file.as_ref().unwrap().read()?;
+        let config_data = self.config_file.as_ref().unwrap().read()?;
         let config_file_path = self
             .inner
             .config_file
@@ -106,12 +99,11 @@ impl RepositoryCommand {
             .unwrap()
             .get_path()
             .to_string();
-        self.inner
-            .config
+        self.config
             .as_mut()
             .unwrap()
             .merge(config_data, &config_file_path);
-        let repos = self.inner.config.as_ref().unwrap().get_repositories();
+        let repos = self.config.as_ref().unwrap().get_repositories();
 
         match action.as_str() {
             "list" | "ls" | "show" => {
@@ -173,21 +165,17 @@ impl RepositoryCommand {
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
-                    self.inner
-                        .config_source
-                        .as_mut()
-                        .unwrap()
-                        .insert_repository(
-                            name.as_deref().unwrap(),
-                            repo_config,
-                            reference_name,
-                            offset,
-                        );
+                    self.config_source.as_mut().unwrap().insert_repository(
+                        name.as_deref().unwrap(),
+                        repo_config,
+                        reference_name,
+                        offset,
+                    );
                     return Ok(0);
                 }
 
                 let append = input.get_option("append").as_bool().unwrap_or(false);
-                self.inner.config_source.as_mut().unwrap().add_repository(
+                self.config_source.as_mut().unwrap().add_repository(
                     name.as_deref().unwrap(),
                     repo_config,
                     append,
@@ -202,13 +190,12 @@ impl RepositoryCommand {
                     }));
                 }
                 let name_str = name.as_deref().unwrap();
-                self.inner
-                    .config_source
+                self.config_source
                     .as_mut()
                     .unwrap()
                     .remove_repository(name_str);
                 if ["packagist", "packagist.org"].contains(&name_str) {
-                    self.inner.config_source.as_mut().unwrap().add_repository(
+                    self.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
                         PhpMixed::Bool(false),
                         false,
@@ -223,8 +210,7 @@ impl RepositoryCommand {
                         code: 0,
                     }));
                 }
-                self.inner
-                    .config_source
+                self.config_source
                     .as_mut()
                     .unwrap()
                     .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
@@ -242,7 +228,7 @@ impl RepositoryCommand {
                     if let PhpMixed::Array(ref repo_map) = *repo {
                         let url = repo_map.get("url").and_then(|v| v.as_string());
                         if let Some(url) = url {
-                            self.inner.inner.get_io().write(url);
+                            self.get_io().write(url);
                             return Ok(0);
                         }
                         return Err(anyhow::anyhow!(InvalidArgumentException {
@@ -257,7 +243,7 @@ impl RepositoryCommand {
                             if n == name_str {
                                 let url = repo_map.get("url").and_then(|v| v.as_string());
                                 if let Some(url) = url {
-                                    self.inner.inner.get_io().write(url);
+                                    self.get_io().write(url);
                                     return Ok(0);
                                 }
                                 return Err(anyhow::anyhow!(InvalidArgumentException {
@@ -286,7 +272,7 @@ impl RepositoryCommand {
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     let append = input.get_option("append").as_bool().unwrap_or(false);
-                    self.inner.config_source.as_mut().unwrap().add_repository(
+                    self.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
                         PhpMixed::Bool(false),
                         append,
@@ -307,8 +293,7 @@ impl RepositoryCommand {
                 }
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
-                    self.inner
-                        .config_source
+                    self.config_source
                         .as_mut()
                         .unwrap()
                         .remove_repository("packagist.org");
@@ -331,7 +316,7 @@ impl RepositoryCommand {
     }
 
     fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) {
-        let io = self.inner.inner.get_io();
+        let io = self.get_io();
 
         let mut packagist_present = false;
         for (_key, repo) in &repos {
@@ -396,84 +381,14 @@ impl RepositoryCommand {
                     .get("url")
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| JsonFile::encode(repo));
+                    .unwrap_or_else(|| JsonFile::encode(repo, 448));
                 io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
             }
         }
     }
 
-    fn suggest_type_for_add() -> Box<dyn Fn(&CompletionInput) -> Vec<String>> {
-        Box::new(|input: &CompletionInput| {
-            if input.get_argument("action").as_string() == Some("add") {
-                vec![
-                    "composer".to_string(),
-                    "vcs".to_string(),
-                    "artifact".to_string(),
-                    "path".to_string(),
-                ]
-            } else {
-                vec![]
-            }
-        })
-    }
-
-    fn suggest_repo_names(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String> + '_> {
-        Box::new(move |input: &CompletionInput| {
-            let action = input
-                .get_argument("action")
-                .as_string()
-                .unwrap_or("")
-                .to_string();
-            if ["enable", "disable"].contains(&action.as_str()) {
-                return vec!["packagist.org".to_string()];
-            }
-            if !["remove", "set-url", "get-url"].contains(&action.as_str()) {
-                return vec![];
-            }
-            let config = Factory::create_config(None, None).unwrap();
-            let config_file_path = self.inner.get_composer_config_file(input, &config);
-            let config_file = JsonFile::new(config_file_path, None, None);
-            let data = config_file.read().unwrap_or_default();
-            let mut repos = vec![];
-            if let Some(repositories) = data.get("repositories").and_then(|v| v.as_list()) {
-                for repo in repositories {
-                    if let PhpMixed::Array(ref repo_map) = **repo {
-                        if let Some(name) = repo_map.get("name").and_then(|v| v.as_string()) {
-                            repos.push(name.to_string());
-                        }
-                    }
-                }
-            }
-            repos.sort();
-            repos
-        })
-    }
-}
-
-impl BaseCommand for RepositoryCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
-    }
+    // TODO(cli-completion): fn suggest_type_for_add()
+    // TODO(cli-completion): fn suggest_repo_names(&self)
 }
 
 impl BaseConfigCommand for RepositoryCommand {
@@ -502,4 +417,12 @@ impl BaseConfigCommand for RepositoryCommand {
     }
 }
 
-impl Command for RepositoryCommand {}
+impl HasBaseCommandData for RepositoryCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
+    }
+
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
+    }
+}

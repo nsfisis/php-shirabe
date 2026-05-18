@@ -50,7 +50,7 @@ impl DefaultPolicy {
         required_package: Option<String>,
         ignore_replace: bool,
     ) -> i64 {
-        if a.get_name() == b.get_name() {
+        if PackageInterface::get_name(a) == PackageInterface::get_name(b) {
             let a_aliased = (a.as_any() as &dyn Any)
                 .downcast_ref::<AliasPackage>()
                 .is_some();
@@ -76,8 +76,10 @@ impl DefaultPolicy {
             if let Some(ref required_package) = required_package {
                 if let Some(pos) = required_package.find('/') {
                     let required_vendor = &required_package[..pos];
-                    let a_is_same_vendor = a.get_name().starts_with(required_vendor);
-                    let b_is_same_vendor = b.get_name().starts_with(required_vendor);
+                    let a_is_same_vendor =
+                        PackageInterface::get_name(a).starts_with(required_vendor);
+                    let b_is_same_vendor =
+                        PackageInterface::get_name(b).starts_with(required_vendor);
                     if b_is_same_vendor != a_is_same_vendor {
                         return if a_is_same_vendor { -1 } else { 1 };
                     }

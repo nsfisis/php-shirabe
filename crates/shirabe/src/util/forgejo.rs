@@ -29,18 +29,18 @@ impl Forgejo {
         message: Option<&str>,
     ) -> anyhow::Result<Result<bool, TransportException>> {
         if let Some(message) = message {
-            self.io.write_error(message, true, io_interface::NORMAL);
+            self.io.write_error3(message, true, io_interface::NORMAL);
         }
 
         let url = format!("https://{}/user/settings/applications", origin_url);
-        self.io.write_error(
+        self.io.write_error3(
             "Setup a personal access token with repository:read permissions on:",
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(&url, true, io_interface::NORMAL);
+        self.io.write_error3(&url, true, io_interface::NORMAL);
         let local_auth_config = self.config.get_local_auth_config_source();
-        self.io.write_error(
+        self.io.write_error3(
             &format!(
                 "Tokens will be stored in plain text in \"{}\" for future use by Composer.",
                 local_auth_config
@@ -52,7 +52,7 @@ impl Forgejo {
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(
+        self.io.write_error3(
             "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#forgejo-token",
             true,
             io_interface::NORMAL,
@@ -78,13 +78,13 @@ impl Forgejo {
             origin_url
         );
         if token.is_empty() || username.is_empty() {
-            self.io.write_error(
+            self.io.write_error3(
                 "<warning>No username/token given, aborting.</warning>",
                 true,
                 io_interface::NORMAL,
             );
             self.io
-                .write_error(&add_token_manually, true, io_interface::NORMAL);
+                .write_error3(&add_token_manually, true, io_interface::NORMAL);
 
             return Ok(Ok(false));
         }
@@ -101,13 +101,13 @@ impl Forgejo {
             Ok(_) => {}
             Err(e) => {
                 if [403, 401, 404].contains(&e.get_code()) {
-                    self.io.write_error(
+                    self.io.write_error3(
                         "<error>Invalid access token provided.</error>",
                         true,
                         io_interface::NORMAL,
                     );
                     self.io
-                        .write_error(&add_token_manually, true, io_interface::NORMAL);
+                        .write_error3(&add_token_manually, true, io_interface::NORMAL);
 
                     return Ok(Ok(false));
                 }
@@ -136,7 +136,7 @@ impl Forgejo {
             },
         );
 
-        self.io.write_error(
+        self.io.write_error3(
             "<info>Token stored successfully.</info>",
             true,
             io_interface::NORMAL,

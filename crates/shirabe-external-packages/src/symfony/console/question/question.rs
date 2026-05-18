@@ -15,6 +15,10 @@ impl Question {
         todo!()
     }
 
+    pub fn set_normalizer(&mut self, _normalizer: Box<dyn Fn(&PhpMixed) -> PhpMixed>) {
+        todo!()
+    }
+
     pub fn set_max_attempts(&mut self, _attempts: Option<i64>) {
         todo!()
     }

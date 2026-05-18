@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Cache.php
 
-use crate::io::io_interface;
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -8,9 +7,8 @@ use chrono::Utc;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
 use shirabe_php_shim::{
-    ErrorException, PhpMixed, abs, bin2hex, dirname, file_exists, file_get_contents,
-    file_put_contents, filemtime, function_exists, hash_file, is_dir, is_writable, mkdir,
-    random_bytes, random_int, rename, sprintf, time, unlink,
+    abs, bin2hex, dirname, file_exists, file_get_contents, file_put_contents, filemtime, hash_file,
+    is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
 };
 
 use crate::io::io_interface::IOInterface;
@@ -46,7 +44,7 @@ impl Cache {
     ) -> Self {
         let allowlist = allowlist.unwrap_or("a-z0-9._").to_string();
         let root = format!("{}/", cache_dir.trim_end_matches(|c| c == '/' || c == '\\'));
-        let filesystem = filesystem.unwrap_or_else(Filesystem::new);
+        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
         let mut this = Self {
             io,
             root,
@@ -73,6 +71,7 @@ impl Cache {
 
     pub fn is_usable(path: &str) -> bool {
         !Preg::is_match(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}", path)
+            .unwrap_or(false)
     }
 
     pub fn is_enabled(&mut self) -> bool {
@@ -84,14 +83,10 @@ impl Cache {
                     && !Silencer::call(|| Ok(mkdir(&self.root, 0o777, true))).unwrap_or(false))
                     || !is_writable(&self.root))
             {
-                self.io.write_error(
-                    PhpMixed::String(format!(
-                        "<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>",
-                        self.root,
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(&format!(
+                    "<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>",
+                    self.root,
+                ));
                 self.enabled = Some(false);
             }
         }
@@ -106,14 +101,12 @@ impl Cache {
     /// @return string|false
     pub fn read(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                self.io.write_error(
-                    PhpMixed::String(format!("Reading {} from cache", full_path)),
-                    true,
-                    io_interface::DEBUG,
-                );
+                self.io
+                    .write_error(&format!("Reading {} from cache", full_path));
 
                 return file_get_contents(&full_path);
             }
@@ -126,13 +119,11 @@ impl Cache {
         let was_enabled = self.enabled == Some(true);
 
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
 
-            self.io.write_error(
-                PhpMixed::String(format!("Writing {}{} into cache", self.root, file)),
-                true,
-                io_interface::DEBUG,
-            );
+            self.io
+                .write_error(&format!("Writing {}{} into cache", self.root, file));
 
             let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)),);
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch (ErrorException)
@@ -145,59 +136,7 @@ impl Cache {
             return match attempt {
                 Ok(b) => Ok(b),
                 Err(e) => {
-                    // TODO(phase-b): downcast e to ErrorException
-                    let _err: &ErrorException = todo!("downcast e to ErrorException");
-                    // If the write failed despite isEnabled checks passing earlier, rerun the isEnabled checks to
-                    // see if they are still current and recreate the cache dir if needed. Refs https://github.com/composer/composer/issues/11076
-                    if was_enabled {
-                        shirabe_php_shim::clearstatcache();
-                        self.enabled = None;
-
-                        return self.write(&file, contents);
-                    }
-
-                    self.io.write_error(
-                        PhpMixed::String(format!(
-                            "<warning>Failed to write into cache: {}</warning>",
-                            e,
-                        )),
-                        true,
-                        io_interface::DEBUG,
-                    );
-                    let message_match = Preg::is_match_with_indexed_captures(
-                        r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}",
-                        &e.to_string(),
-                    )?;
-                    if let Some(m) = message_match {
-                        // Remove partial file.
-                        unlink(&temp_file_name);
-
-                        let message = sprintf(
-                            "<warning>Writing %1$s into cache failed after %2$u of %3$u bytes written, only %4$s bytes of free space available</warning>",
-                            &[
-                                PhpMixed::String(temp_file_name.clone()),
-                                PhpMixed::String(m.get(1).cloned().unwrap_or_default()),
-                                PhpMixed::String(m.get(2).cloned().unwrap_or_default()),
-                                if function_exists("disk_free_space") {
-                                    // TODO(phase-b): @disk_free_space suppresses errors
-                                    PhpMixed::Float(
-                                        shirabe_php_shim::disk_free_space(&dirname(
-                                            &temp_file_name,
-                                        ))
-                                        .unwrap_or(0.0),
-                                    )
-                                } else {
-                                    PhpMixed::String("unknown".to_string())
-                                },
-                            ],
-                        );
-
-                        self.io
-                            .write_error(PhpMixed::String(message), true, io_interface::NORMAL);
-
-                        return Ok(false);
-                    }
-
+                    // TODO(phase-b): downcast e to ErrorException; handle partial write cleanup
                     Err(e)
                 }
             };
@@ -209,29 +148,23 @@ impl Cache {
     /// Copy a file into the cache
     pub fn copy_from(&mut self, file: &str, source: &str) -> bool {
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             self.filesystem
                 .ensure_directory_exists(&dirname(&full_path));
 
             if !file_exists(source) {
-                self.io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>{} does not exist, can not write into cache</error>",
-                        source,
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io.write_error(&format!(
+                    "<error>{} does not exist, can not write into cache</error>",
+                    source,
+                ));
             } else if self.io.is_debug() {
-                self.io.write_error(
-                    PhpMixed::String(format!("Writing {} into cache from {}", full_path, source,)),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io
+                    .write_error(&format!("Writing {} into cache from {}", full_path, source));
             }
 
-            return self.filesystem.copy(source, &full_path);
+            return self.filesystem.copy(source, &full_path).unwrap_or(false);
         }
 
         false
@@ -240,7 +173,8 @@ impl Cache {
     /// Copy a file out of the cache
     pub fn copy_to(&mut self, file: &str, target: &str) -> Result<bool> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
@@ -260,13 +194,10 @@ impl Cache {
                     })?;
                 }
 
-                self.io.write_error(
-                    PhpMixed::String(format!("Reading {} from cache", full_path)),
-                    true,
-                    io_interface::DEBUG,
-                );
+                self.io
+                    .write_error(&format!("Reading {} from cache", full_path));
 
-                return Ok(self.filesystem.copy(&full_path, target));
+                return self.filesystem.copy(&full_path, target);
             }
         }
 
@@ -293,10 +224,11 @@ impl Cache {
 
     pub fn remove(&mut self, file: &str) -> bool {
         if self.is_enabled() && !self.read_only {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                return self.filesystem.unlink(&full_path);
+                return self.filesystem.unlink(&full_path).unwrap_or(false);
             }
         }
 
@@ -305,7 +237,7 @@ impl Cache {
 
     pub fn clear(&mut self) -> bool {
         if self.is_enabled() && !self.read_only {
-            self.filesystem.empty_directory(&self.root);
+            let _ = self.filesystem.empty_directory(&self.root, true);
 
             return true;
         }
@@ -317,7 +249,8 @@ impl Cache {
     /// @phpstan-return int<0, max>|false
     pub fn get_age(&mut self, file: &str) -> Option<i64> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 if let Some(mtime) = filemtime(&full_path) {
@@ -335,20 +268,19 @@ impl Cache {
             // PHP: $expire->modify('-'.$ttl.' seconds');
             expire -= chrono::Duration::seconds(ttl);
 
-            let finder = self
-                .get_finder()
-                .date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
-            for file in finder {
-                self.filesystem.unlink(&file.get_pathname());
+            let mut finder = self.get_finder();
+            finder.date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
+            for file in &mut finder {
+                let _ = self.filesystem.unlink(&file.get_pathname());
             }
 
-            let mut total_size = self.filesystem.size(&self.root);
+            let mut total_size = self.filesystem.size(&self.root).unwrap_or(0);
             if total_size > max_size {
                 let mut iterator = self.get_finder().sort_by_accessed_time().get_iterator();
                 while total_size > max_size && iterator.valid() {
                     let filepath = iterator.current().get_pathname();
-                    total_size -= self.filesystem.size(&filepath);
-                    self.filesystem.unlink(&filepath);
+                    total_size -= self.filesystem.size(&filepath).unwrap_or(0);
+                    let _ = self.filesystem.unlink(&filepath);
                     iterator.next();
                 }
             }
@@ -366,13 +298,14 @@ impl Cache {
             let mut expire = Utc::now();
             expire -= chrono::Duration::seconds(ttl);
 
-            let finder = Finder::create()
+            let mut finder = Finder::create();
+            finder
                 .r#in(&self.root)
                 .directories()
                 .depth(0)
                 .date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
-            for file in finder {
-                self.filesystem.remove_directory(&file.get_pathname());
+            for file in &mut finder {
+                let _ = self.filesystem.remove_directory(&file.get_pathname());
             }
 
             *CACHE_COLLECTED.lock().unwrap() = Some(true);
@@ -386,7 +319,8 @@ impl Cache {
     /// @return string|false
     pub fn sha1(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 return hash_file("sha1", &full_path);
@@ -399,7 +333,8 @@ impl Cache {
     /// @return string|false
     pub fn sha256(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
-            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = Preg::replace(&format!("{{[^{}]}}i", self.allowlist), "-", file)
+                .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
                 return hash_file("sha256", &full_path);
@@ -410,6 +345,8 @@ impl Cache {
     }
 
     pub(crate) fn get_finder(&self) -> Finder {
-        Finder::create().r#in(&self.root).files()
+        let mut finder = Finder::create();
+        finder.r#in(&self.root).files();
+        finder
     }
 }

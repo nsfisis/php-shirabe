@@ -24,7 +24,7 @@ impl InstallerEvent {
         execute_operations: bool,
         transaction: Transaction,
     ) -> Self {
-        let inner = Event::new(event_name, vec![], vec![]);
+        let inner = Event::new(event_name, vec![], indexmap::IndexMap::new());
         Self {
             inner,
             composer,

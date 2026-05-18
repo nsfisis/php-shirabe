@@ -420,38 +420,38 @@ impl IOInterface for ConsoleIO {
         self.output.is_decorated()
     }
 
-    fn write(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        let messages = Self::sanitize(messages, true);
+    fn write3(&mut self, message: &str, newline: bool, verbosity: i64) {
+        let message = Self::sanitize(message, true);
 
-        self.do_write(messages, newline, false, verbosity, false);
+        self.do_write(message, newline, false, verbosity, false);
     }
 
-    fn write_error(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        let messages = Self::sanitize(messages, true);
+    fn write_error3(&mut self, message: &str, newline: bool, verbosity: i64) {
+        let message = Self::sanitize(message, true);
 
-        self.do_write(messages, newline, true, verbosity, false);
+        self.do_write(message, newline, true, verbosity, false);
     }
 
-    fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.do_write(messages, newline, false, verbosity, true);
+    fn write_raw3(&mut self, message: &str, newline: bool, verbosity: i64) {
+        self.do_write(message, newline, false, verbosity, true);
     }
 
-    fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.do_write(messages, newline, true, verbosity, true);
+    fn write_error_raw3(&mut self, message: &str, newline: bool, verbosity: i64) {
+        self.do_write(message, newline, true, verbosity, true);
     }
 
-    fn overwrite(&mut self, messages: PhpMixed, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.do_overwrite(messages, newline, size, false, verbosity);
+    fn overwrite4(&mut self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+        self.do_overwrite(message, newline, size, false, verbosity);
     }
 
-    fn overwrite_error(
+    fn overwrite_error4(
         &mut self,
-        messages: PhpMixed,
+        message: &str,
         newline: bool,
         size: Option<i64>,
         verbosity: i64,
     ) {
-        self.do_overwrite(messages, newline, size, true, verbosity);
+        self.do_overwrite(message, newline, size, true, verbosity);
     }
 
     fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed {
@@ -471,14 +471,17 @@ impl IOInterface for ConsoleIO {
 
     fn ask_confirmation(&mut self, question: String, default: bool) -> bool {
         let helper = self.helper_set.get("question");
-        let default_mixed = PhpMixed::Bool(default);
+        // TODO(phase-b): Self::sanitize returns PhpMixed but new() expects String;
+        // also true/false regexes need to come through composer/symfony defaults.
+        let sanitized = Self::sanitize(PhpMixed::String(question), true)
+            .as_string()
+            .unwrap_or("")
+            .to_string();
         let question = StrictConfirmationQuestion::new(
-            Self::sanitize(PhpMixed::String(question), true),
-            if is_string(&default_mixed) {
-                Self::sanitize(default_mixed, true)
-            } else {
-                default_mixed
-            },
+            sanitized,
+            default,
+            "/^y(?:es)?$/i".to_string(),
+            "/^no?$/i".to_string(),
         );
 
         helper

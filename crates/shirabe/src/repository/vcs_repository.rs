@@ -23,6 +23,7 @@ use crate::package::version::version_parser::VersionParser;
 use crate::repository::array_repository::ArrayRepository;
 use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
 use crate::repository::invalid_repository_exception::InvalidRepositoryException;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
 use crate::repository::version_cache_interface::VersionCacheInterface;
 use crate::util::http_downloader::HttpDownloader;
@@ -703,7 +704,10 @@ impl VcsRepository {
                         );
                     }
                 }
-                self.inner.add_package(Box::new(package))?;
+                // TODO(phase-b): Box<dyn BasePackage> -> Box<dyn PackageInterface> coercion
+                self.inner.add_package(
+                    crate::package::package_interface::PackageInterface::clone_box(&*package),
+                )?;
                 Ok(())
             })();
             if let Err(e) = result {
@@ -748,14 +752,10 @@ impl VcsRepository {
         }
 
         if self.inner.get_packages().is_empty() {
-            return Err(InvalidRepositoryException {
-                message: format!(
-                    "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
-                    self.url
-                ),
-                code: 0,
-            }
-            .into());
+            return Err(InvalidRepositoryException::new(format!(
+                "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
+                self.url
+            )).into());
         }
 
         Ok(())
@@ -950,7 +950,7 @@ impl VcsRepository {
 
         if let VersionCacheResult::Package(data) = cached_package {
             let loaded = self.loader.as_ref().unwrap().load(data, None)?;
-            return Ok(CachedPackageResult::Package(Box::new(loaded)));
+            return Ok(CachedPackageResult::Package(loaded));
         }
 
         Ok(CachedPackageResult::None)

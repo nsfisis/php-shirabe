@@ -529,4 +529,9 @@ impl ClassLoader {
         // TODO(phase-b): preserve PHP `\Closure::bind(static fn($file) => include $file, null, null)`
         // Rust has no `include` operator; this is a no-op placeholder.
     }
+
+    pub fn as_array_iter(&self) -> Vec<(String, PhpMixed)> {
+        // TODO(phase-b): iterate over loader properties as PHP (array) cast would
+        todo!()
+    }
 }

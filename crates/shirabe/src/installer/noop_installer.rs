@@ -55,12 +55,12 @@ impl InstallerInterface for NoopInstaller {
     }
 
     fn install(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
         if !repo.has_package(package) {
-            repo.add_package(package.clone_box());
+            repo.add_package(package.clone_package_box());
         }
 
         Ok(Some(shirabe_external_packages::react::promise::resolve(
@@ -69,7 +69,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     fn update(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
@@ -84,7 +84,7 @@ impl InstallerInterface for NoopInstaller {
 
         repo.remove_package(initial);
         if !repo.has_package(target) {
-            repo.add_package(target.clone_box());
+            repo.add_package(target.clone_package_box());
         }
 
         Ok(Some(shirabe_external_packages::react::promise::resolve(
@@ -93,7 +93,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     fn uninstall(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {

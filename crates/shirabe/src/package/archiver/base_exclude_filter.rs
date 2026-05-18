@@ -59,7 +59,7 @@ impl BaseExcludeFilterBase {
 
         let rule = rule.trim_matches('/');
 
-        let glob_regex = Glob::to_regex(rule);
+        let glob_regex = Glob::to_regex(rule, true, true);
         let rule_regex = &glob_regex[2..glob_regex.len() - 2];
 
         (
@@ -143,7 +143,7 @@ pub trait BaseExcludeFilter {
         let rule = rule.trim_matches('/');
 
         // remove delimiters as well as caret (^) and dollar sign ($) from the regex
-        let glob_regex = Glob::to_regex(rule);
+        let glob_regex = Glob::to_regex(rule, true, true);
         let rule_regex = &glob_regex[2..glob_regex.len() - 2];
 
         (

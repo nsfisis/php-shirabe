@@ -29,8 +29,9 @@ impl IgnoreListPlatformRequirementFilter {
                 ignore_all.push(req);
             }
         }
-        let ignore_regex = base_package::package_names_to_regexp(&ignore_all);
-        let ignore_upper_bound_regex = base_package::package_names_to_regexp(&ignore_upper_bound);
+        let ignore_regex = base_package::package_names_to_regexp(&ignore_all, "{^(?:%s)$}iD");
+        let ignore_upper_bound_regex =
+            base_package::package_names_to_regexp(&ignore_upper_bound, "{^(?:%s)$}iD");
         Ok(Self {
             ignore_regex,
             ignore_upper_bound_regex,
@@ -87,5 +88,9 @@ impl PlatformRequirementFilterInterface for IgnoreListPlatformRequirementFilter 
             return false;
         }
         self.is_ignored(req) || Preg::is_match(&self.ignore_upper_bound_regex, req).unwrap_or(false)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

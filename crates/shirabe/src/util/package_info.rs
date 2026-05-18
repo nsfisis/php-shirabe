@@ -16,14 +16,14 @@ impl PackageInfo {
             }
         }
 
-        package.get_source_url()
+        package.get_source_url().map(|s| s.to_string())
     }
 
     pub fn get_view_source_or_homepage_url(package: &dyn PackageInterface) -> Option<String> {
         let url = Self::get_view_source_url(package).or_else(|| {
             package
                 .as_complete_package_interface()
-                .and_then(|complete| complete.get_homepage())
+                .and_then(|complete| complete.get_homepage().map(|s| s.to_string()))
         });
 
         if url.as_deref() == Some("") {

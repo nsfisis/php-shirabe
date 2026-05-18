@@ -28,7 +28,7 @@ use crate::package::version::version_selector::VersionSelector;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_interface::SearchResult;
+use crate::repository::repository_interface::{RepositoryInterface, SearchResult};
 use crate::repository::repository_set::RepositorySet;
 use crate::util::filesystem::Filesystem;
 
@@ -161,12 +161,12 @@ pub trait PackageDiscoveryTrait {
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                     )
                 {
-                    io.write_error(
-                        PhpMixed::String(format!(
+                    io.write_error3(
+                        &format!(
                             "<warning>The \"{}\" constraint for \"{}\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>",
                             requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                             requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                        )),
+                        ),
                         true,
                         io_interface::NORMAL,
                     );
@@ -188,8 +188,8 @@ pub trait PackageDiscoveryTrait {
 
                     if use_best_version_constraint {
                         requirement.insert("version".to_string(), version.clone());
-                        io.write_error(
-                            PhpMixed::String(sprintf(
+                        io.write_error3(
+                            &sprintf(
                                 "Using version <info>%s</info> for <info>%s</info>",
                                 &[
                                     PhpMixed::String(version),
@@ -197,7 +197,7 @@ pub trait PackageDiscoveryTrait {
                                         requirement.get("name").cloned().unwrap_or_default(),
                                     ),
                                 ],
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -219,7 +219,7 @@ pub trait PackageDiscoveryTrait {
         let version_parser = VersionParser::new();
 
         // Collect existing packages
-        let composer = self.try_composer();
+        let composer = self.try_composer(None, None);
         let mut installed_repo: Option<_> = None;
         if let Some(c) = &composer {
             installed_repo = Some(c.get_repository_manager().get_local_repository());
@@ -319,33 +319,24 @@ pub trait PackageDiscoveryTrait {
                         ));
                     }
 
-                    io.write_error(
-                        PhpMixed::List(vec![
-                            Box::new(PhpMixed::String(String::new())),
-                            Box::new(PhpMixed::String(sprintf(
-                                "Found <info>%s</info> packages matching <info>%s</info>",
-                                &[
-                                    PhpMixed::Int(matches.len() as i64),
-                                    PhpMixed::String(package.clone()),
-                                ],
-                            ))),
-                            Box::new(PhpMixed::String(String::new())),
-                        ]),
-                        true,
-                        io_interface::NORMAL,
-                    );
-
-                    io.write_error(
-                        PhpMixed::List(
-                            choices
-                                .iter()
-                                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                .collect(),
+                    io.write_error3("", true, io_interface::NORMAL);
+                    io.write_error3(
+                        &sprintf(
+                            "Found <info>%s</info> packages matching <info>%s</info>",
+                            &[
+                                PhpMixed::Int(matches.len() as i64),
+                                PhpMixed::String(package.clone()),
+                            ],
                         ),
                         true,
                         io_interface::NORMAL,
                     );
-                    io.write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
+                    io.write_error3("", true, io_interface::NORMAL);
+
+                    for choice in &choices {
+                        io.write_error3(choice, true, io_interface::NORMAL);
+                    }
+                    io.write_error3("", true, io_interface::NORMAL);
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
@@ -432,14 +423,14 @@ pub trait PackageDiscoveryTrait {
                                 fixed,
                             )?;
 
-                            io.write_error(
-                                PhpMixed::String(sprintf(
+                            io.write_error3(
+                                &sprintf(
                                     "Using version <info>%s</info> for <info>%s</info>",
                                     &[
                                         PhpMixed::String(c.clone()),
                                         PhpMixed::String(package.clone()),
                                     ],
-                                )),
+                                ),
                                 true,
                                 io_interface::NORMAL,
                             );

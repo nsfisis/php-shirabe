@@ -62,8 +62,59 @@ impl Finder {
         todo!()
     }
 
+    pub fn sort_by_accessed_time(&mut self) -> &mut Self {
+        todo!()
+    }
+
+    pub fn date(&mut self, _date: &str) -> &mut Self {
+        todo!()
+    }
+
+    pub fn get_iterator(&self) -> FinderIterator {
+        todo!()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = SplFileInfo> {
         todo!();
         std::iter::empty()
+    }
+}
+
+#[derive(Debug)]
+pub struct FinderIterator;
+
+impl FinderIterator {
+    pub fn valid(&self) -> bool {
+        todo!()
+    }
+
+    pub fn current(&self) -> SplFileInfo {
+        todo!()
+    }
+}
+
+impl Iterator for FinderIterator {
+    type Item = SplFileInfo;
+
+    fn next(&mut self) -> Option<SplFileInfo> {
+        todo!()
+    }
+}
+
+impl IntoIterator for Finder {
+    type Item = SplFileInfo;
+    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        todo!()
+    }
+}
+
+impl IntoIterator for &mut Finder {
+    type Item = SplFileInfo;
+    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        todo!()
     }
 }

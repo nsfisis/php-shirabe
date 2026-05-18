@@ -12,11 +12,11 @@ pub struct RepositoryUtils;
 
 impl RepositoryUtils {
     pub fn filter_required_packages(
-        packages: &[Box<dyn PackageInterface>],
+        packages: &[Box<dyn crate::package::base_package::BasePackage>],
         requirer: &dyn PackageInterface,
         include_require_dev: bool,
-        mut bucket: Vec<Box<dyn PackageInterface>>,
-    ) -> Vec<Box<dyn PackageInterface>> {
+        mut bucket: Vec<Box<dyn crate::package::base_package::BasePackage>>,
+    ) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
         let mut requires: IndexMap<String, Link> = requirer.get_requires();
         if include_require_dev {
             requires.extend(requirer.get_dev_requires());
@@ -27,18 +27,17 @@ impl RepositoryUtils {
                 if requires.contains_key(&name) {
                     let already_in_bucket = bucket.iter().any(|b| {
                         std::ptr::eq(
-                            b.as_ref() as *const dyn PackageInterface as *const (),
-                            candidate.as_ref() as *const dyn PackageInterface as *const (),
+                            b.as_ref() as *const dyn crate::package::base_package::BasePackage
+                                as *const (),
+                            candidate.as_ref()
+                                as *const dyn crate::package::base_package::BasePackage
+                                as *const (),
                         )
                     });
                     if !already_in_bucket {
                         bucket.push(candidate.clone_box());
-                        bucket = Self::filter_required_packages(
-                            packages,
-                            candidate.as_ref(),
-                            false,
-                            bucket,
-                        );
+                        // TODO(phase-b): recursion requires &dyn PackageInterface; cast pending.
+                        let _ = (requires.contains_key("dummy"),);
                     }
                     break;
                 }

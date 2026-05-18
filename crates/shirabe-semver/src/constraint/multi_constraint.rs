@@ -2,7 +2,6 @@
 
 use std::cell::RefCell;
 
-use anyhow::bail;
 
 use crate::constraint::bound::Bound;
 use crate::constraint::constraint_interface::ConstraintInterface;
@@ -26,26 +25,22 @@ impl std::fmt::Debug for MultiConstraint {
 }
 
 impl MultiConstraint {
-    pub fn new(
-        constraints: Vec<Box<dyn ConstraintInterface>>,
-        conjunctive: bool,
-    ) -> anyhow::Result<Self> {
-        if constraints.len() < 2 {
-            bail!(
-                "Must provide at least two constraints for a MultiConstraint. Use \
+    pub fn new(constraints: Vec<Box<dyn ConstraintInterface>>, conjunctive: bool) -> Self {
+        assert!(
+            constraints.len() >= 2,
+            "Must provide at least two constraints for a MultiConstraint. Use \
                 the regular Constraint class for one constraint only or MatchAllConstraint for none. You may use \
                 MultiConstraint::create() which optimizes and handles those cases automatically."
-            );
-        }
+        );
 
-        Ok(Self {
+        Self {
             constraints,
             pretty_string: None,
             string: RefCell::new(None),
             conjunctive,
             lower_bound: RefCell::new(None),
             upper_bound: RefCell::new(None),
-        })
+        }
     }
 
     pub fn get_constraints(&self) -> &[Box<dyn ConstraintInterface>] {
@@ -123,7 +118,7 @@ impl MultiConstraint {
             return Ok(constraints.into_iter().next().unwrap());
         }
 
-        Ok(Box::new(MultiConstraint::new(constraints, conjunctive)?))
+        Ok(Box::new(MultiConstraint::new(constraints, conjunctive)))
     }
 
     // Returns the (possibly optimized) constraints and the effective conjunctive flag.
@@ -163,16 +158,13 @@ impl MultiConstraint {
                                 && right1.starts_with('<')
                                 && left1.get(2..) == right0.get(3..)
                             {
-                                Some(Box::new(
-                                    MultiConstraint::new(
-                                        vec![
-                                            l_mc.constraints[0].clone_box(),
-                                            r_mc.constraints[1].clone_box(),
-                                        ],
-                                        true,
-                                    )
-                                    .unwrap(),
-                                )
+                                Some(Box::new(MultiConstraint::new(
+                                    vec![
+                                        l_mc.constraints[0].clone_box(),
+                                        r_mc.constraints[1].clone_box(),
+                                    ],
+                                    true,
+                                ))
                                     as Box<dyn ConstraintInterface>)
                             } else {
                                 None

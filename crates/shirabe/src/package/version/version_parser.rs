@@ -74,6 +74,28 @@ impl VersionParser {
         Ok(result)
     }
 
+    pub fn new() -> Self {
+        Self {
+            inner: SemverVersionParser,
+        }
+    }
+
+    pub fn normalize(&self, version: &str, full_version: Option<&str>) -> anyhow::Result<String> {
+        self.inner.normalize(version, full_version)
+    }
+
+    pub fn normalize_stability(stability: &str) -> anyhow::Result<String> {
+        SemverVersionParser::normalize_stability(stability)
+    }
+
+    pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
+        self.inner.normalize_branch(name)
+    }
+
+    pub fn parse_stability(version: &str) -> String {
+        SemverVersionParser::parse_stability(version)
+    }
+
     pub fn is_upgrade(normalized_from: &str, normalized_to: &str) -> anyhow::Result<bool> {
         if normalized_from == normalized_to {
             return Ok(true);

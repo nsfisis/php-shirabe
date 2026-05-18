@@ -15,4 +15,22 @@ impl ScriptEvents {
     pub const POST_CREATE_PROJECT_CMD: &'static str = "post-create-project-cmd";
     pub const PRE_ARCHIVE_CMD: &'static str = "pre-archive-cmd";
     pub const POST_ARCHIVE_CMD: &'static str = "post-archive-cmd";
+
+    pub fn is_defined(const_name: &str) -> bool {
+        matches!(
+            const_name,
+            "PRE_INSTALL_CMD"
+                | "POST_INSTALL_CMD"
+                | "PRE_UPDATE_CMD"
+                | "POST_UPDATE_CMD"
+                | "PRE_STATUS_CMD"
+                | "POST_STATUS_CMD"
+                | "PRE_AUTOLOAD_DUMP"
+                | "POST_AUTOLOAD_DUMP"
+                | "POST_ROOT_PACKAGE_INSTALL"
+                | "POST_CREATE_PROJECT_CMD"
+                | "PRE_ARCHIVE_CMD"
+                | "POST_ARCHIVE_CMD"
+        )
+    }
 }

@@ -44,12 +44,15 @@ impl SecurityAdvisory {
         }
     }
 
+    pub fn affected_versions(&self) -> &dyn ConstraintInterface {
+        &*self.inner.affected_versions
+    }
+
     pub fn to_ignored_advisory(&self, ignore_reason: Option<String>) -> IgnoredSecurityAdvisory {
         IgnoredSecurityAdvisory::new(
             self.inner.package_name.clone(),
             self.inner.advisory_id.clone(),
-            // TODO: Phase B - handle shared ownership of affected_versions
-            self.inner.affected_versions.clone(),
+            self.inner.affected_versions.clone_box(),
             self.title.clone(),
             self.sources.clone(),
             self.reported_at,

@@ -1,25 +1,57 @@
 //! ref: composer/src/Composer/Downloader/GzipDownloader.php
 
+use crate::cache::Cache;
+use crate::config::Config;
 use crate::downloader::archive_downloader::ArchiveDownloader;
 use crate::downloader::file_downloader::FileDownloader;
+use crate::event_dispatcher::event_dispatcher::EventDispatcher;
+use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
+use crate::util::filesystem::Filesystem;
+use crate::util::http_downloader::HttpDownloader;
 use crate::util::platform::Platform;
+use crate::util::process_executor::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, RuntimeException, extension_loaded,
-    fclose, fopen, fwrite, gzclose, gzopen, gzread, implode, parse_url, pathinfo, strtr,
+    DIRECTORY_SEPARATOR, PATHINFO_FILENAME, PHP_URL_PATH, PhpMixed, RuntimeException,
+    extension_loaded, fclose, fopen, fwrite, gzclose, gzopen, gzread, implode, parse_url, pathinfo,
+    strtr,
 };
 
+#[derive(Debug)]
 pub struct GzipDownloader {
     inner: FileDownloader,
     cleanup_executed: IndexMap<String, bool>,
 }
 
 impl GzipDownloader {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: Config,
+        http_downloader: HttpDownloader,
+        event_dispatcher: Option<EventDispatcher>,
+        cache: Option<Cache>,
+        filesystem: Filesystem,
+        process: ProcessExecutor,
+    ) -> Self {
+        Self {
+            inner: FileDownloader::new(
+                io,
+                config,
+                http_downloader,
+                event_dispatcher,
+                cache,
+                Some(filesystem),
+                Some(process),
+            ),
+            cleanup_executed: IndexMap::new(),
+        }
+    }
+
     pub(crate) fn extract(
-        &self,
+        &mut self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
@@ -31,7 +63,12 @@ impl GzipDownloader {
             ),
             PATHINFO_FILENAME,
         );
-        let target_filepath = format!("{}{}{}", path, DIRECTORY_SEPARATOR, filename);
+        let target_filepath = format!(
+            "{}{}{}",
+            path,
+            DIRECTORY_SEPARATOR,
+            filename.as_string().unwrap_or_default()
+        );
 
         if !Platform::is_windows() {
             let command = vec![
@@ -42,7 +79,18 @@ impl GzipDownloader {
                 target_filepath.clone(),
             ];
 
-            if self.inner.process.execute(&command, &mut String::new()) == 0 {
+            let mut process_output = PhpMixed::Null;
+            if self.inner.process.execute(
+                PhpMixed::List(
+                    command
+                        .iter()
+                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .collect(),
+                ),
+                Some(&mut process_output),
+                None,
+            )? == 0
+            {
                 return Ok(shirabe_external_packages::react::promise::resolve(None));
             }
 

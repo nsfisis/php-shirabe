@@ -44,7 +44,10 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    only = Some(base_package::package_names_to_regexp(&names));
+                    only = Some(base_package::package_names_to_regexp(
+                        &names,
+                        "{^(?:%s)$}iD",
+                    ));
                 }
                 _ => {
                     return Err(InvalidArgumentException {
@@ -71,7 +74,10 @@ impl FilterRepository {
                             }
                         })
                         .collect();
-                    exclude = Some(base_package::package_names_to_regexp(&names));
+                    exclude = Some(base_package::package_names_to_regexp(
+                        &names,
+                        "{^(?:%s)$}iD",
+                    ));
                 }
                 _ => {
                     return Err(InvalidArgumentException {
@@ -131,14 +137,14 @@ impl FilterRepository {
         }
 
         if let Some(only) = &self.only {
-            return Preg::is_match(only, name);
+            return Preg::is_match(only, name).unwrap_or(false);
         }
 
         if self.exclude.is_none() {
             return true;
         }
 
-        !Preg::is_match(self.exclude.as_ref().unwrap(), name)
+        !Preg::is_match(self.exclude.as_ref().unwrap(), name).unwrap_or(false)
     }
 }
 
@@ -225,7 +231,7 @@ impl RepositoryInterface for FilterRepository {
     fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
         let mut result = Vec::new();
         for package in self.repo.get_packages() {
-            if self.is_allowed(package.get_name()) {
+            if self.is_allowed(PackageInterface::get_name(package.as_ref())) {
                 result.push(package);
             }
         }

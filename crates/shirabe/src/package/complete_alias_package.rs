@@ -13,7 +13,13 @@ pub struct CompleteAliasPackage {
 
 impl CompleteAliasPackage {
     pub fn new(alias_of: CompletePackage, version: String, pretty_version: String) -> Self {
-        let inner = AliasPackage::new(alias_of.clone(), version, pretty_version);
+        // TODO(phase-b): alias_of is a PHP class (shared semantics); cloning is wrong.
+        // Use a dummy BasePackage placeholder until the field is migrated to Rc<CompletePackage>.
+        let inner = AliasPackage::new(
+            todo!("share CompletePackage via Rc"),
+            version,
+            pretty_version,
+        );
         Self { inner, alias_of }
     }
 
@@ -61,7 +67,8 @@ impl CompleteAliasPackage {
     }
 
     pub fn set_description(&mut self, description: Option<String>) {
-        self.alias_of.set_description(description);
+        self.alias_of
+            .set_description(description.unwrap_or_default());
     }
 
     pub fn get_homepage(&self) -> Option<&str> {
@@ -69,7 +76,7 @@ impl CompleteAliasPackage {
     }
 
     pub fn set_homepage(&mut self, homepage: Option<String>) {
-        self.alias_of.set_homepage(homepage);
+        self.alias_of.set_homepage(homepage.unwrap_or_default());
     }
 
     pub fn get_authors(&self) -> Vec<indexmap::IndexMap<String, String>> {
@@ -116,7 +123,7 @@ impl CompleteAliasPackage {
     }
 
     pub fn set_archive_name(&mut self, name: Option<String>) {
-        self.alias_of.set_archive_name(name);
+        self.alias_of.set_archive_name(name.unwrap_or_default());
     }
 
     pub fn get_archive_excludes(&self) -> Vec<String> {

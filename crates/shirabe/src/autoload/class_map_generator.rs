@@ -3,7 +3,6 @@
 use indexmap::IndexMap;
 
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator as ExternalClassMapGenerator;
-use shirabe_class_map_generator::file_list::FileList;
 use shirabe_php_shim::PhpMixed;
 
 use crate::io::io_interface::IOInterface;
@@ -42,56 +41,55 @@ impl ClassMapGenerator {
     pub fn create_map(
         path: PhpMixed,
         excluded: Option<String>,
-        io: Option<Box<dyn IOInterface>>,
+        mut io: Option<Box<dyn IOInterface>>,
         namespace: Option<String>,
         autoload_type: Option<String>,
         scanned_files: &mut IndexMap<String, bool>,
     ) -> anyhow::Result<IndexMap<String, String>> {
-        let generator = ExternalClassMapGenerator::new(vec![
+        let _ = scanned_files;
+        let mut generator = ExternalClassMapGenerator::new(vec![
             "php".to_string(),
             "inc".to_string(),
             "hh".to_string(),
         ]);
-        let mut file_list = FileList::new();
-        file_list.files = scanned_files.clone();
-        generator.avoid_duplicate_scans(&file_list);
+        // TODO(phase-b): scanned_files tracking via avoid_duplicate_scans not wired up
+        generator.avoid_duplicate_scans(None);
 
         generator.scan_paths(
             path,
-            excluded.as_deref(),
+            excluded,
             autoload_type.as_deref().unwrap_or("classmap"),
-            namespace.as_deref(),
+            namespace,
+            vec![],
         )?;
 
         let class_map = generator.get_class_map();
 
-        *scanned_files = file_list.files;
-
-        if let Some(io) = &io {
+        if let Some(io) = io.as_mut() {
             for msg in class_map.get_psr_violations() {
                 io.write_error(&format!("<warning>{}</warning>", msg));
             }
 
-            for (class, paths) in class_map.get_ambiguous_classes() {
+            for (class, paths) in class_map.get_ambiguous_classes(None)? {
                 if paths.len() > 1 {
                     io.write_error(&format!(
                         "<warning>Warning: Ambiguous class resolution, \"{}\" was found {}x: in \"{}\" and \"{}\", the first will be used.</warning>",
                         class,
                         paths.len() + 1,
-                        class_map.get_class_path(&class),
+                        class_map.get_class_path(&class).unwrap_or(""),
                         paths.join("\", \""),
                     ));
                 } else {
                     io.write_error(&format!(
                         "<warning>Warning: Ambiguous class resolution, \"{}\" was found in both \"{}\" and \"{}\", the first will be used.</warning>",
                         class,
-                        class_map.get_class_path(&class),
+                        class_map.get_class_path(&class).unwrap_or(""),
                         paths.join("\", \""),
                     ));
                 }
             }
         }
 
-        Ok(class_map.get_map())
+        Ok(class_map.get_map().clone())
     }
 }

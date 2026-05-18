@@ -4,8 +4,6 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
@@ -21,7 +19,7 @@ use shirabe_php_shim::{
 };
 
 use crate::advisory::auditor::Auditor;
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
 use crate::downloader::transport_exception::TransportException;
@@ -54,9 +52,7 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     pub(crate) http_downloader: Option<HttpDownloader>,
     pub(crate) process: Option<ProcessExecutor>,
@@ -65,7 +61,7 @@ pub struct DiagnoseCommand {
 
 impl DiagnoseCommand {
     pub(crate) fn configure(&mut self) {
-        self.inner
+        self
             .set_name("diagnose")
             .set_description("Diagnoses the system to identify common errors")
             .set_help(
@@ -80,8 +76,8 @@ impl DiagnoseCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
-        let composer = self.inner.try_composer();
-        let io = self.inner.get_io();
+        let composer = self.try_composer(None, None);
+        let io = self.get_io();
 
         let config: Config;
         if let Some(ref c) = composer {
@@ -96,10 +92,12 @@ impl DiagnoseCommand {
                 IndexMap::new(),
             );
             c.get_event_dispatcher()
-                .dispatch(command_event.get_name(), &command_event);
+                .dispatch(Some(command_event.get_name()), None);
             self.process = Some(
                 c.get_loop()
+                    .borrow()
                     .get_process_executor()
+                    .cloned()
                     .unwrap_or_else(|| ProcessExecutor::new(Some(io.clone_box()))),
             );
         } else {
@@ -108,15 +106,12 @@ impl DiagnoseCommand {
             self.process = Some(ProcessExecutor::new(Some(io.clone_box())));
         }
 
-        let mut secure_http_wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         config_inner.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
-        secure_http_wrap.insert(
-            "config".to_string(),
-            Box::new(PhpMixed::Array(config_inner)),
-        );
+        let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
+        secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
         let mut config = config;
-        config.merge(PhpMixed::Array(secure_http_wrap), Config::SOURCE_COMMAND);
+        config.merge(&secure_http_wrap, Config::SOURCE_COMMAND);
         config.prohibit_url_by_config("http://repo.packagist.org", &NullIO::new());
 
         self.http_downloader = Some(Factory::create_http_downloader(io, &config)?);
@@ -260,7 +255,7 @@ impl DiagnoseCommand {
             {
                 let composer_repo = ComposerRepository::new(
                     PhpMixed::Array(repo_arr.clone()),
-                    self.inner.get_io().clone_box(),
+                    self.get_io().clone_box(),
                     config.clone(),
                     self.http_downloader.clone().unwrap(),
                 );
@@ -384,7 +379,7 @@ impl DiagnoseCommand {
     }
 
     fn check_composer_schema(&self) -> anyhow::Result<PhpMixed> {
-        let validator = ConfigValidator::new(self.inner.get_io().clone_box());
+        let validator = ConfigValidator::new(self.get_io().clone_box());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file());
 
         if !errors.is_empty() || !warnings.is_empty() {
@@ -489,7 +484,7 @@ impl DiagnoseCommand {
                     result_list.push(Box::new(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         get_class(te),
-                        te.get_message()
+                        te.message
                     ))));
                 } else {
                     return Err(e);
@@ -539,7 +534,7 @@ impl DiagnoseCommand {
                     result_list.push(Box::new(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
                         get_class(te),
-                        te.get_message()
+                        te.message
                     ))));
                 } else {
                     return Err(e);
@@ -568,7 +563,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let proxy_status = proxy.get_status();
+        let proxy_status = proxy.get_status(None).unwrap_or_default();
 
         if proxy.is_excluded_by_no_proxy() {
             return Ok(PhpMixed::String(format!(
@@ -629,7 +624,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        self.inner.get_io().set_authentication(
+        self.get_io().set_authentication(
             domain.to_string(),
             token.to_string(),
             Some("x-oauth-basic".to_string()),
@@ -690,7 +685,7 @@ impl DiagnoseCommand {
         }
 
         if let Some(t) = token {
-            self.inner.get_io().set_authentication(
+            self.get_io().set_authentication(
                 domain.to_string(),
                 t.to_string(),
                 Some("x-oauth-basic".to_string()),
@@ -752,7 +747,7 @@ impl DiagnoseCommand {
     fn check_pub_keys(&self, config: &Config) -> PhpMixed {
         let home = config.get("home").as_string().unwrap_or("").to_string();
         let mut errors: Vec<Box<PhpMixed>> = vec![];
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         if file_exists(&format!("{}/keys.tags.pub", home))
             && file_exists(&format!("{}/keys.dev.pub", home))
@@ -802,7 +797,7 @@ impl DiagnoseCommand {
         }
 
         let versions_util = Versions::new(config.clone(), self.http_downloader.clone().unwrap());
-        let latest = match versions_util.get_latest() {
+        let latest = match versions_util.get_latest(None) {
             Ok(l) => l,
             Err(e) => {
                 return Ok(PhpMixed::String(format!(
@@ -851,7 +846,7 @@ impl DiagnoseCommand {
             "composer/src/Composer/Command/../../../vendor/composer/installed.json".to_string(),
             None,
             None,
-        );
+        )?;
         if !installed_json.exists() {
             return Ok(PhpMixed::String("<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string()));
         }
@@ -986,7 +981,7 @@ impl DiagnoseCommand {
     }
 
     fn output_result(&mut self, result: PhpMixed) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         if result.as_bool() == Some(true) {
             io.write("<info>OK</info>");
 
@@ -1371,30 +1366,12 @@ impl DiagnoseCommand {
     }
 }
 
-impl BaseCommand for DiagnoseCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for DiagnoseCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for DiagnoseCommand {}

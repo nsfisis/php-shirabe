@@ -7,12 +7,20 @@ use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;
 use std::fmt;
 
-#[derive(Debug)]
 pub struct Decisions {
     pub(crate) pool: Pool,
     pub(crate) decision_map: IndexMap<i64, i64>,
     pub(crate) decision_queue: Vec<(i64, Box<dyn Rule>)>,
     iterator_cursor: Option<usize>,
+}
+
+impl std::fmt::Debug for Decisions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Decisions")
+            .field("decision_map", &self.decision_map)
+            .field("decision_queue_len", &self.decision_queue.len())
+            .finish()
+    }
 }
 
 impl Decisions {

@@ -65,12 +65,12 @@ impl ErrorHandler {
             });
         }
 
-        let io_guard = io().lock().unwrap();
+        let mut io_guard = io().lock().unwrap();
         if io_guard.is_some() {
             let has_shown = *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap();
             if has_shown > 0 && !io_guard.as_ref().unwrap().is_verbose() {
                 if has_shown == 1 {
-                    io_guard.as_ref().unwrap().write_error("<warning>More deprecation notices were hidden, run again with `-v` to show them.</warning>");
+                    io_guard.as_mut().unwrap().write_error("<warning>More deprecation notices were hidden, run again with `-v` to show them.</warning>");
                     *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap() = 2;
                 }
                 return Ok(true);
@@ -95,8 +95,8 @@ impl ErrorHandler {
     }
 
     fn output_warning(message: &str, output_even_without_io: bool) {
-        let io_guard = io().lock().unwrap();
-        if let Some(ref io) = *io_guard {
+        let mut io_guard = io().lock().unwrap();
+        if let Some(io) = io_guard.as_mut() {
             io.write_error(&format!("<warning>{}</warning>", message));
             if io.is_verbose() {
                 io.write_error("<warning>Stack trace:</warning>");

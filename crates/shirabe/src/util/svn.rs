@@ -211,11 +211,11 @@ impl Svn {
             .into());
         }
 
-        self.io.write_error(
-            PhpMixed::String(format!(
+        self.io.write_error3(
+            &format!(
                 "The Subversion server ({}) requested credentials:",
                 self.url,
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );

@@ -4,14 +4,11 @@ use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -28,19 +25,7 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct BumpCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for BumpCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl BumpCommand {
@@ -48,8 +33,8 @@ impl BumpCommand {
     const ERROR_LOCK_OUTDATED: i64 = 2;
 
     pub fn configure(&mut self) {
-        let suggest_root_requirement = self.suggest_root_requirement();
-        self.inner
+        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
+        self
             .set_name("bump")
             .set_description("Increases the lower limit of your composer.json requirements to the currently installed versions")
             .set_definition(vec![
@@ -58,11 +43,10 @@ impl BumpCommand {
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "Optional package name(s) to restrict which packages are bumped.",
                     None,
-                    suggest_root_requirement,
                 ),
-                InputOption::new("dev-only", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require-dev\".", None, vec![]),
-                InputOption::new("no-dev-only", Some(PhpMixed::String("R".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require\".", None, vec![]),
-                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the packages to bump, but will not execute anything.", None, vec![]),
+                InputOption::new("dev-only", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require-dev\".", None),
+                InputOption::new("no-dev-only", Some(PhpMixed::String("R".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require\".", None),
+                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the packages to bump, but will not execute anything.", None),
             ])
             .set_help(
                 "The <info>bump</info> command increases the lower limit of your composer.json requirements\n\
@@ -93,7 +77,7 @@ impl BumpCommand {
             .unwrap_or_default();
 
         self.do_bump(
-            self.inner.get_io(),
+            self.get_io(),
             input.get_option("dev-only").as_bool().unwrap_or(false),
             input.get_option("no-dev-only").as_bool().unwrap_or(false),
             input.get_option("dry-run").as_bool().unwrap_or(false),
@@ -111,29 +95,23 @@ impl BumpCommand {
         packages_filter: Vec<String>,
         dev_only_flag_hint: String,
     ) -> Result<i64> {
-        let composer_json_path = Factory::get_composer_file();
+        let composer_json_path = Factory::get_composer_file()?;
 
         if !Filesystem::is_readable(&composer_json_path) {
-            io.write_error(
-                PhpMixed::String(format!(
-                    "<error>{} is not readable.</error>",
-                    composer_json_path
-                )),
+            io.write_error3(
+                &format!("<error>{} is not readable.</error>", composer_json_path),
                 true,
                 io_interface::NORMAL,
             );
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let composer_json = JsonFile::new(composer_json_path.clone());
+        let composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
         let contents = match file_get_contents(&composer_json.get_path()) {
             Some(c) => c,
             None => {
-                io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>{} is not readable.</error>",
-                        composer_json_path
-                    )),
+                io.write_error3(
+                    &format!("<error>{} is not readable.</error>", composer_json_path),
                     true,
                     io_interface::NORMAL,
                 );
@@ -149,28 +127,23 @@ impl BumpCommand {
             })
             .is_err()
         {
-            io.write_error(
-                PhpMixed::String(format!(
-                    "<error>{} is not writable.</error>",
-                    composer_json_path
-                )),
+            io.write_error3(
+                &format!("<error>{} is not writable.</error>", composer_json_path),
                 true,
                 io_interface::NORMAL,
             );
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
         let has_lock_file_disabled = !composer.get_config().has("lock")
             || composer.get_config().get("lock").as_bool().unwrap_or(true);
         let repo = if !has_lock_file_disabled {
             composer.get_locker().get_locked_repository(true)?
         } else if composer.get_locker().is_locked() {
             if !composer.get_locker().is_fresh() {
-                io.write_error(
-                    PhpMixed::String(
-                        "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>".to_string(),
-                    ),
+                io.write_error3(
+                    "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
                     true,
                     io_interface::NORMAL,
                 );
@@ -182,28 +155,24 @@ impl BumpCommand {
         };
 
         if composer.get_package().get_type() != "project" && !dev_only {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>".to_string(),
-                ),
+            io.write_error3(
+                "<warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>",
                 true,
                 io_interface::NORMAL,
             );
 
             let contents_data = composer_json.read()?;
             if !contents_data.contains_key("type") {
-                io.write_error(
-                    PhpMixed::String(
-                        "If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".".to_string(),
-                    ),
+                io.write_error3(
+                    "If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".",
                     true,
                     io_interface::NORMAL,
                 );
-                io.write_error(
-                    PhpMixed::String(format!(
+                io.write_error3(
+                    &format!(
                         "<warning>Alternatively you can use {} to only bump dependencies within \"require-dev\".</warning>",
                         dev_only_flag_hint
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -233,7 +202,7 @@ impl BumpCommand {
                 .collect::<std::collections::HashSet<_>>()
                 .into_iter()
                 .collect();
-            let pattern = base_package::package_names_to_regexp(&unique_lower);
+            let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
             for (key, reqs) in tasks.iter_mut() {
                 reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name).unwrap_or(false));
             }
@@ -291,42 +260,36 @@ impl BumpCommand {
         let change_count: usize = updates.values().map(|m| m.len()).sum();
         if change_count > 0 {
             if dry_run {
-                io.write(
-                    PhpMixed::String(format!(
-                        "<info>{} would be updated with:</info>",
-                        composer_json_path
-                    )),
+                io.write3(
+                    &format!("<info>{} would be updated with:</info>", composer_json_path),
                     true,
                     io_interface::NORMAL,
                 );
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write(
-                            PhpMixed::String(format!(
-                                "<info> - {}.{}: {}</info>",
-                                require_type, package, version
-                            )),
+                        io.write3(
+                            &format!("<info> - {}.{}: {}</info>", require_type, package, version),
                             true,
                             io_interface::NORMAL,
                         );
                     }
                 }
             } else {
-                io.write(
-                    PhpMixed::String(format!(
+                io.write3(
+                    &format!(
                         "<info>{} has been updated ({} changes).</info>",
                         composer_json_path, change_count
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
             }
         } else {
-            io.write(
-                PhpMixed::String(format!(
+            io.write3(
+                &format!(
                     "<info>No requirements to update in {}.</info>",
                     composer_json_path
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -384,30 +347,12 @@ impl BumpCommand {
     }
 }
 
-impl BaseCommand for BumpCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for BumpCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for BumpCommand {}

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::hash;
 
 pub struct ComposerMirror;
@@ -15,7 +15,7 @@ impl ComposerMirror {
         pretty_version: Option<&str>,
     ) -> String {
         let reference = reference.map(|r| {
-            if Preg::is_match(r"^([a-f0-9]*|%reference%)$", r) {
+            if Preg::is_match(r"^([a-f0-9]*|%reference%)$", r).unwrap_or(false) {
                 r.to_string()
             } else {
                 hash("md5", r)
@@ -53,17 +53,46 @@ impl ComposerMirror {
         url: &str,
         r#type: Option<&str>,
     ) -> String {
-        let normalized_url = if let Some(m) = Preg::match_(
+        let mut gh_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
+        let mut bb_matches: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
+        let normalized_url = if Preg::match3(
             r"^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$",
             url,
-        ) {
-            format!("gh-{}/{}", m[1], m[2])
-        } else if let Some(m) =
-            Preg::match_(r"^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$", url)
+            Some(&mut gh_matches),
+        )
+        .unwrap_or(false)
         {
-            format!("bb-{}/{}", m[1], m[2])
+            format!(
+                "gh-{}/{}",
+                gh_matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default(),
+                gh_matches
+                    .get(&CaptureKey::ByIndex(2))
+                    .cloned()
+                    .unwrap_or_default(),
+            )
+        } else if Preg::match3(
+            r"^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$",
+            url,
+            Some(&mut bb_matches),
+        )
+        .unwrap_or(false)
+        {
+            format!(
+                "bb-{}/{}",
+                bb_matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default(),
+                bb_matches
+                    .get(&CaptureKey::ByIndex(2))
+                    .cloned()
+                    .unwrap_or_default(),
+            )
         } else {
-            Preg::replace(r"[^a-z0-9_.-]", "-", url.trim_matches('/'))
+            Preg::replace(r"[^a-z0-9_.-]", "-", url.trim_matches('/')).unwrap_or_default()
         };
 
         ["%package%", "%normalizedUrl%", "%type%"]

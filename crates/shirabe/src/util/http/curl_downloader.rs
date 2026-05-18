@@ -689,7 +689,7 @@ impl CurlDownloader {
                     if_modified
                 )),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
         }
 
@@ -836,7 +836,7 @@ impl CurlDownloader {
                                     .to_string(),
                             ),
                             true,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                     }
 
@@ -922,7 +922,7 @@ impl CurlDownloader {
                                 errno
                             )),
                             true,
-                            <dyn IOInterface>::DEBUG,
+                            crate::io::io_interface::DEBUG,
                         );
                         self.restart_job_with_delay(
                             &job,
@@ -954,7 +954,7 @@ impl CurlDownloader {
                                 errno
                             )),
                             true,
-                            <dyn IOInterface>::DEBUG,
+                            crate::io::io_interface::DEBUG,
                         );
                         let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
                         attrs.insert(
@@ -1068,7 +1068,10 @@ impl CurlDownloader {
                         status_code,
                         headers.clone().unwrap_or_default(),
                         contents.as_string().map(|s| s.to_string()),
-                        progress.clone(),
+                        progress
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect(),
                     ));
                     self.io.write_error(
                         PhpMixed::String(format!(
@@ -1082,7 +1085,7 @@ impl CurlDownloader {
                             )
                         )),
                         true,
-                        <dyn IOInterface>::DEBUG,
+                        crate::io::io_interface::DEBUG,
                     );
                 } else {
                     let max_file_size: Option<i64> = job
@@ -1141,7 +1144,10 @@ impl CurlDownloader {
                         status_code,
                         headers.clone().unwrap_or_default(),
                         contents.as_string().map(|s| s.to_string()),
-                        progress.clone(),
+                        progress
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect(),
                     ));
                     self.io.write_error(
                         PhpMixed::String(format!(
@@ -1155,7 +1161,7 @@ impl CurlDownloader {
                             )
                         )),
                         true,
-                        <dyn IOInterface>::DEBUG,
+                        crate::io::io_interface::DEBUG,
                     );
                 }
                 fclose(job.get("bodyHandle").cloned().unwrap_or(PhpMixed::Null));
@@ -1304,7 +1310,7 @@ impl CurlDownloader {
                                 sc
                             )),
                             true,
-                            <dyn IOInterface>::DEBUG,
+                            crate::io::io_interface::DEBUG,
                         );
                         let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
                         attrs.insert(
@@ -1608,7 +1614,7 @@ impl CurlDownloader {
                     ],
                 )),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
 
             return Ok(Ok(target_url));

@@ -133,6 +133,10 @@ impl CompletePackageInterface for CompletePackage {
 }
 
 impl PackageInterface for CompletePackage {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         todo!()
     }
@@ -253,15 +257,15 @@ impl PackageInterface for CompletePackage {
         todo!()
     }
 
-    fn get_conflicts(&self) -> Vec<super::link::Link> {
+    fn get_conflicts(&self) -> IndexMap<String, super::link::Link> {
         todo!()
     }
 
-    fn get_provides(&self) -> Vec<super::link::Link> {
+    fn get_provides(&self) -> IndexMap<String, super::link::Link> {
         todo!()
     }
 
-    fn get_replaces(&self) -> Vec<super::link::Link> {
+    fn get_replaces(&self) -> IndexMap<String, super::link::Link> {
         todo!()
     }
 

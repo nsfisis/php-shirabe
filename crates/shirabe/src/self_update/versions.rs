@@ -45,7 +45,10 @@ impl Versions {
             return Ok(ch.clone());
         }
 
-        let channel_file = format!("{}/update-channel", self.config.get("home"));
+        let channel_file = format!(
+            "{}/update-channel",
+            self.config.get("home").as_string().unwrap_or("")
+        );
         if std::path::Path::new(&channel_file).exists() {
             let channel = std::fs::read_to_string(&channel_file)?.trim().to_string();
             if ["stable", "preview", "snapshot", "2.2"].contains(&channel.as_str()) {
@@ -74,7 +77,10 @@ impl Versions {
             }));
         }
 
-        let channel_file = format!("{}/update-channel", self.config.get("home"));
+        let channel_file = format!(
+            "{}/update-channel",
+            self.config.get("home").as_string().unwrap_or("")
+        );
         self.channel = Some(channel.clone());
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned

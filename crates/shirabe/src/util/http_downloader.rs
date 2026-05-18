@@ -148,7 +148,7 @@ impl HttpDownloader {
                 1,
                 min(
                     50,
-                    max_jobs_env.as_string().unwrap_or("0").parse().unwrap_or(0),
+                    max_jobs_env.as_deref().unwrap_or("0").parse().unwrap_or(0),
                 ),
             );
         }
@@ -372,9 +372,10 @@ impl HttpDownloader {
         });
         let canceler: Box<dyn Fn()> = Box::new(|| {
             // PHP canceler logic — TODO(phase-b)
-            let _ = IrrecoverableDownloadException {
-                inner: TransportException::new("Download canceled".to_string(), 0),
-            };
+            let _ = IrrecoverableDownloadException(shirabe_php_shim::RuntimeException {
+                message: "Download canceled".to_string(),
+                code: 0,
+            });
             let _ = Url::sanitize("");
         });
         let _ = (resolver, canceler);
@@ -684,7 +685,7 @@ impl HttpDownloader {
         if false != strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
             || false != strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
-            Silencer::suppress();
+            Silencer::suppress(None);
             let mut ctx_options: IndexMap<String, PhpMixed> = IndexMap::new();
             let mut ssl_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             ssl_map.insert("verify_peer".to_string(), Box::new(PhpMixed::Bool(false)));

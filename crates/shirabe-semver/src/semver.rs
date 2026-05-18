@@ -19,8 +19,7 @@ impl Semver {
 
     pub fn satisfies(version: String, constraints: String) -> anyhow::Result<bool> {
         let version_parser = Self::version_parser();
-        let provider =
-            Constraint::new("==".to_string(), version_parser.normalize(&version, None)?)?;
+        let provider = Constraint::new("==".to_string(), version_parser.normalize(&version, None)?);
         let parsed_constraints = version_parser.parse_constraints(&constraints)?;
         Ok(parsed_constraints.matches(&provider))
     }

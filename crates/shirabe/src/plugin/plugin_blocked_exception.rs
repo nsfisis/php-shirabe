@@ -6,6 +6,12 @@ use shirabe_php_shim::UnexpectedValueException;
 #[derive(Debug)]
 pub struct PluginBlockedException(pub UnexpectedValueException);
 
+impl PluginBlockedException {
+    pub fn new(message: String) -> Self {
+        Self(UnexpectedValueException { message, code: 0 })
+    }
+}
+
 impl std::fmt::Display for PluginBlockedException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)

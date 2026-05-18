@@ -29,7 +29,19 @@ impl Table {
         todo!()
     }
 
+    pub fn set_column_width(&mut self, _column_index: usize, _width: i64) -> &mut Self {
+        todo!()
+    }
+
     pub fn set_column_widths(&mut self, _widths: Vec<i64>) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_column_max_width(&mut self, _column_index: usize, _width: i64) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_horizontal(&mut self, _horizontal: bool) -> &mut Self {
         todo!()
     }
 }

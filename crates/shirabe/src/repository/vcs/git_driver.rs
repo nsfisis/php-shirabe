@@ -69,7 +69,7 @@ impl GitDriver {
 
             GitUtil::clean_env(&self.inner.process);
 
-            let fs = Filesystem::new();
+            let fs = Filesystem::new(None);
             fs.ensure_directory_exists(&dirname(&self.repo_dir))?;
 
             if !is_writable(&dirname(&self.repo_dir)) {
@@ -99,7 +99,7 @@ impl GitDriver {
                 &*self.inner.io,
                 &self.inner.config,
                 &self.inner.process,
-                &Filesystem::new(),
+                &Filesystem::new(None),
             );
             if !git_util.sync_mirror(&self.inner.url, &self.repo_dir)? {
                 if !is_dir(&self.repo_dir) {
@@ -164,7 +164,7 @@ impl GitDriver {
                 &*self.inner.io,
                 &self.inner.config,
                 &self.inner.process,
-                &Filesystem::new(),
+                &Filesystem::new(None),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
                 let default_branch =
@@ -396,7 +396,7 @@ impl GitDriver {
         }
 
         let process = ProcessExecutor::new(io);
-        let git_util = GitUtil::new(io, _config, &process, &Filesystem::new());
+        let git_util = GitUtil::new(io, _config, &process, &Filesystem::new(None));
         GitUtil::clean_env(&process);
 
         let result = git_util.run_commands(
@@ -414,5 +414,65 @@ impl GitDriver {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
         }
+    }
+}
+
+// TODO(phase-b): implement VcsDriverInterface for GitDriver — signatures here
+// differ from the trait (some &mut self vs &self, different return shapes), so
+// each method delegates via todo!() until reconciled.
+impl crate::repository::vcs::vcs_driver_interface::VcsDriverInterface for GitDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        GitDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &self,
+        _identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, shirabe_php_shim::PhpMixed>>> {
+        todo!()
+    }
+
+    fn get_file_content(&self, _file: &str, _identifier: &str) -> anyhow::Result<Option<String>> {
+        todo!()
+    }
+
+    fn get_change_date(&self, _identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        todo!()
+    }
+
+    fn get_root_identifier(&self) -> anyhow::Result<String> {
+        todo!()
+    }
+
+    fn get_branches(&self) -> anyhow::Result<IndexMap<String, String>> {
+        todo!()
+    }
+
+    fn get_tags(&self) -> anyhow::Result<IndexMap<String, String>> {
+        todo!()
+    }
+
+    fn get_dist(&self, _identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        todo!()
+    }
+
+    fn get_source(&self, _identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        todo!()
+    }
+
+    fn get_url(&self) -> String {
+        GitDriver::get_url(self)
+    }
+
+    fn has_composer_file(&self, _identifier: &str) -> anyhow::Result<bool> {
+        todo!()
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(_io: &dyn IOInterface, _config: &Config, _url: &str, _deep: bool) -> bool {
+        todo!()
     }
 }

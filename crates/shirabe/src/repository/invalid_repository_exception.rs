@@ -6,6 +6,12 @@ use shirabe_php_shim::Exception;
 #[derive(Debug)]
 pub struct InvalidRepositoryException(pub Exception);
 
+impl InvalidRepositoryException {
+    pub fn new(message: String) -> Self {
+        Self(Exception { message, code: 0 })
+    }
+}
+
 impl std::fmt::Display for InvalidRepositoryException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)

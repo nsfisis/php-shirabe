@@ -263,7 +263,7 @@ impl Pool {
         let mut matches: Vec<Box<dyn BasePackage>> = vec![];
 
         for candidate in candidates {
-            if self.r#match(candidate, name, constraint) {
+            if self.r#match(candidate.as_ref(), name, constraint) {
                 matches.push(candidate.clone_box());
             }
         }

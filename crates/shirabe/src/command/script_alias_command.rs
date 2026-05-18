@@ -1,23 +1,20 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php
 
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
 use crate::util::platform::Platform;
-use crate::{command::base_command::BaseCommand, composer::Composer};
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     script: String,
     description: String,
@@ -53,8 +50,7 @@ impl ScriptAliasCommand {
     }
 
     pub fn configure(&mut self) {
-        self.inner
-            .set_name(&self.script)
+        self.set_name(&self.script)
             .set_description(&self.description)
             .set_aliases(self.aliases.clone())
             .set_definition(vec![
@@ -64,7 +60,6 @@ impl ScriptAliasCommand {
                     Some(InputOption::VALUE_NONE),
                     "Sets the dev mode.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-dev",
@@ -72,14 +67,12 @@ impl ScriptAliasCommand {
                     Some(InputOption::VALUE_NONE),
                     "Disables the dev mode.",
                     None,
-                    vec![],
                 ),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -94,7 +87,7 @@ impl ScriptAliasCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         let args = input.get_arguments();
 
@@ -133,30 +126,12 @@ impl ScriptAliasCommand {
     }
 }
 
-impl BaseCommand for ScriptAliasCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for ScriptAliasCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for ScriptAliasCommand {}

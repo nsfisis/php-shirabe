@@ -241,7 +241,7 @@ impl GitBitbucketDriver {
                 if self.inner.should_cache(identifier) {
                     self.inner.cache.as_ref().unwrap().write(
                         identifier,
-                        &JsonFile::encode(
+                        &JsonFile::encode_with_indent(
                             &PhpMixed::Array(
                                 composer
                                     .clone()

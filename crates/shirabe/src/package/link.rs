@@ -13,6 +13,20 @@ pub struct Link {
     pub(crate) pretty_constraint: Option<String>,
 }
 
+impl Clone for Link {
+    fn clone(&self) -> Self {
+        // TODO(phase-b): Link is a PHP class; this clone is a shallow placeholder until
+        // Link is shared via Rc<Link>.
+        Self {
+            source: self.source.clone(),
+            target: self.target.clone(),
+            constraint: self.constraint.clone_box(),
+            description: self.description.clone(),
+            pretty_constraint: self.pretty_constraint.clone(),
+        }
+    }
+}
+
 impl std::fmt::Debug for Link {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Link")

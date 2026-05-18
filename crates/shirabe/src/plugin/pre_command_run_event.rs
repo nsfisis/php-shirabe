@@ -4,24 +4,21 @@
 use crate::event_dispatcher::event::Event;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 
+#[derive(Debug)]
 pub struct PreCommandRunEvent {
     inner: Event,
-    input: Box<dyn InputInterface>,
     command: String,
 }
 
 impl PreCommandRunEvent {
-    pub fn new(name: String, input: Box<dyn InputInterface>, command: String) -> Self {
-        let inner = Event::new(name);
-        Self {
-            inner,
-            input,
-            command,
-        }
+    // TODO(phase-b): input dropped because storing a &dyn reference would need lifetime params.
+    pub fn new(name: String, _input: &dyn InputInterface, command: String) -> Self {
+        let inner = Event::new(name, vec![], indexmap::IndexMap::new());
+        Self { inner, command }
     }
 
-    pub fn get_input(&self) -> &dyn InputInterface {
-        self.input.as_ref()
+    pub fn get_name(&self) -> &str {
+        self.inner.get_name()
     }
 
     pub fn get_command(&self) -> &str {

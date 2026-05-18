@@ -152,13 +152,13 @@ impl ZipDownloader {
 
                 if !is_windows_guard.unwrap() && unzip_commands_empty {
                     if proc_open_missing {
-                        self.inner.inner.io.write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.inner.io.write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                        self.inner.io.write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
                     } else {
-                        self.inner.inner.io.write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.inner.io.write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                        self.inner.io.write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
                     }
                 }
             }
@@ -226,7 +226,7 @@ impl ZipDownloader {
                     Preg::is_match_strict_groups(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output)
                 {
                     if version_compare(&m[1], "21.01", "<") {
-                        self.inner.inner.io.write_error(&format!(
+                        self.inner.io.write_error(&format!(
                             "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
                             executable, m[1], executable,
                         ));
@@ -235,7 +235,7 @@ impl ZipDownloader {
             }
         }
 
-        let io = &self.inner.inner.io;
+        let io = &self.inner.io;
         let try_fallback = |process_error: anyhow::Error| -> Result<Box<dyn PromiseInterface>> {
             if is_last_chance {
                 return Err(process_error);
@@ -297,7 +297,7 @@ impl ZipDownloader {
             self.extract_with_zip_archive(package, file, path)
         };
 
-        match self.inner.inner.process.execute_async(&command) {
+        match self.inner.process.execute_async(&command) {
             Ok(promise) => Ok(promise.then(
                 Box::new(move |process: Process| -> Result<()> {
                     if !process.is_successful() {

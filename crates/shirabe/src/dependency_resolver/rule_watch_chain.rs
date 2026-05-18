@@ -3,8 +3,9 @@
 use crate::dependency_resolver::rule_watch_node::RuleWatchNode;
 
 /// An extension of SplDoublyLinkedList with seek and removal of current element.
+#[derive(Debug)]
 pub struct RuleWatchChain {
-    data: Vec<RuleWatchNode>,
+    data: Vec<std::rc::Rc<std::cell::RefCell<RuleWatchNode>>>,
     current_offset: usize,
 }
 
@@ -16,12 +17,24 @@ impl RuleWatchChain {
         }
     }
 
-    fn rewind(&mut self) {
+    pub(crate) fn rewind(&mut self) {
         self.current_offset = 0;
     }
 
-    fn next(&mut self) {
+    pub(crate) fn next(&mut self) {
         self.current_offset += 1;
+    }
+
+    pub(crate) fn valid(&self) -> bool {
+        self.current_offset < self.data.len()
+    }
+
+    pub(crate) fn current(&self) -> &std::rc::Rc<std::cell::RefCell<RuleWatchNode>> {
+        &self.data[self.current_offset]
+    }
+
+    pub(crate) fn unshift(&mut self, node: std::rc::Rc<std::cell::RefCell<RuleWatchNode>>) {
+        self.data.insert(0, node);
     }
 
     fn key(&self) -> usize {

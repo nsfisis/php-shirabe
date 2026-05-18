@@ -140,7 +140,7 @@ impl PathDownloader {
         let (mut current_strategy, allowed_strategies) =
             self.compute_allowed_strategies(&transport_options)?;
 
-        let symfony_filesystem = SymfonyFilesystem::new();
+        let symfony_filesystem = SymfonyFilesystem::new(None);
         self.inner.filesystem.remove_directory(&path);
 
         if output {
@@ -254,14 +254,12 @@ impl PathDownloader {
                     io_interface::NORMAL,
                 );
             }
-            let iterator = ArchivableFilesFinder::new(&real_url, vec![]);
+            let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
             symfony_filesystem.mirror(&real_url, &path, Some(&iterator));
         }
 
         if output {
-            self.inner
-                .io
-                .write_error(PhpMixed::String("".to_string()), true, io_interface::NORMAL);
+            self.inner.io.write_error3("", true, io_interface::NORMAL);
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -328,7 +326,7 @@ impl PathDownloader {
         // can happen when using custom installers, see https://github.com/composer/composer/pull/9116
         // not using realpath here as we do not want to resolve the symlink to the original dist url
         // it points to
-        let fs = Filesystem::new();
+        let fs = Filesystem::new(None);
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {

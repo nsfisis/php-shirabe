@@ -60,22 +60,25 @@ impl Constraint {
         }
     }
 
-    pub fn new(operator: String, version: String) -> anyhow::Result<Self> {
-        let op_int = Self::trans_op_str(&operator).ok_or_else(|| {
-            anyhow::anyhow!(
+    pub fn new(operator: impl Into<String>, version: impl Into<String>) -> Self {
+        let operator: String = operator.into();
+        let op_int = Self::trans_op_str(&operator).unwrap_or_else(|| {
+            // PHP raises InvalidArgumentException; in the Rust port keep that as a panic
+            // because invalid operators are programmer errors caught during porting.
+            panic!(
                 "Invalid operator \"{}\" given, expected one of: {}",
                 operator,
                 Self::get_supported_operators().join(", ")
             )
-        })?;
+        });
 
-        Ok(Self {
+        Self {
             operator: op_int,
-            version,
+            version: version.into(),
             pretty_string: None,
             lower_bound: Mutex::new(None),
             upper_bound: Mutex::new(None),
-        })
+        }
     }
 
     pub fn get_version(&self) -> &str {

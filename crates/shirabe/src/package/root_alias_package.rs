@@ -231,6 +231,10 @@ impl std::fmt::Display for RootAliasPackage {
 }
 
 impl PackageInterface for RootAliasPackage {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         todo!()
     }
@@ -321,13 +325,13 @@ impl PackageInterface for RootAliasPackage {
     fn get_requires(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_conflicts(&self) -> Vec<Link> {
+    fn get_conflicts(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_provides(&self) -> Vec<Link> {
+    fn get_provides(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_replaces(&self) -> Vec<Link> {
+    fn get_replaces(&self) -> IndexMap<String, Link> {
         todo!()
     }
     fn get_dev_requires(&self) -> IndexMap<String, Link> {

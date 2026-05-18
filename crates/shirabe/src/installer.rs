@@ -71,6 +71,7 @@ use crate::package::root_alias_package::RootAliasPackage;
 use crate::package::root_package_interface::RootPackageInterface;
 use crate::package::version::version_parser::VersionParser;
 use crate::repository::array_repository::ArrayRepository;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::installed_array_repository::InstalledArrayRepository;
 use crate::repository::installed_repository::InstalledRepository;
@@ -93,7 +94,7 @@ pub struct Installer {
     pub(crate) package: Box<dyn RootPackageInterface>,
     // TODO can we get rid of the below and just use the package itself?
     pub(crate) fixed_root_package: Box<dyn RootPackageInterface>,
-    pub(crate) download_manager: DownloadManager,
+    pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
     pub(crate) repository_manager: RepositoryManager,
     pub(crate) locker: Locker,
     pub(crate) installation_manager: InstallationManager,
@@ -148,7 +149,7 @@ impl Installer {
         io: Box<dyn IOInterface>,
         config: Config,
         package: Box<dyn RootPackageInterface>,
-        download_manager: DownloadManager,
+        download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
         repository_manager: RepositoryManager,
         locker: Locker,
         installation_manager: InstallationManager,
@@ -260,8 +261,12 @@ impl Installer {
                 .dispatch_script(event_name, self.dev_mode);
         }
 
-        self.download_manager.set_prefer_source(self.prefer_source);
-        self.download_manager.set_prefer_dist(self.prefer_dist);
+        self.download_manager
+            .borrow_mut()
+            .set_prefer_source(self.prefer_source);
+        self.download_manager
+            .borrow_mut()
+            .set_prefer_dist(self.prefer_dist);
 
         let local_repo = self.repository_manager.get_local_repository();
 
@@ -848,14 +853,14 @@ impl Installer {
             return Ok(0);
         }
 
-        let mut result_repo = ArrayRepository::new(vec![]);
+        let mut result_repo = ArrayRepository::new(vec![])?;
         let loader = ArrayLoader::new(None, true);
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             result_repo.add_package(loader.load(
                 dumper.dump(&*pkg),
                 "Composer\\Package\\CompletePackage".to_string(),
-            )?);
+            )?)?;
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
@@ -1132,7 +1137,7 @@ impl Installer {
         }
 
         if self.execute_operations {
-            local_repo.set_dev_package_names(self.locker.get_dev_package_names());
+            local_repo.set_dev_package_names(self.locker.get_dev_package_names()?);
             self.installation_manager.execute(
                 &*local_repo,
                 local_repo_transaction.get_operations(),
@@ -1463,12 +1468,12 @@ impl Installer {
         }
         let keys: Vec<String> = packages.keys().cloned().collect();
         for key in keys {
-            let package_clone = packages.get(&key).unwrap().clone_box();
+            let package_clone = packages.get(&key).unwrap().clone_package_box();
             if let Some(alias_pkg) = package_clone.as_alias_package() {
                 let alias_key = alias_pkg.get_alias_of().to_string();
                 let _class_name = get_class(&*package_clone);
                 // PHP: $packages[$key] = new $className($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
-                let aliased = packages.get(&alias_key).unwrap().clone_box();
+                let aliased = packages.get(&alias_key).unwrap().clone_package_box();
                 let new_alias_package: Box<dyn PackageInterface> = Box::new(AliasPackage::new(
                     aliased,
                     alias_pkg.get_version().to_string(),

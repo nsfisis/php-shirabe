@@ -4,16 +4,12 @@ use std::path::Path;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
-use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::factory::Factory;
@@ -23,58 +19,22 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct GlobalCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl GlobalCommand {
-    pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
-        let application = self.inner.get_application();
-        if input.must_suggest_argument_values_for("command-name") {
-            let names: Vec<String> = application
-                .all()
-                .into_iter()
-                .filter(|cmd| !cmd.is_hidden())
-                .filter_map(|cmd| cmd.get_name().map(|n| n.to_string()))
-                .collect();
-            suggestions.suggest_values(names);
-            return;
-        }
-
-        let command_name = input
-            .get_argument("command-name")
-            .as_string()
-            .unwrap_or("")
-            .to_string();
-        if application.has(&command_name) {
-            let sub_input = self.prepare_subcommand_input(input.as_input_interface(), true);
-            let sub_input = CompletionInput::from_string(&sub_input.to_string(), 2);
-            let command = application.find(&command_name);
-            command.merge_application_definition();
-            sub_input.bind(command.get_definition());
-            command.complete(&sub_input, suggestions);
-        }
-    }
+    // TODO(cli-completion): pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
 
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("global")
+        self.set_name("global")
             .set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)")
             .set_definition(vec![
-                InputArgument::new(
-                    "command-name",
-                    Some(InputArgument::REQUIRED),
-                    "",
-                    None,
-                    vec![],
-                ),
+                InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -105,11 +65,11 @@ impl GlobalCommand {
         }
 
         if args.len() < 2 {
-            return self.inner.run(input, output);
+            return self.run(input, output);
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;
-        Ok(self.inner.get_application().run(&sub_input, output)?)
+        Ok(self.get_application().run(&sub_input, output)?)
     }
 
     fn prepare_subcommand_input(
@@ -125,7 +85,7 @@ impl GlobalCommand {
         let home = config.get("home").as_string().unwrap_or("").to_string();
 
         if !Path::new(&home).is_dir() {
-            let fs = Filesystem::new();
+            let fs = Filesystem::new(None);
             fs.ensure_directory_exists(&home)?;
             if !Path::new(&home).is_dir() {
                 return Err(RuntimeException {
@@ -142,7 +102,7 @@ impl GlobalCommand {
         })?;
 
         if !quiet {
-            self.inner.get_io().write_error(&format!(
+            self.get_io().write_error(&format!(
                 "<info>Changed current directory to {}</info>",
                 home
             ));
@@ -154,7 +114,7 @@ impl GlobalCommand {
             &input.to_string(),
             1,
         )?;
-        self.inner.get_application().reset_composer();
+        self.get_application().reset_composer();
 
         Ok(StringInput::new(new_input_str))
     }
@@ -164,30 +124,12 @@ impl GlobalCommand {
     }
 }
 
-impl BaseCommand for GlobalCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for GlobalCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for GlobalCommand {}

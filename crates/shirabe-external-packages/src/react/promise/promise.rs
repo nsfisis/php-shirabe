@@ -1,5 +1,7 @@
 use shirabe_php_shim::PhpMixed;
 
+use super::promise_interface::PromiseInterface;
+
 #[derive(Debug)]
 pub struct Promise;
 
@@ -11,12 +13,14 @@ impl Promise {
     ) -> Self {
         todo!()
     }
+}
 
-    pub fn then<F, G>(self, _on_fulfilled: Option<F>, _on_rejected: Option<G>) -> Self
-    where
-        F: FnOnce(Option<PhpMixed>) -> Option<PhpMixed>,
-        G: FnOnce(Option<PhpMixed>) -> Option<PhpMixed>,
-    {
+impl PromiseInterface for Promise {
+    fn then(
+        &self,
+        _on_fulfilled: Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>,
+        _on_rejected: Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>,
+    ) -> Box<dyn PromiseInterface> {
         todo!()
     }
 }

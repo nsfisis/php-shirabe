@@ -5,10 +5,14 @@ use crate::io::io_interface::IOInterface;
 
 pub const PLUGIN_API_VERSION: &'static str = "2.9.0";
 
-pub trait PluginInterface {
+pub trait PluginInterface: std::fmt::Debug {
     fn activate(&mut self, composer: &Composer, io: &dyn IOInterface);
 
     fn deactivate(&mut self, composer: &Composer, io: &dyn IOInterface);
 
     fn uninstall(&mut self, composer: &Composer, io: &dyn IOInterface);
+
+    fn clone_box(&self) -> Box<dyn PluginInterface> {
+        todo!()
+    }
 }

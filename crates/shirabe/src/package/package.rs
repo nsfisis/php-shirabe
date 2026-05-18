@@ -71,7 +71,10 @@ impl Package {
         let stability = VersionParser::parse_stability(&version).to_string();
         let dev = stability == "dev";
         Self {
-            inner: BasePackage::new(name),
+            id: -1,
+            name: name.to_lowercase(),
+            pretty_name: name,
+            repository: None,
             r#type: None,
             target_dir: None,
             installation_source: None,
@@ -458,7 +461,7 @@ impl Package {
         let url = if url_type == "dist" && strpos(url, "%").is_some() {
             ComposerMirror::process_url(
                 url,
-                &self.inner.name,
+                &self.name,
                 &self.version,
                 r#ref.unwrap_or(""),
                 r#type.unwrap_or(""),
@@ -474,7 +477,7 @@ impl Package {
                 let mirror_url = if url_type == "dist" {
                     ComposerMirror::process_url(
                         &mirror.url,
-                        &self.inner.name,
+                        &self.name,
                         &self.version,
                         r#ref.unwrap_or(""),
                         r#type.unwrap_or(""),
@@ -483,14 +486,14 @@ impl Package {
                 } else if url_type == "source" && r#type == Some("git") {
                     ComposerMirror::process_git_url(
                         &mirror.url,
-                        &self.inner.name,
+                        &self.name,
                         &url,
                         r#type.unwrap_or(""),
                     )
                 } else if url_type == "source" && r#type == Some("hg") {
                     ComposerMirror::process_hg_url(
                         &mirror.url,
-                        &self.inner.name,
+                        &self.name,
                         &url,
                         r#type.unwrap_or(""),
                     )
@@ -568,10 +571,6 @@ impl BasePackage for Package {
         todo!()
     }
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
-    }
-
     fn clone_box(&self) -> Box<dyn BasePackage> {
         todo!()
     }
@@ -584,6 +583,9 @@ impl std::fmt::Display for Package {
 }
 
 impl PackageInterface for Package {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn get_name(&self) -> &str {
         todo!()
     }
@@ -674,13 +676,13 @@ impl PackageInterface for Package {
     fn get_requires(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_conflicts(&self) -> Vec<Link> {
+    fn get_conflicts(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_provides(&self) -> Vec<Link> {
+    fn get_provides(&self) -> IndexMap<String, Link> {
         todo!()
     }
-    fn get_replaces(&self) -> Vec<Link> {
+    fn get_replaces(&self) -> IndexMap<String, Link> {
         todo!()
     }
     fn get_dev_requires(&self) -> IndexMap<String, Link> {

@@ -131,8 +131,10 @@ impl ArrayDumper {
         }
 
         // corresponds to: foreach (BasePackage::$supportedLinkTypes as $type => $opts) { $links = $package->{'get'.ucfirst($opts['method'])}(); ... }
-        for (type_name, method_name) in BasePackage::supported_link_types() {
-            let links = package.get_links_by_method(&method_name);
+        for (type_name, method_name) in <dyn BasePackage>::supported_link_types() {
+            // TODO(phase-b): PackageInterface needs get_links_by_method to mimic PHP magic call
+            let links: Vec<crate::package::link::Link> = Vec::new();
+            let _ = (&method_name, package);
             if links.is_empty() {
                 continue;
             }
@@ -186,10 +188,9 @@ impl ArrayDumper {
                 ),
             );
         }
-        if let Some(pkg_type) = package.get_type() {
-            if !pkg_type.is_empty() {
-                data.insert("type".to_string(), PhpMixed::String(pkg_type.to_string()));
-            }
+        let pkg_type = package.get_type();
+        if !pkg_type.is_empty() {
+            data.insert("type".to_string(), PhpMixed::String(pkg_type.to_string()));
         }
         let extra = package.get_extra();
         if !extra.is_empty() {
@@ -247,10 +248,15 @@ impl ArrayDumper {
             );
         }
         let php_ext = package.get_php_ext();
-        if !php_ext.is_empty() {
+        if let Some(php_ext) = php_ext.as_ref().filter(|m| !m.is_empty()) {
             data.insert(
                 "php-ext".to_string(),
-                PhpMixed::Array(php_ext.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
+                PhpMixed::Array(
+                    php_ext
+                        .iter()
+                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                        .collect(),
+                ),
             );
         }
 

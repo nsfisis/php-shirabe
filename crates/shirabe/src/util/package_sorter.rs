@@ -36,7 +36,7 @@ impl PackageSorter {
     pub fn sort_packages_alphabetically(
         mut packages: Vec<Box<dyn PackageInterface>>,
     ) -> Vec<Box<dyn PackageInterface>> {
-        packages.sort_by_key(|p| p.get_name());
+        packages.sort_by_key(|p| p.get_name().to_string());
         packages
     }
 
@@ -48,9 +48,9 @@ impl PackageSorter {
 
         for package in &packages {
             let mut links: IndexMap<String, Link> = package.get_requires();
-            // TODO: check for RootAliasPackage as well
-            if let Some(root_package) = (package.as_any() as &dyn Any).downcast_ref::<RootPackage>()
-            {
+            // TODO(phase-b): check for RootAliasPackage as well; PackageInterface lacks as_any
+            let root_package: Option<&RootPackage> = None;
+            if let Some(root_package) = root_package {
                 links.extend(root_package.get_dev_requires());
             }
             for link in links.values() {

@@ -55,6 +55,7 @@ impl RequestProxy {
             return Err(TransportException::new(
                 "Cannot use an HTTPS proxy. PHP >= 7.3 and cUrl >= 7.52.0 are required."
                     .to_string(),
+                0,
             ));
         }
 

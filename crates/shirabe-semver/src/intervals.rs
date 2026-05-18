@@ -66,8 +66,7 @@ impl Intervals {
         }
 
         // Phase B: ConstraintInterface needs clone_box() to create owned copies from references.
-        let multi =
-            MultiConstraint::new(vec![candidate.clone_box(), constraint.clone_box()], true)?;
+        let multi = MultiConstraint::new(vec![candidate.clone_box(), constraint.clone_box()], true);
         let intersection_intervals = Self::get(&multi)?;
         let candidate_intervals = Self::get(candidate)?;
 
@@ -125,7 +124,7 @@ impl Intervals {
         }
 
         // Phase B: ConstraintInterface needs clone_box().
-        let multi = MultiConstraint::new(vec![a.clone_box(), b.clone_box()], true)?;
+        let multi = MultiConstraint::new(vec![a.clone_box(), b.clone_box()], true);
         let intersection_intervals = Self::generate_intervals(&multi, true)?;
 
         Ok(!intersection_intervals.numeric.is_empty()
@@ -185,7 +184,7 @@ impl Intervals {
                         un_equal_constraints.push(Box::new(Constraint::new(
                             "!=".to_string(),
                             interval.get_end().get_version().to_string(),
-                        )?));
+                        )));
                         i += 1;
                         continue;
                     }
@@ -202,7 +201,7 @@ impl Intervals {
                     // count is 1 if entire constraint is just one != expression
                     if un_equal_constraints.len() > 1 {
                         constraints
-                            .push(Box::new(MultiConstraint::new(un_equal_constraints, true)?));
+                            .push(Box::new(MultiConstraint::new(un_equal_constraints, true)));
                     } else {
                         constraints.push(un_equal_constraints.into_iter().next().unwrap());
                     }
@@ -220,7 +219,7 @@ impl Intervals {
                     constraints.push(Box::new(Constraint::new(
                         "==".to_string(),
                         interval.get_start().get_version().to_string(),
-                    )?));
+                    )));
                     i += 1;
                     continue;
                 }
@@ -238,7 +237,7 @@ impl Intervals {
                             Box::new(interval.get_end().clone()),
                         ],
                         true,
-                    )?));
+                    )));
                 }
 
                 i += 1;
@@ -260,12 +259,12 @@ impl Intervals {
                     dev_constraints.push(Box::new(Constraint::new(
                         "!=".to_string(),
                         branch_name.clone(),
-                    )?));
+                    )));
                 } else {
                     dev_constraints.push(Box::new(Constraint::new(
                         "==".to_string(),
                         branch_name.clone(),
-                    )?));
+                    )));
                 }
             }
 
@@ -274,25 +273,25 @@ impl Intervals {
             if intervals.branches.exclude {
                 if constraints.len() > 1 {
                     let merged: Vec<Box<dyn ConstraintInterface>> =
-                        std::iter::once(Box::new(MultiConstraint::new(constraints, false)?)
+                        std::iter::once(Box::new(MultiConstraint::new(constraints, false))
                             as Box<dyn ConstraintInterface>)
                         .chain(dev_constraints)
                         .collect();
-                    return Ok(Box::new(MultiConstraint::new(merged, true)?));
+                    return Ok(Box::new(MultiConstraint::new(merged, true)));
                 }
 
                 if constraints.len() == 1
                     && constraints[0].__to_string() == Interval::from_zero().__to_string()
                 {
                     if dev_constraints.len() > 1 {
-                        return Ok(Box::new(MultiConstraint::new(dev_constraints, true)?));
+                        return Ok(Box::new(MultiConstraint::new(dev_constraints, true)));
                     }
                     return Ok(dev_constraints.into_iter().next().unwrap());
                 }
 
                 let merged: Vec<Box<dyn ConstraintInterface>> =
                     constraints.into_iter().chain(dev_constraints).collect();
-                return Ok(Box::new(MultiConstraint::new(merged, true)?));
+                return Ok(Box::new(MultiConstraint::new(merged, true)));
             }
 
             // otherwise devConstraints contains a list of == operators for branches which are
@@ -301,7 +300,7 @@ impl Intervals {
         }
 
         if constraints.len() > 1 {
-            return Ok(Box::new(MultiConstraint::new(constraints, false)?));
+            return Ok(Box::new(MultiConstraint::new(constraints, false)));
         }
 
         if constraints.len() == 1 {
@@ -505,7 +504,7 @@ impl Intervals {
             }
 
             if start.is_none() && active_intervals >= activation_threshold {
-                start = Some(Constraint::new(operator.clone(), version.clone())?);
+                start = Some(Constraint::new(operator.clone(), version.clone()));
             } else if start.is_some() && active_intervals < activation_threshold {
                 let start_c = start.take().unwrap();
                 // filter out invalid intervals like > x - <= x, or >= x - < x
@@ -517,7 +516,7 @@ impl Intervals {
                 } else {
                     intervals.push(Interval::new(
                         start_c,
-                        Constraint::new(operator.clone(), version.clone())?,
+                        Constraint::new(operator.clone(), version.clone()),
                     ));
 
                     if stop_on_first_valid_interval {
@@ -590,10 +589,10 @@ impl Intervals {
                 numeric: vec![
                     Interval::new(
                         Interval::from_zero().clone(),
-                        Constraint::new("<".to_string(), constraint.get_version().to_string())?,
+                        Constraint::new("<".to_string(), constraint.get_version().to_string()),
                     ),
                     Interval::new(
-                        Constraint::new(">".to_string(), constraint.get_version().to_string())?,
+                        Constraint::new(">".to_string(), constraint.get_version().to_string()),
                         Interval::until_positive_infinity().clone(),
                     ),
                 ],
@@ -604,8 +603,8 @@ impl Intervals {
         // convert ==x to an interval of >=x - <=x
         Ok(IntervalCollection {
             numeric: vec![Interval::new(
-                Constraint::new(">=".to_string(), constraint.get_version().to_string())?,
-                Constraint::new("<=".to_string(), constraint.get_version().to_string())?,
+                Constraint::new(">=".to_string(), constraint.get_version().to_string()),
+                Constraint::new("<=".to_string(), constraint.get_version().to_string()),
             )],
             branches: Interval::no_dev(),
         })

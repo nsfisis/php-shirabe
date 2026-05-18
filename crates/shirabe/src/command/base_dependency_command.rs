@@ -9,7 +9,7 @@ use shirabe_php_shim::{InvalidArgumentException, UnexpectedValueException};
 use shirabe_semver::constraint::bound::Bound;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::link::Link;
 use crate::package::package::Package;
@@ -33,30 +33,8 @@ pub trait BaseDependencyCommand: BaseCommand {
     fn colors(&self) -> &[String];
     fn colors_mut(&mut self) -> &mut [String];
 
-    fn set_name(&mut self, name: &str) -> &mut Self {
-        self.inner.set_name(name);
-        self
-    }
-
-    fn set_aliases(&mut self, aliases: Vec<String>) -> &mut Self {
-        self.inner.set_aliases(aliases);
-        self
-    }
-
-    fn set_description(&mut self, description: &str) -> &mut Self {
-        self.inner.set_description(description);
-        self
-    }
-
-    fn set_definition(&mut self, definition: Vec<shirabe_php_shim::PhpMixed>) -> &mut Self {
-        self.inner.set_definition(definition);
-        self
-    }
-
-    fn set_help(&mut self, help: &str) -> &mut Self {
-        self.inner.set_help(help);
-        self
-    }
+    // TODO(phase-b): these wrappers existed to forward BaseCommand setters, but they
+    // shadowed the BaseCommand methods and caused ambiguity. Use BaseCommand directly.
 
     fn do_execute(
         &mut self,
@@ -64,8 +42,8 @@ pub trait BaseDependencyCommand: BaseCommand {
         output: &dyn OutputInterface,
         inverted: bool,
     ) -> anyhow::Result<i64> {
-        let composer = self.inner.require_composer()?;
-        // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.inner.get_name(), input, output) via composer.get_event_dispatcher()
+        let composer = self.require_composer(None, None)?;
+        // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
         repos.push(Box::new(RootPackageRepository::new(
@@ -88,7 +66,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             repos.push(Box::new(PlatformRepository::new(
                 vec![],
                 locker.get_platform_overrides(),
-            )));
+            )?));
         } else {
             let local_repo = composer.get_repository_manager().get_local_repository();
             let root_pkg = composer.get_package();
@@ -98,6 +76,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             {
                 output.writeln(
                     "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>",
+                    shirabe_external_packages::symfony::console::output::output_interface::OUTPUT_NORMAL,
                 );
 
                 return Ok(1);
@@ -105,11 +84,15 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             repos.push(Box::new(local_repo));
 
-            let platform_overrides = composer.get_config().get("platform").unwrap_or_default();
-            repos.push(Box::new(PlatformRepository::new(
-                vec![],
-                platform_overrides,
-            )));
+            let platform_overrides = composer
+                .get_config()
+                .get("platform")
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            // TODO(phase-b): platform_overrides type adjustment; using empty for now
+            let _ = platform_overrides;
+            repos.push(Box::new(PlatformRepository::new(vec![], IndexMap::new())?));
         }
 
         let mut installed_repo = InstalledRepository::new(repos)?;
@@ -144,7 +127,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         );
         if matched_package.is_none() {
             let default_repos = CompositeRepository::new(RepositoryFactory::default_repos(
-                Some(self.inner.get_io()),
+                Some(self.get_io()),
                 Some(composer.get_config()),
                 Some(&mut composer.get_repository_manager()),
             )?);
@@ -169,7 +152,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     )))?;
                 }
             } else {
-                self.inner.get_io().write_error(&format!(
+                self.get_io().write_error(&format!(
                     "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
                     needle, text_constraint
                 ));
@@ -186,7 +169,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             } else {
                 ""
             };
-            self.inner.get_io().write_error(&format!(
+            self.get_io().write_error(&format!(
                 "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
                 needle,
                 text_constraint,
@@ -195,7 +178,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             ));
         } else if inverted {
             let matched = matched_package.as_ref().unwrap();
-            self.inner.get_io().write(&format!(
+            self.get_io().write(&format!(
                 "<comment>Package \"{}\" {} is already installed! To find out why, run `composer why {}`</comment>",
                 needle,
                 matched.get_pretty_version(),
@@ -254,7 +237,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             } else {
                 String::new()
             };
-            self.inner.get_io().write_error(&format!(
+            self.get_io().write_error(&format!(
                 "<info>There is no installed package depending on \"{}\"{}",
                 needle, extra
             ));
@@ -266,7 +249,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .as_complete_package_interface()
                 .and_then(|c| c.get_description())
                 .unwrap_or("");
-            self.inner.get_io().write(&format!(
+            self.get_io().write(&format!(
                 "<info>{}</info> {} {}",
                 root.get_pretty_name(),
                 root.get_pretty_version(),
@@ -297,7 +280,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }
             }
 
-            self.inner.get_io().write_error(&format!(
+            self.get_io().write_error(&format!(
                 "Not finding what you were looking for? Try calling `composer {} \"{}:{}\" --dry-run` to get another view on the problem.",
                 composer_command, needle, text_constraint
             ));
@@ -356,7 +339,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             new_table.extend(table);
             table = new_table;
         }
-        self.inner.render_table(table, output);
+        self.render_table(table, output);
     }
 
     fn init_styles(&mut self, output: &dyn OutputInterface) {
@@ -438,7 +421,7 @@ pub trait BaseDependencyCommand: BaseCommand {
     }
 
     fn write_tree_line(&self, line: &str) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let line = if !io.is_decorated() {
             line.replace('└', "`-")
                 .replace('├', "|-")

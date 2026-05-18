@@ -7,10 +7,10 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL, UnexpectedValueException,
-    array_flip, dirname, r#eval, file_get_contents, get_class, get_debug_type, in_array, is_array,
-    is_int, is_null, is_string, ksort, php_dir, realpath, sort, sort_with_flags, str_repeat, strtr,
-    trim, usort, var_export,
+    Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
+    UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
+    get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir, realpath, sort,
+    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
 };
 
 use crate::installed_versions::InstalledVersions;
@@ -55,7 +55,7 @@ impl FilesystemRepository {
         root_package: Option<Box<dyn RootPackageInterface>>,
         filesystem: Option<Filesystem>,
     ) -> Result<Self> {
-        let filesystem = filesystem.unwrap_or_else(Filesystem::new);
+        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
         if dump_versions && root_package.is_none() {
             return Err(InvalidArgumentException {
                 message: "Expected a root package instance if $dumpVersions is true".to_string(),
@@ -77,6 +77,10 @@ impl FilesystemRepository {
     /// @return bool|null true if dev requirements were installed, false if --no-dev was used, null if yet unknown
     pub fn get_dev_mode(&self) -> Option<bool> {
         self.dev_mode
+    }
+
+    pub fn get_repo_name(&self) -> String {
+        format!("file ({})", self.file.get_path())
     }
 
     /// Initializes repository (reads file, or remote address).
@@ -129,12 +133,15 @@ impl FilesystemRepository {
         })() {
             Ok(p) => p,
             Err(e) => {
-                return Err(InvalidRepositoryException::new(format!(
-                    "Invalid repository data in {}, packages could not be loaded: [{}] {}",
-                    self.file.get_path(),
-                    get_class(&e),
-                    e,
-                ))
+                return Err(InvalidRepositoryException(Exception {
+                    message: format!(
+                        "Invalid repository data in {}, packages could not be loaded: [{}] {}",
+                        self.file.get_path(),
+                        get_class(&e),
+                        e,
+                    ),
+                    code: 0,
+                })
                 .into());
             }
         };

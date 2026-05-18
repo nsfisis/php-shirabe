@@ -259,13 +259,13 @@ impl Factory {
         config.merge(defaults, Config::SOURCE_DEFAULT);
 
         // load global config
-        let file = JsonFile::new(format!("{}/config.json", config.get_str("home")?), None, io);
+        let file = JsonFile::new(format!("{}/config.json", config.get_str("home")?), None, io)?;
         if file.exists() {
             if let Some(io_ref) = io {
                 io_ref.write_error(
                     PhpMixed::String(format!("Loading config file {}", file.get_path())),
                     true,
-                    <dyn IOInterface>::DEBUG,
+                    crate::io::io_interface::DEBUG,
                 );
             }
             Self::validate_json_schema(
@@ -308,13 +308,13 @@ impl Factory {
         }
 
         // load global auth file
-        let auth_file = JsonFile::new(format!("{}/auth.json", config.get_str("home")?), None, io);
+        let auth_file = JsonFile::new(format!("{}/auth.json", config.get_str("home")?), None, io)?;
         if auth_file.exists() {
             if let Some(io_ref) = io {
                 io_ref.write_error(
                     PhpMixed::String(format!("Loading config file {}", auth_file.get_path())),
                     true,
-                    <dyn IOInterface>::DEBUG,
+                    crate::io::io_interface::DEBUG,
                 );
             }
             Self::validate_json_schema(
@@ -440,7 +440,7 @@ impl Factory {
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
 
-            let file = JsonFile::new(path.clone(), None, Some(io));
+            let file = JsonFile::new(path.clone(), None, Some(io))?;
 
             if !file.exists() {
                 let message = if path == "./composer.json" || path == "composer.json" {
@@ -496,14 +496,14 @@ impl Factory {
                     realpath(composer_file_path).unwrap_or_default()
                 )),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
             config.set_config_source(JsonConfigSource::new(
                 JsonFile::new(
                     realpath(composer_file_path).unwrap_or_default(),
                     None,
                     Some(io),
-                ),
+                )?,
                 false,
             ));
 
@@ -514,7 +514,7 @@ impl Factory {
                 ),
                 None,
                 Some(io),
-            );
+            )?;
             if local_auth_file.exists() {
                 io.write_error(
                     PhpMixed::String(format!(
@@ -522,7 +522,7 @@ impl Factory {
                         local_auth_file.get_path()
                     )),
                     true,
-                    <dyn IOInterface>::DEBUG,
+                    crate::io::io_interface::DEBUG,
                 );
                 Self::validate_json_schema(
                     Some(io),
@@ -585,7 +585,10 @@ impl Factory {
 
         let http_downloader = Self::create_http_downloader(io, &config, IndexMap::new())?;
         let process = ProcessExecutor::new(io);
-        let r#loop = Loop::new(http_downloader.clone(), process.clone());
+        let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+            http_downloader.clone(),
+            Some(process.clone()),
+        )));
         composer.set_loop(r#loop.clone());
 
         // initialize event dispatcher
@@ -671,7 +674,7 @@ impl Factory {
                             lock_file
                         )),
                         true,
-                        <dyn IOInterface>::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
                 }
 
@@ -685,7 +688,7 @@ impl Factory {
                         },
                         None,
                         Some(io),
-                    ),
+                    )?,
                     im.clone(),
                     file_get_contents(composer_file_path).unwrap_or_default(),
                     process.clone(),
@@ -694,14 +697,17 @@ impl Factory {
             } else {
                 let locker = Locker::new(
                     io.clone_box(),
-                    JsonFile::new(Platform::get_dev_null(), None, Some(io)),
+                    JsonFile::new(Platform::get_dev_null(), None, Some(io))?,
                     im.clone(),
-                    JsonFile::encode(&PhpMixed::Array(
-                        local_config_data
-                            .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
-                    )),
+                    JsonFile::encode(
+                        &PhpMixed::Array(
+                            local_config_data
+                                .iter()
+                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .collect(),
+                        ),
+                        448,
+                    ),
                     process.clone(),
                 );
                 composer_full.set_locker(locker);
@@ -774,16 +780,20 @@ impl Factory {
     ) {
         let fs = process.map(|p| Filesystem::new(Some(p.clone())));
 
-        rm.set_local_repository(Box::new(InstalledFilesystemRepository::new(
-            JsonFile::new(
-                format!("{}/composer/installed.json", vendor_dir),
-                None,
-                Some(io),
-            ),
-            true,
-            root_package.clone_box(),
-            fs,
-        )));
+        rm.set_local_repository(Box::new(
+            InstalledFilesystemRepository::new(
+                JsonFile::new(
+                    format!("{}/composer/installed.json", vendor_dir),
+                    None,
+                    Some(io.clone_box()),
+                )
+                .expect("installed.json path is always valid"),
+                true,
+                Some(RootPackageInterface::clone_box(root_package)),
+                fs,
+            )
+            .expect("InstalledFilesystemRepository::new should not fail"),
+        ));
     }
 
     fn create_global_composer(
@@ -820,7 +830,7 @@ impl Factory {
                 io.write_error(
                     PhpMixed::String(format!("Failed to initialize global composer: {}", e)),
                     true,
-                    <dyn IOInterface>::DEBUG,
+                    crate::io::io_interface::DEBUG,
                 );
                 None
             }
@@ -836,7 +846,7 @@ impl Factory {
         http_downloader: &HttpDownloader,
         process: &ProcessExecutor,
         event_dispatcher: Option<&EventDispatcher>,
-    ) -> anyhow::Result<DownloadManager> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
         let mut cache: Option<Cache> = None;
         if config
             .get("cache-files-ttl")
@@ -1029,14 +1039,14 @@ impl Factory {
             )),
         );
 
-        Ok(dm)
+        Ok(std::rc::Rc::new(std::cell::RefCell::new(dm)))
     }
 
     pub fn create_archive_manager(
         &self,
         _config: &Config,
-        dm: &DownloadManager,
-        r#loop: &Loop,
+        dm: &std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
     ) -> anyhow::Result<ArchiveManager> {
         let mut am = ArchiveManager::new(dm.clone(), r#loop.clone());
         if class_exists("ZipArchive") {
@@ -1066,7 +1076,7 @@ impl Factory {
 
     pub fn create_installation_manager(
         &self,
-        r#loop: Loop,
+        r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: Box<dyn IOInterface>,
         event_dispatcher: Option<EventDispatcher>,
     ) -> InstallationManager {
@@ -1203,7 +1213,7 @@ impl Factory {
                             .to_string(),
                     ),
                     true,
-                    <dyn IOInterface>::NORMAL,
+                    crate::io::io_interface::NORMAL,
                 );
             }
             unsafe { WARNED = true };
@@ -1263,7 +1273,7 @@ impl Factory {
                                     .to_string(),
                             ),
                             true,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                         io.write(
                             PhpMixed::String(
@@ -1271,7 +1281,7 @@ impl Factory {
                                     .to_string(),
                             ),
                             true,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                         io.write(
                             PhpMixed::String(
@@ -1279,7 +1289,7 @@ impl Factory {
                                     .to_string(),
                             ),
                             true,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                     }
                 }
@@ -1314,7 +1324,7 @@ impl Factory {
             io_ref.write_error(
                 PhpMixed::String("Loading auth config from COMPOSER_AUTH".to_string()),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
         }
         Self::validate_json_schema(
@@ -1393,7 +1403,7 @@ impl Factory {
                     io_ref.write_error(
                         PhpMixed::String(format!("<warning>{}</>", msg)),
                         true,
-                        <dyn IOInterface>::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
                 } else {
                     return Err(anyhow::anyhow!(UnexpectedValueException {
@@ -1433,7 +1443,7 @@ impl PartialComposerOrComposer {
             Self::Partial(p) => p.set_global(),
         }
     }
-    fn set_loop(&mut self, r#loop: Loop) {
+    fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         match self {
             Self::Full(c) => c.set_loop(r#loop),
             Self::Partial(p) => p.set_loop(r#loop),

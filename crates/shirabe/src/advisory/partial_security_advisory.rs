@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
 
 use crate::advisory::security_advisory::SecurityAdvisory;
+use crate::repository::advisory_provider_interface::PartialOrSecurityAdvisory;
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -31,7 +32,7 @@ impl PartialSecurityAdvisory {
         package_name: &str,
         data: &IndexMap<String, PhpMixed>,
         parser: &VersionParser,
-    ) -> Result<Box<dyn std::any::Any>> {
+    ) -> Result<PartialOrSecurityAdvisory> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
         let constraint: Box<dyn ConstraintInterface> =
@@ -40,9 +41,12 @@ impl PartialSecurityAdvisory {
                 Err(_) => {
                     let affected_version =
                         Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
-                    match parser.parse_constraints(&affected_version) {
+                    match parser.parse_constraints(affected_version.as_deref().unwrap_or("")) {
                         Ok(c) => c,
-                        Err(_) => Box::new(Constraint::new("==", "0.0.0-invalid-version")),
+                        Err(_) => Box::new(Constraint::new(
+                            "==".to_string(),
+                            "0.0.0-invalid-version".to_string(),
+                        )),
                     }
                 }
             };
@@ -63,7 +67,8 @@ impl PartialSecurityAdvisory {
                 data["advisoryId"].as_string().unwrap_or("").to_string(),
                 constraint,
                 data["title"].as_string().unwrap_or("").to_string(),
-                data["sources"].clone(),
+                // TODO(phase-b): parse PhpMixed sources array into Vec<IndexMap<String, String>>
+                todo!(),
                 reported_at,
                 data.get("cve")
                     .and_then(|v| v.as_string())
@@ -75,10 +80,10 @@ impl PartialSecurityAdvisory {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
             );
-            return Ok(Box::new(advisory));
+            return Ok(PartialOrSecurityAdvisory::Full(advisory));
         }
 
-        Ok(Box::new(Self {
+        Ok(PartialOrSecurityAdvisory::Partial(Self {
             advisory_id: data["advisoryId"].as_string().unwrap_or("").to_string(),
             package_name: package_name.to_string(),
             affected_versions: constraint,

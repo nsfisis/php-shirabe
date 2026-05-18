@@ -132,28 +132,22 @@ impl ProxyItem {
     }
 
     pub fn to_request_proxy(&self, scheme: String) -> RequestProxy {
-        let mut http_options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+        let mut http_options: IndexMap<String, PhpMixed> = IndexMap::new();
         http_options.insert(
             "proxy".to_string(),
-            Box::new(PhpMixed::String(self.options_proxy.clone())),
+            PhpMixed::String(self.options_proxy.clone()),
         );
 
         if let Some(ref auth) = self.options_auth {
-            http_options.insert(
-                "header".to_string(),
-                Box::new(PhpMixed::String(auth.clone())),
-            );
+            http_options.insert("header".to_string(), PhpMixed::String(auth.clone()));
         }
 
         if scheme == "http" {
-            http_options.insert(
-                "request_fulluri".to_string(),
-                Box::new(PhpMixed::Bool(true)),
-            );
+            http_options.insert("request_fulluri".to_string(), PhpMixed::Bool(true));
         }
 
-        let mut options: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        options.insert("http".to_string(), Box::new(PhpMixed::Array(http_options)));
+        let mut options: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
+        options.insert("http".to_string(), http_options);
 
         RequestProxy::new(
             Some(self.url.clone()),

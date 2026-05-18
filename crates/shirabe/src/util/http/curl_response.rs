@@ -18,10 +18,10 @@ impl CurlResponse {
         headers: Vec<String>,
         body: Option<String>,
         curl_info: IndexMap<String, PhpMixed>,
-    ) -> Self {
-        Self {
-            inner: Response::new(request, code, headers, body),
-            curl_info,
+    ) -> anyhow::Result<Result<Self, shirabe_php_shim::LogicException>> {
+        match Response::new(request, code, headers, body)? {
+            Ok(inner) => Ok(Ok(Self { inner, curl_info })),
+            Err(e) => Ok(Err(e)),
         }
     }
 

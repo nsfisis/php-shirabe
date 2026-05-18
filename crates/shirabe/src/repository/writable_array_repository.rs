@@ -37,4 +37,39 @@ impl WritableArrayRepository {
     pub fn reload(&mut self) {
         self.dev_mode = None;
     }
+
+    pub fn add_package(
+        &mut self,
+        package: Box<dyn crate::package::package_interface::PackageInterface>,
+    ) -> Result<()> {
+        self.inner.add_package(package)
+    }
+
+    pub fn remove_package(
+        &mut self,
+        package: &dyn crate::package::package_interface::PackageInterface,
+    ) -> Result<()> {
+        let _ = package;
+        // TODO(phase-b): delegate to ArrayRepository once it implements remove_package
+        Ok(())
+    }
+
+    pub fn initialize(&mut self) -> Result<()> {
+        // TODO(phase-b): inner ArrayRepository::initialize signature
+        Ok(())
+    }
+
+    pub fn get_canonical_packages(
+        &self,
+    ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+        // TODO(phase-b): delegate to inner once it exposes get_canonical_packages
+        Vec::new()
+    }
+
+    pub fn get_packages(
+        &self,
+    ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+        // TODO(phase-b): delegate to inner ArrayRepository::get_packages
+        Vec::new()
+    }
 }

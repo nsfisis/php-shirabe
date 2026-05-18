@@ -1,15 +1,12 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -17,44 +14,31 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for OutdatedCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl OutdatedCommand {
     pub fn configure(&mut self) {
-        let suggest_installed_package = self.suggest_installed_package(false, false);
-        let suggest_installed_package_for_ignore = self.suggest_installed_package(false, false);
-        self.inner
+        // TODO(cli-completion): suggest_installed_package(false, false) for `package` argument and `--ignore` option
+        self
             .set_name("outdated")
             .set_description("Shows a list of installed packages that have updates available, including their latest version")
             .set_definition(vec![
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, suggest_installed_package),
-                InputOption::new("outdated", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None, vec![]),
-                InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None, vec![]),
-                InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None, vec![]),
-                InputOption::new("direct", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Shows only packages that are directly required by the root package", None, vec![]),
-                InputOption::new("strict", None, Some(InputOption::VALUE_NONE), "Return a non-zero exit code when there are outdated packages", None, vec![]),
-                InputOption::new("major-only", Some(PhpMixed::String("M".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have major SemVer-compatible updates.", None, vec![]),
-                InputOption::new("minor-only", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None, vec![]),
-                InputOption::new("patch-only", Some(PhpMixed::String("p".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None, vec![]),
-                InputOption::new("sort-by-age", Some(PhpMixed::String("A".to_string())), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None, vec![]),
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string())), vec!["json".to_string(), "text".to_string()]),
-                InputOption::new("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, suggest_installed_package_for_ignore),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None, vec![]),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None, vec![]),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None, vec![]),
+                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None),
+                InputOption::new("outdated", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None),
+                InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None),
+                InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None),
+                InputOption::new("direct", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Shows only packages that are directly required by the root package", None),
+                InputOption::new("strict", None, Some(InputOption::VALUE_NONE), "Return a non-zero exit code when there are outdated packages", None),
+                InputOption::new("major-only", Some(PhpMixed::String("M".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have major SemVer-compatible updates.", None),
+                InputOption::new("minor-only", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None),
+                InputOption::new("patch-only", Some(PhpMixed::String("p".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None),
+                InputOption::new("sort-by-age", Some(PhpMixed::String("A".to_string())), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None),
+                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))),
+                InputOption::new("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None),
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None),
+                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None),
+                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None),
             ])
             .set_help(
                 "The outdated command is just a proxy for `composer show -l`\n\n\
@@ -140,7 +124,9 @@ impl OutdatedCommand {
 
         let input = ArrayInput::new(args);
 
-        self.inner.get_application().run(&input, output)
+        // TODO(phase-b): convert ArrayInput/output references to dyn trait objects expected by Application::run
+        let _ = input;
+        self.get_application()?.run(None, None)
     }
 
     pub fn is_proxy_command(&self) -> bool {
@@ -148,30 +134,12 @@ impl OutdatedCommand {
     }
 }
 
-impl BaseCommand for OutdatedCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for OutdatedCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for OutdatedCommand {}

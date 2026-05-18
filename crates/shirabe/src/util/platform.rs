@@ -92,7 +92,8 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        if Preg::is_match(r"#^~[\\/]#", path) {
+        use shirabe_external_packages::composer::pcre::preg::CaptureKey;
+        if Preg::is_match(r"#^~[\\/]#", path).unwrap_or(false) {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),
@@ -102,35 +103,41 @@ impl Platform {
 
         Preg::replace_callback(
             r"#^(\$|(?P<percent>%))(?P<var>\w++)(?(percent)%)(?P<path>.*)#",
-            |matches| -> String {
+            |matches: &indexmap::IndexMap<CaptureKey, String>| -> String {
+                let var = matches
+                    .get(&CaptureKey::ByName("var".to_string()))
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
+                let path_part = matches
+                    .get(&CaptureKey::ByName("path".to_string()))
+                    .map(|s| s.as_str())
+                    .unwrap_or("");
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
-                if Platform::is_windows()
-                    && matches.get("var").map(|s| s.as_str()).unwrap_or("") == "HOME"
-                {
+                if Platform::is_windows() && var == "HOME" {
                     if Platform::get_env("HOME").is_some() {
                         return format!(
                             "{}{}",
                             Platform::get_env("HOME").unwrap_or_default(),
-                            matches.get("path").map(|s| s.as_str()).unwrap_or(""),
+                            path_part,
                         );
                     }
 
                     return format!(
                         "{}{}",
                         Platform::get_env("USERPROFILE").unwrap_or_default(),
-                        matches.get("path").map(|s| s.as_str()).unwrap_or(""),
+                        path_part,
                     );
                 }
 
                 format!(
                     "{}{}",
-                    Platform::get_env(matches.get("var").map(|s| s.as_str()).unwrap_or(""))
-                        .unwrap_or_default(),
-                    matches.get("path").map(|s| s.as_str()).unwrap_or(""),
+                    Platform::get_env(var).unwrap_or_default(),
+                    path_part,
                 )
             },
             path,
         )
+        .unwrap_or_default()
     }
 
     /// @throws \RuntimeException If the user home could not reliably be determined

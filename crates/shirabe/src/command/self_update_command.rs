@@ -3,8 +3,6 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
@@ -20,7 +18,7 @@ use shirabe_php_shim::{
     usleep, version_compare,
 };
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
 use crate::console::input::input_argument::InputArgument;
@@ -35,9 +33,7 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct SelfUpdateCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl SelfUpdateCommand {
@@ -45,23 +41,23 @@ impl SelfUpdateCommand {
     const OLD_INSTALL_EXT: &'static str = "-old.phar";
 
     pub fn configure(&mut self) {
-        self.inner
+        self
             .set_name("self-update")
-            .set_aliases(vec!["selfupdate".to_string()])
+            .set_aliases(&["selfupdate".to_string()])
             .set_description("Updates composer.phar to the latest version")
             .set_definition(vec![
-                InputOption::new("rollback", Some(PhpMixed::String("r".to_string())), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None, vec![]),
-                InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None, vec![]),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None, vec![]),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None, vec![]),
-                InputOption::new("update-keys", None, Some(InputOption::VALUE_NONE), "Prompt user for a key update", None, vec![]),
-                InputOption::new("stable", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel", None, vec![]),
-                InputOption::new("preview", None, Some(InputOption::VALUE_NONE), "Force an update to the preview channel", None, vec![]),
-                InputOption::new("snapshot", None, Some(InputOption::VALUE_NONE), "Force an update to the snapshot channel", None, vec![]),
-                InputOption::new("1", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 1.x versions", None, vec![]),
-                InputOption::new("2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.x versions", None, vec![]),
-                InputOption::new("2.2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.2.x LTS versions", None, vec![]),
-                InputOption::new("set-channel-only", None, Some(InputOption::VALUE_NONE), "Only store the channel as the default one and then exit", None, vec![]),
+                InputOption::new("rollback", Some(PhpMixed::String("r".to_string())), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None),
+                InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None),
+                InputOption::new("update-keys", None, Some(InputOption::VALUE_NONE), "Prompt user for a key update", None),
+                InputOption::new("stable", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel", None),
+                InputOption::new("preview", None, Some(InputOption::VALUE_NONE), "Force an update to the preview channel", None),
+                InputOption::new("snapshot", None, Some(InputOption::VALUE_NONE), "Force an update to the snapshot channel", None),
+                InputOption::new("1", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 1.x versions", None),
+                InputOption::new("2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.x versions", None),
+                InputOption::new("2.2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.2.x LTS versions", None),
+                InputOption::new("set-channel-only", None, Some(InputOption::VALUE_NONE), "Only store the channel as the default one and then exit", None),
             ])
             .set_help(
                 "The <info>self-update</info> command checks getcomposer.org for newer\n\
@@ -144,7 +140,7 @@ impl SelfUpdateCommand {
             format!("https://{}", Self::HOMEPAGE)
         };
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let http_downloader = Factory::create_http_downloader(io, &config)?;
 
         let mut versions_util = Versions::new(config.clone(), http_downloader.clone());
@@ -241,11 +237,11 @@ impl SelfUpdateCommand {
                     .unwrap_or("")
                     .to_string();
                 if is_array(home_owner.clone()) && composer_user_name != home_owner_name {
-                    io.write_error(
-                        PhpMixed::String(format!(
+                    io.write_error3(
+                        &format!(
                             "<warning>You are running Composer as \"{}\", while \"{}\" is owned by \"{}\"</warning>",
                             composer_user_name, home, home_owner_name
-                        )),
+                        ),
                         true,
                         io_interface::NORMAL,
                     );
@@ -308,21 +304,21 @@ impl SelfUpdateCommand {
                     .to_string();
                 update_version = latest_version.clone();
 
-                io.write_error(
-                    PhpMixed::String(format!(
+                io.write_error3(
+                    &format!(
                         "<warning>A new stable major version of Composer is available ({}), run \"composer self-update --{}\" to update to it. See also https://getcomposer.org/{}</warning>",
                         skipped_version, update_major_version, update_major_version
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
             } else if version_compare(&current_major_version, &preview_major_version, "<") {
                 // promote next major version if available in preview
-                io.write_error(
-                    PhpMixed::String(format!(
+                io.write_error3(
+                    &format!(
                         "<warning>A preview release of the next major version of Composer is available ({}), run \"composer self-update --preview\" to give it a try. See also https://github.com/composer/composer/releases for changelogs.</warning>",
                         latest_preview.get("version").and_then(|v| v.as_string()).unwrap_or("")
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -342,24 +338,24 @@ impl SelfUpdateCommand {
                 &effective_channel,
             ) != Some(0)
         {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "<warning>Warning: You forced the install of {} via --{}, but {} is the latest stable version. Updating to it via composer self-update --stable is recommended.</warning>",
                     latest_version,
                     effective_channel,
                     latest_stable.get("version").and_then(|v| v.as_string()).unwrap_or("")
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
         }
         if latest.contains_key("eol") {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "<warning>Warning: Version {} is EOL / End of Life. {} is the latest stable version. Updating to it via composer self-update --stable is recommended.</warning>",
                     latest_version,
                     latest_stable.get("version").and_then(|v| v.as_string()).unwrap_or("")
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -368,11 +364,8 @@ impl SelfUpdateCommand {
         if Preg::is_match(r"{^[0-9a-f]{40}$}", &update_version).unwrap_or(false)
             && update_version != latest_version
         {
-            io.write_error(
-                PhpMixed::String(
-                    "<error>You can not update to a specific SHA-1 as those phars are not available for download</error>"
-                        .to_string(),
-                ),
+            io.write_error3(
+                "<error>You can not update to a specific SHA-1 as those phars are not available for download</error>",
                 true,
                 io_interface::NORMAL,
             );
@@ -386,14 +379,14 @@ impl SelfUpdateCommand {
         }
 
         if Composer::VERSION == update_version.as_str() {
-            io.write_error(
-                PhpMixed::String(sprintf(
+            io.write_error3(
+                &sprintf(
                     "<info>You are already using the latest available Composer version %s (%s channel).</info>",
                     &[
                         PhpMixed::String(update_version.clone()),
                         PhpMixed::String(channel_string.clone()),
                     ],
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -430,14 +423,14 @@ impl SelfUpdateCommand {
         let updating_to_tag =
             !Preg::is_match(r"{^[0-9a-f]{40}$}", &update_version).unwrap_or(false);
 
-        io.write(
-            PhpMixed::String(sprintf(
+        io.write3(
+            &sprintf(
                 "Upgrading to version <info>%s</info> (%s channel).",
                 &[
                     PhpMixed::String(update_version.clone()),
                     PhpMixed::String(channel_string.clone()),
                 ],
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -466,20 +459,13 @@ impl SelfUpdateCommand {
                 return Err(e.into());
             }
         };
-        io.write_error(
-            PhpMixed::String("   ".to_string()),
-            false,
-            io_interface::NORMAL,
-        );
+        io.write_error3("   ", false, io_interface::NORMAL);
         http_downloader.copy(&remote_filename, &temp_filename)?;
-        io.write_error(PhpMixed::String(String::new()), true, io_interface::NORMAL);
+        io.write_error3("", true, io_interface::NORMAL);
 
         if !file_exists(&temp_filename) || signature.is_none() || signature.as_deref() == Some("") {
-            io.write_error(
-                PhpMixed::String(
-                    "<error>The download of the new composer version failed for an unexpected reason</error>"
-                        .to_string(),
-                ),
+            io.write_error3(
+                "<error>The download of the new composer version failed for an unexpected reason</error>",
                 true,
                 io_interface::NORMAL,
             );
@@ -490,11 +476,8 @@ impl SelfUpdateCommand {
 
         // verify phar signature
         if !extension_loaded("openssl") && config.get("disable-tls").as_bool() == Some(true) {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>Skipping phar signature verification as you have disabled OpenSSL via config.disable-tls</warning>"
-                        .to_string(),
-                ),
+            io.write_error3(
+                "<warning>Skipping phar signature verification as you have disabled OpenSSL via config.disable-tls</warning>",
                 true,
                 io_interface::NORMAL,
             );
@@ -640,20 +623,20 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         }
 
         if file_exists(&backup_file) {
-            io.write_error(
-                PhpMixed::String(sprintf(
+            io.write_error3(
+                &sprintf(
                     "Use <info>composer self-update --rollback</info> to return to version <comment>%s</comment>",
                     &[PhpMixed::String(Composer::VERSION.to_string())],
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
         } else {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "<warning>A backup of the current version could not be written to {}, no rollback possible</warning>",
                     backup_file
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -672,11 +655,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             .into());
         }
 
-        io.write(
-            PhpMixed::String(
-                "Open <info>https://composer.github.io/pubkeys.html</info> to find the latest keys"
-                    .to_string(),
-            ),
+        io.write3(
+            "Open <info>https://composer.github.io/pubkeys.html</info> to find the latest keys",
             true,
             io_interface::NORMAL,
         );
@@ -737,11 +717,11 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             config.get("home").as_string().unwrap_or("")
         );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
-        io.write(
-            PhpMixed::String(format!(
+        io.write3(
+            &format!(
                 "Stored key with fingerprint: {}",
                 Keys::fingerprint(&key_path)?
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -784,20 +764,20 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             config.get("home").as_string().unwrap_or("")
         );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
-        io.write(
-            PhpMixed::String(format!(
+        io.write3(
+            &format!(
                 "Stored key with fingerprint: {}",
                 Keys::fingerprint(&key_path)?
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
 
-        io.write(
-            PhpMixed::String(format!(
+        io.write3(
+            &format!(
                 "Public keys stored in {}",
                 config.get("home").as_string().unwrap_or("")
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -857,12 +837,12 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             .into());
         }
 
-        let io = self.inner.get_io();
-        io.write_error(
-            PhpMixed::String(sprintf(
+        let io = self.get_io();
+        io.write_error3(
+            &sprintf(
                 "Rolling back to version <info>%s</info>.",
                 &[PhpMixed::String(rollback_version.clone())],
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -880,7 +860,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         new_filename: &str,
         backup_target: Option<&str>,
     ) -> Result<bool> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let perms = fileperms(local_filename);
         if perms >= 0 {
             // @chmod
@@ -890,8 +870,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         // check phar validity
         let mut error: Option<String> = None;
         if !self.validate_phar(new_filename, &mut error)? {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "<error>The {} file is corrupted ({})</error>",
                     if backup_target.is_some() {
                         "update"
@@ -899,17 +879,14 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                         "backup"
                     },
                     error.unwrap_or_default()
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
 
             if backup_target.is_some() {
-                io.write_error(
-                    PhpMixed::String(
-                        "<error>Please re-run the self-update command to try again.</error>"
-                            .to_string(),
-                    ),
+                io.write_error3(
+                    "<error>Please re-run the self-update command to try again.</error>",
                     true,
                     io_interface::NORMAL,
                 );
@@ -972,16 +949,16 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 
     pub(crate) fn clean_backups(&self, rollback_dir: &str, except: Option<&str>) {
         let finder = self.get_old_installation_finder(rollback_dir);
-        let io = self.inner.get_io();
-        let fs = Filesystem::new();
+        let io = self.get_io();
+        let fs = Filesystem::new(None);
 
         for file in finder {
             if file.get_basename(Self::OLD_INSTALL_EXT) == except.unwrap_or_default() {
                 continue;
             }
             let file_str = file.to_string();
-            io.write_error(
-                PhpMixed::String(format!("<info>Removing: {}</info>", file_str)),
+            io.write_error3(
+                &format!("<info>Removing: {}</info>", file_str),
                 true,
                 io_interface::NORMAL,
             );
@@ -1071,13 +1048,13 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         local_filename: &str,
         new_filename: &str,
     ) -> bool {
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
-        io.write_error(
-            PhpMixed::String(format!(
+        io.write_error3(
+            &format!(
                 "<error>Unable to write \"{}\". Access is denied.</error>",
                 local_filename
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -1086,11 +1063,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             "Complete this operation with Administrator privileges [<comment>Y,n</comment>]? ";
 
         if !io.ask_confirmation(question.to_string(), true) {
-            io.write_error(
-                PhpMixed::String(format!(
-                    "<warning>Operation cancelled. {}</warning>",
-                    help_message
-                )),
+            io.write_error3(
+                &format!("<warning>Operation cancelled. {}</warning>", help_message),
                 true,
                 io_interface::NORMAL,
             );
@@ -1102,8 +1076,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         let tmp_file = match tmp_file {
             Some(f) => f,
             None => {
-                io.write_error(
-                    PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
+                io.write_error3(
+                    &format!("<error>Operation failed. {}</error>", help_message),
                     true,
                     io_interface::NORMAL,
                 );
@@ -1167,14 +1141,14 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         let result = Filesystem::is_readable(local_filename)
             && hash_file("sha256", local_filename) == Some(checksum);
         if result {
-            io.write_error(
-                PhpMixed::String("<info>Operation succeeded.</info>".to_string()),
+            io.write_error3(
+                "<info>Operation succeeded.</info>",
                 true,
                 io_interface::NORMAL,
             );
         } else {
-            io.write_error(
-                PhpMixed::String(format!("<error>Operation failed. {}</error>", help_message)),
+            io.write_error3(
+                &format!("<error>Operation failed. {}</error>", help_message),
                 true,
                 io_interface::NORMAL,
             );
@@ -1184,30 +1158,12 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
     }
 }
 
-impl BaseCommand for SelfUpdateCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for SelfUpdateCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for SelfUpdateCommand {}

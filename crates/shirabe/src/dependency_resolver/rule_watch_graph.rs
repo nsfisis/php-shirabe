@@ -22,33 +22,37 @@ impl RuleWatchGraph {
         }
     }
 
-    pub fn insert(&mut self, node: RuleWatchNode) {
-        if node.get_rule().is_assertion() {
+    pub fn insert(&mut self, node: std::rc::Rc<std::cell::RefCell<RuleWatchNode>>) {
+        if node.borrow().get_rule().is_assertion() {
             return;
         }
 
-        if (node.get_rule().as_any() as &dyn Any)
+        let is_multi_conflict = (node.borrow().get_rule().as_any() as &dyn Any)
             .downcast_ref::<MultiConflictRule>()
-            .is_none()
-        {
-            for literal in [node.watch1, node.watch2] {
+            .is_some();
+
+        if !is_multi_conflict {
+            let watch1 = node.borrow().watch1;
+            let watch2 = node.borrow().watch2;
+            for literal in [watch1, watch2] {
                 if !self.watch_chains.contains_key(&literal) {
                     self.watch_chains.insert(literal, RuleWatchChain::new());
                 }
                 self.watch_chains
                     .get_mut(&literal)
                     .unwrap()
-                    .unshift(node.clone());
+                    .unshift(std::rc::Rc::clone(&node));
             }
         } else {
-            for literal in node.get_rule().get_literals() {
+            let literals: Vec<i64> = node.borrow().get_rule().get_literals().clone();
+            for literal in literals {
                 if !self.watch_chains.contains_key(&literal) {
                     self.watch_chains.insert(literal, RuleWatchChain::new());
                 }
                 self.watch_chains
                     .get_mut(&literal)
                     .unwrap()
-                    .unshift(node.clone());
+                    .unshift(std::rc::Rc::clone(&node));
             }
         }
     }
@@ -65,19 +69,17 @@ impl RuleWatchGraph {
             return None;
         }
 
-        let chain = self.watch_chains.get_mut(&literal).unwrap();
-
-        chain.rewind();
-        while chain.valid() {
-            let node = chain.current();
-            if (node.get_rule().as_any() as &dyn Any)
+        self.watch_chains.get_mut(&literal).unwrap().rewind();
+        while self.watch_chains.get(&literal).unwrap().valid() {
+            let node = self.watch_chains.get(&literal).unwrap().current().clone();
+            let is_multi_conflict = (node.borrow().get_rule().as_any() as &dyn Any)
                 .downcast_ref::<MultiConflictRule>()
-                .is_none()
-            {
-                let other_watch = node.get_other_watch(literal);
+                .is_some();
+            if !is_multi_conflict {
+                let other_watch = node.borrow().get_other_watch(literal);
 
-                if !node.get_rule().is_disabled() && !decisions.satisfy(other_watch) {
-                    let rule_literals = node.get_rule().get_literals();
+                if !node.borrow().get_rule().is_disabled() && !decisions.satisfy(other_watch) {
+                    let rule_literals: Vec<i64> = node.borrow().get_rule().get_literals().clone();
 
                     let alternative_literals: Vec<i64> = rule_literals
                         .into_iter()
@@ -95,35 +97,41 @@ impl RuleWatchGraph {
                     }
 
                     if decisions.conflict(other_watch) {
-                        return Some(chain.current().get_rule_boxed());
+                        return Some(node.borrow().get_rule_boxed());
                     }
 
-                    decisions.decide(other_watch, level, chain.current().get_rule_boxed());
+                    decisions.decide(other_watch, level, node.borrow().get_rule_boxed());
                 }
             } else {
-                for other_literal in node.get_rule().get_literals() {
+                let literals: Vec<i64> = node.borrow().get_rule().get_literals().clone();
+                for other_literal in literals {
                     if literal != other_literal && !decisions.satisfy(other_literal) {
                         if decisions.conflict(other_literal) {
-                            return Some(node.get_rule_boxed());
+                            return Some(node.borrow().get_rule_boxed());
                         }
 
-                        decisions.decide(other_literal, level, node.get_rule_boxed());
+                        decisions.decide(other_literal, level, node.borrow().get_rule_boxed());
                     }
                 }
             }
 
-            chain.next();
+            self.watch_chains.get_mut(&literal).unwrap().next();
         }
 
         None
     }
 
-    pub(crate) fn move_watch(&mut self, from_literal: i64, to_literal: i64, node: RuleWatchNode) {
+    pub(crate) fn move_watch(
+        &mut self,
+        from_literal: i64,
+        to_literal: i64,
+        node: std::rc::Rc<std::cell::RefCell<RuleWatchNode>>,
+    ) {
         if !self.watch_chains.contains_key(&to_literal) {
             self.watch_chains.insert(to_literal, RuleWatchChain::new());
         }
 
-        node.move_watch(from_literal, to_literal);
+        node.borrow_mut().move_watch(from_literal, to_literal);
         self.watch_chains.get_mut(&from_literal).unwrap().remove();
         self.watch_chains
             .get_mut(&to_literal)

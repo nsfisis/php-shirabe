@@ -27,20 +27,20 @@ pub trait InstallerInterface {
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
 
     fn install(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
 
     fn update(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
 
     fn uninstall(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
@@ -53,4 +53,8 @@ pub trait InstallerInterface {
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String>;
+
+    fn clone_box(&self) -> Box<dyn InstallerInterface> {
+        todo!()
+    }
 }

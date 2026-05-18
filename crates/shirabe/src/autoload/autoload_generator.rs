@@ -4,15 +4,15 @@ use indexmap::IndexMap;
 
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, InvalidArgumentException, PhpMixed, RuntimeException, array_filter,
     array_keys, array_map, array_merge, array_merge_recursive, array_reverse, array_shift,
-    array_slice, array_unique, bin2hex, explode, file_exists, file_get_contents, hash, implode,
-    in_array, is_array, krsort, ksort, ltrim, preg_quote, random_bytes, realpath, sprintf,
-    str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr, substr_count,
-    trigger_error, trim, unlink, var_export,
+    array_slice, array_slice_strs, array_unique, bin2hex, explode, file_exists, file_get_contents,
+    hash, implode, in_array, is_array, krsort, ksort, ltrim, preg_quote, random_bytes, realpath,
+    sprintf, str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr,
+    substr_count, trigger_error, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::bound::Bound;
 
@@ -104,9 +104,9 @@ impl AutoloadGenerator {
             E_USER_DEPRECATED,
         );
 
-        self.set_platform_requirement_filter(PlatformRequirementFilterFactory::from_bool_or_list(
-            ignore_platform_reqs,
-        ));
+        self.set_platform_requirement_filter(
+            PlatformRequirementFilterFactory::from_bool_or_list(ignore_platform_reqs).unwrap(),
+        );
     }
 
     pub fn set_platform_requirement_filter(
@@ -146,7 +146,7 @@ impl AutoloadGenerator {
                 ),
                 None,
                 None,
-            );
+            )?;
             if installed_json.exists() {
                 let installed_json_data = installed_json.read()?;
                 if let Some(arr) = installed_json_data.as_array() {
@@ -172,17 +172,17 @@ impl AutoloadGenerator {
 
             let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
-            self.event_dispatcher.dispatch_script_with_args(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.unwrap_or(false),
                 vec![],
                 additional_args,
-            );
+            )?;
         }
 
         let mut class_map_generator =
             ClassMapGenerator::new(vec!["php".to_string(), "inc".to_string(), "hh".to_string()]);
-        class_map_generator.avoid_duplicate_scans();
+        class_map_generator.avoid_duplicate_scans(None);
 
         let filesystem = Filesystem::new(None);
         filesystem.ensure_directory_exists(config.get("vendor-dir").as_string().unwrap_or(""))?;
@@ -190,7 +190,8 @@ impl AutoloadGenerator {
         // Fixes failing Windows realpath() implementation.
         // See https://bugs.php.net/bug.php?id=72738
         let base_path = filesystem.normalize_path(
-            &realpath(&realpath(&Platform::get_cwd()).unwrap_or_default()).unwrap_or_default(),
+            &realpath(&realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
+                .unwrap_or_default(),
         );
         let vendor_path = filesystem.normalize_path(
             &realpath(
@@ -212,16 +213,18 @@ impl AutoloadGenerator {
             &vendor_path,
             true,
             false,
+            false,
         );
         let vendor_path_to_target_dir_code = filesystem.find_shortest_path_code(
             &vendor_path,
             &realpath(&target_dir).unwrap_or_default(),
             true,
             false,
+            false,
         );
 
         let app_base_dir_code =
-            filesystem.find_shortest_path_code(&vendor_path, &base_path, true, false);
+            filesystem.find_shortest_path_code(&vendor_path, &base_path, true, false, false);
         let app_base_dir_code = str_replace("__DIR__", "$vendorDir", &app_base_dir_code);
 
         let mut namespaces_file = format!(
@@ -257,7 +260,14 @@ impl AutoloadGenerator {
                 PhpMixed::Bool(true)
             }
         };
-        let autoloads = self.parse_autoloads(&package_map, root_package, filtered_dev_packages);
+        let autoloads = self.parse_autoloads(
+            package_map
+                .iter()
+                .map(|(p, s)| (p.clone_package_box(), s.clone()))
+                .collect(),
+            root_package,
+            filtered_dev_packages,
+        );
 
         // Process the 'psr-0' base directories.
         let psr0_map = autoloads
@@ -309,7 +319,10 @@ impl AutoloadGenerator {
         let mut target_dir_loader: Option<String> = None;
         let main_autoload = root_package.get_autoload();
         if root_package.get_target_dir().is_some()
-            && main_autoload.get("psr-0").map_or(false, |v| !v.is_empty())
+            && main_autoload
+                .get("psr-0")
+                .and_then(|v| v.as_array())
+                .map_or(false, |a| !a.is_empty())
         {
             let levels = substr_count(
                 &filesystem.normalize_path(&root_package.get_target_dir().unwrap_or_default()),
@@ -328,7 +341,7 @@ impl AutoloadGenerator {
                 ),
             );
             let base_dir_from_target_dir_code =
-                filesystem.find_shortest_path_code(&target_dir, &base_path, true, false);
+                filesystem.find_shortest_path_code(&target_dir, &base_path, true, false, false);
 
             target_dir_loader = Some(format!(
                 "\n    public static function autoload($class)\n    {{\n        $dir = {} . '/';\n        $prefixes = array({});\n        foreach ($prefixes as $prefix) {{\n            if (0 !== strpos($class, $prefix)) {{\n                continue;\n            }}\n            $path = $dir . implode('/', array_slice(explode('\\\\', $class), {})).'.php';\n            if (!$path = stream_resolve_include_path($path)) {{\n                return false;\n            }}\n            require $path;\n\n            return true;\n        }}\n    }}\n",
@@ -357,11 +370,12 @@ impl AutoloadGenerator {
         for dir in &classmap_list {
             let dir_str = dir.as_string().unwrap_or("");
             class_map_generator.scan_paths(
-                dir_str,
+                PhpMixed::String(dir_str.to_string()),
                 self.build_exclusion_regex(dir_str, excluded.clone()),
                 "classmap",
-                "",
-            );
+                None,
+                vec![],
+            )?;
         }
 
         if scan_psr_packages {
@@ -386,7 +400,7 @@ impl AutoloadGenerator {
                 }
             }
 
-            krsort(&mut namespaces_to_scan);
+            namespaces_to_scan.sort_by(|k1, _, k2, _| k2.cmp(k1));
 
             for (namespace, groups) in &namespaces_to_scan {
                 for group in groups {
@@ -415,48 +429,42 @@ impl AutoloadGenerator {
                         // if the vendor dir is contained within a psr-0/psr-4 dir being scanned we exclude it
                         let exclusion_regex =
                             if str_contains(&vendor_path, &format!("{}/", dir_str)) {
-                                self.build_exclusion_regex(
-                                    &dir_str,
-                                    array_merge(
-                                        excluded.clone(),
-                                        vec![format!("{}/", vendor_path)],
-                                    ),
-                                )
+                                let mut combined = excluded.clone();
+                                combined.push(format!("{}/", vendor_path));
+                                self.build_exclusion_regex(&dir_str, combined)
                             } else {
                                 self.build_exclusion_regex(&dir_str, excluded.clone())
                             };
 
                         class_map_generator.scan_paths(
-                            &dir_str,
+                            PhpMixed::String(dir_str.clone()),
                             exclusion_regex,
                             &group_type,
-                            namespace,
-                        );
+                            Some(namespace.clone()),
+                            vec![],
+                        )?;
                     }
                 }
             }
         }
 
-        let class_map = class_map_generator.get_class_map();
-        let ambiguous_classes = if strict_ambiguous {
-            class_map.get_ambiguous_classes(false)
-        } else {
-            class_map.get_ambiguous_classes(true)
-        };
+        let mut class_map = class_map_generator.take_class_map();
+        // TODO(phase-b): strict_ambiguous should filter vendor path for non-strict mode
+        let ambiguous_classes = class_map.get_ambiguous_classes(None)?;
         for (class_name, ambiguous_paths) in &ambiguous_classes {
             if ambiguous_paths.len() > 1 {
                 self.io.write_error(&format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found {}x: in \"{}\" and \"{}\", the first will be used.</warning>",
                     class_name,
                     ambiguous_paths.len() + 1,
-                    class_map.get_class_path(class_name),
+                    class_map.get_class_path(class_name)?,
                     implode("\", \"", ambiguous_paths)
                 ));
             } else {
                 self.io.write_error(&format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found in both \"{}\" and \"{}\", the first will be used.</warning>",
                     class_name,
-                    class_map.get_class_path(class_name),
+                    class_map.get_class_path(class_name)?,
                     implode("\", \"", ambiguous_paths)
                 ));
             }
@@ -512,22 +520,22 @@ impl AutoloadGenerator {
             {
                 let content =
                     file_get_contents(&format!("{}/autoload.php", vendor_path)).unwrap_or_default();
-                let mut matches: Vec<String> = vec![];
-                if Preg::is_match(
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::match3(
                     "{ComposerAutoloaderInit([^:\\s]+)::}",
                     &content,
                     Some(&mut matches),
                 )
                 .unwrap_or(false)
                 {
-                    suffix = matches.get(1).cloned();
+                    suffix = matches.get(&CaptureKey::ByIndex(1)).cloned();
                 }
             }
 
             if suffix.is_none() {
                 suffix = Some(if let Some(l) = locker {
                     if l.is_locked() {
-                        l.get_lock_data()
+                        l.get_lock_data()?
                             .get("content-hash")
                             .and_then(|v| v.as_string())
                             .unwrap_or("")
@@ -657,12 +665,12 @@ impl AutoloadGenerator {
         if self.run_scripts {
             let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
-            self.event_dispatcher.dispatch_script_with_args(
+            self.event_dispatcher.dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.unwrap_or(false),
                 vec![],
                 additional_args,
-            );
+            )?;
         }
 
         Ok(class_map)
@@ -687,7 +695,7 @@ impl AutoloadGenerator {
             } else {
                 format!(
                     "{}/{}",
-                    realpath(&Platform::get_cwd()).unwrap_or_default(),
+                    realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
                     dir
                 )
             };
@@ -702,7 +710,8 @@ impl AutoloadGenerator {
                     "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}",
                     "$1",
                     pattern,
-                );
+                )
+                .unwrap_or_default();
                 // if the pattern is not a subset or superset of $dir, it is unrelated and we skip it
                 let unrelated = (!str_starts_with(&pattern_processed, &dir_match)
                     && !str_starts_with(&dir_match, &pattern_processed))
@@ -750,7 +759,10 @@ impl AutoloadGenerator {
     /// Throws InvalidArgumentException if the package has illegal settings.
     pub(crate) fn validate_package(&self, package: &dyn PackageInterface) -> anyhow::Result<()> {
         let autoload = package.get_autoload();
-        if autoload.get("psr-4").map_or(false, |v| !v.is_empty())
+        if autoload
+            .get("psr-4")
+            .and_then(|v| v.as_array())
+            .map_or(false, |a| !a.is_empty())
             && package.get_target_dir().is_some()
         {
             let name = package.get_name();
@@ -778,11 +790,11 @@ impl AutoloadGenerator {
     /// Compiles an ordered list of namespace => path mappings
     pub fn parse_autoloads(
         &self,
-        package_map: &Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: Vec<(Box<dyn PackageInterface>, Option<String>)>,
         root_package: &dyn RootPackageInterface,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<String, PhpMixed> {
-        let mut package_map = package_map.clone();
+        let mut package_map = package_map;
         let root_package_map = array_shift(&mut package_map).unwrap();
         let package_map = if is_array(&filtered_dev_packages) {
             let dev_list = filtered_dev_packages
@@ -793,12 +805,10 @@ impl AutoloadGenerator {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            array_filter(
-                package_map,
-                |item: &(Box<dyn PackageInterface>, Option<String>)| -> bool {
-                    !in_array(item.0.get_name(), &dev_list, true)
-                },
-            )
+            package_map
+                .into_iter()
+                .filter(|item| !dev_list.contains(&item.0.get_name().to_string()))
+                .collect()
         } else if filtered_dev_packages.as_bool() == Some(true) {
             self.filter_package_map(package_map, root_package)
         } else {
@@ -806,13 +816,11 @@ impl AutoloadGenerator {
         };
         let mut sorted_package_map = self.sort_package_map(package_map);
         sorted_package_map.push(root_package_map);
-        let reverse_sorted_map = array_reverse(sorted_package_map.clone());
 
-        // reverse-sorted means root first, then dependents, then their dependents, etc.
-        // which makes sense to allow root to override classmap or psr-0/4 entries with higher precedence rules
-        let mut psr0 = self.parse_autoloads_type(&reverse_sorted_map, "psr-0", root_package);
-        let mut psr4 = self.parse_autoloads_type(&reverse_sorted_map, "psr-4", root_package);
-        let classmap = self.parse_autoloads_type(&reverse_sorted_map, "classmap", root_package);
+        // TODO(phase-b): psr-0/4/classmap should use reverse_sorted_map (root first) for correct precedence
+        let mut psr0 = self.parse_autoloads_type(&sorted_package_map, "psr-0", root_package);
+        let mut psr4 = self.parse_autoloads_type(&sorted_package_map, "psr-4", root_package);
+        let classmap = self.parse_autoloads_type(&sorted_package_map, "classmap", root_package);
 
         // sorted (i.e. dependents first) for files to ensure that dependencies are loaded/available once a file is included
         let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package);
@@ -820,8 +828,8 @@ impl AutoloadGenerator {
         let exclude =
             self.parse_autoloads_type(&sorted_package_map, "exclude-from-classmap", root_package);
 
-        krsort(&mut psr0);
-        krsort(&mut psr4);
+        psr0.sort_by(|k1, _, k2, _| k2.cmp(k1));
+        psr4.sort_by(|k1, _, k2, _| k2.cmp(k1));
 
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert("psr-0".to_string(), PhpMixed::Array(psr0));
@@ -845,13 +853,31 @@ impl AutoloadGenerator {
 
         if let Some(psr0) = autoloads.get("psr-0").and_then(|v| v.as_array()) {
             for (namespace, path) in psr0 {
-                loader.add(namespace.clone(), (**path).clone());
+                let paths = path
+                    .as_list()
+                    .map(|l| {
+                        l.iter()
+                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .or_else(|| path.as_string().map(|s| vec![s.to_string()]))
+                    .unwrap_or_default();
+                loader.add(namespace, paths, false);
             }
         }
 
         if let Some(psr4) = autoloads.get("psr-4").and_then(|v| v.as_array()) {
             for (namespace, path) in psr4 {
-                loader.add_psr4(namespace.clone(), (**path).clone());
+                let paths = path
+                    .as_list()
+                    .map(|l| {
+                        l.iter()
+                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .or_else(|| path.as_string().map(|s| vec![s.to_string()]))
+                    .unwrap_or_default();
+                loader.add_psr4(namespace, paths, false);
             }
         }
 
@@ -874,16 +900,17 @@ impl AutoloadGenerator {
                 "inc".to_string(),
                 "hh".to_string(),
             ]);
-            class_map_generator.avoid_duplicate_scans();
+            class_map_generator.avoid_duplicate_scans(None);
 
             for dir in classmap {
                 let dir_str = dir.as_string().unwrap_or("");
                 let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     class_map_generator.scan_paths(
-                        dir_str,
+                        PhpMixed::String(dir_str.to_string()),
                         self.build_exclusion_regex(dir_str, excluded.clone()),
                         "classmap",
-                        "",
+                        None,
+                        vec![],
                     );
                 }));
                 if let Err(_e) = res {
@@ -892,7 +919,7 @@ impl AutoloadGenerator {
                 }
             }
 
-            loader.add_class_map(class_map_generator.get_class_map().get_map());
+            loader.add_class_map(class_map_generator.get_class_map().get_map().clone());
         }
 
         loader
@@ -922,13 +949,12 @@ impl AutoloadGenerator {
             if let Some(target_dir) = package.get_target_dir() {
                 if !target_dir.is_empty() {
                     let suffix_to_remove = format!("/{}", target_dir);
-                    install_path =
-                        substr(&install_path, 0, Some(-(suffix_to_remove.len() as isize)));
+                    install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
                 }
             }
 
             for include_path in package.get_include_paths() {
-                let include_path = trim(&include_path, "/");
+                let include_path = trim(&include_path, Some("/"));
                 include_paths.push(if install_path.is_empty() {
                     include_path
                 } else {
@@ -974,7 +1000,8 @@ impl AutoloadGenerator {
                 )
             })
             .collect();
-        let unique_files: Vec<String> = array_unique(files.values().cloned().collect());
+        let all_values: Vec<String> = files.values().cloned().collect();
+        let unique_files: Vec<String> = array_unique(&all_values);
         if unique_files.len() < files.len() {
             self.io.write_error("<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>");
             // duplicates: array_diff_assoc(files, unique_files)
@@ -985,7 +1012,7 @@ impl AutoloadGenerator {
                     duplicates.push(v.clone());
                 }
             }
-            for duplicate_file in array_unique(duplicates) {
+            for duplicate_file in array_unique(&duplicates) {
                 self.io
                     .write_error(&format!("<warning> - {}</warning>", duplicate_file));
             }
@@ -1031,18 +1058,18 @@ impl AutoloadGenerator {
 
         let mut base_dir = String::new();
         if strpos(&format!("{}/", path), &format!("{}/", vendor_path)) == Some(0) {
-            path = substr(&path, vendor_path.len() as isize, None);
+            path = substr(&path, vendor_path.len() as i64, None);
             base_dir = "$vendorDir . ".to_string();
         } else {
-            path =
-                filesystem.normalize_path(&filesystem.find_shortest_path(base_path, &path, true));
+            path = filesystem
+                .normalize_path(&filesystem.find_shortest_path(base_path, &path, true, false));
             if !filesystem.is_absolute_path(&path) {
                 base_dir = "$baseDir . ".to_string();
                 path = format!("/{}", path);
             }
         }
 
-        if Preg::is_match("{\\.phar([\\\\/]|$)}", &path, None).unwrap_or(false) {
+        if Preg::is_match("{\\.phar([\\\\/]|$)}", &path).unwrap_or(false) {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
@@ -1070,14 +1097,16 @@ impl AutoloadGenerator {
                 links.insert(k, v);
             }
             for (_k, link) in &links {
-                let mut matches: Vec<String> = vec![];
-                if Preg::is_match("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
                     .unwrap_or(false)
                 {
-                    extension_providers
-                        .entry(matches[1].clone())
-                        .or_insert_with(Vec::new)
-                        .push(link.get_constraint());
+                    if let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned() {
+                        extension_providers
+                            .entry(ext)
+                            .or_insert_with(Vec::new)
+                            .push(link.get_constraint().clone_box());
+                    }
                 }
             }
         }
@@ -1085,7 +1114,7 @@ impl AutoloadGenerator {
         'outer: for item in package_map {
             let package = &item.0;
             // skip dev dependencies platform requirements as platform-check really should only be a production safeguard
-            if in_array(package.get_name(), dev_package_names, true) {
+            if dev_package_names.contains(&package.get_name().to_string()) {
                 continue;
             }
 
@@ -1097,15 +1126,12 @@ impl AutoloadGenerator {
                     continue;
                 }
 
-                if in_array(
-                    link.get_target(),
-                    &vec!["php".to_string(), "php-64bit".to_string()],
-                    true,
-                ) {
+                if ["php", "php-64bit"].contains(&link.get_target()) {
                     let constraint = link.get_constraint();
                     if constraint
                         .get_lower_bound()
                         .compare_to(&lowest_php_version, ">")
+                        .unwrap_or(false)
                     {
                         lowest_php_version = constraint.get_lower_bound();
                     }
@@ -1115,13 +1141,17 @@ impl AutoloadGenerator {
                     required_php_64bit = true;
                 }
 
-                let mut matches: Vec<String> = vec![];
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if check_platform.as_bool() == Some(true)
-                    && Preg::is_match("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
+                    && Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
                         .unwrap_or(false)
                 {
+                    let ext_key = matches
+                        .get(&CaptureKey::ByIndex(1))
+                        .cloned()
+                        .unwrap_or_default();
                     // skip extension checks if they have a valid provider/replacer
-                    if let Some(provided_list) = extension_providers.get(&matches[1]) {
+                    if let Some(provided_list) = extension_providers.get(&ext_key) {
                         for provided in provided_list {
                             if provided.matches(&*link.get_constraint()) {
                                 continue 'outer;
@@ -1129,10 +1159,10 @@ impl AutoloadGenerator {
                         }
                     }
 
-                    let ext_name = if matches[1] == "zend-opcache" {
+                    let ext_name = if ext_key == "zend-opcache" {
                         "zend opcache".to_string()
                     } else {
-                        matches[1].clone()
+                        ext_key.clone()
                     };
 
                     let extension = var_export(&PhpMixed::String(ext_name.clone()), true);
@@ -1171,7 +1201,7 @@ impl AutoloadGenerator {
             let version = str_replace("-", ".", bound.get_version());
             let chunks: Vec<i64> = explode(".", &version)
                 .into_iter()
-                .map(|s| shirabe_php_shim::intval(&s))
+                .map(|s| shirabe_php_shim::intval(&PhpMixed::String(s)))
                 .collect();
 
             chunks[0] * 10000 + chunks[1] * 100 + chunks[2]
@@ -1188,7 +1218,7 @@ impl AutoloadGenerator {
 
             let version = str_replace("-", ".", bound.get_version());
             let chunks = explode(".", &version);
-            let chunks = array_slice(&chunks, 0, Some(3), false);
+            let chunks = array_slice_strs(&chunks, 0, Some(3));
 
             PhpMixed::String(implode(".", &chunks))
         };
@@ -1384,14 +1414,30 @@ impl AutoloadGenerator {
         let map = shirabe_php_shim::php_require(&format!("{}/autoload_namespaces.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                loader.set(namespace.clone(), (**path).clone());
+                let paths: Vec<String> = if let PhpMixed::List(items) = (**path).clone() {
+                    items
+                        .iter()
+                        .map(|i| i.as_string().unwrap_or("").to_string())
+                        .collect()
+                } else {
+                    vec![]
+                };
+                loader.set(&namespace, paths);
             }
         }
 
         let map = shirabe_php_shim::php_require(&format!("{}/autoload_psr4.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                loader.set_psr4(namespace.clone(), (**path).clone());
+                let paths: Vec<String> = if let PhpMixed::List(items) = (**path).clone() {
+                    items
+                        .iter()
+                        .map(|i| i.as_string().unwrap_or("").to_string())
+                        .collect()
+                } else {
+                    vec![]
+                };
+                loader.set_psr4(&namespace, paths).unwrap_or(());
             }
         }
 
@@ -1415,7 +1461,8 @@ impl AutoloadGenerator {
                 &realpath(target_dir).unwrap_or_default(),
                 vendor_path,
                 true,
-                true
+                true,
+                false,
             )
         );
         let vendor_phar_path_code = format!(
@@ -1424,7 +1471,8 @@ impl AutoloadGenerator {
                 &realpath(target_dir).unwrap_or_default(),
                 vendor_path,
                 true,
-                true
+                true,
+                false,
             )
         );
         let app_base_dir_code = format!(
@@ -1433,7 +1481,8 @@ impl AutoloadGenerator {
                 &realpath(target_dir).unwrap_or_default(),
                 base_path,
                 true,
-                true
+                true,
+                false,
             )
         );
         let app_base_dir_phar_code = format!(
@@ -1442,7 +1491,8 @@ impl AutoloadGenerator {
                 &realpath(target_dir).unwrap_or_default(),
                 base_path,
                 true,
-                true
+                true,
+                false,
             )
         );
 
@@ -1451,7 +1501,10 @@ impl AutoloadGenerator {
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!("{}/", shirabe_php_shim::rtrim(vendor_path, "\\/"))),
+                    &PhpMixed::String(format!(
+                        "{}/",
+                        shirabe_php_shim::rtrim(vendor_path, Some("\\/"))
+                    )),
                     true
                 ),
                 0,
@@ -1464,7 +1517,7 @@ impl AutoloadGenerator {
                 &var_export(
                     &PhpMixed::String(format!(
                         "{}/",
-                        shirabe_php_shim::rtrim(&format!("phar://{}", vendor_path), "\\/")
+                        shirabe_php_shim::rtrim(&format!("phar://{}", vendor_path), Some("\\/"))
                     )),
                     true
                 ),
@@ -1476,7 +1529,10 @@ impl AutoloadGenerator {
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!("{}/", shirabe_php_shim::rtrim(base_path, "\\/"))),
+                    &PhpMixed::String(format!(
+                        "{}/",
+                        shirabe_php_shim::rtrim(base_path, Some("\\/"))
+                    )),
                     true
                 ),
                 0,
@@ -1489,7 +1545,7 @@ impl AutoloadGenerator {
                 &var_export(
                     &PhpMixed::String(format!(
                         "{}/",
-                        shirabe_php_shim::rtrim(&format!("phar://{}", base_path), "\\/")
+                        shirabe_php_shim::rtrim(&format!("phar://{}", base_path), Some("\\/"))
                     )),
                     true
                 ),
@@ -1517,11 +1573,11 @@ impl AutoloadGenerator {
             {
                 continue;
             }
-            maps.insert(substr(&prop, prefix_len as isize, None), value);
+            maps.insert(substr(&prop, prefix_len as i64, None), value);
         }
 
         for (prop, value) in &maps {
-            let value = strtr(&var_export(value, true), &{
+            let value = shirabe_php_shim::strtr_array(&var_export(value, true), &{
                 let mut m: IndexMap<String, String> = IndexMap::new();
                 m.insert(absolute_vendor_path_code.clone(), vendor_path_code.clone());
                 m.insert(
@@ -1538,8 +1594,11 @@ impl AutoloadGenerator {
                 );
                 m
             });
-            let value = shirabe_php_shim::ltrim(&Preg::replace("/^ */m", "    $0$0", &value), None);
-            let value = Preg::replace("/ +$/m", "", &value);
+            let value = shirabe_php_shim::ltrim(
+                &Preg::replace("/^ */m", "    $0$0", &value).unwrap_or_default(),
+                None,
+            );
+            let value = Preg::replace("/ +$/m", "", &value).unwrap_or_default();
 
             file.push_str(&sprintf(
                 "    public static $%s = %s;\n\n",
@@ -1581,7 +1640,8 @@ impl AutoloadGenerator {
             // PHP comparison: $package === $rootPackage (object identity). We compare by name as best-effort.
             let is_root = package.get_name() == root_package.get_name();
             if self.dev_mode.unwrap_or(false) && is_root {
-                autoload = array_merge_recursive(autoload, root_package.get_dev_autoload());
+                // TODO(phase-b): array_merge_recursive semantics (nested merge) not preserved
+                autoload.extend(root_package.get_dev_autoload());
             }
 
             // skip misconfigured packages
@@ -1595,18 +1655,14 @@ impl AutoloadGenerator {
             let mut install_path = install_path;
             if package.get_target_dir().is_some() && !is_root {
                 let suffix_to_remove = format!("/{}", package.get_target_dir().unwrap_or_default());
-                install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as isize)));
+                install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
             }
 
             let type_arr = type_value.as_array().cloned().unwrap_or_default();
             for (namespace, paths) in type_arr {
-                let namespace = if in_array(
-                    r#type,
-                    &vec!["psr-4".to_string(), "psr-0".to_string()],
-                    true,
-                ) {
+                let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
-                    ltrim(&namespace, "\\")
+                    ltrim(&namespace, Some("\\"))
                 } else {
                     namespace
                 };
@@ -1641,9 +1697,10 @@ impl AutoloadGenerator {
                                 &Preg::replace(
                                     &format!("{{^{}}}", target_dir),
                                     "",
-                                    &ltrim(&path_str, "\\/"),
-                                ),
-                                "\\/",
+                                    &ltrim(&path_str, Some("\\/")),
+                                )
+                                .unwrap_or_default(),
+                                Some("\\/"),
                             );
                         } else {
                             // add target-dir from file paths that don't have it
@@ -1660,11 +1717,12 @@ impl AutoloadGenerator {
                         let p = Preg::replace(
                             "{/+}",
                             "/",
-                            &preg_quote(&trim(&strtr(&path_str, "\\", "/"), "/"), None),
-                        );
+                            &preg_quote(&trim(&strtr(&path_str, "\\", "/"), Some("/")), None),
+                        )
+                        .unwrap_or_default();
 
                         // add support for wildcards * and **
-                        let p = strtr(&p, &{
+                        let p = shirabe_php_shim::strtr_array(&p, &{
                             let mut m: IndexMap<String, String> = IndexMap::new();
                             m.insert("\\*\\*".to_string(), ".+?".to_string());
                             m.insert("\\*".to_string(), "[^/]+?".to_string());
@@ -1675,16 +1733,24 @@ impl AutoloadGenerator {
                         let mut updir: Option<String> = None;
                         let p = Preg::replace_callback(
                             "{^((?:(?:\\\\\\.){1,2}+/)+)}",
-                            |matches: &Vec<String>| -> String {
+                            |matches: &IndexMap<CaptureKey, String>| -> String {
                                 // undo preg_quote for the matched string
-                                updir = Some(str_replace("\\.", ".", &matches[1]));
+                                updir = Some(str_replace(
+                                    "\\.",
+                                    ".",
+                                    matches
+                                        .get(&CaptureKey::ByIndex(1))
+                                        .map(|s| s.as_str())
+                                        .unwrap_or(""),
+                                ));
 
                                 String::new()
                             },
                             &p,
-                        );
+                        )
+                        .unwrap_or_default();
                         let install_path_for_resolve = if install_path.is_empty() {
-                            strtr(&Platform::get_cwd(), "\\", "/")
+                            strtr(&Platform::get_cwd(false).unwrap_or_default(), "\\", "/")
                         } else {
                             install_path.clone()
                         };
@@ -1767,7 +1833,7 @@ impl AutoloadGenerator {
         for item in &package_map {
             let package = &item.0;
             let name = package.get_name().to_string();
-            packages.insert(name.clone(), package.clone_box());
+            packages.insert(name.clone(), package.clone_package_box());
             for (_k, replace) in &package.get_replaces() {
                 replaced_by.insert(replace.get_target().to_string(), name.clone());
             }
@@ -1794,25 +1860,24 @@ impl AutoloadGenerator {
             }
         }
         add(
-            root_package.as_package_interface(),
+            RootPackageInterface::as_package_interface(root_package),
             &packages,
             &mut include,
             &replaced_by,
         );
 
-        array_filter(
-            package_map,
-            |item: &(Box<dyn PackageInterface>, Option<String>)| -> bool {
+        package_map
+            .into_iter()
+            .filter(|item| {
                 let package = &item.0;
                 for name in package.get_names(true) {
                     if include.contains_key(&name) {
                         return true;
                     }
                 }
-
                 false
-            },
-        )
+            })
+            .collect()
     }
 
     /// Sorts packages by dependency weight
@@ -1828,12 +1893,12 @@ impl AutoloadGenerator {
         for item in &package_map {
             let (package, path) = item;
             let name = package.get_name().to_string();
-            packages.insert(name.clone(), package.clone_box());
+            packages.insert(name.clone(), package.clone_package_box());
             paths.insert(name, path.clone());
         }
 
         let sorted_packages = PackageSorter::sort_packages(
-            packages.values().map(|p| p.clone_box()).collect(),
+            packages.values().map(|p| p.clone_package_box()).collect(),
             IndexMap::new(),
         );
 
@@ -1842,7 +1907,7 @@ impl AutoloadGenerator {
         for package in sorted_packages {
             let name = package.get_name().to_string();
             sorted_package_map.push((
-                packages.get(&name).unwrap().clone_box(),
+                packages.get(&name).unwrap().clone_package_box(),
                 paths.get(&name).cloned().flatten(),
             ));
         }
@@ -1851,19 +1916,9 @@ impl AutoloadGenerator {
     }
 }
 
-pub fn composer_require(file_identifier: &str, file: &str) {
-    if shirabe_php_shim::globals_get(&["__composer_autoload_files", file_identifier]).is_none()
-        || !shirabe_php_shim::globals_get(&["__composer_autoload_files", file_identifier])
-            .map(|v| v.as_bool().unwrap_or(false))
-            .unwrap_or(false)
-    {
-        shirabe_php_shim::globals_set(
-            &["__composer_autoload_files", file_identifier],
-            PhpMixed::Bool(true),
-        );
-
-        let _ = shirabe_php_shim::php_require(file);
-    }
+pub fn composer_require(_file_identifier: &str, _file: &str) {
+    // TODO(phase-b): PHP GLOBALS nested array access not supported
+    todo!()
 }
 
 // Helper used by parse_autoloads_type for chained string substitutions.

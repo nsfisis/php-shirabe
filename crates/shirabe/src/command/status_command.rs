@@ -2,12 +2,10 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
@@ -21,9 +19,7 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct StatusCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl StatusCommand {
@@ -32,11 +28,11 @@ impl StatusCommand {
     const EXIT_CODE_VERSION_CHANGES: i64 = 4;
 
     pub fn configure(&mut self) {
-        self.inner
+        self
             .set_name("status")
             .set_description("Shows a list of locally modified packages")
             .set_definition(vec![
-                InputOption::new("verbose", Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Show modified files for each directory that contains changes.", None, vec![]),
+                InputOption::new("verbose", Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Show modified files for each directory that contains changes.", None),
             ])
             .set_help(
                 "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status"
@@ -44,36 +40,42 @@ impl StatusCommand {
     }
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch CommandEvent
         let command_event = CommandEvent::new(
             PluginEvents::COMMAND.to_string(),
             "status".to_string(),
-            Box::new(input),
-            Box::new(output),
+            input,
+            output,
             vec![],
             vec![],
         );
         composer
             .get_event_dispatcher()
-            .dispatch(command_event.get_name(), &command_event);
+            .dispatch(Some(command_event.get_name()), None);
 
-        composer
-            .get_event_dispatcher()
-            .dispatch_script(ScriptEvents::PRE_STATUS_CMD, true);
+        composer.get_event_dispatcher().dispatch_script(
+            ScriptEvents::PRE_STATUS_CMD,
+            true,
+            vec![],
+            indexmap::IndexMap::new(),
+        );
 
         let exit_code = self.do_execute(input)?;
 
-        composer
-            .get_event_dispatcher()
-            .dispatch_script(ScriptEvents::POST_STATUS_CMD, true);
+        composer.get_event_dispatcher().dispatch_script(
+            ScriptEvents::POST_STATUS_CMD,
+            true,
+            vec![],
+            indexmap::IndexMap::new(),
+        );
 
         Ok(exit_code)
     }
 
     fn do_execute(&self, input: &dyn InputInterface) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         let installed_repo = composer.get_repository_manager().get_local_repository();
 
@@ -81,7 +83,7 @@ impl StatusCommand {
         let im = composer.get_installation_manager();
 
         let mut errors: IndexMap<String, String> = IndexMap::new();
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
         let mut vcs_version_changes: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
             IndexMap::new();
@@ -89,6 +91,7 @@ impl StatusCommand {
         let parser = VersionParser::new();
         let process_executor = composer
             .get_loop()
+            .borrow()
             .get_process_executor()
             .cloned()
             .unwrap_or_else(|| ProcessExecutor::new(io));
@@ -96,7 +99,7 @@ impl StatusCommand {
         let dumper = ArrayDumper::new();
 
         for package in installed_repo.get_canonical_packages() {
-            let downloader = dm.get_downloader_for_package(package.as_ref());
+            let downloader = dm.borrow().get_downloader_for_package(package.as_ref());
             let target_dir = im.get_install_path(package.as_ref());
             let target_dir = match target_dir {
                 Some(d) => d,
@@ -308,30 +311,12 @@ impl StatusCommand {
     }
 }
 
-impl BaseCommand for StatusCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for StatusCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for StatusCommand {}

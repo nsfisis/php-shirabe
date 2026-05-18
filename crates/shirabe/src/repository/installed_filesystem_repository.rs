@@ -1,11 +1,14 @@
 //! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php
 
+use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
+use crate::json::json_file::JsonFile;
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
+use crate::package::root_package_interface::RootPackageInterface;
 use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
 use crate::repository::filesystem_repository::FilesystemRepository;
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
@@ -13,6 +16,7 @@ use crate::repository::repository_interface::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use crate::repository::writable_repository_interface::WritableRepositoryInterface;
+use crate::util::filesystem::Filesystem;
 
 #[derive(Debug)]
 pub struct InstalledFilesystemRepository {
@@ -20,6 +24,22 @@ pub struct InstalledFilesystemRepository {
 }
 
 impl InstalledFilesystemRepository {
+    pub fn new(
+        repository_file: JsonFile,
+        dump_versions: bool,
+        root_package: Option<Box<dyn RootPackageInterface>>,
+        filesystem: Option<Filesystem>,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: FilesystemRepository::new(
+                repository_file,
+                dump_versions,
+                root_package,
+                filesystem,
+            )?,
+        })
+    }
+
     pub fn get_repo_name(&self) -> String {
         format!("installed {}", self.inner.get_repo_name())
     }

@@ -45,7 +45,7 @@ impl DownloadManager {
         prefer_source: bool,
         filesystem: Option<Filesystem>,
     ) -> Self {
-        let filesystem = filesystem.unwrap_or_else(Filesystem::new);
+        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
         Self {
             io,
             prefer_source,

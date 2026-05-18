@@ -21,6 +21,10 @@ pub struct PrePoolCreateEvent {
 }
 
 impl PrePoolCreateEvent {
+    pub fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,

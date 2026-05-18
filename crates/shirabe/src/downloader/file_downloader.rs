@@ -239,7 +239,7 @@ impl DownloaderInterface for FileDownloader {
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
                 && self.filesystem.is_dir_empty(dir)?
-                && realpath(dir).as_deref() != Some(&Platform::get_cwd())
+                && realpath(dir).as_deref() != Some(&Platform::get_cwd(false).unwrap_or_default())
             {
                 self.filesystem.remove_directory_php(dir)?;
             }
@@ -257,7 +257,7 @@ impl DownloaderInterface for FileDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         if output {
             self.io
-                .write_error(&format!("  - {}", InstallOperation::format(package)));
+                .write_error(&format!("  - {}", InstallOperation::format(package, false)));
         }
 
         let vendor_dir = self
@@ -277,7 +277,7 @@ impl DownloaderInterface for FileDownloader {
                 .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR));
             strpos(&normalized_vendor, &normalized_path).is_some()
         } {
-            self.filesystem.empty_directory(path)?;
+            self.filesystem.empty_directory(path, true)?;
         }
         self.filesystem.ensure_directory_exists(path)?;
         self.filesystem.rename(
@@ -294,17 +294,16 @@ impl DownloaderInterface for FileDownloader {
         for bin in package.get_binaries() {
             let bin_path = format!("{}/{}", path, bin);
             if file_exists(&bin_path) && !is_executable(&bin_path) {
-                Silencer::call_named(
-                    "chmod",
-                    &[
-                        PhpMixed::String(bin_path),
-                        PhpMixed::Int((0o777 & !umask()) as i64),
-                    ],
-                );
+                // TODO(phase-b): Silencer::call_named for native PHP function
+                let _ = Silencer::call(|| {
+                    let _ = bin_path;
+                    let _ = umask();
+                    Ok(())
+                });
             }
         }
 
-        Ok(react_promise_resolve(PhpMixed::Null))
+        Ok(react_promise_resolve(Some(PhpMixed::Null)))
     }
 
     /// @inheritDoc
@@ -316,7 +315,7 @@ impl DownloaderInterface for FileDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         self.io.write_error(&format!(
             "  - {}{}",
-            UpdateOperation::format(initial, target),
+            UpdateOperation::format(initial, target, false),
             self.get_install_operation_appendix(target, path)
         ));
 
@@ -334,8 +333,10 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> Result<Box<dyn PromiseInterface>> {
         if output {
-            self.io
-                .write_error(&format!("  - {}", UninstallOperation::format(package)));
+            self.io.write_error(&format!(
+                "  - {}",
+                UninstallOperation::format(package, false)
+            ));
         }
         let _promise = self.filesystem.remove_directory_async(path)?;
 
@@ -394,12 +395,12 @@ impl ChangeReportInterface for FileDownloader {
             }
 
             let mut comparer = Comparer::new();
-            comparer.set_source(&format!("{}_compare", target_dir));
-            comparer.set_update(&target_dir);
+            comparer.set_source(format!("{}_compare", target_dir));
+            comparer.set_update(target_dir.clone());
             comparer.do_compare();
-            output = comparer.get_changed_as_string(true);
+            output = comparer.get_changed_as_string(true, false);
             self.filesystem
-                .remove_directory(&format!("{}_compare", target_dir), false)?;
+                .remove_directory(&format!("{}_compare", target_dir))?;
             Ok(())
         })();
         if let Err(err) = result {

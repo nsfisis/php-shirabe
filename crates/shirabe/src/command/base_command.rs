@@ -1,13 +1,11 @@
 //! ref: composer/src/Composer/Command/BaseCommand.php
+//! ref: composer/vendor/symfony/console/Command/Command.php
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
-use shirabe_external_packages::symfony::component::console::completion::completion_input::CompletionInput;
-use shirabe_external_packages::symfony::component::console::completion::completion_suggestions::CompletionSuggestions;
 use shirabe_external_packages::symfony::component::console::helper::table::Table;
 use shirabe_external_packages::symfony::component::console::helper::table_separator::TableSeparator;
+use shirabe_external_packages::symfony::component::console::input::input_definition::InputDefinition;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::console::terminal::Terminal;
@@ -34,35 +32,253 @@ use crate::plugin::plugin_events::PluginEvents;
 use crate::plugin::pre_command_run_event::PreCommandRunEvent;
 use crate::util::platform::Platform;
 
-/// Base class for Composer commands
+/// \Composer\Composer\Command\BaseCommand + \Symfony\Component\Console\Command\Command
 pub trait BaseCommand {
-    fn inner(&self) -> &CommandBase;
-    fn inner_mut(&mut self) -> &mut CommandBase;
-    fn composer(&self) -> Option<&Composer>;
-    fn composer_mut(&mut self) -> &mut Option<Composer>;
-    fn io(&self) -> Option<&dyn IOInterface>;
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>>;
-
-    /// Gets the application instance for this command.
-    fn get_application(&self) -> Result<Application> {
-        let application = self.inner().get_application();
-        // TODO(phase-b): `$application instanceof Application` downcast from generic Symfony Application
-        let application_as_composer: Option<Application> = application;
-        if application_as_composer.is_none() {
-            return Err(RuntimeException {
-                message: format!(
-                    "Composer commands can only work with an {} instance set",
-                    "Composer\\Console\\Application"
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(application_as_composer.unwrap())
+    fn new(_name: Option<&str>) -> Self
+    where
+        Self: Sized,
+    {
+        todo!()
     }
 
+    fn get_name(&self) -> Option<String> {
+        todo!()
+    }
+
+    fn set_name(&mut self, _name: &str) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn get_description(&self) -> String {
+        todo!()
+    }
+
+    fn set_description(&mut self, _description: &str) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn set_help(&mut self, _help: &str) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn set_definition(&mut self, _definition: PhpMixed) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn get_definition(&self) -> &InputDefinition {
+        todo!()
+    }
+
+    fn add_argument(
+        &mut self,
+        _name: &str,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: PhpMixed,
+    ) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn add_option(
+        &mut self,
+        _name: &str,
+        _shortcut: Option<&str>,
+        _mode: Option<i64>,
+        _description: &str,
+        _default: PhpMixed,
+    ) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn set_aliases(&mut self, _aliases: &[String]) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn get_aliases(&self) -> Vec<String> {
+        todo!()
+    }
+
+    fn set_hidden(&mut self, _hidden: bool) -> &mut Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn is_hidden(&self) -> bool {
+        todo!()
+    }
+
+    fn run(
+        &mut self,
+        _input: &mut dyn InputInterface,
+        _output: &mut dyn OutputInterface,
+    ) -> anyhow::Result<i64> {
+        todo!()
+    }
+
+    fn get_helper(&self, _name: &str) -> PhpMixed {
+        todo!()
+    }
+
+    fn get_helper_set(&self) -> PhpMixed {
+        todo!()
+    }
+
+    /// Gets the application instance for this command.
+    fn get_application(&self) -> Result<Application>;
+
     /// @deprecated since Composer 2.3.0 use requireComposer or tryComposer depending on whether you have $required set to true or false
+    fn get_composer(
+        &mut self,
+        required: bool,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Result<Option<Composer>>;
+
+    /// Retrieves the default Composer\Composer instance or throws
+    fn require_composer(
+        &mut self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Result<Composer>;
+
+    /// Retrieves the default Composer\Composer instance or null
+    fn try_composer(
+        &mut self,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
+    ) -> Option<Composer>;
+
+    fn set_composer(&mut self, composer: Composer);
+
+    /// Removes the cached composer instance
+    fn reset_composer(&mut self) -> Result<()>;
+
+    /// Whether or not this command is meant to call another command.
+    fn is_proxy_command(&self) -> bool;
+
+    fn get_io(&mut self) -> &mut dyn IOInterface;
+
+    fn set_io(&mut self, io: Box<dyn IOInterface>);
+
+    // TODO(cli-completion): fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions);
+
+    /// @inheritDoc
+    fn initialize(
+        &mut self,
+        input: &mut dyn InputInterface,
+        output: &mut dyn OutputInterface,
+    ) -> Result<()>;
+
+    /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
+    fn create_composer_instance(
+        &self,
+        input: &dyn InputInterface,
+        io: &dyn IOInterface,
+        config: Option<IndexMap<String, PhpMixed>>,
+        disable_plugins: bool,
+        disable_scripts: Option<bool>,
+    ) -> Result<Composer>;
+
+    /// Returns preferSource and preferDist values based on the configuration.
+    fn get_preferred_install_options(
+        &self,
+        config: &Config,
+        input: &dyn InputInterface,
+        keep_vcs_requires_prefer_source: bool,
+    ) -> Result<(bool, bool)>;
+
+    fn get_platform_requirement_filter(
+        &self,
+        input: &dyn InputInterface,
+    ) -> Result<Box<dyn PlatformRequirementFilterInterface>>;
+
+    /// @param array<string> $requirements
+    ///
+    /// @return array<string, string>
+    fn format_requirements(&self, requirements: Vec<String>) -> Result<IndexMap<String, String>>;
+
+    /// @param array<string> $requirements
+    ///
+    /// @return list<array{name: string, version?: string}>
+    fn normalize_requirements(
+        &self,
+        requirements: Vec<String>,
+    ) -> Result<Vec<IndexMap<String, String>>>;
+
+    /// @param array<TableSeparator|mixed[]> $table
+    fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface);
+
+    fn get_terminal_width(&self) -> i64;
+
+    /// @internal
+    /// @param 'format'|'audit-format' $optName
+    /// @return Auditor::FORMAT_*
+    fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String>;
+
+    /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
+    fn create_audit_config(
+        &self,
+        config: &Config,
+        input: &dyn InputInterface,
+    ) -> Result<AuditConfig>;
+}
+
+#[derive(Debug)]
+pub struct BaseCommandData {
+    pub(crate) composer: Option<Composer>,
+    pub(crate) io: Option<Box<dyn IOInterface>>,
+}
+
+pub trait HasBaseCommandData {
+    fn base_command_data(&self) -> &BaseCommandData;
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData;
+
+    fn composer(&self) -> Option<&Composer> {
+        self.base_command_data().composer.as_ref()
+    }
+
+    fn composer_mut(&mut self) -> &mut Option<Composer> {
+        &mut self.base_command_data_mut().composer
+    }
+
+    fn io(&self) -> Option<&dyn IOInterface> {
+        self.base_command_data().io.as_deref()
+    }
+
+    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+        &mut self.base_command_data_mut().io
+    }
+}
+
+impl<C: HasBaseCommandData> BaseCommand for C {
+    fn get_application(&self) -> Result<Application> {
+        // TODO(phase-b): requires inner Symfony Command access
+        todo!()
+    }
+
     fn get_composer(
         &mut self,
         required: bool,
@@ -78,20 +294,17 @@ pub trait BaseCommand {
         Ok(self.try_composer(disable_plugins, disable_scripts))
     }
 
-    /// Retrieves the default Composer\Composer instance or throws
     fn require_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Result<Composer> {
         if self.composer().is_none() {
-            let application = self.inner().get_application();
-            // TODO(phase-b): `$application instanceof Application` downcast
-            let application_as_composer: Option<Application> = application;
-            if let Some(app) = application_as_composer {
+            // TODO(phase-b): requires inner Symfony Application access
+            let application: Option<Application> = todo!();
+            if let Some(app) = application {
                 *self.composer_mut() =
                     Some(app.get_composer(true, disable_plugins, disable_scripts)?);
-                // PHP: assert($this->composer instanceof Composer) — Rust types guarantee this
             } else {
                 return Err(RuntimeException {
                     message:
@@ -106,17 +319,15 @@ pub trait BaseCommand {
         Ok(self.composer().clone().unwrap())
     }
 
-    /// Retrieves the default Composer\Composer instance or null
     fn try_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
     ) -> Option<Composer> {
         if self.composer().is_none() {
-            let application = self.inner().get_application();
-            // TODO(phase-b): `$application instanceof Application` downcast
-            let application_as_composer: Option<Application> = application;
-            if let Some(app) = application_as_composer {
+            // TODO(phase-b): requires inner Symfony Application access
+            let application: Option<Application> = todo!();
+            if let Some(app) = application {
                 *self.composer_mut() = app
                     .get_composer(false, disable_plugins, disable_scripts)
                     .ok();
@@ -130,102 +341,42 @@ pub trait BaseCommand {
         *self.composer_mut() = Some(composer);
     }
 
-    /// Removes the cached composer instance
     fn reset_composer(&mut self) -> Result<()> {
         *self.composer_mut() = None;
         self.get_application()?.reset_composer();
         Ok(())
     }
 
-    /// Whether or not this command is meant to call another command.
     fn is_proxy_command(&self) -> bool {
         false
     }
 
-    fn get_io(&mut self) -> &dyn IOInterface {
+    fn get_io(&mut self) -> &mut dyn IOInterface {
         if self.io().is_none() {
-            let application = self.inner().get_application();
-            // TODO(phase-b): `$application instanceof Application` downcast
-            let application_as_composer: Option<Application> = application;
-            if let Some(app) = application_as_composer {
-                *self.io_mut() = Some(app.get_io());
-            } else {
-                *self.io_mut() = Some(Box::new(NullIO::new()));
-            }
+            // TODO(phase-b): requires inner Symfony Application access
+            *self.io_mut() = Some(Box::new(NullIO::new()));
         }
 
-        &**self.io().as_ref().unwrap()
+        &mut **self.io_mut().as_mut().unwrap()
     }
 
     fn set_io(&mut self, io: Box<dyn IOInterface>) {
         *self.io_mut() = Some(io);
     }
 
-    /// @inheritdoc
-    ///
-    /// Backport suggested values definition from symfony/console 6.1+
-    fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
-        let definition = self.inner().get_definition();
-        let name = input.get_completion_name().to_string();
-        if CompletionInput::TYPE_OPTION_VALUE == input.get_completion_type()
-            && definition.has_option(&name)
-        {
-            let option = definition.get_option(&name);
-            // TODO(phase-b): `$option instanceof InputOption` (our InputOption, not Symfony's)
-            let option_as_input: Option<&InputOption> = None;
-            if let Some(input_option) = option_as_input {
-                input_option.complete(input, suggestions);
-                let _ = option;
-                return;
-            }
-        }
-        if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
-            && definition.has_argument(&name)
-        {
-            let argument = definition.get_argument(&name);
-            // TODO(phase-b): `$argument instanceof InputArgument` (our InputArgument, not Symfony's)
-            let argument_as_input: Option<&InputArgument> = None;
-            if let Some(input_argument) = argument_as_input {
-                input_argument.complete(input, suggestions);
-                let _ = argument;
-                return;
-            }
-        }
-        self.inner().complete(input, suggestions);
-    }
+    // TODO(cli-completion): fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
 
-    /// @inheritDoc
     fn initialize(
         &mut self,
         input: &mut dyn InputInterface,
         output: &mut dyn OutputInterface,
     ) -> Result<()> {
         // initialize a plugin-enabled Composer instance, either local or global
-        let mut disable_plugins =
-            input.has_parameter_option(PhpMixed::String("--no-plugins".to_string()));
-        let mut disable_scripts =
-            input.has_parameter_option(PhpMixed::String("--no-scripts".to_string()));
+        let mut disable_plugins = input.has_parameter_option(&["--no-plugins"], false);
+        let mut disable_scripts = input.has_parameter_option(&["--no-scripts"], false);
 
-        let application = self.inner().get_application();
-        // TODO(phase-b): `$application instanceof Application` downcast
-        let application_as_composer: Option<&Application> = None;
-        if let Some(app) = application_as_composer {
-            if app.get_disable_plugins_by_default() {
-                disable_plugins = true;
-            }
-            if app.get_disable_scripts_by_default() {
-                disable_scripts = true;
-            }
-        }
-        let _ = application;
-
-        // TODO(phase-b): `$this instanceof SelfUpdateCommand` — not representable since
-        // BaseCommand is a struct, not a base type
-        let self_is_self_update: Option<&SelfUpdateCommand> = None;
-        if self_is_self_update.is_some() {
-            disable_plugins = true;
-            disable_scripts = true;
-        }
+        // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
+        // TODO(phase-b): `$this instanceof SelfUpdateCommand` not representable
 
         let composer = self.try_composer(Some(disable_plugins), Some(disable_scripts));
         // TODO(phase-b): re-borrow self for get_io after try_composer move
@@ -242,10 +393,12 @@ pub trait BaseCommand {
             composer
         };
         if let Some(composer) = composer.as_ref() {
+            // TODO(phase-b): requires inner Symfony Command get_name access
+            let command_name: String = todo!();
             let pre_command_run_event = PreCommandRunEvent::new(
                 PluginEvents::PRE_COMMAND_RUN.to_string(),
-                Box::new(input),
-                self.inner().get_name().to_string(),
+                input,
+                command_name,
             );
             composer.get_event_dispatcher().dispatch(
                 pre_command_run_event.get_name(),
@@ -253,12 +406,7 @@ pub trait BaseCommand {
             );
         }
 
-        if true
-            == input.has_parameter_option(PhpMixed::List(vec![Box::new(PhpMixed::String(
-                "--no-ansi".to_string(),
-            ))]))
-            && input.has_option("no-progress")
-        {
+        if input.has_parameter_option(&["--no-ansi"], false) && input.has_option("no-progress") {
             input.set_option("no-progress", PhpMixed::Bool(true));
         }
 
@@ -340,10 +488,10 @@ pub trait BaseCommand {
             }
         }
 
-        self.inner().initialize(input, output)
+        // TODO(phase-b): requires inner Symfony Command initialize
+        Ok(())
     }
 
-    /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
         &self,
         input: &dyn InputInterface,
@@ -352,28 +500,16 @@ pub trait BaseCommand {
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> Result<Composer> {
-        let mut disable_plugins = disable_plugins == true
-            || input.has_parameter_option(PhpMixed::String("--no-plugins".to_string()));
-        let mut disable_scripts = disable_scripts == Some(true)
-            || input.has_parameter_option(PhpMixed::String("--no-scripts".to_string()));
+        let mut disable_plugins =
+            disable_plugins == Some(true) || input.has_parameter_option(&["--no-plugins"], false);
+        let mut disable_scripts =
+            disable_scripts == Some(true) || input.has_parameter_option(&["--no-scripts"], false);
 
-        let application = self.inner().get_application();
-        // TODO(phase-b): `$application instanceof Application` downcast
-        let application_as_composer: Option<&Application> = None;
-        if let Some(app) = application_as_composer {
-            if app.get_disable_plugins_by_default() {
-                disable_plugins = true;
-            }
-            if app.get_disable_scripts_by_default() {
-                disable_scripts = true;
-            }
-        }
-        let _ = application;
+        // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
 
         Factory::create(io, config, disable_plugins, disable_scripts)
     }
 
-    /// Returns preferSource and preferDist values based on the configuration.
     fn get_preferred_install_options(
         &self,
         config: &Config,
@@ -489,9 +625,6 @@ pub trait BaseCommand {
         Ok(PlatformRequirementFilterFactory::ignore_nothing())
     }
 
-    /// @param array<string> $requirements
-    ///
-    /// @return array<string, string>
     fn format_requirements(&self, requirements: Vec<String>) -> Result<IndexMap<String, String>> {
         let mut requires: IndexMap<String, String> = IndexMap::new();
         let requirements = self.normalize_requirements(requirements)?;
@@ -516,9 +649,6 @@ pub trait BaseCommand {
         Ok(requires)
     }
 
-    /// @param array<string> $requirements
-    ///
-    /// @return list<array{name: string, version?: string}>
     fn normalize_requirements(
         &self,
         requirements: Vec<String>,
@@ -529,7 +659,6 @@ pub trait BaseCommand {
         parser.parse_name_version_pairs(requirements)
     }
 
-    /// @param array<TableSeparator|mixed[]> $table
     fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface) {
         let mut renderer = Table::new(output);
         renderer.set_style("compact");
@@ -550,9 +679,6 @@ pub trait BaseCommand {
         width
     }
 
-    /// @internal
-    /// @param 'format'|'audit-format' $optName
-    /// @return Auditor::FORMAT_*
     fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String> {
         if !input.has_option(opt_name) {
             return Err(LogicException {
@@ -585,7 +711,6 @@ pub trait BaseCommand {
         Ok(val.as_string().unwrap_or("").to_string())
     }
 
-    /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
         config: &Config,
@@ -635,3 +760,7 @@ pub trait BaseCommand {
         Ok(audit_config)
     }
 }
+
+// TODO(phase-b): bridge BaseCommand to Symfony Command for trait-object container usage.
+// Cannot blanket-impl a foreign trait for a local generic (orphan rule); each concrete
+// command must impl symfony Command itself, or a wrapper type must be introduced.

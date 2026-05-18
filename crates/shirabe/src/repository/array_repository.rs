@@ -176,8 +176,10 @@ impl RepositoryInterface for ArrayRepository {
         let mut result: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
         for package in &packages {
-            if package_name_map.contains_key(package.get_name()) {
-                let constraint_opt = package_name_map.get(package.get_name()).unwrap();
+            if package_name_map.contains_key(PackageInterface::get_name(package.as_ref())) {
+                let constraint_opt = package_name_map
+                    .get(PackageInterface::get_name(package.as_ref()))
+                    .unwrap();
                 let constraint_matches = match constraint_opt {
                     None => true,
                     Some(c) => c.matches(&Constraint::new("==", package.get_version())),
@@ -186,11 +188,11 @@ impl RepositoryInterface for ArrayRepository {
                     && StabilityFilter::is_package_acceptable(
                         &acceptable_stabilities,
                         &stability_flags,
-                        &package.get_names(true),
+                        &PackageInterface::get_names(package.as_ref(), true),
                         package.get_stability(),
                     )
                     && !already_loaded
-                        .get(package.get_name())
+                        .get(PackageInterface::get_name(package.as_ref()))
                         .map(|v| v.contains_key(package.get_version()))
                         .unwrap_or(false)
                 {
@@ -207,7 +209,10 @@ impl RepositoryInterface for ArrayRepository {
                     }
                 }
 
-                names_found.insert(package.get_name().to_string(), true);
+                names_found.insert(
+                    PackageInterface::get_name(package.as_ref()).to_string(),
+                    true,
+                );
             }
         }
 
@@ -244,7 +249,7 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         for package in self.get_packages() {
-            if name == package.get_name() {
+            if name == PackageInterface::get_name(package.as_ref()) {
                 let pkg_constraint = Constraint::new("==", package.get_version());
                 if constraint.matches(&pkg_constraint) {
                     return Some(package);
@@ -275,7 +280,7 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         for package in self.get_packages() {
-            if name == package.get_name() {
+            if name == PackageInterface::get_name(package.as_ref()) {
                 if constraint.is_none()
                     || constraint
                         .as_ref()
@@ -303,7 +308,7 @@ impl RepositoryInterface for ArrayRepository {
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
         for package in self.get_packages() {
-            let mut name = package.get_name().to_string();
+            let mut name = PackageInterface::get_name(package.as_ref()).to_string();
             if mode == Self::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
                 let parts: Vec<&str> = name.splitn(2, '/').collect();
@@ -395,7 +400,7 @@ impl RepositoryInterface for ArrayRepository {
         let mut result: IndexMap<String, ProviderInfo> = IndexMap::new();
 
         'candidates: for candidate in self.get_packages() {
-            if result.contains_key(candidate.get_name()) {
+            if result.contains_key(PackageInterface::get_name(candidate.as_ref())) {
                 continue;
             }
             for link in candidate.get_provides().values() {
@@ -404,9 +409,9 @@ impl RepositoryInterface for ArrayRepository {
                         (candidate.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
                     let description = complete.and_then(|c| c.get_description().map(String::from));
                     result.insert(
-                        candidate.get_name().to_string(),
+                        PackageInterface::get_name(candidate.as_ref()).to_string(),
                         ProviderInfo {
-                            name: candidate.get_name().to_string(),
+                            name: PackageInterface::get_name(candidate.as_ref()).to_string(),
                             description,
                             r#type: candidate.get_type().to_string(),
                         },

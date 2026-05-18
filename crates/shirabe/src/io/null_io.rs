@@ -10,6 +10,14 @@ pub struct NullIO {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 }
 
+impl NullIO {
+    pub fn new() -> Self {
+        Self {
+            authentications: indexmap::IndexMap::new(),
+        }
+    }
+}
+
 impl IOInterface for NullIO {
     fn is_interactive(&self) -> bool {
         false
@@ -31,22 +39,19 @@ impl IOInterface for NullIO {
         false
     }
 
-    fn write(&mut self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
+    fn write3(&mut self, _message: &str, _newline: bool, _verbosity: i64) {}
 
-    fn write_error(&mut self, _messages: PhpMixed, _newline: bool, _verbosity: i64) {}
+    fn write_error3(&mut self, _message: &str, _newline: bool, _verbosity: i64) {}
 
-    fn overwrite(
+    fn write_raw3(&mut self, _message: &str, _newline: bool, _verbosity: i64) {}
+
+    fn write_error_raw3(&mut self, _message: &str, _newline: bool, _verbosity: i64) {}
+
+    fn overwrite4(&mut self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
+
+    fn overwrite_error4(
         &mut self,
-        _messages: PhpMixed,
-        _newline: bool,
-        _size: Option<i64>,
-        _verbosity: i64,
-    ) {
-    }
-
-    fn overwrite_error(
-        &mut self,
-        _messages: PhpMixed,
+        _message: &str,
         _newline: bool,
         _size: Option<i64>,
         _verbosity: i64,
@@ -85,14 +90,6 @@ impl IOInterface for NullIO {
         _multiselect: bool,
     ) -> PhpMixed {
         default
-    }
-
-    fn write_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        <Self as BaseIO>::write_raw(self, messages, newline, verbosity)
-    }
-
-    fn write_error_raw(&mut self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        <Self as BaseIO>::write_error_raw(self, messages, newline, verbosity)
     }
 
     fn get_authentications(

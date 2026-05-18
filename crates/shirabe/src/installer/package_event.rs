@@ -39,6 +39,10 @@ impl PackageEvent {
         }
     }
 
+    pub fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
     pub fn get_composer(&self) -> &Composer {
         &self.composer
     }

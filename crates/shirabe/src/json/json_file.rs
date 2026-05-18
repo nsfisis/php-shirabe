@@ -401,7 +401,11 @@ impl JsonFile {
     /// @param  int    $options json_encode options (defaults to JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
     /// @param  string $indent  Indentation string
     /// @return string Encoded json
-    pub fn encode(data: &PhpMixed, options: i64, indent: &str) -> String {
+    pub fn encode(data: &PhpMixed, options: i64) -> String {
+        Self::encode_with_indent(data, options, Self::INDENT_DEFAULT)
+    }
+
+    pub fn encode_with_indent(data: &PhpMixed, options: i64, indent: &str) -> String {
         let json = json_encode_ex(data, options);
 
         let json = match json {

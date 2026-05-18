@@ -1288,7 +1288,10 @@ impl ValidatingArrayLoader {
             return Err(anyhow::anyhow!(InvalidPackageException::new(
                 self.errors.clone(),
                 self.warnings.clone(),
-                config.values().map(|v| (**v).clone()).collect(),
+                config
+                    .iter()
+                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .collect(),
             )));
         }
 

@@ -4,6 +4,7 @@ use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::InvalidArgumentException;
 
+#[derive(Debug)]
 pub struct ForgejoUrl {
     pub owner: String,
     pub repository: String,
@@ -37,7 +38,22 @@ impl ForgejoUrl {
 
     pub fn try_from(repo_url: Option<&str>) -> Option<Self> {
         let repo_url = repo_url?;
-        let m = Preg::match_(Self::URL_REGEX, repo_url)?;
+        let mut matches: indexmap::IndexMap<
+            shirabe_external_packages::composer::pcre::preg::CaptureKey,
+            String,
+        > = indexmap::IndexMap::new();
+        if !Preg::match3(Self::URL_REGEX, repo_url, Some(&mut matches)).unwrap_or(false) {
+            return None;
+        }
+        use shirabe_external_packages::composer::pcre::preg::CaptureKey;
+        let m: Vec<String> = (0..5)
+            .map(|i| {
+                matches
+                    .get(&CaptureKey::ByIndex(i))
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .collect();
 
         let origin_url = if !m[1].is_empty() {
             m[1].clone()

@@ -39,7 +39,7 @@ pub const SEARCH_FULLTEXT: i64 = 0;
 pub const SEARCH_NAME: i64 = 1;
 pub const SEARCH_VENDOR: i64 = 2;
 
-pub trait RepositoryInterface: Countable {
+pub trait RepositoryInterface: Countable + std::fmt::Debug {
     fn has_package(&self, package: &dyn PackageInterface) -> bool;
 
     fn find_package(
@@ -75,4 +75,8 @@ pub trait RepositoryInterface: Countable {
     }
 
     fn as_any(&self) -> &dyn std::any::Any;
+
+    fn clone_box(&self) -> Box<dyn RepositoryInterface> {
+        todo!()
+    }
 }

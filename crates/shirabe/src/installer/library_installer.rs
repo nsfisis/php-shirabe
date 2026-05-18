@@ -27,7 +27,7 @@ use crate::util::silencer::Silencer;
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposer,
     pub(crate) vendor_dir: String,
-    pub(crate) download_manager: Option<DownloadManager>,
+    pub(crate) download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) r#type: Option<String>,
     pub(crate) filesystem: Filesystem,
@@ -53,7 +53,7 @@ impl LibraryInstaller {
             None
         };
 
-        let filesystem = filesystem.unwrap_or_else(Filesystem::new);
+        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
         let vendor_dir = rtrim(
             // TODO(phase-b): composer.get_config().get("vendor-dir") returns a PhpMixed/String
             &composer.get_config().get("vendor-dir"),
@@ -123,7 +123,9 @@ impl LibraryInstaller {
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let download_path = self.get_install_path(package).unwrap();
 
-        self.get_download_manager().install(package, &download_path)
+        self.get_download_manager()
+            .borrow()
+            .install(package, &download_path)
     }
 
     /// @return PromiseInterface|null
@@ -165,6 +167,7 @@ impl LibraryInstaller {
         }
 
         self.get_download_manager()
+            .borrow()
             .update(initial, target, &target_download_path)
     }
 
@@ -176,7 +179,9 @@ impl LibraryInstaller {
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let download_path = self.get_package_base_path(package);
 
-        self.get_download_manager().remove(package, &download_path)
+        self.get_download_manager()
+            .borrow()
+            .remove(package, &download_path)
     }
 
     pub(crate) fn initialize_vendor_dir(&mut self) {
@@ -185,7 +190,7 @@ impl LibraryInstaller {
         self.vendor_dir = realpath(&self.vendor_dir).unwrap();
     }
 
-    pub(crate) fn get_download_manager(&self) -> &DownloadManager {
+    pub(crate) fn get_download_manager(&self) -> &std::rc::Rc<std::cell::RefCell<DownloadManager>> {
         // PHP: assert($this->downloadManager instanceof DownloadManager, new \LogicException(...))
         assert!(
             self.download_manager.is_some(),
@@ -252,6 +257,7 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package).unwrap();
 
         self.get_download_manager()
+            .borrow()
             .download(package, &download_path, prev_package)
     }
 
@@ -266,6 +272,7 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package).unwrap();
 
         self.get_download_manager()
+            .borrow()
             .prepare(r#type, package, &download_path, prev_package)
     }
 
@@ -280,11 +287,12 @@ impl InstallerInterface for LibraryInstaller {
         let download_path = self.get_install_path(package).unwrap();
 
         self.get_download_manager()
+            .borrow()
             .cleanup(r#type, package, &download_path, prev_package)
     }
 
     fn install(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
@@ -310,14 +318,14 @@ impl InstallerInterface for LibraryInstaller {
         Ok(Some(promise.then(Box::new(move || -> Result<()> {
             binary_installer.install_binaries(package, &install_path, true);
             if !repo.has_package(package) {
-                repo.add_package(package.clone_box())?;
+                repo.add_package(package.clone_package_box())?;
             }
             Ok(())
         }))))
     }
 
     fn update(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
@@ -348,14 +356,14 @@ impl InstallerInterface for LibraryInstaller {
             binary_installer.install_binaries(target, &install_path, true);
             repo.remove_package(initial)?;
             if !repo.has_package(target) {
-                repo.add_package(target.clone_box())?;
+                repo.add_package(target.clone_package_box())?;
             }
             Ok(())
         }))))
     }
 
     fn uninstall(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {

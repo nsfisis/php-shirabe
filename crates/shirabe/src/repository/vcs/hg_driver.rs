@@ -45,7 +45,7 @@ impl HgDriver {
                 Preg::replace(r"{[^a-z0-9]}i", "-", Url::sanitize(self.inner.url.clone()));
             self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
 
-            let fs = Filesystem::new();
+            let fs = Filesystem::new(None);
             fs.ensure_directory_exists(&cache_vcs_dir)?;
 
             if !is_writable(&dirname(&self.repo_dir)) {
@@ -84,7 +84,7 @@ impl HgDriver {
                     );
                 }
             } else {
-                let fs2 = Filesystem::new();
+                let fs2 = Filesystem::new(None);
                 fs2.remove_directory(&self.repo_dir)?;
 
                 let repo_dir = self.repo_dir.clone();

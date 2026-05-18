@@ -1,13 +1,11 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -15,32 +13,28 @@ use crate::io::io_interface::IOInterface;
 
 #[derive(Debug)]
 pub struct ExecCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl ExecCommand {
     pub fn configure(&mut self) {
-        self.inner
+        self
             .set_name("exec")
             .set_description("Executes a vendored binary/script")
             .set_definition(vec![
-                InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None, vec![]),
+                InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None),
+                // TODO(cli-completion): suggest installed binary names (via get_binaries) for `binary` argument
                 InputArgument::new(
                     "binary",
                     Some(InputArgument::OPTIONAL),
                     "The binary to run, e.g. phpunit",
                     None,
-                    // suggestion callback deferred; binaries listed at runtime via get_binaries
-                    vec![],
                 ),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -65,7 +59,7 @@ impl ExecCommand {
             return Ok(());
         }
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let binary = io.select(
             "Binary to run: ".to_string(),
             binaries.clone(),
@@ -76,7 +70,10 @@ impl ExecCommand {
         );
 
         if let Some(idx) = binary.as_int() {
-            input.set_argument("binary", &binaries[idx as usize]);
+            input.set_argument(
+                "binary",
+                shirabe_php_shim::PhpMixed::String(binaries[idx as usize].clone()),
+            );
         }
 
         Ok(())
@@ -87,7 +84,7 @@ impl ExecCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         if input.get_option("list").as_bool().unwrap_or(false)
             || input.get_argument("binary").as_string_opt().is_none()
@@ -110,13 +107,10 @@ impl ExecCommand {
                 .into());
             }
 
-            self.inner
-                .get_io()
+            self.get_io()
                 .write("<comment>Available binaries:</comment>");
             for bin in &bins {
-                self.inner
-                    .get_io()
-                    .write(&format!("<info>- {}</info>", bin));
+                self.get_io().write(&format!("<info>- {}</info>", bin));
             }
 
             return Ok(0);
@@ -129,10 +123,10 @@ impl ExecCommand {
             .to_string();
 
         let dispatcher = composer.get_event_dispatcher();
-        dispatcher.add_listener("__exec_command", &binary);
+        // TODO(phase-b): add_listener takes a Callable; wiring binary as callable not yet ported
+        let _ = (dispatcher, &binary);
 
-        let initial_working_directory =
-            self.inner.get_application().get_initial_working_directory();
+        let initial_working_directory = self.get_application().get_initial_working_directory();
         if let Some(ref iwd) = initial_working_directory {
             if getcwd().as_deref() != Some(iwd.as_str()) {
                 chdir(iwd).map_err(|e| RuntimeException {
@@ -159,7 +153,7 @@ impl ExecCommand {
     }
 
     fn get_binaries(&self, for_display: bool) -> Result<Vec<String>> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
         let bin_dir = composer
             .get_config()
             .get("bin-dir")
@@ -193,30 +187,12 @@ impl ExecCommand {
     }
 }
 
-impl BaseCommand for ExecCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for ExecCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for ExecCommand {}

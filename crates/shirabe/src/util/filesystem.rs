@@ -834,7 +834,7 @@ impl Filesystem {
             return false;
         }
 
-        let cwd = Platform::get_cwd();
+        let cwd = Platform::get_cwd(false).unwrap_or_default();
 
         let relative_path = self.find_shortest_path(link, target, false, false);
         chdir(&dirname(link));

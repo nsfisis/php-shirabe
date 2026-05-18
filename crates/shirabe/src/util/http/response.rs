@@ -88,4 +88,13 @@ impl Response {
         }
         value
     }
+
+    // TODO(phase-b): historical helpers used in composer_repository — provide stubs.
+    pub fn from_php_mixed(_data: PhpMixed) -> Self {
+        todo!()
+    }
+
+    pub fn new_fake(_body: Option<String>) -> Self {
+        todo!()
+    }
 }

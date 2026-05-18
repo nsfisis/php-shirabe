@@ -33,6 +33,10 @@ impl PostFileDownloadEvent {
         }
     }
 
+    pub fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
     pub fn get_file_name(&self) -> Option<&str> {
         self.file_name.as_deref()
     }

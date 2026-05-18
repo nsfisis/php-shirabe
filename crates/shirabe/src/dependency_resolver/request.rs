@@ -7,6 +7,7 @@ use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
 
 use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 use crate::repository::lock_array_repository::LockArrayRepository;
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions

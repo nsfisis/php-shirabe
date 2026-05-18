@@ -19,6 +19,14 @@ pub struct SolverProblemsException {
 impl SolverProblemsException {
     pub const ERROR_DEPENDENCY_RESOLUTION_FAILED: i64 = 2;
 
+    pub fn get_code(&self) -> i64 {
+        self.inner.code
+    }
+
+    pub fn get_message(&self) -> &str {
+        &self.inner.message
+    }
+
     pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Box<dyn Rule>>>) -> Self {
         let message = format!(
             "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",

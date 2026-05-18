@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/GitHub.php
 
 use crate::io::io_interface;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
@@ -32,7 +33,7 @@ impl GitHub {
         let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
         let http_downloader = match http_downloader {
             Some(h) => h,
-            None => Factory::create_http_downloader(&*io, &config)?,
+            None => Factory::create_http_downloader(&*io, &config, IndexMap::new())?,
         };
         Ok(Self {
             io,

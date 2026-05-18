@@ -1,14 +1,11 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{FILTER_VALIDATE_URL, filter_var};
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -22,26 +19,14 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct HomeCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for HomeCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl HomeCommand {
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("browse")
-            .set_aliases(vec!["home".to_string()])
+        // TODO(cli-completion): suggest_installed_package() for `packages` argument
+        self.set_name("browse")
+            .set_aliases(&["home".to_string()])
             .set_description("Opens the package's repository URL or homepage in your browser")
             .set_definition(vec![
                 InputArgument::new(
@@ -49,7 +34,6 @@ impl HomeCommand {
                     Some(InputArgument::IS_ARRAY),
                     "Package(s) to browse to.",
                     None,
-                    self.suggest_installed_package(),
                 ),
                 InputOption::new(
                     "homepage",
@@ -57,7 +41,6 @@ impl HomeCommand {
                     Some(InputOption::VALUE_NONE),
                     "Open the homepage instead of the repository URL.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "show",
@@ -65,7 +48,6 @@ impl HomeCommand {
                     Some(InputOption::VALUE_NONE),
                     "Only show the homepage or repository URL.",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -83,7 +65,7 @@ impl HomeCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let repos = self.initialize_repos()?;
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let mut return_code: i64 = 0;
 
         let packages: Vec<String> = input
@@ -99,8 +81,7 @@ impl HomeCommand {
         let packages = if packages.is_empty() {
             io.write_error("No package specified, opening homepage for the root package");
             vec![
-                self.inner
-                    .require_composer()?
+                self.require_composer(None, None)?
                     .get_package()
                     .get_name()
                     .to_string(),
@@ -177,7 +158,7 @@ impl HomeCommand {
         }
 
         if show_only {
-            self.inner.get_io().write(&format!("<info>{}</info>", url));
+            self.get_io().write(&format!("<info>{}</info>", url));
         } else {
             self.open_browser(&url);
         }
@@ -186,7 +167,7 @@ impl HomeCommand {
     }
 
     fn open_browser(&self, url: &str) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let mut process = ProcessExecutor::new(io);
         if Platform::is_windows() {
             process.execute(&["start", "\"web\"", "explorer", url], None);
@@ -209,7 +190,7 @@ impl HomeCommand {
     }
 
     fn initialize_repos(&self) -> Result<Vec<Box<dyn RepositoryInterface>>> {
-        let composer = self.inner.try_composer();
+        let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
             let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
@@ -226,35 +207,17 @@ impl HomeCommand {
         }
 
         Ok(RepositoryFactory::default_repos_with_default_manager(
-            self.inner.get_io(),
+            self.get_io(),
         ))
     }
 }
 
-impl BaseCommand for HomeCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for HomeCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for HomeCommand {}

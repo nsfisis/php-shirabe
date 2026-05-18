@@ -19,7 +19,7 @@ impl StrictConfirmationQuestion {
         true_answer_regex: String,
         false_answer_regex: String,
     ) -> Self {
-        let inner = Question::new(question, PhpMixed::Bool(default));
+        let inner = Question::new(&question, Some(PhpMixed::Bool(default)));
         let mut this = Self {
             inner,
             true_answer_regex,
@@ -28,7 +28,7 @@ impl StrictConfirmationQuestion {
         let normalizer = this.get_default_normalizer();
         let validator = this.get_default_validator();
         this.inner.set_normalizer(normalizer);
-        this.inner.set_validator(validator);
+        this.inner.set_validator(Some(validator));
         this
     }
 
@@ -41,14 +41,14 @@ impl StrictConfirmationQuestion {
             if is_bool(answer) {
                 return answer.clone();
             }
-            if empty(answer) && !empty(&default) {
-                return default.clone();
+            if empty(answer) && default.as_ref().is_some_and(|d| !empty(d)) {
+                return default.clone().unwrap_or(PhpMixed::Null);
             }
             if let PhpMixed::String(s) = answer {
-                if Preg::is_match(&true_regex, s) {
+                if Preg::is_match(&true_regex, s).unwrap_or(false) {
                     return PhpMixed::Bool(true);
                 }
-                if Preg::is_match(&false_regex, s) {
+                if Preg::is_match(&false_regex, s).unwrap_or(false) {
                     return PhpMixed::Bool(false);
                 }
             }
@@ -56,16 +56,17 @@ impl StrictConfirmationQuestion {
         })
     }
 
-    fn get_default_validator(&self) -> Box<dyn Fn(&PhpMixed) -> Result<PhpMixed>> {
-        Box::new(|answer: &PhpMixed| {
-            if !is_bool(answer) {
+    fn get_default_validator(&self) -> Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed>> {
+        Box::new(|answer: Option<PhpMixed>| {
+            let answer = answer.unwrap_or(PhpMixed::Null);
+            if !is_bool(&answer) {
                 return Err(InvalidArgumentException {
                     message: "Please answer yes, y, no, or n.".to_string(),
                     code: 0,
                 }
                 .into());
             }
-            Ok(answer.clone())
+            Ok(answer)
         })
     }
 }

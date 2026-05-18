@@ -3,6 +3,7 @@
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::installed_repository::InstalledRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;

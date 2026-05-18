@@ -4,8 +4,6 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::helper::table::Table;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
@@ -13,7 +11,7 @@ use shirabe_external_packages::symfony::console::output::output_interface::Outpu
 use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
@@ -28,15 +26,12 @@ use crate::util::package_sorter::PackageSorter;
 
 #[derive(Debug)]
 pub struct LicensesCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl LicensesCommand {
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("licenses")
+        self.set_name("licenses")
             .set_description("Shows information about licenses of dependencies")
             .set_definition(vec![
                 InputOption::new(
@@ -45,11 +40,6 @@ impl LicensesCommand {
                     Some(InputOption::VALUE_REQUIRED),
                     "Format of the output: text, json or summary",
                     Some(PhpMixed::String("text".to_string())),
-                    vec![
-                        "text".to_string(),
-                        "json".to_string(),
-                        "summary".to_string(),
-                    ],
                 ),
                 InputOption::new(
                     "no-dev",
@@ -57,7 +47,6 @@ impl LicensesCommand {
                     Some(InputOption::VALUE_NONE),
                     "Disables search in require-dev packages.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "locked",
@@ -65,7 +54,6 @@ impl LicensesCommand {
                     Some(InputOption::VALUE_NONE),
                     "Shows licenses from the lock file instead of installed packages.",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -78,14 +66,14 @@ impl LicensesCommand {
     }
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch COMMAND event for plugin hooks
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "licenses".to_string(), input, output);
         composer
             .get_event_dispatcher()
-            .dispatch(command_event.get_name(), &command_event);
+            .dispatch(Some(command_event.get_name()), None);
 
         let root = composer.get_package();
 
@@ -110,7 +98,7 @@ impl LicensesCommand {
         };
 
         let packages = PackageSorter::sort_packages_alphabetically(packages);
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         let format = input
             .get_option("format")
@@ -238,7 +226,7 @@ impl LicensesCommand {
                             .collect(),
                     ),
                 );
-                io.write(&JsonFile::encode(&output_map));
+                io.write(&JsonFile::encode(&output_map, 448));
             }
             "summary" => {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();
@@ -288,30 +276,12 @@ impl LicensesCommand {
     }
 }
 
-impl BaseCommand for LicensesCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for LicensesCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for LicensesCommand {}

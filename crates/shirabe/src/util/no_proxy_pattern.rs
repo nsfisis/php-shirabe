@@ -40,7 +40,7 @@ impl NoProxyPattern {
     /// @param string $pattern NO_PROXY pattern
     pub fn new(pattern: &str) -> Self {
         // PHP: Preg::split('{[\s,]+}', $pattern, -1, PREG_SPLIT_NO_EMPTY)
-        let host_names = Preg::split(r"{[\s,]+}", pattern);
+        let host_names = Preg::split(r"{[\s,]+}", pattern).unwrap_or_default();
         let noproxy = host_names.is_empty() || host_names[0] == "*";
         Self {
             host_names,

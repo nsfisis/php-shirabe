@@ -37,6 +37,7 @@ use crate::repository::advisory_provider_interface::{
 use crate::repository::array_repository::ArrayRepository;
 use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
 use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::repository_security_exception::RepositorySecurityException;
 use crate::util::http::response::Response;
 use crate::util::http_downloader::HttpDownloader;
@@ -84,7 +85,7 @@ pub struct ComposerRepository {
     base_url: String,
     io: Box<dyn IOInterface>,
     http_downloader: HttpDownloader,
-    r#loop: Loop,
+    r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     pub(crate) cache: Cache,
     pub(crate) notify_url: Option<String>,
     pub(crate) search_url: Option<String>,
@@ -270,7 +271,10 @@ impl ComposerRepository {
         let version_parser = VersionParser::new();
         let loader = ArrayLoader::new_with_parser(version_parser.clone());
 
-        let r#loop = Loop::new(http_downloader.clone(), None);
+        let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+            http_downloader.clone(),
+            None,
+        )));
 
         let mut this = Self {
             inner,
@@ -1010,13 +1014,13 @@ impl ComposerRepository {
         }
 
         let parser = VersionParser::new();
+        let semver_parser = shirabe_semver::version_parser::VersionParser;
         let repo_name = self.get_repo_name();
         let create = |data: &IndexMap<String, PhpMixed>,
                       name: &str,
                       package_constraint_map: &IndexMap<String, Box<dyn ConstraintInterface>>|
          -> anyhow::Result<Option<PartialOrSecurityAdvisory>> {
-            let advisory =
-                PartialSecurityAdvisory::create(name.to_string(), data.clone(), &parser)?;
+            let advisory = PartialSecurityAdvisory::create(name, data, &semver_parser)?;
             let is_full = matches!(advisory, PartialOrSecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
                 let data_mixed = PhpMixed::Array(
@@ -1036,13 +1040,13 @@ impl ComposerRepository {
                 }
                 .into());
             }
-            let affected_versions = match &advisory {
-                PartialOrSecurityAdvisory::Partial(p) => &p.affected_versions,
-                PartialOrSecurityAdvisory::Full(p) => &p.inner.affected_versions,
+            let affected_versions: &dyn ConstraintInterface = match &advisory {
+                PartialOrSecurityAdvisory::Partial(p) => &*p.affected_versions,
+                PartialOrSecurityAdvisory::Full(p) => p.affected_versions(),
             };
             let constraint = package_constraint_map.get(name).map(|c| &**c);
             if let Some(c) = constraint {
-                if !affected_versions.matches_constraint(c) {
+                if !affected_versions.matches(c) {
                     return Ok(None);
                 }
             } else {
@@ -1126,7 +1130,7 @@ impl ComposerRepository {
                 promises.push(promise);
             }
 
-            self.r#loop.wait(promises, None)?;
+            self.r#loop.borrow_mut().wait(promises, None)?;
         }
 
         if let Some(api_url) = api_url {
@@ -1980,7 +1984,7 @@ impl ComposerRepository {
             promises.push(promise);
         }
 
-        self.r#loop.wait(promises, None)?;
+        self.r#loop.borrow_mut().wait(promises, None)?;
 
         Ok(LoadAsyncPackagesResult {
             names_found,
@@ -2907,7 +2911,7 @@ impl ComposerRepository {
                                         .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                                         .collect(),
                                 );
-                                json = JsonFile::encode(&as_mixed, 0)?;
+                                json = JsonFile::encode(&as_mixed, 0);
                             }
                         }
                         self.cache.write(ck, &json);
@@ -3086,7 +3090,7 @@ impl ComposerRepository {
                         .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                         .collect(),
                 );
-                json = JsonFile::encode(&as_mixed, 0)?;
+                json = JsonFile::encode(&as_mixed, 0);
             }
             if !self.cache.is_read_only() {
                 self.cache.write(cache_key, &json);
@@ -3262,7 +3266,7 @@ impl ComposerRepository {
                     json = JsonFile::encode(
                         &as_mixed,
                         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-                    )?;
+                    );
                 }
                 let is_ro = unsafe { (*cache_ptr).is_read_only() };
                 if !is_ro {

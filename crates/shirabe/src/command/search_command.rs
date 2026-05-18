@@ -1,5 +1,7 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php
 
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
@@ -9,11 +11,8 @@ use crate::plugin::plugin_events::PluginEvents;
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::{self, RepositoryInterface};
-use crate::{command::base_command::BaseCommand, composer::Composer};
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
@@ -21,22 +20,20 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, pr
 
 #[derive(Debug)]
 pub struct SearchCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl SearchCommand {
     pub fn configure(&mut self) {
-        self.inner
+        self
             .set_name("search")
             .set_description("Searches for packages")
             .set_definition(vec![
-                InputOption::new("only-name", Some(PhpMixed::String("N".to_string())), Some(InputOption::VALUE_NONE), "Search only in package names", None, vec![]),
-                InputOption::new("only-vendor", Some(PhpMixed::String("O".to_string())), Some(InputOption::VALUE_NONE), "Search only for vendor / organization names, returns only \"vendor\" as result", None, vec![]),
-                InputOption::new("type", Some(PhpMixed::String("t".to_string())), Some(InputOption::VALUE_REQUIRED), "Search for a specific package type", None, vec![]),
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string())), vec!["json".to_string(), "text".to_string()]),
-                InputArgument::new("tokens", Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED), "tokens to search for", None, vec![]),
+                InputOption::new("only-name", Some(PhpMixed::String("N".to_string())), Some(InputOption::VALUE_NONE), "Search only in package names", None),
+                InputOption::new("only-vendor", Some(PhpMixed::String("O".to_string())), Some(InputOption::VALUE_NONE), "Search only for vendor / organization names, returns only \"vendor\" as result", None),
+                InputOption::new("type", Some(PhpMixed::String("t".to_string())), Some(InputOption::VALUE_REQUIRED), "Search for a specific package type", None),
+                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))),
+                InputArgument::new("tokens", Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED), "tokens to search for", None),
             ])
             .set_help(
                 "The search command searches for packages by its name\n\
@@ -51,7 +48,7 @@ impl SearchCommand {
         output: &dyn OutputInterface,
     ) -> Result<i64> {
         let platform_repo = PlatformRepository::new(vec![], IndexMap::new(), None, None)?;
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         let format = input
             .get_option("format")
@@ -73,11 +70,10 @@ impl SearchCommand {
             return Ok(1);
         }
 
-        let composer = if let Some(c) = self.inner.try_composer() {
+        let composer = if let Some(c) = self.try_composer(None, None) {
             c
         } else {
-            self.inner
-                .create_composer_instance(input, self.inner.get_io(), vec![])?
+            self.create_composer_instance(input, self.get_io(), vec![])?
         };
         let local_repo = composer.get_repository_manager().get_local_repository();
         let installed_repo =
@@ -90,14 +86,14 @@ impl SearchCommand {
         let command_event = CommandEvent::new(
             PluginEvents::COMMAND.to_string(),
             "search".to_string(),
-            Box::new(input),
-            Box::new(output),
+            input,
+            output,
             vec![],
             vec![],
         );
         composer
             .get_event_dispatcher()
-            .dispatch(command_event.get_name(), &command_event);
+            .dispatch(Some(command_event.get_name()), None);
 
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
         if input.get_option("only-name").as_bool().unwrap_or(false) {
@@ -135,7 +131,7 @@ impl SearchCommand {
         let results = repos.search(query, mode, r#type);
 
         if results.len() > 0 && format == "text" {
-            let width = self.inner.get_terminal_width();
+            let width = self.get_terminal_width();
             let mut name_length: i64 = 0;
             for result in &results {
                 name_length = name_length.max(result.name.len() as i64);
@@ -176,37 +172,19 @@ impl SearchCommand {
                 }
             }
         } else if format == "json" {
-            io.write(&JsonFile::encode(&results));
+            io.write(&JsonFile::encode(&results, 448));
         }
 
         Ok(0)
     }
 }
 
-impl BaseCommand for SearchCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for SearchCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for SearchCommand {}

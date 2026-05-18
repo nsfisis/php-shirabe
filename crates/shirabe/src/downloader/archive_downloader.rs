@@ -99,7 +99,7 @@ pub trait ArchiveDownloader {
         self.inner_mut().add_cleanup_path(package, &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
-        if !is_dir(path) || realpath(path) != Platform::get_cwd() {
+        if !is_dir(path) || realpath(path) != Platform::get_cwd(false).unwrap_or_default() {
             self.inner_mut().add_cleanup_path(package, path);
         }
 
@@ -116,7 +116,7 @@ pub trait ArchiveDownloader {
 
             // clean up
             filesystem.remove_directory(&temporary_dir);
-            if is_dir(path) && realpath(path) != Platform::get_cwd() {
+            if is_dir(path) && realpath(path) != Platform::get_cwd(false).unwrap_or_default() {
                 filesystem.remove_directory(path);
             }
             self.inner_mut()

@@ -37,13 +37,13 @@ impl PluginInstaller {
         }
     }
 
-    pub fn disable_plugins(&self) {
+    pub fn disable_plugins(&mut self) {
         // TODO(plugin): disable plugins via plugin manager
-        self.get_plugin_manager().disable_plugins();
+        self.get_plugin_manager_mut().disable_plugins();
     }
 
     fn rollback_install(
-        &self,
+        &mut self,
         e: anyhow::Error,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
@@ -70,6 +70,11 @@ impl PluginInstaller {
         );
         // TODO(plugin): return plugin manager from composer
         self.inner.composer.get_plugin_manager()
+    }
+
+    fn get_plugin_manager_mut(&mut self) -> &mut PluginManager {
+        // TODO(plugin): return mutable plugin manager from composer
+        todo!()
     }
 }
 
@@ -129,7 +134,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     fn install(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
@@ -149,7 +154,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     fn update(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
@@ -171,12 +176,12 @@ impl InstallerInterface for PluginInstaller {
     }
 
     fn uninstall(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         // TODO(plugin): uninstall package from plugin manager
-        self.get_plugin_manager().uninstall_package(package);
+        self.get_plugin_manager_mut().uninstall_package(package);
 
         self.inner.uninstall(repo, package)
     }

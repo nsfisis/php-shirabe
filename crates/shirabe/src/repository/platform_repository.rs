@@ -55,6 +55,13 @@ impl PlatformRepository {
     pub fn new(
         packages: Vec<Box<dyn PackageInterface>>,
         overrides: IndexMap<String, PhpMixed>,
+    ) -> anyhow::Result<Self> {
+        Self::new4(packages, overrides, None, None)
+    }
+
+    pub fn new4(
+        packages: Vec<Box<dyn PackageInterface>>,
+        overrides: IndexMap<String, PhpMixed>,
         runtime: Option<Runtime>,
         hhvm_detector: Option<HhvmDetector>,
     ) -> anyhow::Result<Self> {
@@ -91,7 +98,7 @@ impl PlatformRepository {
             );
         }
         Ok(Self {
-            inner: ArrayRepository::new(packages),
+            inner: ArrayRepository::new(packages)?,
             version_parser: None,
             overrides: overrides_map,
             disabled_packages: IndexMap::new(),
@@ -1666,5 +1673,79 @@ impl PlatformRepository {
                 .collect(),
             _ => Vec::new(),
         }
+    }
+}
+
+impl shirabe_php_shim::Countable for PlatformRepository {
+    fn count(&self) -> i64 {
+        self.inner.count()
+    }
+}
+
+impl crate::repository::repository_interface::RepositoryInterface for PlatformRepository {
+    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+        self.inner.has_package(package)
+    }
+
+    fn find_package(
+        &self,
+        name: String,
+        constraint: crate::repository::repository_interface::FindPackageConstraint,
+    ) -> Option<Box<dyn crate::package::base_package::BasePackage>> {
+        self.inner.find_package(name, constraint)
+    }
+
+    fn find_packages(
+        &self,
+        name: String,
+        constraint: Option<crate::repository::repository_interface::FindPackageConstraint>,
+    ) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
+        self.inner.find_packages(name, constraint)
+    }
+
+    fn get_packages(&self) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
+        self.inner.get_packages()
+    }
+
+    fn load_packages(
+        &self,
+        package_name_map: IndexMap<
+            String,
+            Option<Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>>,
+        >,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+    ) -> crate::repository::repository_interface::LoadPackagesResult {
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> Vec<crate::repository::repository_interface::SearchResult> {
+        self.inner.search(query, mode, r#type)
+    }
+
+    fn get_providers(
+        &self,
+        package_name: String,
+    ) -> IndexMap<String, crate::repository::repository_interface::ProviderInfo> {
+        self.inner.get_providers(package_name)
+    }
+
+    fn get_repo_name(&self) -> String {
+        PlatformRepository::get_repo_name(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

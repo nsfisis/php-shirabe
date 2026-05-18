@@ -14,4 +14,8 @@ impl PlatformRequirementFilterInterface for IgnoreAllPlatformRequirementFilter {
     fn is_upper_bound_ignored(&self, req: &str) -> bool {
         self.is_ignored(req)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

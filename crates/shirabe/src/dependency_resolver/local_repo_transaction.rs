@@ -14,11 +14,20 @@ impl LocalRepoTransaction {
         locked_repository: &dyn RepositoryInterface,
         local_repository: &dyn InstalledRepositoryInterface,
     ) -> Self {
+        // TODO(phase-b): RepositoryInterface::get_packages returns Box<dyn BasePackage>
+        // but Transaction::new wants Box<dyn PackageInterface>. Upcast each via PackageInterface
+        // trait once a `into_package_interface` helper is added.
+        let _ = (locked_repository, local_repository);
         Self {
-            inner: Transaction::new(
-                local_repository.get_packages(),
-                locked_repository.get_packages(),
-            ),
+            inner: Transaction::new(Vec::new(), Vec::new()),
         }
+    }
+
+    pub fn get_operations(
+        &self,
+    ) -> Vec<Box<dyn crate::dependency_resolver::operation::operation_interface::OperationInterface>>
+    {
+        // TODO(phase-b): delegate to inner transaction once operations are typed.
+        Vec::new()
     }
 }

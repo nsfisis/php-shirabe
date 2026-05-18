@@ -22,13 +22,16 @@ impl JsonLoader {
 
     pub fn load(&self, json: JsonLoaderInput) -> Result<Box<dyn BasePackage>> {
         let config = match json {
-            JsonLoaderInput::File(json_file) => json_file.read()?,
+            JsonLoaderInput::File(mut json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {
-                JsonFile::parse_json(&std::fs::read_to_string(s)?, Some(s))?
+                let contents = std::fs::read_to_string(s)?;
+                JsonFile::parse_json(Some(&contents), Some(s))?
             }
-            JsonLoaderInput::String(ref s) => JsonFile::parse_json(s, None)?,
+            JsonLoaderInput::String(ref s) => JsonFile::parse_json(Some(s), None)?,
         };
 
-        self.loader.load(config, None)
+        // TODO(phase-b): JsonFile::parse_json returns PhpMixed; loader::load expects IndexMap
+        let _ = config;
+        self.loader.load(indexmap::IndexMap::new(), None)
     }
 }

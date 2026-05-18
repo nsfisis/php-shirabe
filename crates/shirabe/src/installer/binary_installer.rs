@@ -33,7 +33,7 @@ impl BinaryInstaller {
         filesystem: Option<Filesystem>,
         vendor_dir: Option<String>,
     ) -> Self {
-        let filesystem = filesystem.unwrap_or_else(Filesystem::new);
+        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
         Self {
             bin_dir,
             bin_compat,

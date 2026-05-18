@@ -263,7 +263,7 @@ impl RemoteFilesystem {
                 using_proxy
             )),
             true,
-            <dyn IOInterface>::DEBUG,
+            crate::io::io_interface::DEBUG,
         );
 
         if (!Preg::is_match("{^http://(repo\\.)?packagist\\.org/p/}", &file_url).unwrap_or(false)
@@ -277,7 +277,7 @@ impl RemoteFilesystem {
             self.io.write_error(
                 PhpMixed::String("Downloading (<comment>connecting...</comment>)".to_string()),
                 false,
-                <dyn IOInterface>::NORMAL,
+                crate::io::io_interface::NORMAL,
             );
         }
 
@@ -352,7 +352,7 @@ impl RemoteFilesystem {
                             base64_encode(result.as_deref().unwrap_or(""))
                         )),
                         true,
-                        <dyn IOInterface>::DEBUG,
+                        crate::io::io_interface::DEBUG,
                     );
 
                     return Err(anyhow::anyhow!(e));
@@ -398,7 +398,7 @@ impl RemoteFilesystem {
                     self.io.write_error(
                         PhpMixed::String("".to_string()),
                         true,
-                        <dyn IOInterface>::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
                     self.io.write_error(
                         PhpMixed::List(vec![
@@ -409,7 +409,7 @@ impl RemoteFilesystem {
                             )),
                         ]),
                         true,
-                        <dyn IOInterface>::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
 
                     return self.get(
@@ -498,7 +498,7 @@ impl RemoteFilesystem {
                             PhpMixed::String("Downloading (<error>failed</error>)".to_string()),
                             false,
                             None,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                     }
 
@@ -533,7 +533,7 @@ impl RemoteFilesystem {
                 )),
                 false,
                 None,
-                <dyn IOInterface>::NORMAL,
+                crate::io::io_interface::NORMAL,
             );
         }
 
@@ -565,7 +565,7 @@ impl RemoteFilesystem {
                             )),
                         ]),
                         true,
-                        <dyn IOInterface>::NORMAL,
+                        crate::io::io_interface::NORMAL,
                     );
 
                     return self.get(
@@ -643,7 +643,7 @@ impl RemoteFilesystem {
                 self.io.write_error(
                     PhpMixed::String("".to_string()),
                     true,
-                    <dyn IOInterface>::NORMAL,
+                    crate::io::io_interface::NORMAL,
                 );
                 self.io.write_error(
                     PhpMixed::List(vec![
@@ -654,7 +654,7 @@ impl RemoteFilesystem {
                         )),
                     ]),
                     true,
-                    <dyn IOInterface>::NORMAL,
+                    crate::io::io_interface::NORMAL,
                 );
 
                 return self.get(
@@ -778,7 +778,7 @@ impl RemoteFilesystem {
                             )),
                             false,
                             None,
-                            <dyn IOInterface>::NORMAL,
+                            crate::io::io_interface::NORMAL,
                         );
                     }
                 }
@@ -947,7 +947,7 @@ impl RemoteFilesystem {
             self.io.write_error(
                 PhpMixed::String("".to_string()),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
             self.io.write_error(
                 PhpMixed::String(sprintf(
@@ -958,7 +958,7 @@ impl RemoteFilesystem {
                     ],
                 )),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
 
             additional_options.insert("redirects".to_string(), PhpMixed::Int(self.redirects));

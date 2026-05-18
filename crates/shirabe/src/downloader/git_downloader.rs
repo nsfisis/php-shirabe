@@ -250,9 +250,7 @@ impl GitDownloader {
             }
         }
 
-        self.inner
-            .io
-            .write_error(PhpMixed::String(msg), true, io_interface::NORMAL);
+        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
         self.git_util.run_commands(commands, url, &path, true);
 
@@ -334,9 +332,7 @@ impl GitDownloader {
             }
         }
 
-        self.inner
-            .io
-            .write_error(PhpMixed::String(msg), true, io_interface::NORMAL);
+        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
         let mut output = String::new();
         if self.inner.process.execute(
@@ -1250,7 +1246,7 @@ impl GitDownloader {
 
         self.inner
             .io
-            .write_error(PhpMixed::String(output), true, io_interface::NORMAL);
+            .write_error3(&output, true, io_interface::NORMAL);
     }
 
     pub(crate) fn normalize_path(&self, path: &str) -> String {
@@ -1303,5 +1299,83 @@ impl GitDownloader {
 impl DvcsDownloaderInterface for GitDownloader {
     fn get_unpushed_changes(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
         GitDownloader::get_unpushed_changes(self, package, &path)
+    }
+}
+
+// TODO(phase-b): GitDownloader extends VcsDownloader which implements DownloaderInterface.
+// Delegating each trait method to todo!() until the inner VcsDownloaderBase exposes the
+// matching impl surface.
+impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloader {
+    fn get_installation_source(&self) -> String {
+        todo!()
+    }
+
+    fn download(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+        _output: bool,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
+    }
+
+    fn prepare(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
+    }
+
+    fn install(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
+    }
+
+    fn update(
+        &self,
+        _initial: &dyn PackageInterface,
+        _target: &dyn PackageInterface,
+        _path: &str,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
+    }
+
+    fn remove(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
+    }
+
+    fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<
+        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
+    > {
+        todo!()
     }
 }

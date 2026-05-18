@@ -232,7 +232,7 @@ impl Solver {
         self.io.write_error(
             PhpMixed::String("Generating rules".to_string()),
             true,
-            <dyn IOInterface>::DEBUG,
+            crate::io::io_interface::DEBUG,
         );
         let mut rule_set_generator =
             RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
@@ -244,7 +244,10 @@ impl Solver {
         self.watch_graph = RuleWatchGraph::new();
 
         for rule in self.rules.iter() {
-            self.watch_graph.insert(RuleWatchNode::new(rule.clone()))?;
+            self.watch_graph
+                .insert(std::rc::Rc::new(std::cell::RefCell::new(
+                    RuleWatchNode::new(rule.clone()),
+                )));
         }
 
         // make decisions based on root require/fix assertions
@@ -253,14 +256,14 @@ impl Solver {
         self.io.write_error(
             PhpMixed::String("Resolving dependencies through SAT".to_string()),
             true,
-            <dyn IOInterface>::DEBUG,
+            crate::io::io_interface::DEBUG,
         );
         let before = microtime(true);
         self.run_sat()?;
         self.io.write_error(
             PhpMixed::String("".to_string()),
             true,
-            <dyn IOInterface>::DEBUG,
+            crate::io::io_interface::DEBUG,
         );
         self.io.write_error(
             PhpMixed::String(sprintf(
@@ -268,7 +271,7 @@ impl Solver {
                 &[PhpMixed::Float(microtime(true) - before)],
             )),
             true,
-            <dyn IOInterface>::VERBOSE,
+            crate::io::io_interface::VERBOSE,
         );
 
         if self.problems.len() > 0 {
@@ -368,7 +371,7 @@ impl Solver {
             };
 
             if level == 1 {
-                self.analyze_unsolvable(&rule);
+                self.analyze_unsolvable(rule.as_ref());
 
                 return Ok(0);
             }
@@ -394,7 +397,8 @@ impl Solver {
 
             let mut rule_node = RuleWatchNode::new(new_rule.clone().into());
             rule_node.watch2_on_highest(&self.decisions);
-            self.watch_graph.insert(rule_node)?;
+            self.watch_graph
+                .insert(std::rc::Rc::new(std::cell::RefCell::new(rule_node)));
 
             self.decisions.decide(learn_literal, level, new_rule.into());
         }
@@ -691,7 +695,7 @@ impl Solver {
             if 1 == level {
                 let conflict_rule = self.propagate(level);
                 if let Some(cr) = conflict_rule {
-                    self.analyze_unsolvable(&cr);
+                    self.analyze_unsolvable(cr.as_ref());
 
                     return Ok(());
                 }
@@ -766,7 +770,7 @@ impl Solver {
             self.io.write_error(
                 PhpMixed::String("Looking at all rules.".to_string()),
                 true,
-                <dyn IOInterface>::DEBUG,
+                crate::io::io_interface::DEBUG,
             );
             let mut i = 0_i64;
             let mut n = 0_i64;
@@ -779,7 +783,7 @@ impl Solver {
                                 pass
                             )),
                             false,
-                            <dyn IOInterface>::DEBUG,
+                            crate::io::io_interface::DEBUG,
                         );
                     } else {
                         self.io.overwrite_error(
@@ -789,7 +793,7 @@ impl Solver {
                             )),
                             false,
                             None,
-                            <dyn IOInterface>::DEBUG,
+                            crate::io::io_interface::DEBUG,
                         );
                     }
 

@@ -328,7 +328,7 @@ impl VersionParser {
             let constraint: Box<dyn ConstraintInterface> = if constraint_objects.len() == 1 {
                 constraint_objects.into_iter().next().unwrap()
             } else {
-                Box::new(MultiConstraint::new(constraint_objects, true)?)
+                Box::new(MultiConstraint::new(constraint_objects, true))
             };
 
             or_groups.push(constraint);
@@ -402,7 +402,7 @@ impl VersionParser {
                 return Ok(vec![Box::new(Constraint::new(
                     ">=".to_string(),
                     "0.0.0.0-dev".to_string(),
-                )?)]);
+                ))]);
             }
 
             return Ok(vec![Box::new(MatchAllConstraint {
@@ -461,7 +461,7 @@ impl VersionParser {
 
             let low_version =
                 self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = Constraint::new(">=".to_string(), low_version)?;
+            let lower_bound = Constraint::new(">=".to_string(), low_version);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
@@ -471,7 +471,7 @@ impl VersionParser {
                 self.manipulate_version_string(&matches, high_position, 1, "0")
                     .unwrap_or_default()
             );
-            let upper_bound = Constraint::new("<".to_string(), high_version)?;
+            let upper_bound = Constraint::new("<".to_string(), high_version);
 
             return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
         }
@@ -508,7 +508,7 @@ impl VersionParser {
 
             let low_version =
                 self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = Constraint::new(">=".to_string(), low_version)?;
+            let lower_bound = Constraint::new(">=".to_string(), low_version);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
@@ -517,7 +517,7 @@ impl VersionParser {
                 self.manipulate_version_string(&matches, position, 1, "0")
                     .unwrap_or_default()
             );
-            let upper_bound = Constraint::new("<".to_string(), high_version)?;
+            let upper_bound = Constraint::new("<".to_string(), high_version);
 
             return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
         }
@@ -557,12 +557,12 @@ impl VersionParser {
                 return Ok(vec![Box::new(Constraint::new(
                     "<".to_string(),
                     high_version,
-                )?)]);
+                ))]);
             }
 
             return Ok(vec![
-                Box::new(Constraint::new(">=".to_string(), low_version)?),
-                Box::new(Constraint::new("<".to_string(), high_version)?),
+                Box::new(Constraint::new(">=".to_string(), low_version)),
+                Box::new(Constraint::new("<".to_string(), high_version)),
             ]);
         }
 
@@ -596,7 +596,7 @@ impl VersionParser {
             let lower_bound = Constraint::new(
                 ">=".to_string(),
                 format!("{}{}", low_version, low_stability_suffix),
-            )?;
+            );
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
             let empty = |x: &Option<String>| -> bool { x.as_deref().is_none_or(|s| s.is_empty()) };
@@ -610,7 +610,7 @@ impl VersionParser {
             {
                 let to_str = matches[10].clone().unwrap_or_default(); // matches['to']
                 let hv = self.normalize(&to_str, None)?;
-                Constraint::new("<=".to_string(), hv)?
+                Constraint::new("<=".to_string(), hv)
             } else {
                 // matches[11]=to major, matches[12]=to minor, matches[13]=to patch,
                 // matches[14]=to fourth
@@ -632,7 +632,7 @@ impl VersionParser {
                     self.manipulate_version_string(&high_match, position, 1, "0")
                         .unwrap_or_default()
                 );
-                Constraint::new("<".to_string(), hv)?
+                Constraint::new("<".to_string(), hv)
             };
 
             return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
@@ -644,7 +644,7 @@ impl VersionParser {
             let version_str = match_[2].clone().unwrap_or_default();
             let op_str = match_[1].clone().unwrap_or_default();
 
-            let version_result: anyhow::Result<String> = (match self.normalize(&version_str, None) {
+            let version_result: anyhow::Result<String> = match self.normalize(&version_str, None) {
                 Ok(v) => Ok(v),
                 Err(e) => {
                     // recover from an invalid constraint like foobar-dev which should be
@@ -661,7 +661,7 @@ impl VersionParser {
                         Err(e)
                     }
                 }
-            });
+            };
 
             if let Ok(mut version) = version_result {
                 let op = if op_str.is_empty() { "=" } else { &op_str };
@@ -691,7 +691,7 @@ impl VersionParser {
                 } else {
                     op_str
                 };
-                return Ok(vec![Box::new(Constraint::new(final_op, version)?)]);
+                return Ok(vec![Box::new(Constraint::new(final_op, version))]);
             }
         }
 

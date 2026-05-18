@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -20,15 +18,12 @@ use crate::util::filesystem::Filesystem;
 
 #[derive(Debug)]
 pub struct ValidateCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl ValidateCommand {
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("validate")
+        self.set_name("validate")
             .set_description("Validates a composer.json and composer.lock")
             .set_definition(vec![
                 InputOption::new(
@@ -37,7 +32,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Do not validate requires for overly strict/loose constraints",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "check-lock",
@@ -45,7 +39,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Check if lock file is up to date (even when config.lock is false)",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-check-lock",
@@ -53,7 +46,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Do not check if lock file is up to date",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-check-publish",
@@ -61,7 +53,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Do not check for publish errors",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-check-version",
@@ -69,7 +60,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Do not report a warning if the version field is present",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "with-dependencies",
@@ -77,7 +67,6 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Also validate the composer.json of all installed dependencies",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "strict",
@@ -85,14 +74,12 @@ impl ValidateCommand {
                     Some(InputOption::VALUE_NONE),
                     "Return a non-zero exit code for warnings as well as errors",
                     None,
-                    vec![],
                 ),
                 InputArgument::new(
                     "file",
                     Some(InputArgument::OPTIONAL),
                     "path to composer.json file",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -111,7 +98,7 @@ impl ValidateCommand {
             .as_string_opt()
             .map(|s| s.to_string())
             .unwrap_or_else(|| Factory::get_composer_file());
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         if !std::path::Path::new(&file).exists() {
             io.write_error(&format!("<error>{} not found.</error>", file));
@@ -147,7 +134,7 @@ impl ValidateCommand {
             validator.validate(&file, check_all, check_version)?;
 
         let mut lock_errors: Vec<String> = vec![];
-        let composer = self.inner.create_composer_instance(input, io, vec![])?;
+        let composer = self.create_composer_instance(input, io, vec![])?;
         let check_lock = (check_lock
             && composer.get_config().get("lock").as_bool().unwrap_or(true))
             || input.get_option("check-lock").as_bool().unwrap_or(false);
@@ -230,14 +217,14 @@ impl ValidateCommand {
         let command_event = CommandEvent::new(
             PluginEvents::COMMAND.to_string(),
             "validate".to_string(),
-            Box::new(input),
-            Box::new(output),
+            input,
+            output,
             vec![],
             vec![],
         );
         let event_code = composer
             .get_event_dispatcher()
-            .dispatch(command_event.get_name(), &command_event);
+            .dispatch(Some(command_event.get_name()), None)?;
 
         Ok(exit_code.max(event_code))
     }
@@ -336,30 +323,12 @@ impl ValidateCommand {
     }
 }
 
-impl BaseCommand for ValidateCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for ValidateCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for ValidateCommand {}

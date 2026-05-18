@@ -2,14 +2,12 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, strip_tags};
 use shirabe_semver::constraint::constraint::Constraint;
 
-use crate::command::base_command::BaseCommand;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
@@ -17,6 +15,7 @@ use crate::json::json_file::JsonFile;
 use crate::package::link::Link;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::root_package_repository::RootPackageRepository;
 
 struct CheckResult {
@@ -29,20 +28,18 @@ struct CheckResult {
 
 #[derive(Debug)]
 pub struct CheckPlatformReqsCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl CheckPlatformReqsCommand {
     pub fn configure(&mut self) {
-        self.inner
+        self
             .set_name("check-platform-reqs")
             .set_description("Check that platform requirements are satisfied")
             .set_definition(vec![
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables checking of require-dev packages requirements.", None, vec![]),
-                InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Checks requirements only from the lock file, not from installed packages.", None, vec![]),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(shirabe_php_shim::PhpMixed::String("text".to_string())), vec!["json".to_string(), "text".to_string()]),
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables checking of require-dev packages requirements.", None),
+                InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Checks requirements only from the lock file, not from installed packages.", None),
+                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(shirabe_php_shim::PhpMixed::String("text".to_string()))),
             ])
             .set_help(
                 "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
@@ -56,8 +53,8 @@ impl CheckPlatformReqsCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.inner.require_composer()?;
-        let io = self.inner.get_io();
+        let composer = self.require_composer(None, None)?;
+        let io = self.get_io();
 
         let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
 
@@ -120,7 +117,7 @@ impl CheckPlatformReqsCommand {
 
         let installed_repo_with_platform = InstalledRepository::new(vec![
             Box::new(installed_repo),
-            Box::new(PlatformRepository::new(vec![], vec![])),
+            Box::new(PlatformRepository::new(vec![], indexmap::IndexMap::new())?),
         ]);
 
         let mut results: Vec<CheckResult> = vec![];
@@ -229,7 +226,7 @@ impl CheckPlatformReqsCommand {
     }
 
     fn print_table(&self, output: &dyn OutputInterface, results: &[CheckResult], format: &str) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         if format == "json" {
             let rows: Vec<PhpMixed> = results
@@ -288,9 +285,10 @@ impl CheckPlatformReqsCommand {
                 })
                 .collect();
 
-            io.write(&JsonFile::encode(&PhpMixed::List(
-                rows.into_iter().map(Box::new).collect(),
-            )));
+            io.write(&JsonFile::encode(
+                &PhpMixed::List(rows.into_iter().map(Box::new).collect()),
+                448,
+            ));
         } else {
             let rows: Vec<Vec<PhpMixed>> = results
                 .iter()
@@ -318,35 +316,17 @@ impl CheckPlatformReqsCommand {
                 })
                 .collect();
 
-            self.inner.render_table(rows, output);
+            self.render_table(rows, output);
         }
     }
 }
 
-impl BaseCommand for CheckPlatformReqsCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for CheckPlatformReqsCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for CheckPlatformReqsCommand {}

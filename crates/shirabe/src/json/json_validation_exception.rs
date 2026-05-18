@@ -19,6 +19,10 @@ impl JsonValidationException {
     pub fn get_errors(&self) -> &Vec<String> {
         &self.errors
     }
+
+    pub fn get_message(&self) -> &str {
+        &self.inner.message
+    }
 }
 
 impl std::fmt::Display for JsonValidationException {

@@ -9,6 +9,7 @@ use std::sync::Mutex;
 // None = null (uninitialized), Some(None) = false (not found), Some(Some(v)) = version
 static HHVM_VERSION_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
 
+#[derive(Debug)]
 pub struct HhvmDetector {
     executable_finder: Option<ExecutableFinder>,
     process_executor: Option<ProcessExecutor>,
@@ -47,25 +48,30 @@ impl HhvmDetector {
             let finder = self
                 .executable_finder
                 .get_or_insert_with(ExecutableFinder::new);
-            let hhvm_path = finder.find("hhvm");
+            let hhvm_path = finder.find("hhvm", None, &[]);
             if let Some(hhvm_path) = hhvm_path {
                 let executor = self
                     .process_executor
-                    .get_or_insert_with(ProcessExecutor::new);
-                let mut version_output = String::new();
-                let exit_code = executor.execute(
-                    &[
-                        &hhvm_path,
+                    .get_or_insert_with(|| ProcessExecutor::new(None, None));
+                let mut version_output = shirabe_php_shim::PhpMixed::Null;
+                let cmd = shirabe_php_shim::PhpMixed::List(
+                    [
+                        hhvm_path.as_str(),
                         "--php",
                         "-d",
                         "hhvm.jit=0",
                         "-r",
                         "echo HHVM_VERSION;",
-                    ],
-                    &mut version_output,
+                    ]
+                    .into_iter()
+                    .map(|s| Box::new(shirabe_php_shim::PhpMixed::String(s.to_string())))
+                    .collect(),
                 );
+                let exit_code = executor
+                    .execute(cmd, Some(&mut version_output), None)
+                    .unwrap_or(1);
                 if exit_code == 0 {
-                    *cache = Some(Some(version_output));
+                    *cache = Some(version_output.as_string().map(|s| s.to_string()));
                 }
             }
         }

@@ -177,8 +177,8 @@ impl Application {
         input: &mut dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
-        self.disable_plugins_by_default = input.has_parameter_option("--no-plugins", false);
-        self.disable_scripts_by_default = input.has_parameter_option("--no-scripts", false);
+        self.disable_plugins_by_default = input.has_parameter_option(&["--no-plugins"], false);
+        self.disable_scripts_by_default = input.has_parameter_option(&["--no-scripts"], false);
 
         // PHP: static $stdin = null;
         // We use an Option here to mimic the lazy initialization.
@@ -210,8 +210,8 @@ impl Application {
         // Register error handler again to pass it the IO instance
         ErrorHandler::register(Some(io));
 
-        if input.has_parameter_option("--no-cache", false) {
-            io.write_error("Disabling cache usage", true, io_interface::DEBUG);
+        if input.has_parameter_option(&["--no-cache"], false) {
+            io.write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
                 if Platform::is_windows() {
@@ -230,7 +230,7 @@ impl Application {
             chdir(nwd);
             self.initial_working_directory = getcwd();
             let cwd = Platform::get_cwd_real(true);
-            io.write_error(
+            io.write_error3(
                 &format!(
                     "Changed CWD to {}",
                     if !cwd.is_empty() {
@@ -283,10 +283,10 @@ impl Application {
             && !file_exists(&Factory::get_composer_file())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
-                || (input.has_parameter_option("--file", true) == false
-                    && input.has_parameter_option("-f", true) == false))
-            && input.has_parameter_option("--help", true) == false
-            && input.has_parameter_option("-h", true) == false
+                || (input.has_parameter_option(&["--file"], true) == false
+                    && input.has_parameter_option(&["-f"], true) == false))
+            && input.has_parameter_option(&["--help"], true) == false
+            && input.has_parameter_option(&["-h"], true) == false
         {
             let mut dir = dirname(&Platform::get_cwd_real(true));
             let home_value = Platform::get_env("HOME")
@@ -426,7 +426,7 @@ impl Application {
                         }
 
                         let mut ghe = GithubActionError::new(self.io.clone_box());
-                        ghe.emit(&pe.get_message(), file.as_deref(), line);
+                        ghe.emit(&pe.message, file.as_deref(), line);
 
                         return Err(e);
                     } else {
@@ -458,7 +458,7 @@ impl Application {
         }
 
         if !is_proxy_command {
-            io.write_error(
+            io.write_error3(
                 &sprintf(
                     "Running %s (%s) with %s on %s",
                     &[
@@ -675,7 +675,7 @@ impl Application {
 
         let mut start_time: Option<f64> = None;
         let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
-            if input.has_parameter_option("--profile", false) {
+            if input.has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime(true));
                 self.io.enable_debugging(start_time.unwrap());
             }
@@ -712,7 +712,7 @@ impl Application {
             io.write_error(&format!(
                 "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
                 round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
-                round((memory_get_peak_usage() as f64) / 1024.0 / 1024.0, 2),
+                round((memory_get_peak_usage(true) as f64) / 1024.0 / 1024.0, 2),
                 round(microtime(true) - st, 2)
             ));
         }
@@ -725,8 +725,8 @@ impl Application {
                         && self.is_running_as_root()
                         && !self.io.is_interactive()
                     {
-                        io.write_error("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
-                        io.write_error(
+                        io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
+                        io.write_error3(
                             "<error>See also https://getcomposer.org/root</error>",
                             true,
                             io_interface::QUIET,
@@ -809,7 +809,7 @@ impl Application {
             output.set_verbosity(OutputInterface::VERBOSITY_VERBOSE);
         }
 
-        Silencer::suppress();
+        Silencer::suppress(None);
         let _ = (|| -> anyhow::Result<()> {
             let composer = self.get_composer(false, Some(true), None)?;
             if composer.is_some() && function_exists("disk_free_space") {
@@ -835,7 +835,7 @@ impl Application {
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if hit {
-                    io.write_error(&format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir), true, io_interface::QUIET);
+                    io.write_error3(&format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir), true, io_interface::QUIET);
                 }
             }
             Ok(())
@@ -846,12 +846,12 @@ impl Application {
         if exception.downcast_ref::<TransportException>().is_some()
             && str_contains(&message, "Unable to use a proxy")
         {
-            io.write_error(
+            io.write_error3(
                 "<error>The following exception indicates your proxy is misconfigured</error>",
                 true,
                 io_interface::QUIET,
             );
-            io.write_error("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/faqs/how-to-use-composer-behind-a-proxy.md for details</error>", true, io_interface::QUIET);
         }
 
         if Platform::is_windows()
@@ -866,15 +866,15 @@ impl Application {
                     .collect(),
             )) && count(&avast_detect) != 0
             {
-                io.write_error("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
-                io.write_error(
+                io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
+                io.write_error3(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
                     true,
                     io_interface::QUIET,
                 );
             } else {
-                io.write_error("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, io_interface::QUIET);
-                io.write_error(
+                io.write_error3("<error>The following exception indicates a possible issue with a Firewall/Antivirus</error>", true, io_interface::QUIET);
+                io.write_error3(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
                     true,
                     io_interface::QUIET,
@@ -885,13 +885,13 @@ impl Application {
         if Platform::is_windows()
             && strpos(&message, "The system cannot find the path specified").is_some()
         {
-            io.write_error("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, io_interface::QUIET);
-            io.write_error("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, io_interface::QUIET);
+            io.write_error3("<error>The following exception may be caused by a stale entry in your cmd.exe AutoRun</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#-the-system-cannot-find-the-path-specified-windows- for details</error>", true, io_interface::QUIET);
         }
 
         if strpos(&message, "fork failed - Cannot allocate memory").is_some() {
-            io.write_error("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", true, io_interface::QUIET);
-            io.write_error("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
+            io.write_error3("<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>", true, io_interface::QUIET);
         }
 
         if exception
@@ -903,26 +903,26 @@ impl Application {
                 true,
                 io_interface::QUIET,
             );
-            io.write_error("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>", true, io_interface::QUIET);
         }
 
         if self.get_disable_plugins_by_default()
             && self.is_running_as_root()
             && !self.io.is_interactive()
         {
-            io.write_error("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the following exception. See also https://getcomposer.org/root</error>", true, io_interface::QUIET);
         } else if exception
             .downcast_ref::<CommandNotFoundException>()
             .is_some()
             && self.get_disable_plugins_by_default()
         {
-            io.write_error("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
+            io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
         }
 
         let hints = HttpDownloader::get_exception_hints_from_error(exception);
         if !hints.is_empty() && count(&hints) > 0 {
             for hint in &hints {
-                io.write_error(hint, true, io_interface::QUIET);
+                io.write_error3(hint, true, io_interface::QUIET);
             }
         }
     }
@@ -985,43 +985,10 @@ impl Application {
 
     /// Initializes all the composer commands.
     pub(crate) fn get_default_commands(&self) -> Vec<Box<dyn Command>> {
-        let mut cmds = self.inner.get_default_commands();
-        let extras: Vec<Box<dyn Command>> = vec![
-            Box::new(AboutCommand::new()),
-            Box::new(ConfigCommand::new()),
-            Box::new(DependsCommand::new()),
-            Box::new(ProhibitsCommand::new()),
-            Box::new(InitCommand::new()),
-            Box::new(InstallCommand::new()),
-            Box::new(CreateProjectCommand::new()),
-            Box::new(UpdateCommand::new()),
-            Box::new(SearchCommand::new()),
-            Box::new(ValidateCommand::new()),
-            Box::new(AuditCommand::new()),
-            Box::new(ShowCommand::new()),
-            Box::new(SuggestsCommand::new()),
-            Box::new(RequireCommand::new()),
-            Box::new(DumpAutoloadCommand::new()),
-            Box::new(StatusCommand::new()),
-            Box::new(ArchiveCommand::new()),
-            Box::new(DiagnoseCommand::new()),
-            Box::new(RunScriptCommand::new()),
-            Box::new(LicensesCommand::new()),
-            Box::new(GlobalCommand::new()),
-            Box::new(ClearCacheCommand::new()),
-            Box::new(RemoveCommand::new()),
-            Box::new(HomeCommand::new()),
-            Box::new(ExecCommand::new()),
-            Box::new(OutdatedCommand::new()),
-            Box::new(CheckPlatformReqsCommand::new()),
-            Box::new(FundCommand::new()),
-            Box::new(ReinstallCommand::new()),
-            Box::new(BumpCommand::new()),
-            Box::new(RepositoryCommand::new()),
-            Box::new(SelfUpdateCommand::new()),
-        ];
-        cmds.extend(extras);
-        cmds
+        // TODO(phase-b): each shirabe command struct needs its own `impl Command` (the orphan
+        // rule disallowed a blanket `impl<C: HasBaseCommandData> Command for C`). Until those
+        // are written, expose only the inner symfony defaults.
+        self.inner.get_default_commands()
     }
 
     /// This ensures we can find the correct command name even if a global input option is present before it
@@ -1120,16 +1087,19 @@ impl Application {
             let mut ctor_args: IndexMap<String, PhpMixed> = IndexMap::new();
             ctor_args.insert(
                 "composer".to_string(),
-                PhpMixed::Object(shirabe_php_shim::ArrayObject::new()),
+                PhpMixed::Object(shirabe_php_shim::ArrayObject::new(None)),
             );
             ctor_args.insert(
                 "io".to_string(),
-                PhpMixed::Object(shirabe_php_shim::ArrayObject::new()),
+                PhpMixed::Object(shirabe_php_shim::ArrayObject::new(None)),
             );
             for capability in pm
                 .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
             {
-                let new_commands = capability.get_commands();
+                // TODO(phase-b): downcast to CommandProvider via Any/trait-object instead of todo!()
+                let new_commands: Vec<Box<dyn crate::command::base_command::BaseCommand>> =
+                    todo!("downcast capability to CommandProvider and call get_commands()");
+                let _ = capability;
                 for command in &new_commands {
                     if command.as_any().downcast_ref::<BaseCommand>().is_none() {
                         return Err(UnexpectedValueException {

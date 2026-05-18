@@ -9,6 +9,7 @@ pub enum PhpMixed {
     String(String),
     List(Vec<Box<PhpMixed>>),
     Array(IndexMap<String, Box<PhpMixed>>),
+    Object(ArrayObject),
 }
 
 impl PhpMixed {
@@ -56,6 +57,94 @@ impl PhpMixed {
 
     pub fn is_null(&self) -> bool {
         matches!(self, PhpMixed::Null)
+    }
+
+    pub fn as_string_opt(&self) -> Option<&str> {
+        self.as_string()
+    }
+
+    pub fn get(&self, key: &str) -> Option<&PhpMixed> {
+        self.as_array().and_then(|m| m.get(key).map(|v| v.as_ref()))
+    }
+
+    /// Treats PhpMixed::Null as None, everything else as Some.
+    pub fn as_opt(&self) -> Option<&PhpMixed> {
+        if self.is_null() { None } else { Some(self) }
+    }
+
+    pub fn unwrap_or(self, default: PhpMixed) -> PhpMixed {
+        if self.is_null() { default } else { self }
+    }
+}
+
+impl From<bool> for PhpMixed {
+    fn from(_value: bool) -> Self {
+        todo!()
+    }
+}
+
+impl From<i64> for PhpMixed {
+    fn from(_value: i64) -> Self {
+        todo!()
+    }
+}
+
+impl From<f64> for PhpMixed {
+    fn from(_value: f64) -> Self {
+        todo!()
+    }
+}
+
+impl From<String> for PhpMixed {
+    fn from(_value: String) -> Self {
+        todo!()
+    }
+}
+
+impl From<&str> for PhpMixed {
+    fn from(value: &str) -> Self {
+        PhpMixed::String(value.to_string())
+    }
+}
+
+impl<T> From<IndexMap<String, T>> for PhpMixed
+where
+    T: Into<PhpMixed>,
+{
+    fn from(value: IndexMap<String, T>) -> Self {
+        PhpMixed::Array(
+            value
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v.into())))
+                .collect(),
+        )
+    }
+}
+
+impl<T> From<Vec<T>> for PhpMixed
+where
+    T: Into<PhpMixed>,
+{
+    fn from(value: Vec<T>) -> Self {
+        PhpMixed::List(value.into_iter().map(|v| Box::new(v.into())).collect())
+    }
+}
+
+impl<T> From<Option<T>> for PhpMixed
+where
+    T: Into<PhpMixed>,
+{
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(v) => v.into(),
+            None => PhpMixed::Null,
+        }
+    }
+}
+
+impl std::fmt::Display for PhpMixed {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }
 
@@ -2038,7 +2127,7 @@ pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
 pub const DATE_RFC3339: &str = "Y-m-d\\TH:i:sP";
 pub const PREG_BACKTRACK_LIMIT_ERROR: i64 = 2;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayObject {
     data: IndexMap<String, Box<PhpMixed>>,
 }

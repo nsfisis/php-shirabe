@@ -194,7 +194,6 @@ impl SvnDriver {
                         .map(PhpMixed::from)
                         .unwrap_or(PhpMixed::Null),
                     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-                    None,
                 );
                 self.inner
                     .cache
@@ -474,7 +473,7 @@ impl SvnDriver {
 
     /// An absolute path (leading '/') is converted to a file:// url.
     pub(crate) fn normalize_url(url: &str) -> String {
-        let fs = Filesystem::new();
+        let fs = Filesystem::new(None);
         if fs.is_absolute_path(url) {
             return format!("file://{}", strtr(url, "\\", "/"));
         }

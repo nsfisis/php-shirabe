@@ -29,6 +29,7 @@ use crate::package::package_interface::PackageInterface;
 use crate::package::version::stability_filter::StabilityFilter;
 use crate::plugin::plugin_events::PluginEvents;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::root_package_repository::RootPackageRepository;
@@ -302,10 +303,12 @@ impl PoolBuilder {
         }
 
         if self.event_dispatcher.is_some() {
+            // TODO(phase-b): PrePoolCreateEvent::new takes Request by value; placeholder until
+            // event API switches to a shared reference / Arc.
             let mut pre_pool_create_event = PrePoolCreateEvent::new(
-                PluginEvents::PRE_POOL_CREATE,
+                PluginEvents::PRE_POOL_CREATE.to_string(),
                 repositories.clone(),
-                request,
+                todo!("share Request with PrePoolCreateEvent without moving"),
                 self.acceptable_stabilities.clone(),
                 self.stability_flags.clone(),
                 self.root_aliases.clone(),
@@ -316,10 +319,11 @@ impl PoolBuilder {
                     .map(|p| p.clone_box())
                     .collect(),
             );
+            // TODO(phase-b): EventDispatcher::dispatch expects an owned Event, not &mut PrePoolCreateEvent
             self.event_dispatcher
                 .as_mut()
                 .unwrap()
-                .dispatch(pre_pool_create_event.get_name(), &mut pre_pool_create_event);
+                .dispatch(Some(pre_pool_create_event.get_name()), None)?;
             // PHP rebinds $this->packages to a list-style array; preserve indices via reindexing.
             self.packages = pre_pool_create_event
                 .get_packages()
@@ -574,7 +578,7 @@ impl PoolBuilder {
                 .insert(index, alias.clone());
         }
 
-        let name = package.get_name().to_string();
+        let name = PackageInterface::get_name(package).to_string();
 
         // we're simply setting the root references on all versions for a name here and rely on the solver to pick the
         // right version. It'd be more work to figure out which versions and which aliases of those versions this may
@@ -591,7 +595,9 @@ impl PoolBuilder {
         //
         // packages in pathRepoUnlocked however need to also load root aliases, they have propagateUpdate set to
         // false because their deps should not be unlocked, but that is irrelevant for root aliases
-        let path_repo_match = self.path_repo_unlocked.contains_key(package.get_name());
+        let path_repo_match = self
+            .path_repo_unlocked
+            .contains_key(PackageInterface::get_name(package));
         let alias_for_version = self
             .root_aliases
             .get(&name)
@@ -756,7 +762,9 @@ impl PoolBuilder {
     fn is_update_allowed(&self, package: &dyn BasePackage) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if Preg::is_match(&pattern_regexp, package.get_name(), None).unwrap_or(false) {
+            if Preg::is_match(&pattern_regexp, PackageInterface::get_name(package), None)
+                .unwrap_or(false)
+            {
                 return true;
             }
         }
@@ -779,7 +787,9 @@ impl PoolBuilder {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
             // update pattern matches a locked package? => all good
             for package in request.get_locked_repository().unwrap().get_packages() {
-                if Preg::is_match(&pattern_regexp, package.get_name(), None).unwrap_or(false) {
+                if Preg::is_match(&pattern_regexp, PackageInterface::get_name(package), None)
+                    .unwrap_or(false)
+                {
                     continue 'outer;
                 }
             }
@@ -824,7 +834,7 @@ impl PoolBuilder {
         let skipped: Vec<Box<dyn PackageInterface>> = self
             .skipped_load
             .get(name)
-            .map(|v| v.iter().map(|p| p.clone_box()).collect())
+            .map(|v| v.iter().map(|p| p.clone_package_box()).collect())
             .unwrap_or_default();
         for package_or_replacer in &skipped {
             // if we unfixed a replaced package name, we also need to unfix the replacer itself
@@ -869,7 +879,7 @@ impl PoolBuilder {
             let entries: Vec<(i64, Box<dyn BasePackage>)> = self
                 .packages
                 .iter()
-                .filter(|(_, p)| p.get_name() == name)
+                .filter(|(_, p)| PackageInterface::get_name(p.as_ref()) == name)
                 .map(|(i, p)| (*i, p.clone_box()))
                 .collect();
             for (index, package) in &entries {
@@ -993,7 +1003,7 @@ impl PoolBuilder {
 
         if repo_index >= 0 {
             if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                if let Some(name_map) = repo_map.get_mut(package.get_name()) {
+                if let Some(name_map) = repo_map.get_mut(PackageInterface::get_name(package)) {
                     name_map.shift_remove(package.get_version());
                 }
             }
@@ -1004,7 +1014,9 @@ impl PoolBuilder {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0 {
                     if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                        if let Some(name_map) = repo_map.get_mut(alias_package.get_name()) {
+                        if let Some(name_map) =
+                            repo_map.get_mut(PackageInterface::get_name(alias_package.as_ref()))
+                        {
                             name_map.shift_remove(alias_package.get_version());
                         }
                     }

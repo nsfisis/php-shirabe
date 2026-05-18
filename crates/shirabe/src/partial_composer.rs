@@ -11,7 +11,7 @@ use crate::util::r#loop::Loop;
 pub struct PartialComposer {
     global: bool,
     package: Option<Box<dyn RootPackageInterface>>,
-    r#loop: Option<Loop>,
+    r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
     repository_manager: Option<RepositoryManager>,
     installation_manager: Option<InstallationManager>,
     config: Option<Config>,
@@ -35,11 +35,11 @@ impl PartialComposer {
         self.config.as_ref().unwrap()
     }
 
-    pub fn set_loop(&mut self, r#loop: Loop) {
+    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
         self.r#loop = Some(r#loop);
     }
 
-    pub fn get_loop(&self) -> &Loop {
+    pub fn get_loop(&self) -> &std::rc::Rc<std::cell::RefCell<Loop>> {
         self.r#loop.as_ref().unwrap()
     }
 

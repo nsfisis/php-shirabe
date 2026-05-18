@@ -34,14 +34,17 @@ impl GitExcludeFilter {
     }
 
     fn parse_git_attributes_line_static(line: &str) -> Option<(String, bool, bool)> {
-        let parts = Preg::split(r"\s+", line);
+        let parts = Preg::split(r"\s+", line).unwrap_or_default();
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
             return Some(BaseExcludeFilterBase::generate_pattern(&parts[0]));
         }
 
         if parts.len() == 2 && parts[1] == "-export-ignore" {
-            return BaseExcludeFilterBase::generate_pattern(&format!("!{}", parts[0]));
+            return Some(BaseExcludeFilterBase::generate_pattern(&format!(
+                "!{}",
+                parts[0]
+            )));
         }
 
         None

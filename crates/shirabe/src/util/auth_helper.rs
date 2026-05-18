@@ -157,8 +157,7 @@ impl AuthHelper {
                     "GitHub API token requires SSO authorization. Authorize this token at {}\n",
                     sso_url,
                 );
-                self.io
-                    .write_error(PhpMixed::String(message), true, io_interface::NORMAL);
+                self.io.write_error3(&message, true, io_interface::NORMAL);
                 if !self.io.is_interactive() {
                     return Err(TransportException::new(
                         format!("Could not authenticate against {}", origin),

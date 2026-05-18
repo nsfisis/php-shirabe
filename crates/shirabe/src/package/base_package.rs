@@ -83,71 +83,25 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>);
     fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>>;
 
-    fn as_any(&self) -> &dyn std::any::Any;
     fn clone_box(&self) -> Box<dyn BasePackage>;
 
-    fn get_name(&self) -> &str {
-        self.name()
+    // as_alias_package / as_complete_package_interface inherited from PackageInterface.
+
+    fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::alias_package::AliasPackage> {
+        None
     }
 
-    fn get_pretty_name(&self) -> &str {
-        self.pretty_name()
-    }
+    // get_name / get_pretty_name / get_names live on PackageInterface; the BasePackage
+    // duplicates were causing ambiguity at every call site (`pkg.get_name()` with
+    // pkg: &dyn BasePackage). Concrete impls already forward to name()/pretty_name().
 
-    fn get_names(&self, provides: bool) -> Vec<String> {
-        let mut names: IndexMap<String, bool> = IndexMap::new();
-        names.insert(self.get_name().to_string(), true);
-
-        if provides {
-            for link in self.get_provides().values() {
-                names.insert(link.get_target().to_string(), true);
-            }
-        }
-
-        for link in self.get_replaces().values() {
-            names.insert(link.get_target().to_string(), true);
-        }
-
-        names.into_keys().collect()
-    }
-
-    fn set_id(&mut self, id: i64) {
-        *self.id_mut() = id;
-    }
-
-    fn get_id(&self) -> i64 {
-        self.id()
-    }
-
-    fn set_repository(&mut self, repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
-        if let Some(existing) = self.repository_opt() {
-            // TODO(phase-b): proper reference identity check before raising error
-            return Err(anyhow::anyhow!(LogicException {
-                message: format!(
-                    "Package \"{}\" cannot be added to repository \"{}\" as it is already in repository \"{}\".",
-                    self.get_pretty_name(),
-                    repository.get_repo_name(),
-                    existing.get_repo_name(),
-                ),
-                code: 0,
-            }));
-        }
-        self.set_repository_box(repository);
-        Ok(())
-    }
-
-    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository_opt()
-    }
+    // set_id, get_id, get_repository, get_unique_name, set_repository are inherited
+    // from PackageInterface; do not redeclare here to avoid trait-method ambiguity.
 
     fn is_platform(&self) -> bool {
         self.repository_opt()
             .and_then(|r| r.as_any().downcast_ref::<PlatformRepository>())
             .is_some()
-    }
-
-    fn get_unique_name(&self) -> String {
-        format!("{}-{}", self.get_name(), self.get_version())
     }
 
     fn equals(&self, _package: &dyn PackageInterface) -> bool {
@@ -156,14 +110,12 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
         todo!("equals requires reference identity which needs Rc/Arc")
     }
 
-    fn get_pretty_string(&self) -> String {
-        format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
-    }
+    // get_pretty_string is inherited from PackageInterface.
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> anyhow::Result<String> {
-        const DISPLAY_SOURCE_REF_IF_DEV: i64 = PackageInterface::DISPLAY_SOURCE_REF_IF_DEV;
-        const DISPLAY_SOURCE_REF: i64 = PackageInterface::DISPLAY_SOURCE_REF;
-        const DISPLAY_DIST_REF: i64 = PackageInterface::DISPLAY_DIST_REF;
+        const DISPLAY_SOURCE_REF_IF_DEV: i64 = <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV;
+        const DISPLAY_SOURCE_REF: i64 = <dyn PackageInterface>::DISPLAY_SOURCE_REF;
+        const DISPLAY_DIST_REF: i64 = <dyn PackageInterface>::DISPLAY_DIST_REF;
 
         if display_mode == DISPLAY_SOURCE_REF_IF_DEV
             && (!self.is_dev()
@@ -207,7 +159,7 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn get_stability_priority(&self) -> i64 {
         *STABILITIES
             .get(self.get_stability())
-            .unwrap_or(&Self::STABILITY_STABLE)
+            .unwrap_or(&STABILITY_STABLE)
     }
 
     fn php_clone(&mut self) {

@@ -14,7 +14,9 @@ use crate::repository::repository_interface::RepositoryInterface;
 /// @phpstan-type AutoloadRules    array{psr-0?: array<string, string|string[]>, psr-4?: array<string, string|string[]>, classmap?: list<string>, files?: list<string>, exclude-from-classmap?: list<string>}
 /// @phpstan-type DevAutoloadRules array{psr-0?: array<string, string|string[]>, psr-4?: array<string, string|string[]>, classmap?: list<string>, files?: list<string>}
 /// @phpstan-type PhpExtConfig     array{extension-name?: string, priority?: int, support-zts?: bool, support-nts?: bool, build-path?: string|null, download-url-method?: string|list<string>, os-families?: non-empty-list<non-empty-string>, os-families-exclude?: non-empty-list<non-empty-string>, configure-options?: list<array{name: string, description?: string}>}
-pub trait PackageInterface: std::fmt::Display {
+pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
+    fn as_any(&self) -> &dyn std::any::Any;
+
     /// Returns the package's name without version info, thus not a unique identifier
     ///
     /// @return string package name
@@ -170,20 +172,20 @@ pub trait PackageInterface: std::fmt::Display {
     /// Returns a set of links to packages which must not be installed at the
     /// same time as this package
     ///
-    /// @return Link[] An array of package links defining conflicting packages
-    fn get_conflicts(&self) -> Vec<Link>;
+    /// @return array<string, Link> A map of package links defining conflicting packages
+    fn get_conflicts(&self) -> IndexMap<String, Link>;
 
     /// Returns a set of links to virtual packages that are provided through
     /// this package
     ///
-    /// @return Link[] An array of package links defining provided packages
-    fn get_provides(&self) -> Vec<Link>;
+    /// @return array<string, Link> A map of package links defining provided packages
+    fn get_provides(&self) -> IndexMap<String, Link>;
 
     /// Returns a set of links to packages which can alternatively be
     /// satisfied by installing this package
     ///
-    /// @return Link[] An array of package links defining replaced packages
-    fn get_replaces(&self) -> Vec<Link>;
+    /// @return array<string, Link> A map of package links defining replaced packages
+    fn get_replaces(&self) -> IndexMap<String, Link>;
 
     /// Returns a set of links to packages which are required to develop
     /// this package. These are installed if in dev mode.
@@ -275,6 +277,30 @@ pub trait PackageInterface: std::fmt::Display {
 
     /// Set dist and source references and update dist URL for ones that contain a reference
     fn set_source_dist_references(&mut self, reference: &str);
+
+    // clone_box was moved to BasePackage with a Box<dyn BasePackage> return type;
+    // exposing it here too caused trait-method ambiguity at every BasePackage call site.
+    // Callers holding `&dyn PackageInterface` (rather than `&dyn BasePackage`) can use
+    // `clone_package_box` instead.
+    fn clone_package_box(&self) -> Box<dyn PackageInterface> {
+        todo!()
+    }
+
+    fn as_alias_package(&self) -> Option<&crate::package::alias_package::AliasPackage> {
+        None
+    }
+
+    fn as_complete_package_interface(
+        &self,
+    ) -> Option<&dyn crate::package::complete_package_interface::CompletePackageInterface> {
+        None
+    }
+
+    fn as_complete_package(
+        &self,
+    ) -> Option<&dyn crate::package::complete_package_interface::CompletePackageInterface> {
+        None
+    }
 }
 
 impl dyn PackageInterface {

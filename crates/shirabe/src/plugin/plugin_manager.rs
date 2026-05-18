@@ -832,14 +832,15 @@ impl PluginManager {
                                         "allow-plugins",
                                         PhpMixed::Array(allow_plugins.clone()),
                                     );
-                                let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+                                // TODO(phase-b): get_config() returns &Config, but merge needs &mut Config; ownership needs refactoring
                                 let mut inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
                                 inner.insert(
                                     "allow-plugins".to_string(),
                                     Box::new(PhpMixed::Array(allow_plugins)),
                                 );
-                                wrap.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                                composer_ref.get_config().merge(PhpMixed::Array(wrap), "");
+                                let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
+                                wrap.insert("config".to_string(), PhpMixed::Array(inner));
+                                todo!("see TODO(phase-b) above");
                             }
                         }
 

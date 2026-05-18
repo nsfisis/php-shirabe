@@ -23,7 +23,8 @@ impl InstallOperation {
             "{}<info>{}</info> (<comment>{}</comment>)",
             if lock { "Locking " } else { "Installing " },
             package.get_pretty_name(),
-            package.get_full_pretty_version(),
+            package
+                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV),
         )
     }
 }

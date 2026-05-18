@@ -42,7 +42,8 @@ impl RepositoryFactory {
             let json = JsonFile::new(
                 repository.to_string(),
                 Some(Factory::create_http_downloader(io, config)?),
-            );
+                Some(io),
+            )?;
             let data = json.read()?;
             let has_packages = data.get("packages").map_or(false, |v| !v.is_null());
             let has_includes = data.get("includes").map_or(false, |v| !v.is_null());

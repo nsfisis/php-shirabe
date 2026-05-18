@@ -2,17 +2,15 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::exception::invalid_argument_exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower};
 
 use crate::advisory::auditor::Auditor;
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
+use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::config::json_config_source::JsonConfigSource;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
@@ -23,20 +21,19 @@ use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::package::base_package;
 use crate::package::base_package::BasePackage;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 
 #[derive(Debug)]
 pub struct RemoveCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 }
 
 impl RemoveCommand {
     pub fn configure(&mut self) {
-        let suggest_root_requirement = self.suggest_root_requirement();
-        self.inner
+        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
+        self
             .set_name("remove")
-            .set_aliases(vec!["rm".to_string(), "uninstall".to_string()])
+            .set_aliases(&["rm".to_string(), "uninstall".to_string()])
             .set_description("Removes a package from the require or require-dev")
             .set_definition(vec![
                 InputArgument::new(
@@ -44,7 +41,6 @@ impl RemoveCommand {
                     Some(InputArgument::IS_ARRAY),
                     "Packages that should be removed.",
                     None,
-                    suggest_root_requirement,
                 ),
                 InputOption::new(
                     "dev",
@@ -52,7 +48,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Removes a package from the require-dev section.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "dry-run",
@@ -60,7 +55,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Outputs the operations but will not execute anything (implicitly enables --verbose).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-progress",
@@ -68,7 +62,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Do not output download progress.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-update",
@@ -76,7 +69,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Disables the automatic update of the dependencies (implies --no-install).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-install",
@@ -84,7 +76,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Skip the install step after updating the composer.lock file.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-audit",
@@ -92,7 +83,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "audit-format",
@@ -100,7 +90,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_REQUIRED),
                     "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
                     Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())),
-                    Auditor::FORMATS.to_vec(),
                 ),
                 InputOption::new(
                     "no-security-blocking",
@@ -108,7 +97,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "update-no-dev",
@@ -116,7 +104,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Run the dependency update with the --no-dev option.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "update-with-dependencies",
@@ -124,7 +111,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Allows inherited dependencies to be updated with explicit dependencies (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var). (Deprecated, is now default behavior)",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "update-with-all-dependencies",
@@ -132,7 +118,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "with-all-dependencies",
@@ -140,7 +125,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Alias for --update-with-all-dependencies",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "no-update-with-dependencies",
@@ -148,7 +132,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Does not allow inherited dependencies to be updated with explicit dependencies.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "minimal-changes",
@@ -156,7 +139,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "unused",
@@ -164,7 +146,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Remove all packages which are locked but not required by any other package.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "ignore-platform-req",
@@ -172,7 +153,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                     "Ignore a specific platform requirement (php & ext- packages).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "ignore-platform-reqs",
@@ -180,7 +160,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Ignore all platform requirements (php & ext- packages).",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "optimize-autoloader",
@@ -188,7 +167,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Optimize autoloader during autoloader dump",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "classmap-authoritative",
@@ -196,7 +174,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "apcu-autoloader",
@@ -204,7 +181,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_NONE),
                     "Use APCu to cache found/not-found classes.",
                     None,
-                    vec![],
                 ),
                 InputOption::new(
                     "apcu-autoloader-prefix",
@@ -212,7 +188,6 @@ impl RemoveCommand {
                     Some(InputOption::VALUE_REQUIRED),
                     "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader",
                     None,
-                    vec![],
                 ),
             ])
             .set_help(
@@ -252,7 +227,7 @@ impl RemoveCommand {
             .unwrap_or_default();
 
         if input.get_option("unused").as_bool().unwrap_or(false) {
-            let composer = self.require_composer()?;
+            let composer = self.require_composer(None, None)?;
             let locker = composer.get_locker();
             if !locker.is_locked() {
                 return Err(anyhow::anyhow!(UnexpectedValueException {
@@ -263,7 +238,7 @@ impl RemoveCommand {
                 }));
             }
 
-            let locked_packages = locker.get_locked_repository()?.get_packages();
+            let locked_packages = locker.get_locked_repository(true)?.get_packages();
 
             let mut required: IndexMap<String, bool> = IndexMap::new();
             for link in composer
@@ -312,13 +287,14 @@ impl RemoveCommand {
             }
         }
 
-        let file = Factory::get_composer_file();
+        let file = Factory::get_composer_file()?;
 
-        let json_file = JsonFile::new(&file, None, None);
+        let json_file = JsonFile::new(file.clone(), None, None)?;
         let composer_data = json_file.read()?;
         let composer_backup = std::fs::read_to_string(json_file.get_path())?;
 
-        let json = JsonConfigSource::new(&json_file);
+        let json_file_for_source = JsonFile::new(file, None, None)?;
+        let json = JsonConfigSource::new(json_file_for_source, false);
 
         let r#type = if input.get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
@@ -484,14 +460,14 @@ impl RemoveCommand {
         }
 
         // TODO(plugin): deactivate installed plugins
-        if let Some(composer_opt) = self.try_composer() {
+        if let Some(composer_opt) = self.try_composer(None, None) {
             composer_opt
                 .get_plugin_manager()
                 .deactivate_installed_plugins();
         }
 
         self.reset_composer();
-        let composer = self.require_composer()?;
+        let composer = self.require_composer(None, None)?;
 
         if dry_run {
             let root_package = composer.get_package();
@@ -680,30 +656,12 @@ impl RemoveCommand {
     }
 }
 
-impl BaseCommand for RemoveCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for RemoveCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for RemoveCommand {}

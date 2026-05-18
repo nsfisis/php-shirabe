@@ -128,8 +128,7 @@ impl JsonManipulator {
                         JsonFile::encode(
                             &PhpMixed::String(str_replace("\\/", "/", &existing_owned)),
                             0
-                        )
-                        .unwrap_or_default(),
+                        ),
                         m.get("separator").cloned().unwrap_or_default(),
                         constraint_owned
                     )
@@ -1024,7 +1023,7 @@ impl JsonManipulator {
                         if now_empty {
                             arr.insert(
                                 name_owned.clone(),
-                                Box::new(PhpMixed::Object(ArrayObject::new())),
+                                Box::new(PhpMixed::Object(ArrayObject::new(None))),
                             );
                         }
                     }
@@ -1068,7 +1067,7 @@ impl JsonManipulator {
                         if now_empty {
                             arr.insert(
                                 name_capture.clone(),
-                                Box::new(PhpMixed::Object(ArrayObject::new())),
+                                Box::new(PhpMixed::Object(ArrayObject::new(None))),
                             );
                         }
                     }

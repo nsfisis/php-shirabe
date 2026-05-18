@@ -90,7 +90,7 @@ impl Transaction {
                 self.result_packages_by_name
                     .entry(name)
                     .or_insert_with(Vec::new)
-                    .push(package.clone_box());
+                    .push(package.clone_package_box());
             }
             self.result_package_map
                 .insert(spl_object_hash(package.as_ref()), package);
@@ -124,11 +124,12 @@ impl Transaction {
                 .is_some()
             {
                 let key = format!("{}::{}", package.get_name(), package.get_version());
-                present_alias_map.insert(key.clone(), package.clone_box());
-                remove_alias_map.insert(key, package.clone_box());
+                present_alias_map.insert(key.clone(), package.clone_package_box());
+                remove_alias_map.insert(key, package.clone_package_box());
             } else {
-                present_package_map.insert(package.get_name().to_string(), package.clone_box());
-                remove_map.insert(package.get_name().to_string(), package.clone_box());
+                present_package_map
+                    .insert(package.get_name().to_string(), package.clone_package_box());
+                remove_map.insert(package.get_name().to_string(), package.clone_package_box());
             }
         }
 
@@ -149,9 +150,9 @@ impl Transaction {
             if !visited.contains_key(&spl_object_hash(package.as_ref())) {
                 visited.insert(spl_object_hash(package.as_ref()), true);
 
-                stack.push(package.clone_box());
+                stack.push(package.clone_package_box());
                 if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
-                    stack.push(alias.get_alias_of().clone_box());
+                    stack.push(alias.get_alias_of().clone_package_box());
                 } else {
                     for link in package.get_requires().values() {
                         let possible_requires = self.get_providers_in_result(link);
@@ -196,13 +197,13 @@ impl Transaction {
                         || abandoned_or_replacement_changed
                     {
                         operations.push(Box::new(UpdateOperation::new(
-                            source.clone_box(),
-                            package.clone_box(),
+                            source.clone_package_box(),
+                            package.clone_package_box(),
                         )));
                     }
                     remove_map.shift_remove(package.get_name());
                 } else {
-                    operations.push(Box::new(InstallOperation::new(package.clone_box())));
+                    operations.push(Box::new(InstallOperation::new(package.clone_package_box())));
                     remove_map.shift_remove(package.get_name());
                 }
             }
@@ -246,7 +247,7 @@ impl Transaction {
         let mut roots: IndexMap<String, Box<dyn PackageInterface>> = self
             .result_package_map
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone_box()))
+            .map(|(k, v)| (k.clone(), v.clone_package_box()))
             .collect();
 
         for (package_hash, package) in &self.result_package_map {
@@ -275,7 +276,7 @@ impl Transaction {
             return vec![];
         };
 
-        packages.iter().map(|p| p.clone_box()).collect()
+        packages.iter().map(|p| p.clone_package_box()).collect()
     }
 
     /// Workaround: if your packages depend on plugins, we must be sure
@@ -309,11 +310,11 @@ impl Transaction {
             let package: Box<dyn PackageInterface> = if let Some(install_op) =
                 (op.as_ref() as &dyn Any).downcast_ref::<InstallOperation>()
             {
-                install_op.get_package().clone_box()
+                install_op.get_package().clone_package_box()
             } else if let Some(update_op) =
                 (op.as_ref() as &dyn Any).downcast_ref::<UpdateOperation>()
             {
-                update_op.get_target_package().clone_box()
+                update_op.get_target_package().clone_package_box()
             } else {
                 continue;
             };

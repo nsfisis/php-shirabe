@@ -236,8 +236,11 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let packages: Vec<Box<dyn PackageInterface>> =
-            self.added_map.values().map(|p| p.clone_box()).collect();
+        let packages: Vec<Box<dyn PackageInterface>> = self
+            .added_map
+            .values()
+            .map(|p| p.clone_package_box())
+            .collect();
 
         for package in &packages {
             for link in package.get_conflicts().values() {
@@ -283,7 +286,7 @@ impl RuleSetGenerator {
         let names_packages: Vec<(String, Vec<Box<dyn PackageInterface>>)> = self
             .added_packages_by_names
             .iter()
-            .map(|(k, v)| (k.clone(), v.iter().map(|p| p.clone_box()).collect()))
+            .map(|(k, v)| (k.clone(), v.iter().map(|p| p.clone_package_box()).collect()))
             .collect();
 
         for (name, packages) in names_packages {
@@ -304,7 +307,10 @@ impl RuleSetGenerator {
         for package in request.get_fixed_packages().values() {
             if package.get_id() == -1 {
                 // fixed package was not added to the pool as it did not pass the stability requirements, this is fine
-                if self.pool.is_unacceptable_fixed_or_locked_package(package) {
+                if self
+                    .pool
+                    .is_unacceptable_fixed_or_locked_package(package.as_ref())
+                {
                     continue;
                 }
 

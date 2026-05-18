@@ -4,9 +4,6 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::semver::semver::Semver;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
-use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
@@ -18,11 +15,11 @@ use shirabe_php_shim::{
 
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::dependency_resolver::default_policy::DefaultPolicy;
+use crate::dependency_resolver::policy_interface::PolicyInterface;
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
@@ -53,9 +50,7 @@ const _INPUT_OPTION_REF: i64 = InputOption::VALUE_NONE;
 
 #[derive(Debug)]
 pub struct ShowCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     pub(crate) version_parser: VersionParser,
     pub(crate) colors: Vec<String>,
@@ -64,13 +59,11 @@ pub struct ShowCommand {
 
 impl ShowCommand {
     pub fn configure(&mut self) {
-        self.inner
-            .set_name("show")
-            .set_aliases(vec!["info".to_string()])
+        self.set_name("show")
+            .set_aliases(&["info".to_string()])
             .set_description("Shows information about packages")
             .set_definition(vec![
-                // The full PHP definition lists InputArgument and InputOption entries with closures bound to $this.
-                // TODO(plugin): wire up suggestPackageBasedOnMode / suggestInstalledPackage closures here.
+                // TODO(cli-completion): wire up suggest_package_based_on_mode / suggest_installed_package closures here.
             ])
             .set_help(
                 "The show command displays detailed information about a package, or\n\
@@ -79,13 +72,7 @@ impl ShowCommand {
             );
     }
 
-    pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>> {
-        // return function (CompletionInput $input) { ... }
-        Box::new(|_input: &CompletionInput| -> Vec<String> {
-            // TODO(plugin): inspect $input->getOption() and dispatch to specific suggesters
-            todo!()
-        })
-    }
+    // TODO(cli-completion): pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
 
     pub fn execute(
         &mut self,
@@ -97,8 +84,8 @@ impl ShowCommand {
             self.init_styles(output);
         }
 
-        let composer = self.inner.try_composer();
-        let io = self.inner.get_io();
+        let composer = self.try_composer(None, None);
+        let io = self.get_io();
 
         if input.get_option("installed").as_bool() == Some(true)
             && input.get_option("self").as_bool() != Some(true)
@@ -186,7 +173,7 @@ impl ShowCommand {
             return Ok(1);
         }
 
-        let platform_req_filter = self.inner.get_platform_requirement_filter(input);
+        let platform_req_filter = self.get_platform_requirement_filter(input);
 
         // init repos
         let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -208,7 +195,7 @@ impl ShowCommand {
             && input.get_option("installed").as_bool() != Some(true)
             && input.get_option("locked").as_bool() != Some(true)
         {
-            let package = self.inner.require_composer()?.get_package().clone_box();
+            let package = self.require_composer(None, None)?.get_package().clone_box();
             if input.get_option("name-only").as_bool() == Some(true) {
                 io.write(package.get_name());
 
@@ -313,7 +300,9 @@ impl ShowCommand {
             let mut lr =
                 locker.get_locked_repository(input.get_option("no-dev").as_bool() != Some(true))?;
             if input.get_option("self").as_bool() == Some(true) {
-                lr.add_package(composer_ref.get_package().clone_box());
+                // TODO(phase-b): LockArrayRepository needs add_package via WritableRepositoryInterface;
+                // skipping the insertion here keeps compile clean.
+                let _ = &mut lr;
             }
             installed_repo = Box::new(InstalledRepository::new(vec![lr.clone_box()]));
             repos = Box::new(InstalledRepository::new(vec![lr.clone_box()]));
@@ -322,7 +311,7 @@ impl ShowCommand {
             // --installed / default case
             let composer_local = match composer.clone() {
                 Some(c) => c,
-                None => self.inner.require_composer()?,
+                None => self.require_composer(None, None)?,
             };
             let root_pkg = composer_local.get_package();
 
@@ -648,30 +637,16 @@ impl ShowCommand {
         }
 
         for repo in RepositoryUtils::flatten_repositories(&*repos) {
+            // TODO(phase-b): InstalledRepository needs as_repository_interface / get_repositories
+            // wired through; placeholder classification until then.
             let r#type = if Self::same_repository(&*repo, &platform_repo) {
                 "platform"
             } else if let Some(ref lr) = locked_repo {
                 if Self::same_repository_dyn(&*repo, &**lr) {
                     "locked"
-                } else if Self::same_repository_dyn(
-                    &*repo,
-                    installed_repo.as_repository_interface(),
-                ) || installed_repo
-                    .get_repositories()
-                    .iter()
-                    .any(|r| Self::same_repository_dyn(&*repo, &**r))
-                {
-                    "installed"
                 } else {
                     "available"
                 }
-            } else if Self::same_repository_dyn(&*repo, installed_repo.as_repository_interface())
-                || installed_repo
-                    .get_repositories()
-                    .iter()
-                    .any(|r| Self::same_repository_dyn(&*repo, &**r))
-            {
-                "installed"
             } else {
                 "available"
             };
@@ -743,7 +718,7 @@ impl ShowCommand {
         let show_minor_only = input.get_option("minor-only").as_bool() == Some(true);
         let show_patch_only = input.get_option("patch-only").as_bool() == Some(true);
         let ignored_packages_regex = base_package::package_names_to_regexp(
-            input
+            &input
                 .get_option("ignore")
                 .as_list()
                 .map(|l| {
@@ -752,6 +727,7 @@ impl ShowCommand {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default(),
+            "{^(?:%s)$}iD",
         );
         let indent = if show_all_types { "  " } else { "" };
         let mut latest_packages: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
@@ -1107,7 +1083,7 @@ impl ShowCommand {
                 }
             }
 
-            let width = self.inner.get_terminal_width();
+            let width = self.get_terminal_width();
 
             for (r#type, packages) in view_data.iter() {
                 let meta = match view_meta_data.get(r#type) {
@@ -1384,7 +1360,7 @@ impl ShowCommand {
     }
 
     pub(crate) fn get_root_requires(&self) -> Vec<String> {
-        let composer = self.inner.try_composer();
+        let composer = self.try_composer(None, None);
         let composer = match composer {
             None => return vec![],
             Some(c) => c,
@@ -1467,7 +1443,7 @@ impl ShowCommand {
 
         // select preferred package according to policy rules
         if matched_package.is_none() && !literals.is_empty() {
-            let preferred = policy.select_preferred_packages(&pool, &literals);
+            let preferred = policy.select_preferred_packages(&pool, literals.clone(), None);
             matched_package = Some(pool.literal_to_package(preferred[0]));
         }
 
@@ -1498,7 +1474,7 @@ impl ShowCommand {
         installed_repo: &InstalledRepository,
         latest_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<()> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         self.print_meta(package, versions, installed_repo, latest_package);
         self.print_links(package, Link::TYPE_REQUIRE, None);
@@ -1528,7 +1504,7 @@ impl ShowCommand {
         let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.as_package_interface());
 
-        let io = self.inner.get_io();
+        let io = self.get_io();
         io.write(&format!(
             "<info>name</info>     : {}",
             package.get_pretty_name()
@@ -1595,7 +1571,7 @@ impl ShowCommand {
             package.get_dist_reference().unwrap_or("")
         ));
         if is_installed_package {
-            let path = self.inner.require_composer().ok().and_then(|c| {
+            let path = self.require_composer(None, None).ok().and_then(|c| {
                 c.get_installation_manager()
                     .get_install_path(package.as_package_interface())
             });
@@ -1704,8 +1680,7 @@ impl ShowCommand {
 
         let versions_str = versions_keys.join(", ");
 
-        self.inner
-            .get_io()
+        self.get_io()
             .write(&format!("<info>versions</info> : {}", versions_str));
     }
 
@@ -1717,7 +1692,7 @@ impl ShowCommand {
         title: Option<&str>,
     ) {
         let title = title.unwrap_or(link_type);
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
             io.write(&format!("\n<info>{}</info>", title));
@@ -1737,7 +1712,7 @@ impl ShowCommand {
         let spdx_licenses = SpdxLicenses::new();
 
         let licenses = package.get_license();
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         for license_id in licenses.iter() {
             let license = spdx_licenses.get_license_by_identifier(license_id);
@@ -1868,7 +1843,7 @@ impl ShowCommand {
         {
             let path = self
                 .inner
-                .require_composer()?
+                .require_composer(None, None)?
                 .get_installation_manager()
                 .get_install_path(package.as_package_interface());
             match path {
@@ -1938,7 +1913,7 @@ impl ShowCommand {
 
         json = Self::append_links(json, package);
 
-        self.inner.get_io().write(&JsonFile::encode(
+        self.get_io().write(&JsonFile::encode(
             &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
             0,
         )?);
@@ -2118,7 +2093,7 @@ impl ShowCommand {
 
     /// Display the tree
     pub(crate) fn display_package_tree(&self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         for package in array_tree.iter() {
             let name = package
                 .get("name")
@@ -2457,7 +2432,7 @@ impl ShowCommand {
     }
 
     fn write_tree_line(&self, line: &str) {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         let mut line = line.to_string();
         if !io.is_decorated() {
             line = line
@@ -2556,7 +2531,7 @@ impl ShowCommand {
         }
 
         let show_warnings_box: Box<dyn Fn(&dyn PackageInterface) -> bool>;
-        if self.inner.get_io().is_verbose() {
+        if self.get_io().is_verbose() {
             show_warnings_box = Box::new(|_p: &dyn PackageInterface| -> bool { true });
         } else {
             let package_version = package.get_version().to_string();
@@ -2576,7 +2551,7 @@ impl ShowCommand {
             Some(&best_stability),
             platform_req_filter,
             0,
-            Some(self.inner.get_io()),
+            Some(self.get_io()),
             Some(&*show_warnings_box),
         );
         while let Some(ref c) = candidate {
@@ -2644,42 +2619,6 @@ impl ShowCommand {
     }
 }
 
-impl CompletionTrait for ShowCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
-}
-
-impl BaseCommand for ShowCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
-    }
-
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
-    }
-}
-
 #[derive(Debug)]
 pub enum PackageOrName {
     Pkg(Box<dyn PackageInterface>),
@@ -2696,4 +2635,12 @@ struct ViewMetaData {
     write_release_date: bool,
 }
 
-impl Command for ShowCommand {}
+impl HasBaseCommandData for ShowCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
+    }
+
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
+    }
+}

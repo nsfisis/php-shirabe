@@ -3,6 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
+use crate::package::package_interface::PackageInterface;
+
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::link::Link;
 
@@ -48,4 +50,16 @@ pub trait RootPackageInterface: CompletePackageInterface {
     fn set_suggests(&mut self, suggests: IndexMap<String, String>);
 
     fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>);
+
+    fn clone_as_package_interface(&self) -> Box<dyn PackageInterface> {
+        todo!()
+    }
+
+    fn clone_box(&self) -> Box<dyn RootPackageInterface> {
+        todo!()
+    }
+
+    fn as_package_interface(&self) -> &dyn PackageInterface {
+        todo!()
+    }
 }

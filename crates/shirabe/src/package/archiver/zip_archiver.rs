@@ -13,6 +13,10 @@ use shirabe_php_shim::{
 pub struct ZipArchiver;
 
 impl ZipArchiver {
+    pub fn new() -> Self {
+        Self
+    }
+
     fn formats() -> IndexMap<String, bool> {
         let mut map = IndexMap::new();
         map.insert("zip".to_string(), true);
@@ -33,7 +37,7 @@ impl ArchiverInterface for ZipArchiver {
         excludes: Vec<String>,
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
-        let fs = Filesystem::new();
+        let fs = Filesystem::new(None);
         let sources_realpath = realpath(&sources);
         let sources = if let Some(p) = sources_realpath {
             p
@@ -47,7 +51,7 @@ impl ArchiverInterface for ZipArchiver {
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             for file in files {
                 let filepath = file.get_pathname();
-                let mut relative_path = file.get_relative_pathname();
+                let mut relative_path = file.get_relative_path_name();
 
                 if Platform::is_windows() {
                     relative_path = shirabe_php_shim::strtr(&relative_path, "\\", "/");

@@ -4,7 +4,6 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::application::Application;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
@@ -213,7 +212,7 @@ impl EventDispatcher {
                         .unwrap_or_default()
                 )),
                 true,
-                <dyn IOInterface>::NORMAL,
+                crate::io::io_interface::NORMAL,
             );
         }
 
@@ -328,7 +327,7 @@ impl EventDispatcher {
                             ],
                         )),
                         true,
-                        <dyn IOInterface>::VERBOSE,
+                        crate::io::io_interface::VERBOSE,
                     );
                 }
                 // TODO(plugin): actually invoke callable with $event and inspect result
@@ -345,7 +344,7 @@ impl EventDispatcher {
                                 ],
                             )),
                             true,
-                            <dyn IOInterface>::VERBOSE,
+                            crate::io::io_interface::VERBOSE,
                         );
 
                         let mut script: Vec<String> = substr(callable_str, 1, None)
@@ -404,7 +403,7 @@ impl EventDispatcher {
                                     ],
                                 )),
                                 true,
-                                <dyn IOInterface>::QUIET,
+                                crate::io::io_interface::QUIET,
                             );
 
                                 return Err(anyhow::anyhow!(ScriptExecutionException(
@@ -432,7 +431,7 @@ impl EventDispatcher {
                                     &[PhpMixed::String(callable_str.clone())],
                                 )),
                                 true,
-                                <dyn IOInterface>::QUIET,
+                                crate::io::io_interface::QUIET,
                             );
                             }
 
@@ -468,7 +467,7 @@ impl EventDispatcher {
                                                 ],
                                             )),
                                             true,
-                                            <dyn IOInterface>::QUIET,
+                                            crate::io::io_interface::QUIET,
                                         );
                                     }
                                     return Err(e);
@@ -490,7 +489,7 @@ impl EventDispatcher {
                                 event.get_name()
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
                             continue;
                         }
@@ -502,7 +501,7 @@ impl EventDispatcher {
                                 event.get_name()
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
                             continue;
                         }
@@ -526,7 +525,7 @@ impl EventDispatcher {
                                         )
                                     )),
                                     true,
-                                    <dyn IOInterface>::QUIET,
+                                    crate::io::io_interface::QUIET,
                                 );
                                 return Err(e);
                             }
@@ -550,7 +549,7 @@ impl EventDispatcher {
                                 event.get_name()
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
                             continue;
                         }
@@ -566,7 +565,7 @@ impl EventDispatcher {
                                 event.get_name()
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
                             continue;
                         }
@@ -580,7 +579,7 @@ impl EventDispatcher {
                                 event.get_name()
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
                             continue;
                         }
@@ -595,15 +594,9 @@ impl EventDispatcher {
                         }
                         app.set_auto_exit(false);
                         // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
-                        let cmd = CommandBase::new(None); // TODO(plugin): pass event name
-                        if method_exists(&PhpMixed::String("Application".to_string()), "addCommand")
-                        {
-                            app.add_command(cmd.clone());
-                        } else {
-                            // Compatibility layer for symfony/console <7.4
-                            app.add(cmd.clone());
-                        }
-                        app.set_default_command(cmd.get_name().to_string(), true);
+                        todo!(
+                            "plugin: CommandBase::new — dynamic plugin command instantiation not supported"
+                        );
                         let result = (|| -> anyhow::Result<i64> {
                             let args = additional_args
                                 .iter()
@@ -647,7 +640,7 @@ impl EventDispatcher {
                                         )
                                     )),
                                     true,
-                                    <dyn IOInterface>::QUIET,
+                                    crate::io::io_interface::QUIET,
                                 );
                                 return Err(e);
                             }
@@ -687,7 +680,7 @@ impl EventDispatcher {
                                     ],
                                 )),
                                 true,
-                                <dyn IOInterface>::NORMAL,
+                                crate::io::io_interface::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
                             self.io.write_error(
@@ -696,7 +689,7 @@ impl EventDispatcher {
                                     &[PhpMixed::String(exec.clone())],
                                 )),
                                 true,
-                                <dyn IOInterface>::NORMAL,
+                                crate::io::io_interface::NORMAL,
                             );
                         }
 
@@ -828,7 +821,7 @@ impl EventDispatcher {
                                 ],
                             )),
                             true,
-                            <dyn IOInterface>::QUIET,
+                            crate::io::io_interface::QUIET,
                         );
 
                             return Err(anyhow::anyhow!(ScriptExecutionException(
@@ -949,7 +942,7 @@ impl EventDispatcher {
                     ],
                 )),
                 true,
-                <dyn IOInterface>::NORMAL,
+                crate::io::io_interface::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error(
@@ -961,7 +954,7 @@ impl EventDispatcher {
                     ],
                 )),
                 true,
-                <dyn IOInterface>::NORMAL,
+                crate::io::io_interface::NORMAL,
             );
         }
 
@@ -1094,7 +1087,7 @@ impl EventDispatcher {
                     event.get_name()
                 )),
                 true,
-                <dyn IOInterface>::VERBOSE,
+                crate::io::io_interface::VERBOSE,
             );
 
             return Vec::new();

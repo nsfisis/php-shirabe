@@ -38,12 +38,12 @@ pub struct AliasPackage {
     pub(crate) requires: IndexMap<String, Link>,
     /// @var Link[]
     pub(crate) dev_requires: IndexMap<String, Link>,
-    /// @var Link[]
-    pub(crate) conflicts: Vec<Link>,
-    /// @var Link[]
-    pub(crate) provides: Vec<Link>,
-    /// @var Link[]
-    pub(crate) replaces: Vec<Link>,
+    /// @var array<string, Link>
+    pub(crate) conflicts: IndexMap<String, Link>,
+    /// @var array<string, Link>
+    pub(crate) provides: IndexMap<String, Link>,
+    /// @var array<string, Link>
+    pub(crate) replaces: IndexMap<String, Link>,
 }
 
 impl AliasPackage {
@@ -69,9 +69,9 @@ impl AliasPackage {
             alias_of,
             requires: IndexMap::new(),
             dev_requires: IndexMap::new(),
-            conflicts: vec![],
-            provides: vec![],
-            replaces: vec![],
+            conflicts: IndexMap::new(),
+            provides: IndexMap::new(),
+            replaces: IndexMap::new(),
         };
 
         for r#type in Link::types() {
@@ -101,9 +101,24 @@ impl AliasPackage {
                         .map(|l| (l.get_target().to_string(), l))
                         .collect();
                 }
-                Link::TYPE_PROVIDE => this.provides = replaced,
-                Link::TYPE_CONFLICT => this.conflicts = replaced,
-                Link::TYPE_REPLACE => this.replaces = replaced,
+                Link::TYPE_PROVIDE => {
+                    this.provides = replaced
+                        .into_iter()
+                        .map(|l| (l.get_target().to_string(), l))
+                        .collect()
+                }
+                Link::TYPE_CONFLICT => {
+                    this.conflicts = replaced
+                        .into_iter()
+                        .map(|l| (l.get_target().to_string(), l))
+                        .collect()
+                }
+                Link::TYPE_REPLACE => {
+                    this.replaces = replaced
+                        .into_iter()
+                        .map(|l| (l.get_target().to_string(), l))
+                        .collect()
+                }
                 _ => {}
             }
         }
@@ -202,7 +217,7 @@ impl std::fmt::Display for AliasPackage {
         write!(
             f,
             "{} ({}alias of {})",
-            self.inner,
+            self.alias_of,
             if self.root_package_alias { "root " } else { "" },
             self.alias_of.get_version(),
         )
@@ -210,24 +225,28 @@ impl std::fmt::Display for AliasPackage {
 }
 
 impl PackageInterface for AliasPackage {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
-        self.inner.get_name()
+        self.alias_of.get_name()
     }
 
     fn get_pretty_name(&self) -> &str {
-        self.inner.get_pretty_name()
+        self.alias_of.get_pretty_name()
     }
 
     fn get_names(&self, provides: bool) -> Vec<String> {
-        self.inner.get_names(provides)
+        self.alias_of.get_names(provides)
     }
 
     fn set_id(&mut self, id: i64) {
-        self.inner.set_id(id);
+        self.alias_of.set_id(id);
     }
 
     fn get_id(&self) -> i64 {
-        self.inner.get_id()
+        self.alias_of.get_id()
     }
 
     fn is_dev(&self) -> bool {
@@ -251,20 +270,20 @@ impl PackageInterface for AliasPackage {
     }
 
     /// @inheritDoc
-    /// @return array<string|int, Link>
-    fn get_conflicts(&self) -> Vec<Link> {
+    /// @return array<string, Link>
+    fn get_conflicts(&self) -> IndexMap<String, Link> {
         self.conflicts.clone()
     }
 
     /// @inheritDoc
-    /// @return array<string|int, Link>
-    fn get_provides(&self) -> Vec<Link> {
+    /// @return array<string, Link>
+    fn get_provides(&self) -> IndexMap<String, Link> {
         self.provides.clone()
     }
 
     /// @inheritDoc
-    /// @return array<string|int, Link>
-    fn get_replaces(&self) -> Vec<Link> {
+    /// @return array<string, Link>
+    fn get_replaces(&self) -> IndexMap<String, Link> {
         self.replaces.clone()
     }
 
@@ -410,25 +429,25 @@ impl PackageInterface for AliasPackage {
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
         // TODO(phase-b): BasePackage.get_full_pretty_version returns Result; bridge here
-        self.inner
+        self.alias_of
             .get_full_pretty_version(truncate, display_mode)
             .unwrap_or_default()
     }
 
     fn get_unique_name(&self) -> String {
-        self.inner.get_unique_name()
+        self.alias_of.get_unique_name()
     }
 
     fn get_pretty_string(&self) -> String {
-        self.inner.get_pretty_string()
+        self.alias_of.get_pretty_string()
     }
 
     fn set_repository(&mut self, repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
-        self.inner.set_repository(repository)
+        self.alias_of.set_repository(repository)
     }
 
     fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        self.inner.get_repository()
+        self.alias_of.get_repository()
     }
 }
 
@@ -466,10 +485,6 @@ impl BasePackage for AliasPackage {
     }
 
     fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
-        todo!()
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
         todo!()
     }
 

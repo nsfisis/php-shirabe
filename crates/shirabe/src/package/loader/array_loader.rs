@@ -588,7 +588,7 @@ impl ArrayLoader {
         let alias_normalized = self.get_branch_alias(config)?;
         if let Some(alias_normalized) = alias_normalized {
             if !alias_normalized.is_empty() {
-                let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized);
+                let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized)?;
 
                 // TODO(phase-b): `$package instanceof RootPackage` downcast from CompletePackage
                 let package_as_root: Option<RootPackage> = None;

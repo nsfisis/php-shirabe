@@ -29,6 +29,12 @@ fn compress_formats() -> IndexMap<&'static str, i64> {
 #[derive(Debug)]
 pub struct PharArchiver;
 
+impl PharArchiver {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 impl ArchiverInterface for PharArchiver {
     fn archive(
         &self,
@@ -46,6 +52,7 @@ impl ArchiverInterface for PharArchiver {
             unlink(&target);
         }
 
+        let target_outer = target.clone();
         let inner = (|| -> anyhow::Result<String> {
             let pos = strrpos(&target, &format).unwrap_or(target.len());
             let filename = target[..pos.saturating_sub(1)].to_string();
@@ -63,7 +70,10 @@ impl ArchiverInterface for PharArchiver {
                 *formats.get(format.as_str()).unwrap_or(&Phar::TAR),
             );
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
-            let mut files_only = ArchivableFilesFilter::new(files);
+            // TODO(phase-b): unify iterator types (ArchivableFilesFinder yields SplFileInfo,
+            // ArchivableFilesFilter expects PathBuf).
+            let mut files_only =
+                ArchivableFilesFilter::new(Box::new(files.map(|f| f.get_pathname().into())));
             phar.build_from_iterator(&mut files_only, &sources);
             files_only.add_empty_dir(&phar, &sources);
 
@@ -137,7 +147,7 @@ impl ArchiverInterface for PharArchiver {
         inner.map_err(|e| {
             let message = format!(
                 "Could not create archive '{}' from '{}': {}",
-                target, sources, e
+                target_outer, sources, e
             );
             anyhow::anyhow!(RuntimeException { message, code: 0 })
         })

@@ -24,6 +24,14 @@ impl TransportException {
         }
     }
 
+    pub fn get_code(&self) -> i64 {
+        self.code
+    }
+
+    pub fn get_message(&self) -> &str {
+        &self.message
+    }
+
     pub fn set_headers(&mut self, headers: Vec<String>) {
         self.headers = Some(headers);
     }

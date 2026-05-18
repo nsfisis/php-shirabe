@@ -6,9 +6,12 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IgnoredSecurityAdvisory {
+    #[serde(flatten)]
     inner: SecurityAdvisory,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ignore_reason: Option<String>,
 }
 
@@ -40,15 +43,5 @@ impl IgnoredSecurityAdvisory {
             inner,
             ignore_reason,
         }
-    }
-
-    pub fn json_serialize(&self) -> PhpMixed {
-        let mut data = self.inner.json_serialize();
-        if self.ignore_reason.is_none() {
-            if let PhpMixed::Array(ref mut map) = data {
-                map.remove("ignoreReason");
-            }
-        }
-        data
     }
 }

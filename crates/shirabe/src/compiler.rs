@@ -45,7 +45,7 @@ impl Compiler {
             shirabe_php_shim::unlink(phar_file);
         }
 
-        let process = ProcessExecutor::new_default();
+        let process = ProcessExecutor::new(None, None);
 
         let command = Git::build_rev_list_command(&process, &["-n1", "--format=%H", "HEAD"]);
         let mut output = String::new();
@@ -93,7 +93,7 @@ impl Compiler {
         } else {
             // get branch-alias defined in composer.json for dev-main (if any)
             let local_config_path = format!("{}/composer.json", repo_root);
-            let file = JsonFile::new(&local_config_path);
+            let file = JsonFile::new(local_config_path.clone(), None, None)?;
             let local_config = file.read()?;
             if let Some(branch_alias) = local_config
                 .as_array()

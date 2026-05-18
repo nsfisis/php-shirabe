@@ -69,17 +69,17 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     fn install(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
-        self.io.write_error(
+        self.io.write_error3(
             &format!("  - {}", InstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );
 
-        repo.add_package(package.clone_box());
+        repo.add_package(package.clone_package_box());
 
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
@@ -87,7 +87,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     fn update(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
@@ -100,14 +100,14 @@ impl InstallerInterface for MetapackageInstaller {
             .into());
         }
 
-        self.io.write_error(
+        self.io.write_error3(
             &format!("  - {}", UpdateOperation::format(initial, target, false)),
             true,
             io_interface::NORMAL,
         );
 
         repo.remove_package(initial);
-        repo.add_package(target.clone_box());
+        repo.add_package(target.clone_package_box());
 
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
@@ -115,7 +115,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     fn uninstall(
-        &self,
+        &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
@@ -127,7 +127,7 @@ impl InstallerInterface for MetapackageInstaller {
             .into());
         }
 
-        self.io.write_error(
+        self.io.write_error3(
             &format!("  - {}", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,

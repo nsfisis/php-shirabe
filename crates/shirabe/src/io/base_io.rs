@@ -98,7 +98,7 @@ pub trait BaseIO: IOInterface {
         let custom_headers = config.get("custom-headers");
         let client_certificate = config.get("client-certificate");
 
-        if let Some(map) = bitbucket_oauth.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = bitbucket_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
                 if let Some(cred_map) = cred.as_array() {
                     let consumer_key = cred_map
@@ -115,7 +115,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = github_oauth.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = github_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
                 let token_str = token.as_string().unwrap_or("").to_string();
                 let github_domains = config.get("github-domains");
@@ -139,9 +139,9 @@ pub trait BaseIO: IOInterface {
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("github-domains".to_string(), Box::new(merged));
-                    let mut outer = IndexMap::new();
-                    outer.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                    config.merge(PhpMixed::Array(outer), "implicit-due-to-auth");
+                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 if !Preg::is_match(r"^[.A-Za-z0-9_]+$", &token_str).unwrap_or(false) {
@@ -161,7 +161,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = gitlab_oauth.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = gitlab_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
@@ -184,9 +184,9 @@ pub trait BaseIO: IOInterface {
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("gitlab-domains".to_string(), Box::new(merged));
-                    let mut outer = IndexMap::new();
-                    outer.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                    config.merge(PhpMixed::Array(outer), "implicit-due-to-auth");
+                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 let token_str = if let Some(arr) = token.as_array() {
@@ -201,7 +201,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = gitlab_token.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = gitlab_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
@@ -224,9 +224,9 @@ pub trait BaseIO: IOInterface {
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("gitlab-domains".to_string(), Box::new(merged));
-                    let mut outer = IndexMap::new();
-                    outer.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                    config.merge(PhpMixed::Array(outer), "implicit-due-to-auth");
+                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 let (username, password) = if let Some(arr) = token.as_array() {
@@ -250,7 +250,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = forgejo_token.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = forgejo_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
                 let forgejo_domains = config.get("forgejo-domains");
                 if !in_array(
@@ -271,9 +271,9 @@ pub trait BaseIO: IOInterface {
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("forgejo-domains".to_string(), Box::new(merged));
-                    let mut outer = IndexMap::new();
-                    outer.insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
-                    config.merge(PhpMixed::Array(outer), "implicit-due-to-auth");
+                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 if let Some(cred_map) = cred.as_array() {
@@ -291,7 +291,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = http_basic.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = http_basic.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
                 if let Some(cred_map) = cred.as_array() {
                     let username = cred_map
@@ -308,14 +308,14 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = bearer_token.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = bearer_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
                 let token_str = token.as_string().unwrap_or("").to_string();
                 self.check_and_set_authentication(domain, token_str, Some("bearer".to_string()));
             }
         }
 
-        if let Some(map) = custom_headers.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = custom_headers.as_opt().and_then(|v| v.as_array()) {
             for (domain, headers) in map.clone() {
                 if !headers.is_null() {
                     let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
@@ -328,7 +328,7 @@ pub trait BaseIO: IOInterface {
             }
         }
 
-        if let Some(map) = client_certificate.as_ref().and_then(|v| v.as_array()) {
+        if let Some(map) = client_certificate.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
                 if let Some(cred_map) = cred.as_array() {
                     let local_cert = cred_map

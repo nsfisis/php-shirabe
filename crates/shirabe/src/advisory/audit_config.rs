@@ -6,7 +6,7 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 use crate::advisory::auditor::Auditor;
 use crate::config::Config;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AuditConfig {
     pub audit: bool,
     pub audit_format: String,
@@ -123,7 +123,11 @@ impl AuditConfig {
         Ok((for_audit, for_block))
     }
 
-    pub fn from_config(config: &Config, audit: bool, audit_format: &str) -> anyhow::Result<Self> {
+    pub fn from_config(
+        config: &mut Config,
+        audit: bool,
+        audit_format: &str,
+    ) -> anyhow::Result<Self> {
         let audit_config_raw = config.get("audit");
         let audit_config = audit_config_raw.as_array();
 

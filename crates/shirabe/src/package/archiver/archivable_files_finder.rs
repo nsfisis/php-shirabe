@@ -23,7 +23,7 @@ impl std::fmt::Debug for ArchivableFilesFinder {
 
 impl ArchivableFilesFinder {
     pub fn new(sources: &str, excludes: Vec<String>, ignore_filters: bool) -> anyhow::Result<Self> {
-        let fs = Filesystem::new();
+        let fs = Filesystem::new(None);
 
         let sources_real_path = realpath(sources);
         if sources_real_path.is_none() {
@@ -39,8 +39,8 @@ impl ArchivableFilesFinder {
             vec![]
         } else {
             vec![
-                Box::new(GitExcludeFilter::new(&sources)),
-                Box::new(ComposerExcludeFilter::new(&sources, excludes)),
+                Box::new(GitExcludeFilter::new(sources.clone())),
+                Box::new(ComposerExcludeFilter::new(sources.clone(), excludes)),
             ]
         };
 
@@ -61,7 +61,8 @@ impl ArchivableFilesFinder {
                 &format!("^{}", preg_quote(&sources_clone, Some('#'))),
                 "",
                 &fs.normalize_path(&realpath),
-            );
+            )
+            .unwrap_or_default();
 
             let mut exclude = false;
             for f in &filters {
@@ -72,13 +73,14 @@ impl ArchivableFilesFinder {
         };
 
         finder
-            .in_dir(&sources)
-            .filter(Box::new(filter))
+            .r#in(&sources)
+            // TODO(phase-b): symfony Finder filter takes Box<dyn Fn(&SplFileInfo) -> bool>; signature not yet wired
             .ignore_vcs(true)
             .ignore_dot_files(false)
             .sort_by_name();
+        let _ = filter;
 
-        let inner_iter = finder.get_iterator();
+        let inner_iter: Box<dyn Iterator<Item = SplFileInfo>> = Box::new(finder.get_iterator());
 
         Ok(Self { finder, inner_iter })
     }
@@ -88,7 +90,7 @@ impl ArchivableFilesFinder {
             return true;
         }
 
-        let path = current.to_string();
+        let path = current.get_pathname();
         match std::fs::read_dir(&path) {
             Ok(mut iter) => iter.next().is_none(),
             Err(_) => false,

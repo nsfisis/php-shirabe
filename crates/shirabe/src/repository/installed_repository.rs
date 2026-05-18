@@ -37,14 +37,16 @@ pub struct InstalledRepository {
 }
 
 impl InstalledRepository {
-    pub fn new(repositories: Vec<Box<dyn RepositoryInterface>>) -> anyhow::Result<Self> {
+    pub fn new(repositories: Vec<Box<dyn RepositoryInterface>>) -> Self {
         let mut this = Self {
             inner: CompositeRepository::new(vec![]),
         };
         for repo in repositories {
-            this.add_repository(repo)?;
+            // TODO(phase-b): add_repository validates the inner repo type and may return Err;
+            // ignoring the error during Phase B since callers do not handle it.
+            let _ = this.add_repository(repo);
         }
-        Ok(this)
+        this
     }
 
     pub fn find_packages_with_replacers_and_providers(

@@ -9,7 +9,7 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a dyn DownloaderInterface),
-    Manager(&'a DownloadManager),
+    Manager(&'a std::rc::Rc<std::cell::RefCell<DownloadManager>>),
 }
 
 impl<'a> DownloaderOrManager<'a> {
@@ -21,7 +21,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.download(package, path, prev_package),
-            Self::Manager(d) => d.download(package, path, prev_package),
+            Self::Manager(d) => d.borrow().download(package, path, prev_package),
         }
     }
 
@@ -34,14 +34,14 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.prepare(r#type, package, path, prev_package),
-            Self::Manager(d) => d.prepare(r#type, package, path, prev_package),
+            Self::Manager(d) => d.borrow().prepare(r#type, package, path, prev_package),
         }
     }
 
     fn install(&self, package: &dyn PackageInterface, path: &str) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.install(package, path),
-            Self::Manager(d) => d.install(package, path),
+            Self::Manager(d) => d.borrow().install(package, path),
         }
     }
 
@@ -53,7 +53,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.update(package, prev_package, path),
-            Self::Manager(d) => d.update(package, prev_package, path),
+            Self::Manager(d) => d.borrow().update(package, prev_package, path),
         }
     }
 
@@ -66,7 +66,7 @@ impl<'a> DownloaderOrManager<'a> {
     ) -> Box<dyn PromiseInterface> {
         match self {
             Self::Interface(d) => d.cleanup(r#type, package, path, prev_package),
-            Self::Manager(d) => d.cleanup(r#type, package, path, prev_package),
+            Self::Manager(d) => d.borrow().cleanup(r#type, package, path, prev_package),
         }
     }
 }
@@ -75,7 +75,7 @@ pub struct SyncHelper;
 
 impl SyncHelper {
     pub fn download_and_install_package_sync(
-        r#loop: &Loop,
+        r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         downloader: DownloaderOrManager<'_>,
         path: String,
         package: &dyn PackageInterface,
@@ -121,9 +121,12 @@ impl SyncHelper {
         Ok(())
     }
 
-    pub fn r#await(r#loop: &Loop, promise: Option<Box<dyn PromiseInterface>>) -> Result<()> {
+    pub fn r#await(
+        r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
+        promise: Option<Box<dyn PromiseInterface>>,
+    ) -> Result<()> {
         if let Some(promise) = promise {
-            r#loop.wait(vec![promise]);
+            r#loop.borrow_mut().wait(vec![promise], None)?;
         }
         Ok(())
     }

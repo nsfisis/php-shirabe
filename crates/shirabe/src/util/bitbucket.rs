@@ -36,7 +36,7 @@ impl Bitbucket {
         let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
         let http_downloader = match http_downloader {
             Some(h) => h,
-            None => Factory::create_http_downloader(&*io, &config)?,
+            None => Factory::create_http_downloader(&*io, &config, IndexMap::new())?,
         };
         Ok(Self {
             io,

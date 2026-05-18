@@ -75,7 +75,7 @@ impl PathRepository {
             .map(|(k, v)| (k, *v))
             .collect::<IndexMap<String, PhpMixed>>();
         if !options.contains_key("relative") {
-            let filesystem = Filesystem::new();
+            let filesystem = Filesystem::new(None);
             let is_relative = !filesystem.is_absolute_path(&url);
             options.insert("relative".to_string(), PhpMixed::Bool(is_relative));
         }

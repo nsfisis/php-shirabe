@@ -11,13 +11,17 @@ use shirabe_php_shim::InvalidArgumentException;
 #[derive(Debug)]
 pub struct ProjectInstaller {
     install_path: String,
-    download_manager: DownloadManager,
+    download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
     filesystem: Filesystem,
 }
 
 impl ProjectInstaller {
-    pub fn new(install_path: &str, dm: DownloadManager, fs: Filesystem) -> Self {
-        let install_path = format!("{}/", install_path.replace('\\', '/').trim_end_matches('/'));
+    pub fn new(
+        install_path: &str,
+        dm: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
+        fs: Filesystem,
+    ) -> Self {
+        let install_path = format!("{}/", install_path.replace('\\', "/").trim_end_matches('/'));
         Self {
             install_path,
             download_manager: dm,
@@ -59,7 +63,9 @@ impl InstallerInterface for ProjectInstaller {
         }
 
         self.download_manager
+            .borrow()
             .download(package, install_path, prev_package)
+            .map(Some)
     }
 
     fn prepare(
@@ -69,7 +75,9 @@ impl InstallerInterface for ProjectInstaller {
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
         self.download_manager
+            .borrow()
             .prepare(r#type, package, &self.install_path, prev_package)
+            .map(Some)
     }
 
     fn cleanup(
@@ -79,19 +87,23 @@ impl InstallerInterface for ProjectInstaller {
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
         self.download_manager
+            .borrow()
             .cleanup(r#type, package, &self.install_path, prev_package)
+            .map(Some)
     }
 
     fn install(
-        &self,
+        &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
-        self.download_manager.install(package, &self.install_path)
+        self.download_manager
+            .borrow()
+            .install(package, &self.install_path)
     }
 
     fn update(
-        &self,
+        &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
@@ -104,7 +116,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     fn uninstall(
-        &self,
+        &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {

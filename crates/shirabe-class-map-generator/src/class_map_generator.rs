@@ -45,7 +45,7 @@ impl ClassMapGenerator {
 
     /// When calling scanPaths repeatedly with paths that may overlap, calling this will ensure that the same class is never scanned twice
     pub fn avoid_duplicate_scans(&mut self, scanned_files: Option<FileList>) -> &mut Self {
-        self.scanned_files = Some(scanned_files.unwrap_or_else(FileList::new));
+        self.scanned_files = Some(scanned_files.unwrap_or_default());
         self
     }
 
@@ -58,6 +58,11 @@ impl ClassMapGenerator {
 
     pub fn get_class_map(&self) -> &ClassMap {
         &self.class_map
+    }
+
+    /// Take ownership of the inner ClassMap, leaving a default in its place.
+    pub fn take_class_map(&mut self) -> ClassMap {
+        std::mem::take(&mut self.class_map)
     }
 
     /// Iterate over all files in the given directory searching for classes

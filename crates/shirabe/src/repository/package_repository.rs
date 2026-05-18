@@ -86,6 +86,8 @@ impl AdvisoryProviderInterface for PackageRepository {
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();
+        let semver_parser = shirabe_semver::version_parser::VersionParser;
+        let _ = parser;
 
         let mut advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
@@ -101,19 +103,9 @@ impl AdvisoryProviderInterface for PackageRepository {
                                     .collect::<IndexMap<String, PhpMixed>>(),
                                 _ => return Ok(None),
                             };
-                            let advisory_any =
-                                PartialSecurityAdvisory::create(package_name, &data_map, &parser)
-                                    .ok()?;
                             let advisory =
-                                if let Ok(full) = advisory_any.downcast::<SecurityAdvisory>() {
-                                    PartialOrSecurityAdvisory::Full(*full)
-                                } else if let Ok(partial) =
-                                    advisory_any.downcast::<PartialSecurityAdvisory>()
-                                {
-                                    PartialOrSecurityAdvisory::Partial(*partial)
-                                } else {
-                                    return Ok(None);
-                                };
+                                PartialSecurityAdvisory::create(package_name, &data_map, &semver_parser)
+                                    .ok()?;
                             if !allow_partial_advisories
                                 && matches!(advisory, PartialOrSecurityAdvisory::Partial(_))
                             {

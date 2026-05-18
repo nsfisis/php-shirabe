@@ -2,7 +2,7 @@
 
 use crate::constraint::bound::Bound;
 
-pub trait ConstraintInterface {
+pub trait ConstraintInterface: std::fmt::Debug {
     fn matches(&self, provider: &dyn ConstraintInterface) -> bool;
 
     fn compile(&self, other_operator: i64) -> String;

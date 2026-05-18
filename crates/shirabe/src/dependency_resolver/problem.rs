@@ -110,14 +110,14 @@ impl Problem {
         }
 
         reasons.sort_by(|rule1, rule2| {
-            let rule1_prio = self.get_rule_priority(rule1);
-            let rule2_prio = self.get_rule_priority(rule2);
+            let rule1_prio = self.get_rule_priority(rule1.as_ref());
+            let rule2_prio = self.get_rule_priority(rule2.as_ref());
             if rule1_prio != rule2_prio {
                 return rule2_prio.cmp(&rule1_prio);
             }
 
-            self.get_sortable_string(pool, rule1)
-                .cmp(&self.get_sortable_string(pool, rule2))
+            self.get_sortable_string(pool, rule1.as_ref())
+                .cmp(&self.get_sortable_string(pool, rule2.as_ref()))
         });
 
         Ok(Self::format_deduplicated_rules(

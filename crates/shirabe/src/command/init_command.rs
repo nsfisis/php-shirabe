@@ -5,8 +5,6 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::component::console::helper::formatter_helper::FormatterHelper;
 use shirabe_external_packages::symfony::component::console::input::array_input::ArrayInput;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
@@ -19,8 +17,7 @@ use shirabe_php_shim::{
     strtolower, trim, ucwords,
 };
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::command::package_discovery_trait::PackageDiscoveryTrait;
 use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
@@ -38,22 +35,10 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct InitCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
+    base_command_data: BaseCommandData,
 
     /// @var array<string, string>
     git_config: Option<IndexMap<String, String>>,
-}
-
-impl CompletionTrait for InitCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
 }
 
 impl PackageDiscoveryTrait for InitCommand {
@@ -97,25 +82,22 @@ impl PackageDiscoveryTrait for InitCommand {
 
 impl InitCommand {
     pub fn configure(&mut self) {
-        let suggest_available_package_incl_platform =
-            self.suggest_available_package_incl_platform();
-        let suggest_available_package_incl_platform2 =
-            self.suggest_available_package_incl_platform();
-        self.inner
+        // TODO(cli-completion): suggest_available_package_incl_platform() for `require` / `require-dev`
+        self
             .set_name("init")
             .set_description("Creates a basic composer.json file in current directory")
             .set_definition(vec![
-                InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None, vec![]),
-                InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None, vec![]),
-                InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None, vec![]),
-                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED), "Type of package (e.g. library, project, metapackage, composer-plugin)", None, vec![]),
-                InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None, vec![]),
-                InputOption::new("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, suggest_available_package_incl_platform),
-                InputOption::new("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, suggest_available_package_incl_platform2),
-                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &array_keys(&BasePackage::stabilities()))), None, vec![]),
-                InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None, vec![]),
-                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None, vec![]),
-                InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None, vec![]),
+                InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None),
+                InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None),
+                InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None),
+                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED), "Type of package (e.g. library, project, metapackage, composer-plugin)", None),
+                InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None),
+                InputOption::new("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None),
+                InputOption::new("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None),
+                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &array_keys(&BasePackage::stabilities()))), None),
+                InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None),
+                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None),
+                InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None),
             ])
             .set_help(
                 "The <info>init</info> command creates a basic composer.json file\n\
@@ -133,7 +115,7 @@ impl InitCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
 
         let allowlist: Vec<String> = vec![
             "name".to_string(),
@@ -239,7 +221,7 @@ impl InitCommand {
                         .collect()
                 })
                 .unwrap_or_default();
-            let formatted = self.inner.format_requirements(req_list)?;
+            let formatted = self.format_requirements(req_list)?;
             if formatted.is_empty() {
                 // PHP: new \stdClass — represented as an empty IndexMap (JSON object)
                 PhpMixed::Array(IndexMap::new())
@@ -267,7 +249,7 @@ impl InitCommand {
                         .collect()
                 })
                 .unwrap_or_default();
-            let formatted = self.inner.format_requirements(req_list)?;
+            let formatted = self.format_requirements(req_list)?;
             let value = if formatted.is_empty() {
                 PhpMixed::Array(IndexMap::new())
             } else {
@@ -303,13 +285,13 @@ impl InitCommand {
             options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
         }
 
-        let file_obj = JsonFile::new(&Factory::get_composer_file(), None, None);
+        let file_obj = JsonFile::new(Factory::get_composer_file(), None, None)?;
         let options_for_encode: IndexMap<String, Box<PhpMixed>> = options
             .clone()
             .into_iter()
             .map(|(k, v)| (k, Box::new(v)))
             .collect();
-        let json = JsonFile::encode(&options_for_encode);
+        let json = JsonFile::encode(&options_for_encode, 448);
 
         if input.is_interactive() {
             io.write_error(
@@ -362,10 +344,11 @@ impl InitCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                Silencer::call(
-                    "unlink",
-                    &[PhpMixed::String(file_obj.get_path().to_string())],
-                );
+                let path_to_unlink = file_obj.get_path().to_string();
+                let _ = Silencer::call(|| {
+                    shirabe_php_shim::unlink(&path_to_unlink);
+                    Ok::<(), anyhow::Error>(())
+                });
 
                 return Ok(1);
             }
@@ -374,7 +357,7 @@ impl InitCommand {
 
         // --autoload - Create src folder
         if let Some(ref ap) = autoload_path {
-            let filesystem = Filesystem::new();
+            let filesystem = Filesystem::new(None);
             filesystem.ensure_directory_exists(ap);
 
             // dump-autoload only for projects without added dependencies.
@@ -440,7 +423,7 @@ impl InitCommand {
     }
 
     pub(crate) fn initialize(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) {
-        self.inner.initialize(input, output);
+        self.initialize(input, output);
 
         if !input.is_interactive() {
             if input.get_option("name").is_null() {
@@ -463,9 +446,9 @@ impl InitCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<()> {
-        let io = self.inner.get_io();
+        let io = self.get_io();
         // @var FormatterHelper $formatter
-        let formatter: &FormatterHelper = self.inner.get_helper_set().get("formatter");
+        let formatter: &FormatterHelper = self.get_helper_set().get("formatter");
 
         // initialize repos if configured
         let repositories: Vec<String> = input
@@ -484,7 +467,7 @@ impl InitCommand {
 
             let mut repos: Vec<
                 Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-            > = vec![Box::new(PlatformRepository::new(vec![], PhpMixed::Null))];
+            > = vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
                 let repo_config =
@@ -977,7 +960,7 @@ impl InitCommand {
             return self.git_config.clone().unwrap_or_default();
         }
 
-        let mut process = ProcessExecutor::new(self.inner.get_io());
+        let mut process = ProcessExecutor::new(self.get_io());
 
         let mut output = String::new();
         if process.execute(
@@ -1059,14 +1042,14 @@ impl InitCommand {
 
     fn update_dependencies(&self, output: &dyn OutputInterface) {
         // PHP try/catch: catch \Exception
-        let result = self.inner.get_application().and_then(|app| {
+        let result = self.get_application().and_then(|app| {
             let update_command = app.find("update")?;
             app.reset_composer()?;
             update_command.run(ArrayInput::new(IndexMap::new()), output)?;
             Ok(())
         });
         if let Err(_e) = result {
-            self.inner.get_io().write_error(
+            self.get_io().write_error(
                 PhpMixed::String(
                     "Could not update dependencies. Run `composer update` to see more information."
                         .to_string(),
@@ -1078,14 +1061,14 @@ impl InitCommand {
     }
 
     fn run_dump_autoload_command(&self, output: &dyn OutputInterface) {
-        let result = self.inner.get_application().and_then(|app| {
+        let result = self.get_application().and_then(|app| {
             let command = app.find("dump-autoload")?;
             app.reset_composer()?;
             command.run(ArrayInput::new(IndexMap::new()), output)?;
             Ok(())
         });
         if let Err(_e) = result {
-            self.inner.get_io().write_error(
+            self.get_io().write_error(
                 PhpMixed::String("Could not run dump-autoload.".to_string()),
                 true,
                 io_interface::NORMAL,
@@ -1206,30 +1189,12 @@ impl InitCommand {
     }
 }
 
-impl BaseCommand for InitCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for InitCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for InitCommand {}

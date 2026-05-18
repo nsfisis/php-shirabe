@@ -4,14 +4,11 @@ use std::any::Any;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::command::command::CommandBase;
 use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{LogicException, get_debug_type};
 
-use crate::command::base_command::BaseCommand;
-use crate::command::completion_trait::CompletionTrait;
+use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
 use crate::console::input::input_argument::InputArgument;
@@ -35,36 +32,24 @@ use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
-    inner: CommandBase,
-    composer: Option<Composer>,
-    io: Option<Box<dyn IOInterface>>,
-}
-
-impl CompletionTrait for ArchiveCommand {
-    fn require_composer(
-        &self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Composer {
-        todo!()
-    }
+    base_command_data: BaseCommandData,
 }
 
 impl ArchiveCommand {
     const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
 
     pub fn configure(&mut self) {
-        let suggest_available_package = self.suggest_available_package();
-        self.inner
+        // TODO(cli-completion): suggest_available_package(99) for `package` argument
+        self
             .set_name("archive")
             .set_description("Creates an archive of this composer package")
             .set_definition(vec![
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, suggest_available_package),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None, vec![]),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None, Self::FORMATS.iter().map(|s| s.to_string()).collect()),
-                InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None, vec![]),
-                InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None, vec![]),
-                InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None, vec![]),
+                InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None),
+                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None),
+                InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None),
+                InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None),
+                InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None),
             ])
             .set_help(
                 "The <info>archive</info> command creates an archive of the specified format\n\
@@ -76,7 +61,7 @@ impl ArchiveCommand {
     }
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let composer = self.inner.try_composer();
+        let composer = self.try_composer(None, None);
         let mut config: Option<Config> = None;
 
         if let Some(ref composer) = composer {
@@ -85,14 +70,19 @@ impl ArchiveCommand {
             let command_event = CommandEvent::new(
                 PluginEvents::COMMAND.to_string(),
                 "archive".to_string(),
-                Box::new(input),
-                Box::new(output),
+                input,
+                output,
                 vec![],
                 vec![],
             );
             let event_dispatcher = composer.get_event_dispatcher();
-            event_dispatcher.dispatch(command_event.get_name(), &command_event);
-            event_dispatcher.dispatch_script(ScriptEvents::PRE_ARCHIVE_CMD, true);
+            event_dispatcher.dispatch(Some(command_event.get_name()), None);
+            event_dispatcher.dispatch_script(
+                ScriptEvents::PRE_ARCHIVE_CMD,
+                true,
+                vec![],
+                indexmap::IndexMap::new(),
+            );
         }
 
         let config = match config {
@@ -125,7 +115,7 @@ impl ArchiveCommand {
             });
 
         let return_code = self.archive(
-            self.inner.get_io(),
+            self.get_io(),
             &config,
             input
                 .get_argument("package")
@@ -150,9 +140,12 @@ impl ArchiveCommand {
 
         if return_code == 0 {
             if let Some(ref composer) = composer {
-                composer
-                    .get_event_dispatcher()
-                    .dispatch_script(ScriptEvents::POST_ARCHIVE_CMD, true);
+                composer.get_event_dispatcher().dispatch_script(
+                    ScriptEvents::POST_ARCHIVE_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
             }
         }
 
@@ -175,11 +168,14 @@ impl ArchiveCommand {
             composer.get_archive_manager().clone_box()
         } else {
             let factory = Factory::new();
-            let process = ProcessExecutor::new_default();
+            let process = ProcessExecutor::new(None, None);
             let http_downloader = Factory::create_http_downloader(io, config)?;
             let download_manager =
                 factory.create_download_manager(io, config, &http_downloader, &process)?;
-            let loop_ = Loop::new(http_downloader, process);
+            let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+                http_downloader,
+                Some(process),
+            )));
             factory.create_archive_manager(config, &download_manager, &loop_)?
         };
 
@@ -189,7 +185,7 @@ impl ArchiveCommand {
                 None => return Ok(1),
             }
         } else {
-            self.inner.require_composer()?.get_package().clone_box()
+            self.require_composer(None, None)?.get_package().clone_box()
         };
 
         io.write_error(&format!(
@@ -203,8 +199,9 @@ impl ArchiveCommand {
             file_name.as_deref(),
             ignore_filters,
         )?;
-        let fs = Filesystem::new();
-        let short_path = fs.find_shortest_path(&Platform::get_cwd(), &package_path, true);
+        let fs = Filesystem::new(None);
+        let short_path =
+            fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false);
 
         io.write_error_no_newline("Created: ");
         let display = if short_path.len() < package_path.len() {
@@ -229,7 +226,7 @@ impl ArchiveCommand {
         let mut min_stability;
         let repo;
 
-        if let Some(composer) = self.inner.try_composer() {
+        if let Some(composer) = self.try_composer(None, None) {
             let local_repo = composer.get_repository_manager().get_local_repository();
             let mut repos: Vec<
                 Box<dyn crate::repository::repository_interface::RepositoryInterface>,
@@ -332,30 +329,12 @@ impl ArchiveCommand {
     }
 }
 
-impl BaseCommand for ArchiveCommand {
-    fn inner(&self) -> &CommandBase {
-        &self.inner
+impl HasBaseCommandData for ArchiveCommand {
+    fn base_command_data(&self) -> &BaseCommandData {
+        &self.base_command_data
     }
 
-    fn inner_mut(&mut self) -> &mut CommandBase {
-        &mut self.inner
-    }
-
-    fn composer(&self) -> Option<&Composer> {
-        self.composer.as_ref()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
-        &mut self.composer
-    }
-
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.io.as_deref()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
-        &mut self.io
+    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
+        &mut self.base_command_data
     }
 }
-
-impl Command for ArchiveCommand {}
