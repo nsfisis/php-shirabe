@@ -130,9 +130,9 @@ impl PoolOptimizer {
 
             // Keep track of alias packages for every package so if either the alias or aliased is kept
             // we keep the others as they are a unit of packages really
-            if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
                 self.aliases_per_package
-                    .entry(alias_pkg.get_alias_of().id)
+                    .entry(alias_pkg.get_alias_of().id())
                     .or_insert_with(Vec::new)
                     .push(package.clone_box());
             }
@@ -175,8 +175,8 @@ impl PoolOptimizer {
     }
 
     fn mark_package_irremovable(&mut self, package: &dyn BasePackage) {
-        self.irremovable_packages.insert(package.id, true);
-        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+        self.irremovable_packages.insert(package.id(), true);
+        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked as irremovable as well
             self.mark_package_irremovable(alias_pkg.get_alias_of());
@@ -184,8 +184,8 @@ impl PoolOptimizer {
         // PHP: foreach ($this->aliasesPerPackage[$package->id] as $aliasPackage)
         let alias_ids: Vec<i64> = self
             .aliases_per_package
-            .get(&package.id)
-            .map(|aliases| aliases.iter().map(|a| a.id).collect())
+            .get(&package.id())
+            .map(|aliases| aliases.iter().map(|a| a.id()).collect())
             .unwrap_or_default();
         for alias_id in alias_ids {
             self.irremovable_packages.insert(alias_id, true);
@@ -197,7 +197,7 @@ impl PoolOptimizer {
         let mut packages: Vec<Box<dyn BasePackage>> = vec![];
         let mut removed_versions: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
         for package in pool.get_packages() {
-            if !self.packages_to_remove.contains_key(&package.id) {
+            if !self.packages_to_remove.contains_key(&package.id()) {
                 packages.push(package.clone_box());
             } else {
                 removed_versions
@@ -238,11 +238,11 @@ impl PoolOptimizer {
         for package in pool.get_packages() {
             // If that package was already marked irremovable, we can skip
             // the entire process for it
-            if self.irremovable_packages.contains_key(&package.id) {
+            if self.irremovable_packages.contains_key(&package.id()) {
                 continue;
             }
 
-            self.mark_package_for_removal(package.id)?;
+            self.mark_package_for_removal(package.id())?;
 
             let dependency_hash = self.calculate_dependency_hash(package.as_ref());
 
@@ -311,7 +311,7 @@ impl PoolOptimizer {
                         .or_insert_with(Vec::new)
                         .push(package.clone_box());
                     package_identical_definition_lookup
-                        .entry(package.id)
+                        .entry(package.id())
                         .or_insert_with(IndexMap::new)
                         .insert(
                             package_name.clone(),
@@ -344,7 +344,7 @@ impl PoolOptimizer {
                     let mut literals: Vec<i64> = vec![];
 
                     for package in packages {
-                        literals.push(package.id);
+                        literals.push(package.id());
                     }
 
                     for preferred_literal in
@@ -439,13 +439,13 @@ impl PoolOptimizer {
         >,
     ) {
         // Already marked to keep
-        if !self.packages_to_remove.contains_key(&package.id) {
+        if !self.packages_to_remove.contains_key(&package.id()) {
             return;
         }
 
-        self.packages_to_remove.shift_remove(&package.id);
+        self.packages_to_remove.shift_remove(&package.id());
 
-        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked to be kept as well
             self.keep_package(
@@ -457,7 +457,7 @@ impl PoolOptimizer {
 
         // record all the versions of the package group so we can list them later in Problem output
         for name in package.get_names(false) {
-            if let Some(per_name) = package_identical_definition_lookup.get(&package.id) {
+            if let Some(per_name) = package_identical_definition_lookup.get(&package.id()) {
                 if let Some(package_group_pointers) = per_name.get(&name) {
                     let package_group = identical_definitions_per_package
                         .get(&name)
@@ -466,7 +466,7 @@ impl PoolOptimizer {
                     if let Some(package_group) = package_group {
                         for pkg in package_group {
                             let pkg = if let Some(alias_pkg) =
-                                (pkg.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
+                                pkg.as_any().downcast_ref::<AliasPackage>()
                             {
                                 if alias_pkg.get_pretty_version()
                                     == VersionParser::DEFAULT_BRANCH_ALIAS
@@ -493,8 +493,13 @@ impl PoolOptimizer {
 
         let alias_info: Vec<(i64, Vec<String>)> = self
             .aliases_per_package
-            .get(&package.id)
-            .map(|aliases| aliases.iter().map(|a| (a.id, a.get_names(false))).collect())
+            .get(&package.id())
+            .map(|aliases| {
+                aliases
+                    .iter()
+                    .map(|a| (a.id(), a.get_names(false)))
+                    .collect()
+            })
             .unwrap_or_default();
         for (alias_id, alias_names) in alias_info {
             self.packages_to_remove.shift_remove(&alias_id);
@@ -510,7 +515,7 @@ impl PoolOptimizer {
                         if let Some(package_group) = package_group {
                             for pkg in package_group {
                                 let pkg = if let Some(alias_pkg) =
-                                    (pkg.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
+                                    pkg.as_any().downcast_ref::<AliasPackage>()
                                 {
                                     if alias_pkg.get_pretty_version()
                                         == VersionParser::DEFAULT_BRANCH_ALIAS
@@ -549,7 +554,7 @@ impl PoolOptimizer {
             IndexMap::new();
 
         for package in pool.get_packages() {
-            let id = package.id;
+            let id = package.id();
 
             // Do not remove irremovable packages
             if self.irremovable_packages.contains_key(&id) {
@@ -557,9 +562,7 @@ impl PoolOptimizer {
             }
             // Do not remove a package aliased by another package, nor aliases
             if self.aliases_per_package.contains_key(&id)
-                || (package.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .is_some()
+                || package.as_any().downcast_ref::<AliasPackage>().is_some()
             {
                 continue;
             }
@@ -573,7 +576,7 @@ impl PoolOptimizer {
             package_index
                 .entry(PackageInterface::get_name(package.as_ref()).to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(package.id, package.clone_box());
+                .insert(package.id(), package.clone_box());
         }
 
         for (_, package) in request.get_locked_packages() {
@@ -671,10 +674,9 @@ impl PoolOptimizer {
         &self,
         constraint: Box<dyn ConstraintInterface>,
     ) -> Vec<Box<dyn ConstraintInterface>> {
-        // TODO(phase-b): Intervals::compactConstraint expects/returns ConstraintInterface
-        let constraint = Intervals::compact_constraint(constraint);
+        let constraint = Intervals::compact_constraint(&*constraint).unwrap_or(constraint);
 
-        if let Some(multi) = (constraint.as_ref() as &dyn Any).downcast_ref::<MultiConstraint>() {
+        if let Some(multi) = constraint.as_any().downcast_ref::<MultiConstraint>() {
             if multi.is_disjunctive() {
                 // No need to call ourselves recursively here because Intervals::compactConstraint() ensures that there
                 // are no nested disjunctive MultiConstraint instances possible

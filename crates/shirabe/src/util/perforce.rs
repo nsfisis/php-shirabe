@@ -29,12 +29,12 @@ pub struct Perforce {
     pub(crate) p4_client_spec: String,
     pub(crate) p4_depot_type: Option<String>,
     pub(crate) p4_branch: Option<String>,
-    pub(crate) process: ProcessExecutor,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub(crate) unique_perforce_client_name: String,
     pub(crate) windows_flag: bool,
     pub(crate) command_result: String,
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) filesystem: Option<Filesystem>,
+    pub(crate) filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 }
 
 impl Perforce {
@@ -43,7 +43,7 @@ impl Perforce {
         repo_config: IndexMap<String, PhpMixed>,
         port: String,
         path: String,
-        process: ProcessExecutor,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         is_windows: bool,
         io: Box<dyn IOInterface>,
     ) -> Self {
@@ -75,7 +75,7 @@ impl Perforce {
         repo_config: IndexMap<String, PhpMixed>,
         port: String,
         path: String,
-        process: ProcessExecutor,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         io: Box<dyn IOInterface>,
     ) -> Self {
         Self::new(repo_config, port, path, process, Platform::is_windows(), io)
@@ -83,7 +83,7 @@ impl Perforce {
 
     pub fn check_server_exists(url: &str, process_executor: &mut ProcessExecutor) -> bool {
         let mut ignored_output = String::new();
-        process_executor.execute(
+        process_executor.execute_args(
             &vec![
                 "p4".to_string(),
                 "-p".to_string(),
@@ -152,7 +152,7 @@ impl Perforce {
         ));
         let client_spec = self.get_p4_client_spec();
         let file_system = self.get_filesystem();
-        file_system.remove(&client_spec);
+        file_system.borrow_mut().remove(&client_spec);
     }
 
     /// @param non-empty-string|non-empty-list<string> $command
@@ -168,7 +168,8 @@ impl Perforce {
             _ => vec![],
         };
         self.process
-            .execute(&cmd_vec, &mut self.command_result, None)
+            .borrow_mut()
+            .execute_args(&cmd_vec, &mut self.command_result, None)
     }
 
     pub fn get_client(&mut self) -> String {
@@ -195,7 +196,7 @@ impl Perforce {
     pub fn initialize_path(&mut self, path: &str) {
         self.path = path.to_string();
         let fs = self.get_filesystem();
-        fs.ensure_directory_exists(path);
+        fs.borrow_mut().ensure_directory_exists(path);
     }
 
     pub(crate) fn get_port(&self) -> &str {
@@ -361,7 +362,7 @@ impl Perforce {
                 .collect(),
         ));
         if exit_code != 0 {
-            let error_output = self.process.get_error_output().to_string();
+            let error_output = self.process.borrow().get_error_output().to_string();
             let user = self.get_user().unwrap_or_default();
             let index = strpos(&error_output, &user);
             if index.is_none() {
@@ -401,7 +402,7 @@ impl Perforce {
             file_get_contents(&self.get_p4_client_spec()),
             None,
         );
-        process.run(None, IndexMap::new());
+        process.run(None);
     }
 
     pub fn sync_code_base(&mut self, source_reference: Option<&str>) -> Result<()> {
@@ -558,7 +559,7 @@ impl Perforce {
             None,
         );
 
-        process.run(None, IndexMap::new())
+        process.run(None)
     }
 
     pub fn p4_login(&mut self) -> Result<()> {
@@ -583,11 +584,14 @@ impl Perforce {
                     password,
                     None,
                 );
-                process.run(None, IndexMap::new());
+                process.run(None);
 
                 if !process.is_successful() {
                     return Err(Exception {
-                        message: format!("Error logging in:{}", self.process.get_error_output()),
+                        message: format!(
+                            "Error logging in:{}",
+                            self.process.borrow().get_error_output()
+                        ),
                         code: 0,
                     }
                     .into());
@@ -847,15 +851,17 @@ impl Perforce {
         Some(self.command_result.clone())
     }
 
-    pub fn get_filesystem(&mut self) -> &Filesystem {
+    pub fn get_filesystem(&mut self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>> {
         if self.filesystem.is_none() {
-            self.filesystem = Some(Filesystem::new(&self.process));
+            self.filesystem = Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
+                Some(std::rc::Rc::clone(&self.process)),
+            ))));
         }
 
         self.filesystem.as_ref().unwrap()
     }
 
-    pub fn set_filesystem(&mut self, fs: Filesystem) {
+    pub fn set_filesystem(&mut self, fs: std::rc::Rc<std::cell::RefCell<Filesystem>>) {
         self.filesystem = Some(fs);
     }
 

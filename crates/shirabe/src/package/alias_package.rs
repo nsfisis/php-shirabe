@@ -53,13 +53,16 @@ impl AliasPackage {
     /// @param string      $version       The version the alias must report
     /// @param string      $prettyVersion The alias's non-normalized version
     pub fn new(alias_of: Box<dyn BasePackage>, version: String, pretty_version: String) -> Self {
-        let inner = BasePackage::new(alias_of.get_name().to_string());
+        let alias_name = alias_of.get_name().to_string();
 
-        let stability = VersionParser::parse_stability(&version);
+        let stability = VersionParser::parse_stability(&version).to_string();
         let dev = stability == "dev";
 
         let mut this = Self {
-            inner,
+            id: -1,
+            name: alias_name.to_lowercase(),
+            pretty_name: alias_name,
+            repository: None,
             version,
             pretty_version,
             dev,
@@ -429,8 +432,7 @@ impl PackageInterface for AliasPackage {
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
         // TODO(phase-b): BasePackage.get_full_pretty_version returns Result; bridge here
-        self.alias_of
-            .get_full_pretty_version(truncate, display_mode)
+        BasePackage::get_full_pretty_version(self.alias_of.as_ref(), truncate, display_mode)
             .unwrap_or_default()
     }
 

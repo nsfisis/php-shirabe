@@ -92,6 +92,10 @@ impl RuleSet {
         &*self.rule_by_id[&id]
     }
 
+    pub fn rule_by_id_mut(&mut self, id: i64) -> &mut dyn Rule {
+        &mut *self.rule_by_id.get_mut(&id).unwrap()
+    }
+
     pub fn get_rules(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
         &self.rules
     }

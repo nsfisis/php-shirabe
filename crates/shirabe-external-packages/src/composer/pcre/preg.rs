@@ -437,6 +437,13 @@ impl Preg {
         todo!()
     }
 
+    pub fn is_match_with_indexed_captures(
+        _pattern: &str,
+        _subject: &str,
+    ) -> anyhow::Result<Option<Vec<String>>> {
+        todo!()
+    }
+
     pub fn is_match_all3(
         _pattern: &str,
         _subject: &str,

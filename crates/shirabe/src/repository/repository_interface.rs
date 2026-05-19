@@ -12,6 +12,15 @@ pub enum FindPackageConstraint {
     Constraint(Box<dyn ConstraintInterface>),
 }
 
+impl Clone for FindPackageConstraint {
+    fn clone(&self) -> Self {
+        match self {
+            Self::String(s) => Self::String(s.clone()),
+            Self::Constraint(c) => Self::Constraint(c.clone_box()),
+        }
+    }
+}
+
 pub struct LoadPackagesResult {
     pub names_found: Vec<String>,
     pub packages: Vec<Box<dyn BasePackage>>,
@@ -44,13 +53,13 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>>;
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>>;
 

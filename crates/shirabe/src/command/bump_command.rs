@@ -4,8 +4,8 @@ use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -37,16 +37,10 @@ impl BumpCommand {
         self
             .set_name("bump")
             .set_description("Increases the lower limit of your composer.json requirements to the currently installed versions")
-            .set_definition(vec![
-                InputArgument::new(
-                    "packages",
-                    Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-                    "Optional package name(s) to restrict which packages are bumped.",
-                    None,
-                ),
-                InputOption::new("dev-only", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require-dev\".", None),
-                InputOption::new("no-dev-only", Some(PhpMixed::String("R".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require\".", None),
-                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the packages to bump, but will not execute anything.", None),
+            .set_definition (&[
+                InputArgument::new("packages",Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),"Optional package name(s) to restrict which packages are bumped.",None,).unwrap().into(),InputOption::new("dev-only", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require-dev\".", None).unwrap().into(),
+                    InputOption::new("no-dev-only", Some(PhpMixed::String("R".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require\".", None).unwrap().into(),
+        InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the packages to bump, but will not execute anything.", None).unwrap().into(),
             ])
             .set_help(
                 "The <info>bump</info> command increases the lower limit of your composer.json requirements\n\
@@ -136,23 +130,34 @@ impl BumpCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let has_lock_file_disabled = !composer.get_config().has("lock")
-            || composer.get_config().get("lock").as_bool().unwrap_or(true);
-        let repo = if !has_lock_file_disabled {
-            composer.get_locker().get_locked_repository(true)?
-        } else if composer.get_locker().is_locked() {
-            if !composer.get_locker().is_fresh() {
-                io.write_error3(
+        let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
+            || composer
+                .get_config()
+                .borrow_mut()
+                .get("lock")
+                .as_bool()
+                .unwrap_or(true);
+        let repo: Box<dyn crate::repository::repository_interface::RepositoryInterface> =
+            if !has_lock_file_disabled {
+                Box::new(composer.get_locker().get_locked_repository(true)?)
+            } else if composer.get_locker().is_locked() {
+                if !composer.get_locker().is_fresh()? {
+                    io.write_error3(
                     "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
                     true,
                     io_interface::NORMAL,
                 );
-                return Ok(Self::ERROR_LOCK_OUTDATED);
-            }
-            composer.get_locker().get_locked_repository(true)?
-        } else {
-            composer.get_repository_manager().get_local_repository()
-        };
+                    return Ok(Self::ERROR_LOCK_OUTDATED);
+                }
+                Box::new(composer.get_locker().get_locked_repository(true)?)
+            } else {
+                // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
+                // cloning into an owned Box requires clone_box on that trait.
+                composer
+                    .get_repository_manager()
+                    .get_local_repository()
+                    .clone_box()
+            };
 
         if composer.get_package().get_type() != "project" && !dev_only {
             io.write_error3(
@@ -162,7 +167,10 @@ impl BumpCommand {
             );
 
             let contents_data = composer_json.read()?;
-            if !contents_data.contains_key("type") {
+            if !contents_data
+                .as_array()
+                .map_or(false, |m| m.contains_key("type"))
+            {
                 io.write_error3(
                     "If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".",
                     true,
@@ -192,7 +200,7 @@ impl BumpCommand {
             let packages_filter: Vec<String> = packages_filter
                 .iter()
                 .map(|constraint| {
-                    Preg::replace(r"{[:= ].+}", "", constraint.clone())
+                    Preg::replace(r"{[:= ].+}", "", constraint)
                         .unwrap_or_else(|_| constraint.clone())
                 })
                 .collect();
@@ -218,20 +226,25 @@ impl BumpCommand {
                 if PlatformRepository::is_platform_package(pkg_name) {
                     continue;
                 }
-                let current_constraint = link.get_pretty_constraint();
+                let current_constraint = link.get_pretty_constraint()?;
 
-                let package_opt = repo.find_package(pkg_name, "*");
-                let package = match package_opt {
+                let package_opt = repo.find_package(
+                    pkg_name,
+                    crate::repository::repository_interface::FindPackageConstraint::String(
+                        "*".to_string(),
+                    ),
+                );
+                let mut package = match package_opt {
                     None => continue,
                     Some(p) => p,
                 };
-                let mut package = package;
                 while let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
-                    package = alias.get_alias_of();
+                    // TODO(phase-b): get_alias_of returns &dyn BasePackage; cloning into Box
+                    // requires clone_box on BasePackage applied to a borrowed ref.
+                    package = alias.get_alias_of().clone_box();
                 }
 
-                let bumped =
-                    bumper.bump_requirement(link.get_constraint().as_ref(), package.as_ref())?;
+                let bumped = bumper.bump_requirement(link.get_constraint(), package.as_ref())?;
 
                 if bumped == current_constraint {
                     continue;
@@ -245,62 +258,64 @@ impl BumpCommand {
         }
 
         if !dry_run && !self.update_file_cleanly(&composer_json, &updates)? {
-            let mut composer_definition = composer_json.read()?;
+            let mut composer_definition = match composer_json.read()? {
+                PhpMixed::Array(m) => m,
+                _ => indexmap::IndexMap::new(),
+            };
             for (key, packages) in &updates {
                 for (package, version) in packages {
-                    composer_definition
+                    let section = composer_definition
                         .entry(key.to_string())
-                        .or_insert_with(indexmap::IndexMap::new)
-                        .insert(package.clone(), version.clone());
+                        .or_insert_with(|| Box::new(PhpMixed::Array(indexmap::IndexMap::new())));
+                    if let PhpMixed::Array(map) = section.as_mut() {
+                        map.insert(package.clone(), Box::new(PhpMixed::String(version.clone())));
+                    }
                 }
             }
-            composer_json.write(composer_definition)?;
+            composer_json.write(PhpMixed::Array(composer_definition))?;
         }
 
         let change_count: usize = updates.values().map(|m| m.len()).sum();
         if change_count > 0 {
             if dry_run {
-                io.write3(
-                    &format!("<info>{} would be updated with:</info>", composer_json_path),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write(&format!(
+                    "<info>{} would be updated with:</info>",
+                    composer_json_path
+                ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write3(
-                            &format!("<info> - {}.{}: {}</info>", require_type, package, version),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        io.write(&format!(
+                            "<info> - {}.{}: {}</info>",
+                            require_type, package, version
+                        ));
                     }
                 }
             } else {
-                io.write3(
-                    &format!(
-                        "<info>{} has been updated ({} changes).</info>",
-                        composer_json_path, change_count
-                    ),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write(&format!(
+                    "<info>{} has been updated ({} changes).</info>",
+                    composer_json_path, change_count
+                ));
             }
         } else {
-            io.write3(
-                &format!(
-                    "<info>No requirements to update in {}.</info>",
-                    composer_json_path
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write(&format!(
+                "<info>No requirements to update in {}.</info>",
+                composer_json_path
+            ));
         }
 
         if !dry_run
             && composer.get_locker().is_locked()
-            && composer.get_config().get("lock").as_bool().unwrap_or(true)
+            && composer
+                .get_config()
+                .borrow_mut()
+                .get("lock")
+                .as_bool()
+                .unwrap_or(true)
             && change_count > 0
         {
-            composer.get_locker().update_hash(&composer_json)?;
+            composer
+                .get_locker()
+                .update_hash(&composer_json, None::<fn(_) -> _>)?;
         }
 
         if dry_run && change_count > 0 {
@@ -330,7 +345,7 @@ impl BumpCommand {
 
         for (key, packages) in updates {
             for (package, version) in packages {
-                if !manipulator.add_link(key, package, version)? {
+                if !manipulator.add_link(key, package, version, false)? {
                     return Ok(false);
                 }
             }

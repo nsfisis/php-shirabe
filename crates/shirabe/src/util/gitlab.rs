@@ -15,22 +15,28 @@ use crate::util::process_executor::ProcessExecutor;
 #[derive(Debug)]
 pub struct GitLab {
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) config: Config,
-    pub(crate) process: ProcessExecutor,
-    pub(crate) http_downloader: HttpDownloader,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl GitLab {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        process: Option<ProcessExecutor>,
-        http_downloader: Option<HttpDownloader>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
+        http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     ) -> anyhow::Result<Self> {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+        });
         let http_downloader = match http_downloader {
             Some(h) => h,
-            None => Factory::create_http_downloader(&*io, &config, IndexMap::new())?,
+            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
+                &*io,
+                &config,
+                IndexMap::new(),
+            )?)),
         };
         Ok(Self {
             io,
@@ -45,7 +51,7 @@ impl GitLab {
         let bc_origin_url =
             Preg::replace("{:\\d+}", "", origin_url).unwrap_or_else(|_| origin_url.to_string());
 
-        let gitlab_domains = self.config.get("gitlab-domains");
+        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let domains = match gitlab_domains.as_array() {
             Some(arr) => arr.clone(),
             None => return false,
@@ -60,7 +66,7 @@ impl GitLab {
 
         // if available use token from git config
         let mut output = String::new();
-        if self.process.execute(
+        if self.process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "config".to_string(),
@@ -81,7 +87,7 @@ impl GitLab {
         // if available use deploy token from git config
         let mut token_user = String::new();
         let mut token_password = String::new();
-        if self.process.execute(
+        if self.process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "config".to_string(),
@@ -90,7 +96,7 @@ impl GitLab {
             &mut token_user,
             None,
         ) == 0
-            && self.process.execute(
+            && self.process.borrow_mut().execute_args(
                 &[
                     "git".to_string(),
                     "config".to_string(),
@@ -109,7 +115,7 @@ impl GitLab {
         }
 
         // if available use token from composer config
-        let auth_tokens = self.config.get("gitlab-token");
+        let auth_tokens = self.config.borrow_mut().get("gitlab-token");
 
         let mut token: Option<PhpMixed> = None;
 
@@ -168,68 +174,53 @@ impl GitLab {
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
-            self.io.write_error(
-                PhpMixed::String(msg.to_string()),
-                true,
-                io_interface::NORMAL,
-            );
+            self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let local_auth_config = self.config.get_local_auth_config_source();
+        let local_auth_config = self.config.borrow().get_local_auth_config_source();
         let personal_access_token_link = format!(
             "{}://{}/-/user_settings/personal_access_tokens",
             scheme, origin_url
         );
         let revoke_link = format!("{}://{}/-/user_settings/applications", scheme, origin_url);
-        self.io.write_error(
-            PhpMixed::String(format!(
+        self.io.write_error3(
+            &format!(
                 "A token will be created and stored in \"{}\", your password will never be stored",
                 local_auth_config
                     .as_ref()
                     .map(|c| format!("{} OR ", c.get_name()))
                     .unwrap_or_default()
-                    + &self.config.get_auth_config_source().get_name()
-            )),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error(
-            PhpMixed::String("To revoke access to this token you can visit:".to_string()),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error(
-            PhpMixed::String(revoke_link.clone()),
-            true,
-            io_interface::NORMAL,
-        );
-        self.io.write_error(
-            PhpMixed::String(
-                "Alternatively you can setup an personal access token on:".to_string(),
+                    + &self.config.borrow().get_auth_config_source().get_name()
             ),
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(
-            PhpMixed::String(personal_access_token_link.clone()),
+        self.io.write_error3(
+            "To revoke access to this token you can visit:",
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(
-            PhpMixed::String("and store it under \"gitlab-token\" see https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token for more details.".to_string()),
+        self.io
+            .write_error3(&revoke_link, true, io_interface::NORMAL);
+        self.io.write_error3(
+            "Alternatively you can setup an personal access token on:",
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(
-            PhpMixed::String("https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token".to_string()),
+        self.io
+            .write_error3(&personal_access_token_link, true, io_interface::NORMAL);
+        self.io.write_error3(
+            "and store it under \"gitlab-token\" see https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token for more details.",
             true,
             io_interface::NORMAL,
         );
-        self.io.write_error(
-            PhpMixed::String("for more details.".to_string()),
+        self.io.write_error3(
+            "https://getcomposer.org/doc/articles/authentication-for-private-packages.md#gitlab-token",
             true,
             io_interface::NORMAL,
         );
+        self.io
+            .write_error3("for more details.", true, io_interface::NORMAL);
 
         let mut store_in_local_auth_config = false;
         if local_auth_config.is_some() {
@@ -261,41 +252,41 @@ impl GitLab {
                                     .and_then(|v| v.as_string())
                                     == Some("invalid_grant");
                                 if is_invalid_grant {
-                                    self.io.write_error(
-                                        PhpMixed::String("Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token".to_string()),
+                                    self.io.write_error3(
+                                        "Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token",
                                         true,
                                         io_interface::NORMAL,
                                     );
                                 } else {
-                                    self.io.write_error(
-                                        PhpMixed::String("Bad credentials.".to_string()),
+                                    self.io.write_error3(
+                                        "Bad credentials.",
                                         true,
                                         io_interface::NORMAL,
                                     );
                                 }
                             } else {
-                                self.io.write_error(
-                                    PhpMixed::String("Maximum number of login attempts exceeded. Please try again later.".to_string()),
+                                self.io.write_error3(
+                                    "Maximum number of login attempts exceeded. Please try again later.",
                                     true,
                                     io_interface::NORMAL,
                                 );
                             }
 
-                            self.io.write_error(
-                                PhpMixed::String("You can also manually create a personal access token enabling the \"read_api\" scope at:".to_string()),
+                            self.io.write_error3(
+                                "You can also manually create a personal access token enabling the \"read_api\" scope at:",
                                 true,
                                 io_interface::NORMAL,
                             );
-                            self.io.write_error(
-                                PhpMixed::String(personal_access_token_link.clone()),
+                            self.io.write_error3(
+                                &personal_access_token_link,
                                 true,
                                 io_interface::NORMAL,
                             );
-                            self.io.write_error(
-                                PhpMixed::String(format!(
+                            self.io.write_error3(
+                                &format!(
                                     "Add it using \"composer config --global --auth gitlab-token.{} <token>\"",
                                     origin_url
-                                )),
+                                ),
                                 true,
                                 io_interface::NORMAL,
                             );
@@ -342,7 +333,7 @@ impl GitLab {
                     )?;
                 }
             } else {
-                let mut auth_config_source = self.config.get_auth_config_source();
+                let mut auth_config_source = self.config.borrow().get_auth_config_source();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
                         &format!("gitlab-oauth.{}", origin_url),
@@ -375,8 +366,8 @@ impl GitLab {
             Ok(r) => r,
             Err(e) => match e.downcast::<TransportException>() {
                 Ok(te) => {
-                    self.io.write_error(
-                        PhpMixed::String(format!("Couldn't refresh access token: {}", te.message)),
+                    self.io.write_error3(
+                        &format!("Couldn't refresh access token: {}", te.message),
                         true,
                         io_interface::NORMAL,
                     );
@@ -400,10 +391,13 @@ impl GitLab {
         );
 
         // store value in user config in auth file
-        self.config.get_auth_config_source().add_config_setting(
-            &format!("gitlab-oauth.{}", origin_url),
-            Self::build_oauth_config(&response, &access_token),
-        )?;
+        self.config
+            .borrow()
+            .get_auth_config_source()
+            .add_config_setting(
+                &format!("gitlab-oauth.{}", origin_url),
+                Self::build_oauth_config(&response, &access_token),
+            )?;
 
         Ok(true)
     }
@@ -454,23 +448,21 @@ impl GitLab {
 
         let token = self
             .http_downloader
+            .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, api_url),
                 &PhpMixed::Array(options),
             )?
             .decode_json()?;
 
-        self.io.write_error(
-            PhpMixed::String("Token successfully created".to_string()),
-            true,
-            io_interface::NORMAL,
-        );
+        self.io
+            .write_error3("Token successfully created", true, io_interface::NORMAL);
 
         Ok(token)
     }
 
     pub fn is_oauth_expired(&self, origin_url: &str) -> bool {
-        let auth_tokens = self.config.get("gitlab-oauth");
+        let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         if let Some(map) = auth_tokens.as_array() {
             if let Some(token_info) = map.get(origin_url) {
                 if let Some(token_map) = token_info.as_array() {
@@ -489,7 +481,7 @@ impl GitLab {
     }
 
     fn refresh_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
-        let auth_tokens = self.config.get("gitlab-oauth");
+        let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         let refresh_token = auth_tokens
             .as_array()
             .and_then(|map| map.get(origin_url))
@@ -543,22 +535,23 @@ impl GitLab {
 
         let token = self
             .http_downloader
+            .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, origin_url),
                 &PhpMixed::Array(options),
             )?
             .decode_json()?;
 
-        self.io.write_error(
-            PhpMixed::String("GitLab token successfully refreshed".to_string()),
+        self.io.write_error3(
+            "GitLab token successfully refreshed",
             true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write_error(
-            PhpMixed::String(format!(
+        self.io.write_error3(
+            &format!(
                 "To revoke access to this token you can visit {}://{}/-/user_settings/applications",
                 scheme, origin_url
-            )),
+            ),
             true,
             io_interface::VERY_VERBOSE,
         );

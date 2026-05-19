@@ -6,6 +6,7 @@ use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, imp
 
 use super::{request::Request, rule::ReasonData};
 
+#[derive(Debug)]
 pub struct GenericRule {
     inner: RuleBase,
     pub(crate) literals: Vec<i64>,
@@ -13,7 +14,7 @@ pub struct GenericRule {
 
 impl GenericRule {
     pub fn new(mut literals: Vec<i64>, reason: PhpMixed, reason_data: PhpMixed) -> Self {
-        let inner = RuleBase::new(reason, reason_data);
+        let inner = RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data));
         literals.sort();
         Self { inner, literals }
     }
@@ -69,6 +70,20 @@ pub trait RuleLiterals {
     fn get_literals(&self) -> &Vec<i64>;
     fn is_multi_conflict_rule(&self) -> bool {
         false
+    }
+    fn is_assertion(&self) -> bool {
+        false
+    }
+    fn is_disabled(&self) -> bool {
+        false
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        todo!()
+    }
+    /// Clone this rule into an owned `Box<dyn Rule>` so callers like
+    /// `RuleWatchGraph::propagate_literal` can hand it to `Decisions::decide`.
+    fn clone_rule_box(&self) -> Box<dyn Rule> {
+        todo!()
     }
 }
 

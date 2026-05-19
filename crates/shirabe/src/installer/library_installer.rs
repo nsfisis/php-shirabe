@@ -30,7 +30,7 @@ pub struct LibraryInstaller {
     pub(crate) download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) r#type: Option<String>,
-    pub(crate) filesystem: Filesystem,
+    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     pub(crate) binary_installer: BinaryInstaller,
 }
 
@@ -40,31 +40,34 @@ impl LibraryInstaller {
         io: Box<dyn IOInterface>,
         composer: PartialComposer,
         r#type: Option<String>,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
         // PHP: $this->downloadManager = $composer instanceof Composer ? $composer->getDownloadManager() : null;
-        let download_manager = if let Some(full_composer) =
-            (composer.as_any() as &dyn Any).downcast_ref::<Composer>()
-        {
-            // TODO(phase-b): clone or borrow the DownloadManager from the full Composer
-            Some(todo!("composer.get_download_manager() as DownloadManager"))
-        } else {
-            None
-        };
+        let download_manager =
+            if let Some(full_composer) = composer.as_any().downcast_ref::<Composer>() {
+                // TODO(phase-b): clone or borrow the DownloadManager from the full Composer
+                Some(todo!("composer.get_download_manager() as DownloadManager"))
+            } else {
+                None
+            };
 
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
+        let filesystem = filesystem
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = rtrim(
-            // TODO(phase-b): composer.get_config().get("vendor-dir") returns a PhpMixed/String
-            &composer.get_config().get("vendor-dir"),
+            // TODO(phase-b): composer.get_config().borrow_mut().get("vendor-dir") returns a PhpMixed/String
+            &composer.get_config().borrow_mut().get("vendor-dir"),
             Some("/"),
         );
         let binary_installer = binary_installer.unwrap_or_else(|| {
             BinaryInstaller::new(
                 // TODO(phase-b): pass io by reference/clone
                 todo!("io reference"),
-                rtrim(&composer.get_config().get("bin-dir"), Some("/")),
-                composer.get_config().get("bin-compat"),
+                rtrim(
+                    &composer.get_config().borrow_mut().get("bin-dir"),
+                    Some("/"),
+                ),
+                composer.get_config().borrow_mut().get("bin-compat"),
                 // TODO(phase-b): pass filesystem reference
                 todo!("filesystem reference"),
                 vendor_dir.clone(),
@@ -163,6 +166,7 @@ impl LibraryInstaller {
             }
 
             self.filesystem
+                .borrow_mut()
                 .rename(&initial_download_path, &target_download_path);
         }
 
@@ -185,7 +189,9 @@ impl LibraryInstaller {
     }
 
     pub(crate) fn initialize_vendor_dir(&mut self) {
-        self.filesystem.ensure_directory_exists(&self.vendor_dir);
+        self.filesystem
+            .borrow_mut()
+            .ensure_directory_exists(&self.vendor_dir);
         // TODO(phase-b): realpath returns Option<String>; PHP assigns to vendorDir even when false
         self.vendor_dir = realpath(&self.vendor_dir).unwrap();
     }
@@ -232,7 +238,7 @@ impl InstallerInterface for LibraryInstaller {
             return true;
         }
 
-        if Platform::is_windows() && self.filesystem.is_junction(&install_path) {
+        if Platform::is_windows() && self.filesystem.borrow_mut().is_junction(&install_path) {
             return true;
         }
 
@@ -393,7 +399,7 @@ impl InstallerInterface for LibraryInstaller {
             if strpos(package.get_name(), "/").is_some() {
                 let package_vendor_dir = shirabe_php_shim::dirname(&download_path);
                 if shirabe_php_shim::is_dir(&package_vendor_dir)
-                    && filesystem.is_dir_empty(&package_vendor_dir)
+                    && filesystem.borrow().is_dir_empty(&package_vendor_dir)
                 {
                     Silencer::call(|| {
                         rmdir(&package_vendor_dir);

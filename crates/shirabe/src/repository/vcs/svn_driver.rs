@@ -3,7 +3,7 @@
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, array_key_exists,
     is_array, max, sprintf, stripos, strrpos, strtr, substr, trim,
@@ -90,6 +90,7 @@ impl SvnDriver {
                 "{}/{}",
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or(""),
@@ -102,6 +103,7 @@ impl SvnDriver {
         self.inner.cache.as_mut().unwrap().set_read_only(
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-read-only")
                 .as_bool()
                 .unwrap_or(false),
@@ -135,7 +137,10 @@ impl SvnDriver {
     }
 
     pub(crate) fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some() && Preg::is_match(r"{@\d+$}", identifier)
+        self.inner.cache.is_some()
+            && Preg::is_match(r"{@\d+$}", identifier)
+                .unwrap_or(false)
+                .unwrap_or(false)
     }
 
     pub fn get_composer_information(
@@ -170,22 +175,30 @@ impl SvnDriver {
             }
 
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let composer: Option<IndexMap<String, PhpMixed>> =
-                match self.inner.get_base_composer_information(identifier) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        // TODO(phase-b): downcast to TransportException
-                        let _te: &TransportException = todo!("downcast e to TransportException");
-                        let message = e.to_string();
-                        if stripos(&message, "path not found").is_none()
-                            && stripos(&message, "svn: warning: W160013").is_none()
-                        {
-                            return Err(e);
-                        }
-                        // remember a not-existent composer.json
-                        None
+            let base_result =
+                self.get_file_content("composer.json", identifier)
+                    .and_then(|file_content| {
+                        VcsDriverBase::finish_base_composer_information(
+                            identifier,
+                            file_content,
+                            || self.get_change_date(identifier),
+                        )
+                    });
+            let composer: Option<IndexMap<String, PhpMixed>> = match base_result {
+                Ok(c) => c,
+                Err(e) => {
+                    // TODO(phase-b): downcast to TransportException
+                    let _te: &TransportException = todo!("downcast e to TransportException");
+                    let message = e.to_string();
+                    if stripos(&message, "path not found").is_none()
+                        && stripos(&message, "svn: warning: W160013").is_none()
+                    {
+                        return Err(e);
                     }
-                };
+                    // remember a not-existent composer.json
+                    None
+                }
+            };
 
             if self.should_cache(identifier) {
                 let encoded = JsonFile::encode(
@@ -282,12 +295,17 @@ impl SvnDriver {
             vec!["svn".to_string(), "info".to_string()],
             &format!("{}{}{}", self.base_url, path, rev),
         )?;
-        for line in self.inner.process.split_lines(&output) {
+        for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty() {
-                if let Some(m) =
-                    Preg::is_match_strict_groups(r"{^Last Changed Date: ([^(]+)}", &line)
+                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(
+                    r"{^Last Changed Date: ([^(]+)}",
+                    &line,
+                    Some(&mut m),
+                )
+                .unwrap_or(false)
                 {
-                    let date_str = m.get(1).cloned().unwrap_or_default();
+                    let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     // PHP: new \DateTimeImmutable($match[1], new \DateTimeZone('UTC'))
                     return Ok(Utc
                         .datetime_from_str(date_str.trim(), "%Y-%m-%d %H:%M:%S %z")
@@ -313,15 +331,23 @@ impl SvnDriver {
                     .unwrap_or_default();
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
-                    for line in self.inner.process.split_lines(&output) {
+                    for line in self.inner.process.borrow().split_lines(&output) {
                         let line = trim(&line, None);
                         if !line.is_empty() {
-                            if let Some(m) =
-                                Preg::is_match_strict_groups(r"{^\s*(\S+).*?(\S+)\s*$}", &line)
+                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            if Preg::is_match_strict_groups3(
+                                r"{^\s*(\S+).*?(\S+)\s*$}",
+                                &line,
+                                Some(&mut m),
+                            )
+                            .unwrap_or(false)
                             {
-                                let rev: i64 =
-                                    m.get(1).map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-                                let path = m.get(2).cloned().unwrap_or_default();
+                                let rev: i64 = m
+                                    .get(&CaptureKey::ByIndex(1))
+                                    .and_then(|s| s.parse().ok())
+                                    .unwrap_or(0);
+                                let path =
+                                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                                 if path == "./" {
                                     last_rev = rev;
                                 } else {
@@ -360,14 +386,22 @@ impl SvnDriver {
                 )
                 .unwrap_or_default();
             if !output.is_empty() {
-                for line in self.inner.process.split_lines(&output) {
+                for line in self.inner.process.borrow().split_lines(&output) {
                     let line = trim(&line, None);
                     if !line.is_empty() {
-                        if let Some(m) =
-                            Preg::is_match_strict_groups(r"{^\s*(\S+).*?(\S+)\s*$}", &line)
+                        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match_strict_groups3(
+                            r"{^\s*(\S+).*?(\S+)\s*$}",
+                            &line,
+                            Some(&mut m),
+                        )
+                        .unwrap_or(false)
                         {
-                            let rev: i64 = m.get(1).map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-                            let path = m.get(2).cloned().unwrap_or_default();
+                            let rev: i64 = m
+                                .get(&CaptureKey::ByIndex(1))
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(0);
+                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                             if path == "./" {
                                 let identifier = self.build_identifier(
                                     &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
@@ -393,15 +427,28 @@ impl SvnDriver {
                     .unwrap_or_default();
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
-                    for line in self.inner.process.split_lines(&trim(&output, None)) {
+                    for line in self
+                        .inner
+                        .process
+                        .borrow()
+                        .split_lines(&trim(&output, None))
+                    {
                         let line = trim(&line, None);
                         if !line.is_empty() {
-                            if let Some(m) =
-                                Preg::is_match_strict_groups(r"{^\s*(\S+).*?(\S+)\s*$}", &line)
+                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            if Preg::is_match_strict_groups3(
+                                r"{^\s*(\S+).*?(\S+)\s*$}",
+                                &line,
+                                Some(&mut m),
+                            )
+                            .unwrap_or(false)
                             {
-                                let rev: i64 =
-                                    m.get(1).map(|s| s.parse().unwrap_or(0)).unwrap_or(0);
-                                let path = m.get(2).cloned().unwrap_or_default();
+                                let rev: i64 = m
+                                    .get(&CaptureKey::ByIndex(1))
+                                    .and_then(|s| s.parse().ok())
+                                    .unwrap_or(0);
+                                let path =
+                                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                                 if path == "./" {
                                     last_rev = rev;
                                 } else {
@@ -426,7 +473,10 @@ impl SvnDriver {
 
     pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, deep: bool) -> bool {
         let url = Self::normalize_url(url);
-        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url) {
+        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url)
+            .unwrap_or(false)
+            .unwrap_or(false)
+        {
             return true;
         }
 
@@ -437,7 +487,7 @@ impl SvnDriver {
 
         let mut process = ProcessExecutor::new(io);
         let mut ignored_output = String::new();
-        let exit = process.execute(
+        let exit = process.execute_args(
             &[
                 "svn".to_string(),
                 "info".to_string(),
@@ -516,7 +566,7 @@ impl SvnDriver {
                         message: format!(
                             "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
                             self.inner.url,
-                            self.inner.process.get_error_output(),
+                            self.inner.process.borrow().get_error_output(),
                         ),
                         code: 0,
                     }

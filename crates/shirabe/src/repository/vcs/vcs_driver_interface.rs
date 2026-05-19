@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-pub trait VcsDriverInterface {
+pub trait VcsDriverInterface: std::fmt::Debug {
     fn initialize(&mut self) -> anyhow::Result<()>;
 
     fn get_composer_information(

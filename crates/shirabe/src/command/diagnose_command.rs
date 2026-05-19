@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
@@ -54,8 +54,8 @@ use crate::util::process_executor::ProcessExecutor;
 pub struct DiagnoseCommand {
     base_command_data: BaseCommandData,
 
-    pub(crate) http_downloader: Option<HttpDownloader>,
-    pub(crate) process: Option<ProcessExecutor>,
+    pub(crate) http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
+    pub(crate) process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     pub(crate) exit_code: i64,
 }
 
@@ -79,11 +79,11 @@ impl DiagnoseCommand {
         let composer = self.try_composer(None, None);
         let io = self.get_io();
 
-        let config: Config;
+        let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref c) = composer {
             config = c.get_config().clone();
 
-            let command_event = CommandEvent::new(
+            let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "diagnose",
                 input,
@@ -97,13 +97,19 @@ impl DiagnoseCommand {
                 c.get_loop()
                     .borrow()
                     .get_process_executor()
-                    .cloned()
-                    .unwrap_or_else(|| ProcessExecutor::new(Some(io.clone_box()))),
+                    .map(std::rc::Rc::clone)
+                    .unwrap_or_else(|| {
+                        std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                            io.clone_box(),
+                        ))))
+                    }),
             );
         } else {
-            config = Factory::create_config(None)?;
+            config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
 
-            self.process = Some(ProcessExecutor::new(Some(io.clone_box())));
+            self.process = Some(std::rc::Rc::new(std::cell::RefCell::new(
+                ProcessExecutor::new(Some(io.clone_box())),
+            )));
         }
 
         let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
@@ -111,14 +117,20 @@ impl DiagnoseCommand {
         let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
         secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
         let mut config = config;
-        config.merge(&secure_http_wrap, Config::SOURCE_COMMAND);
-        config.prohibit_url_by_config("http://repo.packagist.org", &NullIO::new());
+        config
+            .borrow_mut()
+            .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
+        config
+            .borrow_mut()
+            .prohibit_url_by_config("http://repo.packagist.org", &NullIO::new());
 
-        self.http_downloader = Some(Factory::create_http_downloader(io, &config)?);
+        self.http_downloader = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
+        )));
 
         if strpos(file!(), "phar:") == Some(0) {
             io.write_no_newline("Checking pubkeys: ");
-            let r = self.check_pub_keys(&config);
+            let r = self.check_pub_keys(&*config.borrow());
             self.output_result(r);
 
             io.write_no_newline("Checking Composer version: ");
@@ -132,10 +144,11 @@ impl DiagnoseCommand {
         ));
 
         io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
-        let r = self.check_composer_audit(&config)?;
+        let r = self.check_composer_audit(&*config.borrow())?;
         self.output_result(r);
 
         let platform_overrides = config
+            .borrow_mut()
             .get("platform")
             .as_array()
             .cloned()
@@ -241,14 +254,14 @@ impl DiagnoseCommand {
         self.output_result(PhpMixed::String(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");
-        let r = self.check_http("http", &config)?;
+        let r = self.check_http("http", &*config.borrow())?;
         self.output_result(r);
 
         io.write_no_newline("Checking https connectivity to packagist: ");
-        let r = self.check_http("https", &config)?;
+        let r = self.check_http("https", &*config.borrow())?;
         self.output_result(r);
 
-        for repo in config.get_repositories() {
+        for repo in config.borrow().get_repositories() {
             let repo_arr = repo.as_array().cloned().unwrap_or_default();
             if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
                 && repo_arr.get("url").is_some()
@@ -256,7 +269,7 @@ impl DiagnoseCommand {
                 let composer_repo = ComposerRepository::new(
                     PhpMixed::Array(repo_arr.clone()),
                     self.get_io().clone_box(),
-                    config.clone(),
+                    &*config.borrow(),
                     self.http_downloader.clone().unwrap(),
                 );
                 // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
@@ -276,13 +289,13 @@ impl DiagnoseCommand {
                         .and_then(|v| v.as_string())
                         .unwrap_or("")
                 ));
-                let r = self.check_composer_repo(&url, &config)?;
+                let r = self.check_composer_repo(&url, &*config.borrow())?;
                 self.output_result(r);
             }
         }
 
         let proxy_manager = ProxyManager::get_instance();
-        let protos: Vec<&str> = if config.get("disable-tls").as_bool() == Some(true) {
+        let protos: Vec<&str> = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
             vec!["http"]
         } else {
             vec!["http", "https"]
@@ -319,6 +332,7 @@ impl DiagnoseCommand {
         }
 
         let oauth = config
+            .borrow_mut()
             .get("github-oauth")
             .as_array()
             .cloned()
@@ -372,7 +386,7 @@ impl DiagnoseCommand {
         }
 
         io.write_no_newline("Checking disk free space: ");
-        let r = self.check_disk_space(&config);
+        let r = self.check_disk_space(&*config.borrow());
         self.output_result(r);
 
         Ok(self.exit_code)
@@ -403,7 +417,7 @@ impl DiagnoseCommand {
     fn check_composer_lock_schema(&self, locker: &Locker) -> anyhow::Result<PhpMixed> {
         let json = locker.get_json_file();
 
-        match json.validate_schema(JsonFile::LOCK_SCHEMA) {
+        match json.validate_schema(JsonFile::LOCK_SCHEMA, None) {
             Ok(_) => {}
             Err(e) => {
                 if let Some(jve) = e.downcast_ref::<JsonValidationException>() {
@@ -427,7 +441,7 @@ impl DiagnoseCommand {
         }
 
         let mut output = String::new();
-        self.process.as_mut().unwrap().execute(
+        self.process.as_mut().unwrap().borrow_mut().execute(
             &vec![
                 "git".to_string(),
                 "config".to_string(),
@@ -467,15 +481,15 @@ impl DiagnoseCommand {
             tls_warning = Some("<warning>Composer is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
         }
 
-        match self.http_downloader.as_mut().unwrap().get(
+        match self.http_downloader.as_ref().unwrap().borrow_mut().get(
             &format!("{}://repo.packagist.org/packages.json", proto),
             IndexMap::new(),
         ) {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    let hints = HttpDownloader::get_exception_hints(te);
-                    if !hints.is_empty() && count(&hints) > 0 {
+                    let hints = HttpDownloader::get_exception_hints(te).unwrap_or_default();
+                    if !hints.is_empty() {
                         for hint in hints {
                             result_list.push(Box::new(PhpMixed::String(hint)));
                         }
@@ -517,15 +531,16 @@ impl DiagnoseCommand {
 
         match self
             .http_downloader
-            .as_mut()
+            .as_ref()
             .unwrap()
+            .borrow_mut()
             .get(url, IndexMap::new())
         {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    let hints = HttpDownloader::get_exception_hints(te);
-                    if !hints.is_empty() && count(&hints) > 0 {
+                    let hints = HttpDownloader::get_exception_hints(te).unwrap_or_default();
+                    if !hints.is_empty() {
                         for hint in hints {
                             result_list.push(Box::new(PhpMixed::String(hint)));
                         }
@@ -574,16 +589,22 @@ impl DiagnoseCommand {
 
         let json = self
             .http_downloader
-            .as_mut()
+            .as_ref()
             .unwrap()
+            .borrow_mut()
             .get(
                 &format!("{}://repo.packagist.org/packages.json", protocol),
                 IndexMap::new(),
             )?
             .decode_json()?;
         if let Some(provider_includes) = json.as_array().and_then(|a| a.get("provider-includes")) {
-            let mut hash_val = reset(&provider_includes.as_array().cloned().unwrap_or_default());
-            hash_val = hash_val
+            let provider_includes_arr = provider_includes.as_array().cloned().unwrap_or_default();
+            let first = provider_includes_arr
+                .values()
+                .next()
+                .map(|v| (**v).clone())
+                .unwrap_or(PhpMixed::Null);
+            let hash_val = first
                 .as_array()
                 .and_then(|a| a.get("sha256"))
                 .map(|v| (**v).clone())
@@ -596,8 +617,9 @@ impl DiagnoseCommand {
             );
             let provider = self
                 .http_downloader
-                .as_mut()
+                .as_ref()
                 .unwrap()
+                .borrow_mut()
                 .get(
                     &format!("{}://repo.packagist.org/{}", protocol, path),
                     IndexMap::new(),
@@ -641,7 +663,13 @@ impl DiagnoseCommand {
             Box::new(PhpMixed::Bool(false)),
         );
 
-        match self.http_downloader.as_mut().unwrap().get(&url, opts) {
+        match self
+            .http_downloader
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .get(&url, opts)
+        {
             Ok(response) => {
                 let expiration = response.get_header("github-authentication-token-expiration");
 
@@ -704,8 +732,9 @@ impl DiagnoseCommand {
         );
         let data = self
             .http_downloader
-            .as_mut()
+            .as_ref()
             .unwrap()
+            .borrow_mut()
             .get(&url, opts)?
             .decode_json()?;
 
@@ -790,15 +819,27 @@ impl DiagnoseCommand {
         }
     }
 
-    fn check_version(&mut self, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_version(
+        &mut self,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> anyhow::Result<PhpMixed> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
         if result.as_bool() != Some(true) {
             return Ok(result);
         }
 
-        let versions_util = Versions::new(config.clone(), self.http_downloader.clone().unwrap());
+        let versions_util = Versions::new(
+            std::rc::Rc::clone(config),
+            self.http_downloader.clone().unwrap(),
+        );
         let latest = match versions_util.get_latest(None) {
-            Ok(l) => l,
+            Ok(Ok(l)) => l,
+            Ok(Err(e)) => {
+                return Ok(PhpMixed::String(format!(
+                    "<error>[{}] {}</error>",
+                    "UnexpectedValueException", e.message
+                )));
+            }
             Err(e) => {
                 return Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
@@ -809,8 +850,7 @@ impl DiagnoseCommand {
         };
 
         let latest_version = latest
-            .as_array()
-            .and_then(|a| a.get("version"))
+            .get("version")
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
@@ -832,7 +872,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let auditor = Auditor::new();
+        let auditor = Auditor;
         let mut repo_set = RepositorySet::new(
             "stable".to_string(),
             IndexMap::new(),
@@ -920,7 +960,7 @@ impl DiagnoseCommand {
             }
 
             let version = curl_version();
-            let version_arr = version.as_array().cloned().unwrap_or_default();
+            let version_arr = version.unwrap_or_default();
             let libz_version = version_arr
                 .get("libz_version")
                 .and_then(|v| v.as_string())
@@ -1102,16 +1142,20 @@ impl DiagnoseCommand {
         ob_start();
         phpinfo(INFO_GENERAL);
         let phpinfo_str = ob_get_clean();
-        let mut phpinfo_match: Vec<String> = vec![];
+        let mut phpinfo_match: IndexMap<CaptureKey, String> = IndexMap::new();
         if phpinfo_str.is_some()
-            && Preg::is_match_strict_groups(
+            && Preg::is_match_strict_groups3(
                 "{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m",
                 phpinfo_str.as_ref().unwrap(),
                 Some(&mut phpinfo_match),
             )
             .unwrap_or(false)
         {
-            let configure = &phpinfo_match[1];
+            let configure = phpinfo_match
+                .get(&CaptureKey::ByIndex(1))
+                .cloned()
+                .unwrap_or_default();
+            let configure = configure.as_str();
 
             if str_contains(configure, "--enable-sigchild") {
                 warnings.insert("sigchild".to_string(), PhpMixed::Bool(true));
@@ -1251,9 +1295,11 @@ impl DiagnoseCommand {
                     ),
                     "openssl_version" => {
                         // Attempt to parse version number out, fallback to whole string value.
-                        let openssl_trimmed =
-                            trim(&strstr(OPENSSL_VERSION_TEXT, " ", false), " \t\n\r\0\u{0B}");
-                        let mut openssl_version = strstr(&openssl_trimmed, " ", true);
+                        let openssl_trimmed = trim(
+                            &strstr(OPENSSL_VERSION_TEXT, " ").unwrap_or_default(),
+                            " \t\n\r\0\u{0B}",
+                        );
+                        let mut openssl_version = strstr(&openssl_trimmed, " ").unwrap_or_default();
                         if openssl_version.is_empty() {
                             openssl_version = OPENSSL_VERSION_TEXT.to_string();
                         }

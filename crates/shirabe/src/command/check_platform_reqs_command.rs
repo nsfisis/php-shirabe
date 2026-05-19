@@ -2,10 +2,11 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, strip_tags};
 use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
@@ -36,10 +37,10 @@ impl CheckPlatformReqsCommand {
         self
             .set_name("check-platform-reqs")
             .set_description("Check that platform requirements are satisfied")
-            .set_definition(vec![
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables checking of require-dev packages requirements.", None),
-                InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Checks requirements only from the lock file, not from installed packages.", None),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(shirabe_php_shim::PhpMixed::String("text".to_string()))),
+            .set_definition(&[
+                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables checking of require-dev packages requirements.", None).unwrap().into(),
+                InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Checks requirements only from the lock file, not from installed packages.", None).unwrap().into(),
+                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(shirabe_php_shim::PhpMixed::String("text".to_string()))).unwrap().into(),
             ])
             .set_help(
                 "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
@@ -61,12 +62,14 @@ impl CheckPlatformReqsCommand {
         let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
         let mut remove_packages: Vec<String> = vec![];
 
-        let installed_repo_base = if input.get_option("lock").as_bool().unwrap_or(false) {
+        let installed_repo_base: Box<
+            dyn crate::repository::repository_interface::RepositoryInterface,
+        > = if input.get_option("lock").as_bool().unwrap_or(false) {
             io.write_error(&format!(
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            composer.get_locker().get_locked_repository(!no_dev)?
+            Box::new(composer.get_locker().get_locked_repository(!no_dev)?)
         } else {
             let local_repo = composer.get_repository_manager().get_local_repository();
             if local_repo.get_packages().is_empty() {
@@ -74,7 +77,8 @@ impl CheckPlatformReqsCommand {
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                composer.get_locker().get_locked_repository(!no_dev)?
+                Box::new(composer.get_locker().get_locked_repository(!no_dev)?)
+                    as Box<dyn crate::repository::repository_interface::RepositoryInterface>
             } else {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names().clone();
@@ -126,28 +130,31 @@ impl CheckPlatformReqsCommand {
         'requirements: for (require, links) in &requires_sorted {
             if PlatformRepository::is_platform_package(require) {
                 let candidates = installed_repo_with_platform
-                    .find_packages_with_replacers_and_providers(require);
+                    .find_packages_with_replacers_and_providers(require, None);
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
-                        let candidate_constraint = if candidate.get_name() == require {
-                            let mut c = Constraint::new("=", candidate.get_version());
-                            c.set_pretty_string(candidate.get_pretty_version());
-                            Some(c)
-                        } else {
-                            let mut found = None;
-                            for link in candidate
-                                .get_provides()
-                                .iter()
-                                .chain(candidate.get_replaces().iter())
-                            {
-                                if link.get_target() == require {
-                                    found = Some(link.get_constraint().clone_box());
-                                    break;
+                        let candidate_constraint: Option<Box<dyn ConstraintInterface>> =
+                            if candidate.get_name() == require {
+                                let mut c = Constraint::new("=", candidate.get_version());
+                                c.set_pretty_string(Some(
+                                    candidate.get_pretty_version().to_string(),
+                                ));
+                                Some(Box::new(c))
+                            } else {
+                                let mut found: Option<Box<dyn ConstraintInterface>> = None;
+                                for (_, link) in candidate
+                                    .get_provides()
+                                    .iter()
+                                    .chain(candidate.get_replaces().iter())
+                                {
+                                    if link.get_target() == require {
+                                        found = Some(link.get_constraint().clone_box());
+                                        break;
+                                    }
                                 }
-                            }
-                            found.map(|c| Constraint::from_constraint_interface(c))
-                        };
+                                found
+                            };
 
                         let candidate_constraint = match candidate_constraint {
                             Some(c) => c,
@@ -155,7 +162,7 @@ impl CheckPlatformReqsCommand {
                         };
 
                         for link in links {
-                            if !link.get_constraint().matches(&candidate_constraint) {
+                            if !link.get_constraint().matches(&*candidate_constraint) {
                                 req_results.push(CheckResult {
                                     platform_package: if candidate.get_name() == require {
                                         candidate.get_pretty_name().to_string()
@@ -290,13 +297,13 @@ impl CheckPlatformReqsCommand {
                 448,
             ));
         } else {
-            let rows: Vec<Vec<PhpMixed>> = results
+            let rows: Vec<PhpMixed> = results
                 .iter()
                 .map(|result| {
-                    vec![
-                        PhpMixed::String(result.platform_package.clone()),
-                        PhpMixed::String(result.version.clone()),
-                        if let Some(link) = &result.link {
+                    PhpMixed::List(vec![
+                        Box::new(PhpMixed::String(result.platform_package.clone())),
+                        Box::new(PhpMixed::String(result.version.clone())),
+                        Box::new(if let Some(link) = &result.link {
                             PhpMixed::String(format!(
                                 "{} {} {} ({})",
                                 link.get_source(),
@@ -306,13 +313,13 @@ impl CheckPlatformReqsCommand {
                             ))
                         } else {
                             PhpMixed::String(String::new())
-                        },
-                        PhpMixed::String(
+                        }),
+                        Box::new(PhpMixed::String(
                             format!("{} {}", result.status, result.provider)
                                 .trim_end()
                                 .to_string(),
-                        ),
-                    ]
+                        )),
+                    ])
                 })
                 .collect();
 

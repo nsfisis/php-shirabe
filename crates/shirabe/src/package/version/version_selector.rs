@@ -17,7 +17,7 @@ use crate::filter::platform_requirement_filter::platform_requirement_filter_fact
 use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
 use crate::io::io_interface::IOInterface;
 use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
@@ -41,7 +41,7 @@ impl VersionSelector {
             IndexMap::new();
         if let Some(platform_repo) = platform_repo {
             for package in platform_repo.get_packages() {
-                let constraint = Constraint::new("==", package.get_version())?;
+                let constraint = Constraint::new("==", package.get_version());
                 platform_constraints
                     .entry(package.get_name().to_string())
                     .or_default()
@@ -65,7 +65,7 @@ impl VersionSelector {
         io: Option<&dyn IOInterface>,
         show_warnings: shirabe_php_shim::PhpMixed,
     ) -> anyhow::Result<Option<Box<dyn PackageInterface>>> {
-        if !BasePackage::STABILITIES.contains_key(preferred_stability) {
+        if !base_package::STABILITIES.contains_key(preferred_stability) {
             return Err(shirabe_php_shim::UnexpectedValueException {
                 message: format!(
                     "Expected a valid stability name as 3rd argument, got {}",
@@ -92,7 +92,7 @@ impl VersionSelector {
             repo_set_flags,
         )?;
 
-        let min_priority = *BasePackage::STABILITIES.get(preferred_stability).unwrap();
+        let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {
             let a_priority = a.get_stability_priority();
             let b_priority = b.get_stability_priority();
@@ -116,7 +116,9 @@ impl VersionSelector {
             }
         });
 
-        let is_ignore_all = (platform_requirement_filter.as_ref() as &dyn Any)
+        let is_ignore_all = platform_requirement_filter
+            .as_ref()
+            .as_any()
             .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
             .is_some();
 
@@ -141,9 +143,11 @@ impl VersionSelector {
                             if link.get_constraint().matches(provided_constraint.as_ref()) {
                                 continue 'reqs;
                             }
-                            let list_filter_opt = (platform_requirement_filter.as_ref()
-                                as &dyn Any)
-                                .downcast_ref::<IgnoreListPlatformRequirementFilter>();
+                            let list_filter_opt = platform_requirement_filter
+                                .as_ref()
+                                .as_any()
+                                .downcast_ref::<IgnoreListPlatformRequirementFilter>(
+                            );
                             if let Some(list_filter) = list_filter_opt {
                                 if list_filter.is_upper_bound_ignored(name) {
                                     let filtered_constraint = list_filter.filter_constraint(
@@ -178,8 +182,8 @@ impl VersionSelector {
                             } else {
                                 ""
                             };
-                            io.write_error(
-                                shirabe_php_shim::PhpMixed::String(format!(
+                            io.write_error3(
+                                &format!(
                                     "<warning>Cannot use {}{} {} as it {} {} {} which {}.</>",
                                     pkg.get_pretty_name(),
                                     latest,
@@ -188,7 +192,7 @@ impl VersionSelector {
                                     link.get_target(),
                                     link.get_pretty_constraint(),
                                     reason
-                                )),
+                                ),
                                 true,
                                 if is_first_warning {
                                     io_interface::NORMAL
@@ -223,16 +227,16 @@ impl VersionSelector {
             Some(p) => p,
         };
 
-        let package =
-            if let Some(alias) = (package.as_ref() as &dyn Any).downcast_ref::<AliasPackage>() {
-                if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                    alias.get_alias_of()
-                } else {
-                    package
-                }
+        let package = if let Some(alias) = package.as_ref().as_any().downcast_ref::<AliasPackage>()
+        {
+            if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
+                alias.get_alias_of()
             } else {
                 package
-            };
+            }
+        } else {
+            package
+        };
 
         Ok(Some(package))
     }
@@ -268,7 +272,7 @@ impl VersionSelector {
         if let Some(extra) = extra {
             if extra != VersionParser::DEFAULT_BRANCH_ALIAS {
                 let new_extra =
-                    Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", extra.clone())?;
+                    Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", &extra)?;
                 if new_extra != extra {
                     let new_extra = new_extra.replace(".9999999", ".0");
                     return self.transform_version(&new_extra, &new_extra, "dev");

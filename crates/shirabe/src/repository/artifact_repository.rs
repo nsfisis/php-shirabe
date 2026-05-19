@@ -106,7 +106,7 @@ impl ArtifactRepository {
             let basename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             match package {
                 None => {
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!(
                             "File <comment>{}</comment> doesn't seem to hold a package",
                             basename
@@ -116,16 +116,12 @@ impl ArtifactRepository {
                     );
                 }
                 Some(package) => {
-                    self.io.write_error(
-                        &format!(
-                            "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
-                            package.get_name(),
-                            package.get_pretty_version(),
-                            basename,
-                        ),
-                        true,
-                        io_interface::VERBOSE,
-                    );
+                    self.io.write_error3(&format!(
+                        "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
+                        package.get_name(),
+                        package.get_pretty_version(),
+                        basename,
+                    ), true, io_interface::VERBOSE);
                     self.inner.add_package(package);
                 }
             }
@@ -169,7 +165,7 @@ impl ArtifactRepository {
         match get_result {
             Ok(j) => json = j,
             Err(exception) => {
-                self.io.write(
+                self.io.write3(
                     &format!("Failed loading package {}: {}", pathname, exception),
                     false,
                     io_interface::VERBOSE,

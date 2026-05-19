@@ -33,6 +33,10 @@ impl SolverOperation for UninstallOperation {
 }
 
 impl OperationInterface for UninstallOperation {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_operation_type(&self) -> String {
         Self::TYPE.to_string()
     }
@@ -43,5 +47,9 @@ impl OperationInterface for UninstallOperation {
 
     fn to_string(&self) -> String {
         self.show(true)
+    }
+
+    fn as_uninstall_operation(&self) -> Option<&UninstallOperation> {
+        Some(self)
     }
 }

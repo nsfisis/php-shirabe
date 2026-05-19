@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-pub trait ConfigSourceInterface {
+pub trait ConfigSourceInterface: std::fmt::Debug {
     fn add_repository(
         &mut self,
         name: &str,

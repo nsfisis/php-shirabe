@@ -32,7 +32,7 @@ impl MultiConflictRule {
         literals.sort();
 
         Ok(Self {
-            inner: RuleBase::new(reason, reason_data),
+            inner: RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data)),
             literals,
         })
     }

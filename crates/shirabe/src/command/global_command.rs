@@ -4,9 +4,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::input::string_input::StringInput;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -28,14 +28,18 @@ impl GlobalCommand {
     pub fn configure(&mut self) {
         self.set_name("global")
             .set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)")
-            .set_definition(vec![
-                InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None),
+            .set_definition(&[
+                InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None)
+                    .unwrap()
+                    .into(),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "Use this command as a wrapper to run other Composer commands\n\
@@ -52,8 +56,8 @@ impl GlobalCommand {
             );
     }
 
-    pub fn run(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &input.to_string())?;
+    pub fn run(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+        let tokens = Preg::split(r"{\s+}", &input.to_input_string())?;
         let mut args: Vec<String> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with('-') {
@@ -69,11 +73,12 @@ impl GlobalCommand {
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;
-        Ok(self.get_application().run(&sub_input, output)?)
+        let mut app = self.get_application()?;
+        Ok(app.run(Some(&sub_input), Some(output))?)
     }
 
     fn prepare_subcommand_input(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         quiet: bool,
     ) -> Result<StringInput> {
@@ -81,11 +86,11 @@ impl GlobalCommand {
             Platform::clear_env("COMPOSER");
         }
 
-        let config = Factory::create_config(None, None)?;
+        let mut config = Factory::create_config(None, None)?;
         let home = config.get("home").as_string().unwrap_or("").to_string();
 
         if !Path::new(&home).is_dir() {
-            let fs = Filesystem::new(None);
+            let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&home)?;
             if !Path::new(&home).is_dir() {
                 return Err(RuntimeException {
@@ -96,7 +101,7 @@ impl GlobalCommand {
             }
         }
 
-        chdir(&home).map_err(|e| RuntimeException {
+        chdir(&home).map_err(|_e| RuntimeException {
             message: format!("Could not switch to home directory \"{}\"", home),
             code: 0,
         })?;
@@ -108,15 +113,15 @@ impl GlobalCommand {
             ));
         }
 
-        let new_input_str = Preg::replace(
+        let new_input_str = Preg::replace4(
             r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}",
             "",
-            &input.to_string(),
+            &input.to_input_string(),
             1,
         )?;
-        self.get_application().reset_composer();
+        self.get_application()?.reset_composer();
 
-        Ok(StringInput::new(new_input_str))
+        Ok(StringInput::new(&new_input_str))
     }
 
     pub fn is_proxy_command(&self) -> bool {

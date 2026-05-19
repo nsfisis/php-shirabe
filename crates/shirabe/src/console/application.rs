@@ -15,7 +15,9 @@ use shirabe_external_packages::symfony::component::console::input::input_definit
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
 use shirabe_external_packages::symfony::component::console::output::console_output_interface::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::{
+    self as output_interface, OutputInterface,
+};
 use shirabe_external_packages::symfony::component::console::single_command_application::SingleCommandApplication;
 use shirabe_external_packages::symfony::component::process::exception::process_timed_out_exception::ProcessTimedOutException;
 use shirabe_php_shim::{
@@ -202,7 +204,7 @@ impl Application {
         let mut helpers: Vec<
             Box<dyn shirabe_external_packages::symfony::component::console::helper::helper::Helper>,
         > = vec![];
-        helpers.push(Box::new(QuestionHelper::new()));
+        helpers.push(Box::new(QuestionHelper));
         let console_io = ConsoleIO::new(input, output, HelperSet::new(helpers));
         self.io = Box::new(console_io);
         let io = &mut *self.io;
@@ -339,10 +341,11 @@ impl Application {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
                     let _ = Silencer::call(|| {
-                        shirabe_php_shim::exec(&format!(
-                            "sudo -u \\#{} sudo -K > /dev/null 2>&1",
-                            uid
-                        ));
+                        shirabe_php_shim::exec(
+                            &format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
+                            None,
+                            None,
+                        );
                         Ok(())
                     });
                 }
@@ -350,7 +353,7 @@ impl Application {
 
             // Silently clobber any remaining sudo leases on the current user as well to avoid privilege escalations
             let _ = Silencer::call(|| {
-                shirabe_php_shim::exec("sudo -K > /dev/null 2>&1");
+                shirabe_php_shim::exec("sudo -K > /dev/null 2>&1", None, None);
                 Ok(())
             });
         }
@@ -608,6 +611,7 @@ impl Application {
                                             &map,
                                             composer
                                                 .get_config()
+                                                .borrow()
                                                 .get("vendor-dir")
                                                 .as_string()
                                                 .map(|s| s.to_string()),
@@ -805,8 +809,8 @@ impl Application {
         let io = self.get_io();
 
         let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
-        if is_logic_or_error && output.get_verbosity() < OutputInterface::VERBOSITY_VERBOSE {
-            output.set_verbosity(OutputInterface::VERBOSITY_VERBOSE);
+        if is_logic_or_error && output.get_verbosity() < output_interface::VERBOSITY_VERBOSE {
+            output.set_verbosity(output_interface::VERBOSITY_VERBOSE);
         }
 
         Silencer::suppress(None);
@@ -817,11 +821,17 @@ impl Application {
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
-                let mut dir = config.get("home").as_string().unwrap_or("").to_string();
+                let mut dir = config
+                    .borrow_mut()
+                    .get("home")
+                    .as_string()
+                    .unwrap_or("")
+                    .to_string();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
                     dir = config
+                        .borrow_mut()
                         .get("vendor-dir")
                         .as_string()
                         .unwrap_or("")
@@ -898,7 +908,7 @@ impl Application {
             .downcast_ref::<ProcessTimedOutException>()
             .is_some()
         {
-            io.write_error(
+            io.write_error3(
                 "<error>The following exception is caused by a process timeout</error>",
                 true,
                 io_interface::QUIET,

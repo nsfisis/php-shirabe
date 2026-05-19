@@ -3,7 +3,7 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
 use shirabe_external_packages::symfony::component::console::helper::formatter_helper::FormatterHelper;
 use shirabe_external_packages::symfony::component::console::input::array_input::ArrayInput;
@@ -25,7 +25,7 @@ use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::json::json_validation_exception::JsonValidationException;
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::{self, BasePackage};
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_factory::RepositoryFactory;
@@ -86,18 +86,18 @@ impl InitCommand {
         self
             .set_name("init")
             .set_description("Creates a basic composer.json file in current directory")
-            .set_definition(vec![
-                InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None),
-                InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None),
-                InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None),
-                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED), "Type of package (e.g. library, project, metapackage, composer-plugin)", None),
-                InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None),
-                InputOption::new("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None),
-                InputOption::new("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None),
-                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &array_keys(&BasePackage::stabilities()))), None),
-                InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None),
-                InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None),
-                InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None),
+            .set_definition(&[
+                InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None).unwrap().into(),
+        InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None).unwrap().into(),
+        InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None).unwrap().into(),
+        InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED), "Type of package (e.g. library, project, metapackage, composer-plugin)", None).unwrap().into(),
+        InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
+        InputOption::new("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None).unwrap().into(),
+        InputOption::new("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None).unwrap().into(),
+        InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>())), None).unwrap().into(),
+        InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
+        InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
+        InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
             ])
             .set_help(
                 "The <info>init</info> command creates a basic composer.json file\n\
@@ -188,10 +188,12 @@ impl InitCommand {
             })
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
-            let config = Factory::create_config(Some(io), None)?;
+            let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
+                Some(io),
+                None,
+            )?));
             for repo in &repositories {
-                let repo_config =
-                    RepositoryFactory::config_from_string(io, &config, repo, Some(true))?;
+                let repo_config = RepositoryFactory::config_from_string(io, &config, repo, true)?;
                 let entry = options
                     .entry("repositories".to_string())
                     .or_insert_with(|| PhpMixed::List(vec![]));
@@ -294,7 +296,7 @@ impl InitCommand {
         let json = JsonFile::encode(&options_for_encode, 448);
 
         if input.is_interactive() {
-            io.write_error(
+            io.write_error3(
                 PhpMixed::List(vec![
                     Box::new(PhpMixed::String(String::new())),
                     Box::new(PhpMixed::String(json)),
@@ -307,17 +309,13 @@ impl InitCommand {
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
                 true,
             ) {
-                io.write_error(
-                    PhpMixed::String("<error>Command aborted</error>".to_string()),
-                    true,
-                    io_interface::NORMAL,
-                );
+                io.write_error3("<error>Command aborted</error>", true, io_interface::NORMAL);
 
                 return Ok(1);
             }
         } else {
-            io.write_error(
-                PhpMixed::String(format!("Writing {}", file_obj.get_path())),
+            io.write_error3(
+                &format!("Writing {}", file_obj.get_path()),
                 true,
                 io_interface::NORMAL,
             );
@@ -328,10 +326,8 @@ impl InitCommand {
         if let Err(e) = validate_result {
             // try to downcast to JsonValidationException
             if let Some(json_err) = e.downcast_ref::<JsonValidationException>() {
-                io.write_error(
-                    PhpMixed::String(
-                        "<error>Schema validation error, aborting</error>".to_string(),
-                    ),
+                io.write_error3(
+                    "<error>Schema validation error, aborting</error>",
                     true,
                     io_interface::NORMAL,
                 );
@@ -339,8 +335,8 @@ impl InitCommand {
                     " - {}",
                     implode(&format!("{} - ", PHP_EOL), &json_err.get_errors())
                 );
-                io.write_error(
-                    PhpMixed::String(format!("{}:{}{}", json_err.message, PHP_EOL, errors)),
+                io.write_error3(
+                    &format!("{}:{}{}", json_err.message, PHP_EOL, errors),
                     true,
                     io_interface::NORMAL,
                 );
@@ -400,23 +396,16 @@ impl InitCommand {
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
 
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "PSR-4 autoloading configured. Use \"<comment>namespace {};</comment>\" in {}",
                     namespace,
                     autoload_path.as_deref().unwrap_or("")
-                )),
-                true,
-                io_interface::NORMAL,
-            );
-            io.write_error(
-                PhpMixed::String(
-                    "Include the Composer autoloader with: <comment>require 'vendor/autoload.php';</comment>"
-                        .to_string(),
                 ),
                 true,
                 io_interface::NORMAL,
             );
+            io.write_error3("Include the Composer autoloader with: <comment>require 'vendor/autoload.php';</comment>", true, io_interface::NORMAL);
         }
 
         Ok(0)
@@ -461,17 +450,19 @@ impl InitCommand {
             })
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
-            let config = Factory::create_config(Some(io), None)?;
-            io.load_configuration(&config);
-            let mut repo_manager = RepositoryFactory::manager(io, &config, None, None);
+            let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
+                Some(io),
+                None,
+            )?));
+            io.load_configuration(&mut *config.borrow_mut())?;
+            let mut repo_manager = RepositoryFactory::manager(io, &config, None, None, None)?;
 
             let mut repos: Vec<
                 Box<dyn crate::repository::repository_interface::RepositoryInterface>,
             > = vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
-                let repo_config =
-                    RepositoryFactory::config_from_string(io, &config, repo, Some(true))?;
+                let repo_config = RepositoryFactory::config_from_string(io, &config, repo, true)?;
                 let is_packagist_false = repo_config
                     .get("packagist")
                     .map(|v| v.as_bool() == Some(false))
@@ -513,7 +504,7 @@ impl InitCommand {
             // unset($repos, $config, $repositories);
         }
 
-        io.write_error(
+        io.write_error3(
             PhpMixed::List(vec![
                 Box::new(PhpMixed::String(String::new())),
                 Box::new(PhpMixed::String(formatter.format_block(
@@ -528,7 +519,7 @@ impl InitCommand {
         );
 
         // namespace
-        io.write_error(
+        io.write_error3(
             PhpMixed::List(vec![
                 Box::new(PhpMixed::String(String::new())),
                 Box::new(PhpMixed::String(
@@ -659,14 +650,20 @@ impl InitCommand {
                         .unwrap_or(PhpMixed::Null);
                 }
 
-                if !BasePackage::stabilities().contains_key(value.as_string().unwrap_or("")) {
+                if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
                     // TODO(phase-b): closure cannot throw
                     panic!(
                         "{}",
                         format!(
                             "Invalid minimum stability \"{}\". Must be empty or one of: {}",
                             value.as_string().unwrap_or(""),
-                            implode(", ", &array_keys(&BasePackage::stabilities()))
+                            implode(
+                                ", ",
+                                &base_package::STABILITIES
+                                    .keys()
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<_>>()
+                            )
                         )
                     );
                 }
@@ -733,7 +730,7 @@ impl InitCommand {
         }
         input.set_option("license", license);
 
-        io.write_error(
+        io.write_error3(
             PhpMixed::List(vec![
                 Box::new(PhpMixed::String(String::new())),
                 Box::new(PhpMixed::String("Define your dependencies.".to_string())),
@@ -885,11 +882,15 @@ impl InitCommand {
 
     /// @return array{name: string, email: string|null}
     fn parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
-        if let Some(m) = Preg::is_match_strict_groups(
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(
             r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
             author,
-        ) {
-            let email = m.get("email").cloned();
+            Some(&mut m),
+        )
+        .unwrap_or(false)
+        {
+            let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
             if let Some(ref email) = email {
                 if !self.is_valid_email(email) {
                     return Err(InvalidArgumentException {
@@ -903,7 +904,12 @@ impl InitCommand {
             let mut result: IndexMap<String, Option<String>> = IndexMap::new();
             result.insert(
                 "name".to_string(),
-                Some(trim(&m.get("name").cloned().unwrap_or_default(), None)),
+                Some(trim(
+                    &m.get(&CaptureKey::ByName("name".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
+                    None,
+                )),
             );
             result.insert("email".to_string(), email);
 
@@ -944,7 +950,7 @@ impl InitCommand {
 
         let namespace: Vec<String> = array_map(
             |part: &String| {
-                let part = Preg::replace(r"/[^a-z0-9]/i", " ", part.clone());
+                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part);
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -963,17 +969,20 @@ impl InitCommand {
         let mut process = ProcessExecutor::new(self.get_io());
 
         let mut output = String::new();
-        if process.execute(
+        if process.execute_args(
             &vec!["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
             None,
         ) == 0
         {
             self.git_config = Some(IndexMap::new());
-            let matches = Preg::is_match_all_strict_groups(r"{^([^=]+)=(.*)$}m", &output);
-            if let Some(m) = matches {
-                let keys: Vec<String> = m.get(1).cloned().unwrap_or_default();
-                let values: Vec<String> = m.get(2).cloned().unwrap_or_default();
+            let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+            if Preg::is_match_all_strict_groups3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m))
+                .unwrap_or(false)
+            {
+                let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let values: Vec<String> =
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 for (key, value) in keys.iter().zip(values.iter()) {
                     self.git_config
                         .as_mut()
@@ -1049,11 +1058,8 @@ impl InitCommand {
             Ok(())
         });
         if let Err(_e) = result {
-            self.get_io().write_error(
-                PhpMixed::String(
-                    "Could not update dependencies. Run `composer update` to see more information."
-                        .to_string(),
-                ),
+            self.get_io().write_error3(
+                "Could not update dependencies. Run `composer update` to see more information.",
                 true,
                 io_interface::NORMAL,
             );
@@ -1068,11 +1074,8 @@ impl InitCommand {
             Ok(())
         });
         if let Err(_e) = result {
-            self.get_io().write_error(
-                PhpMixed::String("Could not run dump-autoload.".to_string()),
-                true,
-                io_interface::NORMAL,
-            );
+            self.get_io()
+                .write_error3("Could not run dump-autoload.", true, io_interface::NORMAL);
         }
     }
 
@@ -1100,11 +1103,12 @@ impl InitCommand {
         let name = Preg::replace(
             r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
             "$1$3-$2$4",
-            name.to_string(),
-        );
+            name,
+        )
+        .unwrap_or_default();
         let name = strtolower(&name);
-        let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", name);
-        let name = Preg::replace(r"{([_.-]){2,}}u", "$1", name);
+        let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", &name).unwrap_or_default();
+        let name = Preg::replace(r"{([_.-]){2,}}u", "$1", &name).unwrap_or_default();
 
         name
     }

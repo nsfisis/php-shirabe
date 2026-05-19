@@ -7,7 +7,7 @@ use crate::util::ini_helper::IniHelper;
 use crate::util::platform::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::process::Process;
@@ -164,9 +164,7 @@ impl ZipDownloader {
             }
         }
 
-        self.inner
-            .inner
-            .download(package, path, prev_package, output)
+        self.inner.download(package, path, prev_package, output)
     }
 
     fn extract_with_system_unzip(
@@ -217,18 +215,23 @@ impl ZipDownloader {
             let mut output = String::new();
             if self
                 .inner
-                .inner
                 .process
                 .execute(&[command_spec[1].as_str()], &mut output)
                 == 0
             {
-                if let Some(m) =
-                    Preg::is_match_strict_groups(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output)
+                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(
+                    r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)",
+                    &output,
+                    Some(&mut m),
+                )
+                .unwrap_or(false)
                 {
-                    if version_compare(&m[1], "21.01", "<") {
+                    let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    if version_compare(&m1, "21.01", "<") {
                         self.inner.io.write_error(&format!(
                             "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
-                            executable, m[1], executable,
+                            executable, m1, executable,
                         ));
                     }
                 }
@@ -281,7 +284,6 @@ impl ZipDownloader {
                         io.write_error(&format!(
                             "Origin URL: {}",
                             self.inner
-                                .inner
                                 .process_url(package, &package.get_dist_url().unwrap_or_default())
                         ));
                         let headers = FileDownloader::response_headers.lock().unwrap();
@@ -297,7 +299,7 @@ impl ZipDownloader {
             self.extract_with_zip_archive(package, file, path)
         };
 
-        match self.inner.process.execute_async(&command) {
+        match self.inner.process.borrow_mut().execute_async(&command) {
             Ok(promise) => Ok(promise.then(
                 Box::new(move |process: Process| -> Result<()> {
                     if !process.is_successful() {

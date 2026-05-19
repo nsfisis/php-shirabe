@@ -54,37 +54,29 @@ pub trait BaseIO: IOInterface {
         self.authentications_mut().insert(repository_name, auth);
     }
 
-    fn write_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.write(messages, newline, verbosity);
-    }
-
-    fn write_error_raw(&self, messages: PhpMixed, newline: bool, verbosity: i64) {
-        self.write_error(messages, newline, verbosity);
-    }
-
     fn check_and_set_authentication(
         &mut self,
         repository_name: String,
         username: String,
         password: Option<String>,
     ) {
-        if self.has_authentication(&repository_name) {
-            let auth = self.get_authentication(&repository_name);
+        if BaseIO::has_authentication(self, &repository_name) {
+            let auth = BaseIO::get_authentication(self, &repository_name);
             if auth.get("username").and_then(|v| v.as_deref()) == Some(username.as_str())
                 && *auth.get("password").unwrap_or(&None) == password
             {
                 return;
             }
-            self.write_error(
-                PhpMixed::String(format!(
+            self.write_error3(
+                &format!(
                     "<warning>Warning: You should avoid overwriting already defined auth settings for {}.</warning>",
                     repository_name
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
         }
-        self.set_authentication(repository_name, username, password);
+        BaseIO::set_authentication(self, repository_name, username, password);
     }
 
     fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()> {
@@ -358,14 +350,10 @@ pub trait BaseIO: IOInterface {
                     }
 
                     if !ssl_options.contains_key("local_cert") {
-                        self.write_error(
-                            PhpMixed::String(format!(
-                                "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
-                                domain
-                            )),
-                            true,
-                            io_interface::NORMAL,
-                        );
+                        self.write_error3(&format!(
+                            "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
+                            domain
+                        ), true, io_interface::NORMAL);
                         continue;
                     }
 
@@ -481,31 +469,31 @@ pub trait BaseIO: IOInterface {
             ]),
             false,
         ) {
-            self.write_error(
-                PhpMixed::String(format!("<error>{}</error>", message_str)),
+            self.write_error3(
+                &format!("<error>{}</error>", message_str),
                 true,
                 io_interface::NORMAL,
             );
         } else if level_str == LogLevel::WARNING {
-            self.write_error(
-                PhpMixed::String(format!("<warning>{}</warning>", message_str)),
+            self.write_error3(
+                &format!("<warning>{}</warning>", message_str),
                 true,
                 io_interface::NORMAL,
             );
         } else if level_str == LogLevel::NOTICE {
-            self.write_error(
-                PhpMixed::String(format!("<info>{}</info>", message_str)),
+            self.write_error3(
+                &format!("<info>{}</info>", message_str),
                 true,
                 io_interface::VERBOSE,
             );
         } else if level_str == LogLevel::INFO {
-            self.write_error(
-                PhpMixed::String(format!("<info>{}</info>", message_str)),
+            self.write_error3(
+                &format!("<info>{}</info>", message_str),
                 true,
                 io_interface::VERY_VERBOSE,
             );
         } else {
-            self.write_error(PhpMixed::String(message_str), true, io_interface::DEBUG);
+            self.write_error3(&message_str, true, io_interface::DEBUG);
         }
     }
 }

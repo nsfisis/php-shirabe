@@ -1,3 +1,5 @@
+use crate::symfony::console::formatter::output_formatter::OutputFormatter;
+
 pub trait OutputInterface {
     fn write(&mut self, messages: &str, newline: bool, r#type: i64);
     fn writeln(&mut self, messages: &str, r#type: i64);
@@ -9,6 +11,8 @@ pub trait OutputInterface {
     fn is_debug(&self) -> bool;
     fn set_decorated(&mut self, decorated: bool);
     fn is_decorated(&self) -> bool;
+    fn set_formatter(&mut self, formatter: OutputFormatter);
+    fn get_formatter(&mut self) -> &mut OutputFormatter;
 }
 
 pub const VERBOSITY_QUIET: i64 = 16;

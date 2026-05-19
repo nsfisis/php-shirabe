@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     LogicException, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
 };
@@ -10,6 +10,7 @@ use crate::config::Config;
 use crate::io::io_interface::IOInterface;
 use crate::package::base_package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::package::loader::array_loader::ArrayLoader;
+use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_alias_package::RootAliasPackage;
@@ -25,7 +26,7 @@ use crate::util::process_executor::ProcessExecutor;
 pub struct RootPackageLoader {
     inner: ArrayLoader,
     manager: RepositoryManager,
-    config: Config,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     version_guesser: VersionGuesser,
     io: Option<Box<dyn IOInterface>>,
 }
@@ -33,7 +34,7 @@ pub struct RootPackageLoader {
 impl RootPackageLoader {
     pub fn new(
         manager: RepositoryManager,
-        config: Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: Option<VersionParser>,
         version_guesser: Option<VersionGuesser>,
         io: Option<Box<dyn IOInterface>>,
@@ -42,7 +43,12 @@ impl RootPackageLoader {
         let version_guesser = version_guesser.unwrap_or_else(|| {
             let mut process_executor = ProcessExecutor::new(io.as_deref());
             process_executor.enable_async();
-            VersionGuesser::new(&config, process_executor, inner.version_parser.clone())
+            VersionGuesser::new(
+                std::rc::Rc::clone(&config),
+                std::rc::Rc::new(std::cell::RefCell::new(process_executor)),
+                inner.version_parser.clone(),
+                io.as_ref().map(|i| i.clone_box()),
+            )
         });
         Self {
             inner,
@@ -284,11 +290,15 @@ impl RootPackageLoader {
             );
         }
 
-        let repos = RepositoryFactory::default_repos(None, &self.config, &mut self.manager)?;
+        let repos = RepositoryFactory::default_repos(
+            None,
+            Some(std::rc::Rc::clone(&self.config)),
+            Some(&mut self.manager),
+        )?;
         for repo in repos {
             self.manager.add_repository(repo);
         }
-        real_package.set_repositories(self.config.get_repositories());
+        real_package.set_repositories(self.config.borrow().get_repositories());
 
         Ok(package)
     }
@@ -299,27 +309,31 @@ impl RootPackageLoader {
         mut aliases: Vec<IndexMap<String, String>>,
     ) -> Vec<IndexMap<String, String>> {
         for (req_name, req_version) in requires {
-            if let Some(m) = Preg::is_match_strict_groups(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(
                 r"(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)",
                 req_version,
+                Some(&mut m),
             )
-            .unwrap_or(None)
+            .unwrap_or(false)
             {
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let mut alias = IndexMap::new();
                 alias.insert("package".to_string(), strtolower(req_name));
                 alias.insert(
                     "version".to_string(),
                     self.inner
                         .version_parser
-                        .normalize(&m[1], req_version)
+                        .normalize(&m1, Some(req_version))
                         .unwrap_or_default(),
                 );
-                alias.insert("alias".to_string(), m[2].clone());
+                alias.insert("alias".to_string(), m2.clone());
                 alias.insert(
                     "alias_normalized".to_string(),
                     self.inner
                         .version_parser
-                        .normalize(&m[2], req_version)
+                        .normalize(&m2, Some(req_version))
                         .unwrap_or_default(),
                 );
                 aliases.push(alias);
@@ -370,9 +384,13 @@ impl RootPackageLoader {
 
             let mut matched = false;
             for constraint in &constraints {
-                if let Some(Some(m)) = Preg::is_match_strict_groups(&pattern, constraint).ok() {
+                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(&pattern, constraint, Some(&mut m))
+                    .unwrap_or(false)
+                {
                     let name = strtolower(req_name);
-                    let stability = stabilities[VersionParser::normalize_stability(&m[1])];
+                    let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    let stability = stabilities[VersionParser::normalize_stability(&m1)];
 
                     if stability_flags.get(&name).copied().unwrap_or(i64::MAX) > stability {
                         continue;
@@ -415,12 +433,16 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let req_version =
                 Preg::replace(r"^([^,\s@]+) as .+$", "$1", req_version).unwrap_or_default();
-            if let Some(Some(m)) =
-                Preg::is_match_strict_groups(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version).ok()
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version, Some(&mut m))
+                .unwrap_or(false)
             {
                 if VersionParser::parse_stability(&req_version) == "dev" {
                     let name = strtolower(req_name);
-                    references.insert(name, m[1].clone());
+                    references.insert(
+                        name,
+                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    );
                 }
             }
         }

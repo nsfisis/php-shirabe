@@ -9,7 +9,7 @@ use crate::util::http_downloader::HttpDownloader;
 #[derive(Debug)]
 pub struct PreFileDownloadEvent {
     inner: Event,
-    http_downloader: HttpDownloader,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     processed_url: String,
     custom_cache_key: Option<String>,
     r#type: String,
@@ -20,7 +20,7 @@ pub struct PreFileDownloadEvent {
 impl PreFileDownloadEvent {
     pub fn new(
         name: String,
-        http_downloader: HttpDownloader,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         processed_url: String,
         r#type: String,
         context: PhpMixed,
@@ -36,7 +36,7 @@ impl PreFileDownloadEvent {
         }
     }
 
-    pub fn get_http_downloader(&self) -> &HttpDownloader {
+    pub fn get_http_downloader(&self) -> &std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
         &self.http_downloader
     }
 

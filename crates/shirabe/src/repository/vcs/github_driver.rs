@@ -4,7 +4,7 @@ use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
     array_search_mixed, base64_decode, basename, count, empty, explode, extension_loaded, in_array,
@@ -18,6 +18,7 @@ use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
 use crate::repository::vcs::vcs_driver::VcsDriverBase;
+use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
 use crate::util::github::GitHub;
 use crate::util::http::response::Response;
 
@@ -45,31 +46,43 @@ pub struct GitHubDriver {
 
 impl GitHubDriver {
     pub fn initialize(&mut self) -> Result<()> {
-        let match_ = match Preg::is_match_strict_groups(
+        let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(
             r"#^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
             &self.inner.url,
-        ) {
-            Some(m) => m,
-            None => {
-                return Err(InvalidArgumentException {
-                    message: sprintf(
-                        "The GitHub repository URL %s is invalid.",
-                        &[PhpMixed::String(self.inner.url.clone())],
-                    ),
-                    code: 0,
-                }
-                .into());
+            Some(&mut match_),
+        )
+        .unwrap_or(false)
+        {
+            return Err(InvalidArgumentException {
+                message: sprintf(
+                    "The GitHub repository URL %s is invalid.",
+                    &[PhpMixed::String(self.inner.url.clone())],
+                ),
+                code: 0,
             }
-        };
+            .into());
+        }
 
-        self.owner = match_.get(3).cloned().unwrap_or_default();
-        self.repository = match_.get(4).cloned().unwrap_or_default();
+        self.owner = match_
+            .get(&CaptureKey::ByIndex(3))
+            .cloned()
+            .unwrap_or_default();
+        self.repository = match_
+            .get(&CaptureKey::ByIndex(4))
+            .cloned()
+            .unwrap_or_default();
         self.inner.origin_url = strtolower(
             &match_
-                .get(1)
+                .get(&CaptureKey::ByIndex(1))
                 .cloned()
                 .filter(|s| !s.is_empty())
-                .unwrap_or_else(|| match_.get(2).cloned().unwrap_or_default()),
+                .unwrap_or_else(|| {
+                    match_
+                        .get(&CaptureKey::ByIndex(2))
+                        .cloned()
+                        .unwrap_or_default()
+                }),
         );
         if self.inner.origin_url == "www.github.com" {
             self.inner.origin_url = "github.com".to_string();
@@ -80,6 +93,7 @@ impl GitHubDriver {
                 "{}/{}/{}/{}",
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or(""),
@@ -95,6 +109,7 @@ impl GitHubDriver {
             c.set_read_only(
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
@@ -111,7 +126,13 @@ impl GitHubDriver {
             self.allow_git_fallback = false;
         }
 
-        if self.inner.config.get("use-github-api").as_bool() == Some(false)
+        if self
+            .inner
+            .config
+            .borrow_mut()
+            .get("use-github-api")
+            .as_bool()
+            == Some(false)
             || self
                 .inner
                 .repo_config
@@ -230,7 +251,12 @@ impl GitHubDriver {
                     .unwrap_or_default();
                 JsonFile::parse_json(&res, None)?
             } else {
-                let composer = self.inner.get_base_composer_information(identifier)?;
+                let file_content = self.get_file_content("composer.json", identifier)?;
+                let composer = VcsDriverBase::finish_base_composer_information(
+                    identifier,
+                    file_content,
+                    || self.get_change_date(identifier),
+                )?;
 
                 if self.inner.should_cache(identifier) {
                     if let Some(ref composer_map) = composer {
@@ -384,7 +410,7 @@ impl GitHubDriver {
         ] {
             let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
             options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-            let response = self.inner.http_downloader.get(
+            let response = self.inner.http_downloader.borrow_mut().get(
                 file_url,
                 &PhpMixed::Array(options.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
             );
@@ -436,20 +462,26 @@ impl GitHubDriver {
 
         let mut result: Vec<IndexMap<String, PhpMixed>> = vec![];
         let mut key: Option<String> = None;
-        for line in Preg::split(r"{\r?\n}", &funding) {
+        for line in Preg::split(r"{\r?\n}", &funding).unwrap_or_default() {
             let line = trim(&line, None);
-            if let Some(m) = Preg::is_match_strict_groups(r"{^(\w+)\s*:\s*(.+)$}", &line) {
-                let g1 = m.get(1).cloned().unwrap_or_default();
-                let g2 = m.get(2).cloned().unwrap_or_default();
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(r"{^(\w+)\s*:\s*(.+)$}", &line, Some(&mut m))
+                .unwrap_or(false)
+            {
+                let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if g2 == "[" {
                     key = Some(g1);
                     continue;
                 }
-                if let Some(m2) = Preg::is_match_strict_groups(r"{^\[(.*?)\](?:\s*#.*)?$}", &g2) {
-                    let inner = m2.get(1).cloned().unwrap_or_default();
+                let mut m2: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(r"{^\[(.*?)\](?:\s*#.*)?$}", &g2, Some(&mut m2))
+                    .unwrap_or(false)
+                {
+                    let inner = m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for item in array_map(
                         |s: &String| trim(s, None),
-                        &Preg::split(r#"{[\'\"]?\s*,\s*[\'\"]?}"#, &inner),
+                        &Preg::split(r#"{[\'\"]?\s*,\s*[\'\"]?}"#, &inner).unwrap_or_default(),
                     ) {
                         let mut entry = IndexMap::new();
                         entry.insert("type".to_string(), PhpMixed::String(g1.clone()));
@@ -459,30 +491,40 @@ impl GitHubDriver {
                         );
                         result.push(entry);
                     }
-                } else if let Some(m2) =
-                    Preg::is_match_strict_groups(r"{^([^#].*?)(?:\s+#.*)?$}", &g2)
+                } else if Preg::is_match_strict_groups3(
+                    r"{^([^#].*?)(?:\s+#.*)?$}",
+                    &g2,
+                    Some(&mut m2),
+                )
+                .unwrap_or(false)
                 {
                     let mut entry = IndexMap::new();
                     entry.insert("type".to_string(), PhpMixed::String(g1.clone()));
                     entry.insert(
                         "url".to_string(),
                         PhpMixed::String(trim(
-                            &m2.get(1).cloned().unwrap_or_default(),
+                            &m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
                             Some("\"' "),
                         )),
                     );
                     result.push(entry);
                 }
                 key = None;
-            } else if let Some(m) = Preg::is_match_strict_groups(r"{^(\w+)\s*:\s*#\s*$}", &line) {
-                key = Some(m.get(1).cloned().unwrap_or_default());
-            } else if key.is_some()
-                && (Preg::is_match_strict_groups(r"{^-\s*(.+)(?:\s+#.*)?$}", &line).is_some()
-                    || Preg::is_match_strict_groups(r"{^(.+),(?:\s*#.*)?$}", &line).is_some())
+            } else if Preg::is_match_strict_groups3(r"{^(\w+)\s*:\s*#\s*$}", &line, Some(&mut m))
+                .unwrap_or(false)
             {
-                let m = Preg::is_match_strict_groups(r"{^-\s*(.+)(?:\s+#.*)?$}", &line)
-                    .or_else(|| Preg::is_match_strict_groups(r"{^(.+),(?:\s*#.*)?$}", &line))
-                    .unwrap();
+                key = Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
+            } else if key.is_some() && {
+                let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
+                Preg::is_match_strict_groups3(r"{^-\s*(.+)(?:\s+#.*)?$}", &line, Some(&mut m))
+                    .unwrap_or(false)
+                    || Preg::is_match_strict_groups3(r"{^(.+),(?:\s*#.*)?$}", &line, Some(&mut tmp))
+                        .unwrap_or(false)
+                        && {
+                            m = tmp;
+                            true
+                        }
+            } {
                 let mut entry = IndexMap::new();
                 entry.insert(
                     "type".to_string(),
@@ -490,7 +532,10 @@ impl GitHubDriver {
                 );
                 entry.insert(
                     "url".to_string(),
-                    PhpMixed::String(trim(&m.get(1).cloned().unwrap_or_default(), Some("\"' "))),
+                    PhpMixed::String(trim(
+                        &m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                        Some("\"' "),
+                    )),
                 );
                 result.push(entry);
             } else if key.is_some() && line == "]" {
@@ -623,11 +668,11 @@ impl GitHubDriver {
                             continue;
                         }
 
-                        self.inner.io.write_error(
-                            PhpMixed::String(format!(
+                        self.inner.io.write_error3(
+                            &format!(
                                 "<warning>Funding URL {} not in a supported format.</warning>",
                                 item_url
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -874,21 +919,31 @@ impl GitHubDriver {
     }
 
     pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, _deep: bool) -> bool {
-        let matches = match Preg::is_match_strict_groups(
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(
             r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
             url,
-        ) {
-            Some(m) => m,
-            None => return false,
-        };
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
+            return false;
+        }
 
         let origin_url = matches
-            .get(2)
+            .get(&CaptureKey::ByIndex(2))
             .cloned()
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| matches.get(3).cloned().unwrap_or_default());
+            .unwrap_or_else(|| {
+                matches
+                    .get(&CaptureKey::ByIndex(3))
+                    .cloned()
+                    .unwrap_or_default()
+            });
         if !in_array(
-            PhpMixed::String(strtolower(&Preg::replace(r"{^www\.}i", "", origin_url))),
+            PhpMixed::String(strtolower(
+                &Preg::replace(r"{^www\.}i", "", &origin_url).unwrap_or_default(),
+            )),
             &config.get("github-domains"),
             false,
         ) {
@@ -896,11 +951,11 @@ impl GitHubDriver {
         }
 
         if !extension_loaded("openssl") {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "Skipping GitHub driver for {} because the OpenSSL PHP extension is missing.",
                     url
-                )),
+                ),
                 true,
                 io_interface::VERBOSE,
             );
@@ -945,11 +1000,11 @@ impl GitHubDriver {
             Ok(r) => Ok(r),
             Err(e) => {
                 let mut git_hub_util = GitHub::new(
-                    self.inner.io.as_ref(),
-                    &self.inner.config,
-                    &self.inner.process,
-                    &self.inner.http_downloader,
-                );
+                    self.inner.io.clone_box(),
+                    std::rc::Rc::clone(&self.inner.config),
+                    Some(std::rc::Rc::clone(&self.inner.process)),
+                    Some(std::rc::Rc::clone(&self.inner.http_downloader)),
+                )?;
 
                 match e.code {
                     401 | 404 => {
@@ -1057,11 +1112,11 @@ impl GitHubDriver {
 
                         if !self.inner.io.has_authentication(&self.inner.origin_url) {
                             if !self.inner.io.is_interactive() {
-                                self.inner.io.write_error(
-                                    PhpMixed::String(format!(
+                                self.inner.io.write_error3(
+                                    &format!(
                                         "<error>GitHub API limit exhausted. Failed to get metadata for the {} repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>",
                                         self.inner.url
-                                    )),
+                                    ),
                                     true,
                                     io_interface::NORMAL,
                                 );
@@ -1083,14 +1138,14 @@ impl GitHubDriver {
                             let rate_limit = git_hub_util.get_rate_limit(
                                 e.get_headers().map(|h| h.as_slice()).unwrap_or(&[]),
                             );
-                            self.inner.io.write_error(
-                                PhpMixed::String(sprintf(
+                            self.inner.io.write_error3(
+                                &sprintf(
                                     "<error>GitHub API limit (%d calls/hr) is exhausted. You are already authorized so you have to wait until %s before doing more requests</error>",
                                     &[
                                         rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
                                         rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
                                     ],
-                                )),
+                                ),
                                 true,
                                 io_interface::NORMAL,
                             );
@@ -1206,11 +1261,11 @@ impl GitHubDriver {
             Err(setup_err) => {
                 self.git_driver = None;
 
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your GitHub credentials</error>",
                         self.generate_ssh_url()
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -1233,8 +1288,8 @@ impl GitHubDriver {
             repo_config,
             self.inner.io.clone(),
             self.inner.config.clone(),
-            self.inner.http_downloader.clone(),
-            self.inner.process.clone(),
+            std::rc::Rc::clone(&self.inner.http_downloader),
+            std::rc::Rc::clone(&self.inner.process),
         );
         git_driver.initialize()?;
         self.git_driver = Some(git_driver);
@@ -1249,8 +1304,11 @@ impl GitHubDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(m) = Preg::is_match_strict_groups(r#"{<(.+?)>; *rel="next"}"#, link) {
-                return Some(m.get(1).cloned().unwrap_or_default());
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut m))
+                .unwrap_or(false)
+            {
+                return Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
             }
         }
 

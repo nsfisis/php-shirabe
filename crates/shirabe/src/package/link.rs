@@ -114,7 +114,10 @@ impl Link {
     pub fn to_string(&self) -> String {
         format!(
             "{} {} {} ({})",
-            self.source, self.description, self.target, self.constraint
+            self.source,
+            self.description,
+            self.target,
+            self.constraint.__to_string(),
         )
     }
 

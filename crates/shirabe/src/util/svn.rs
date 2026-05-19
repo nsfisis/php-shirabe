@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     LogicException, PHP_URL_HOST, PhpMixed, RuntimeException, empty, implode, parse_url,
     parse_url_all, stripos, strpos, trim,
@@ -35,11 +35,11 @@ pub struct Svn {
     /// @var bool
     pub(crate) cache_credentials: bool,
     /// @var ProcessExecutor
-    pub(crate) process: ProcessExecutor,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var int
     pub(crate) qty_auth_tries: i64,
     /// @var Config
-    pub(crate) config: Config,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
 }
 
 /// @var string|null
@@ -51,10 +51,12 @@ impl Svn {
     pub fn new(
         url: String,
         io: Box<dyn IOInterface>,
-        config: Config,
-        process: Option<ProcessExecutor>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+        });
         Self {
             url,
             io,
@@ -91,7 +93,11 @@ impl Svn {
         verbose: bool,
     ) -> Result<String> {
         // Ensure we are allowed to use this URL by config
-        self.config.prohibit_url_by_config(url, &*self.io)?;
+        self.config.borrow_mut().prohibit_url_by_config(
+            url,
+            Some(&*self.io),
+            &indexmap::IndexMap::new(),
+        )?;
 
         self.execute_with_auth_retry(command, cwd, url, path, verbose)
             .map(|o| o.unwrap_or_default())
@@ -149,14 +155,16 @@ impl Svn {
         };
         // TODO(phase-b): pass handler callback to process.execute
         let mut handler_output = String::new();
-        let status = self
-            .process
-            .execute(&command, &mut handler_output, cwd.map(String::from));
+        let status = self.process.borrow_mut().execute_args(
+            &command,
+            &mut handler_output,
+            cwd.map(String::from),
+        );
         if 0 == status {
             return Ok(output);
         }
 
-        let error_output = self.process.get_error_output();
+        let error_output = self.process.borrow().get_error_output();
         let full_output = trim(
             &implode("\n", &[output.clone().unwrap_or_default(), error_output]),
             None,
@@ -341,12 +349,12 @@ impl Svn {
 
     /// Create the auth params from the configuration file.
     fn create_auth_from_config(&mut self) -> bool {
-        if !self.config.has("http-basic") {
+        if !self.config.borrow().has("http-basic") {
             self.has_auth = Some(false);
             return false;
         }
 
-        let auth_config = self.config.get("http-basic");
+        let auth_config = self.config.borrow_mut().get("http-basic");
 
         let host = parse_url(&self.url, PHP_URL_HOST);
         let host_str = host.as_string().unwrap_or("");
@@ -419,16 +427,21 @@ impl Svn {
         let mut cached = VERSION.lock().unwrap();
         if cached.is_none() {
             let mut output = String::new();
-            if 0 == self.process.execute(
+            if 0 == self.process.borrow_mut().execute_args(
                 &["svn".to_string(), "--version".to_string()],
                 &mut output,
                 None,
             ) {
-                // TODO(phase-b): Preg::is_match with captures should populate $match
-                if let Ok(Some(matches)) =
-                    Preg::is_match_with_indexed_captures(r"{(\d+(?:\.\d+)+)}", &output)
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches))
+                    .unwrap_or(false)
                 {
-                    *cached = Some(matches.get(1).cloned().unwrap_or_default());
+                    *cached = Some(
+                        matches
+                            .get(&CaptureKey::ByIndex(1))
+                            .cloned()
+                            .unwrap_or_default(),
+                    );
                 }
             }
         }

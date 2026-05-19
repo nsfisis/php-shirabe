@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/DumpAutoloadCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -23,18 +23,18 @@ impl DumpAutoloadCommand {
             .set_name("dump-autoload")
             .set_aliases(&["dumpautoload".to_string()])
             .set_description("Dumps the autoloader")
-            .set_definition(vec![
-                InputOption::new("optimize", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None),
-                InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None),
-                InputOption::new("apcu", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None),
-                InputOption::new("apcu-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu", None),
-                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything.", None),
-                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables autoload-dev rules. Composer will by default infer this automatically according to the last install or update --no-dev state.", None),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables autoload-dev rules. Composer will by default infer this automatically according to the last install or update --no-dev state.", None),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None),
-                InputOption::new("strict-psr", None, Some(InputOption::VALUE_NONE), "Return a failed status code (1) if PSR-4 or PSR-0 mapping errors are present. Requires --optimize to work.", None),
-                InputOption::new("strict-ambiguous", None, Some(InputOption::VALUE_NONE), "Return a failed status code (2) if the same class is found in multiple files. Requires --optimize to work.", None),
+            .set_definition(&[
+                InputOption::new("optimize", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
+        InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
+        InputOption::new("apcu", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
+        InputOption::new("apcu-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu", None).unwrap().into(),
+        InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything.", None).unwrap().into(),
+        InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Enables autoload-dev rules. Composer will by default infer this automatically according to the last install or update --no-dev state.", None).unwrap().into(),
+        InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables autoload-dev rules. Composer will by default infer this automatically according to the last install or update --no-dev state.", None).unwrap().into(),
+        InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+        InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+        InputOption::new("strict-psr", None, Some(InputOption::VALUE_NONE), "Return a failed status code (1) if PSR-4 or PSR-0 mapping errors are present. Requires --optimize to work.", None).unwrap().into(),
+        InputOption::new("strict-ambiguous", None, Some(InputOption::VALUE_NONE), "Return a failed status code (2) if the same class is found in multiple files. Requires --optimize to work.", None).unwrap().into(),
             ])
             .set_help(
                 "<info>php composer.phar dump-autoload</info>\n\n\
@@ -46,14 +46,8 @@ impl DumpAutoloadCommand {
         let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(
-            PluginEvents::COMMAND.to_string(),
-            "dump-autoload".to_string(),
-            input,
-            output,
-            vec![],
-            vec![],
-        );
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "dump-autoload", input, output);
         composer
             .get_event_dispatcher()
             .dispatch(Some(command_event.get_name()), None);
@@ -74,12 +68,17 @@ impl DumpAutoloadCommand {
         }
 
         let optimize = input.get_option("optimize").as_bool().unwrap_or(false)
-            || config.get("optimize-autoloader").as_bool().unwrap_or(false);
+            || config
+                .borrow_mut()
+                .get("optimize-autoloader")
+                .as_bool()
+                .unwrap_or(false);
         let authoritative = input
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
             || config
+                .borrow_mut()
                 .get("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false);
@@ -89,7 +88,11 @@ impl DumpAutoloadCommand {
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input.get_option("apcu").as_bool().unwrap_or(false)
-            || config.get("apcu-autoloader").as_bool().unwrap_or(false);
+            || config
+                .borrow_mut()
+                .get("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false);
 
         if input.get_option("strict-psr").as_bool().unwrap_or(false) && !optimize && !authoritative
         {
@@ -148,7 +151,7 @@ impl DumpAutoloadCommand {
         generator.set_apcu(apcu, apcu_prefix.as_deref());
         generator.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
         let class_map = generator.dump(
-            config,
+            &*config.borrow(),
             &local_repo,
             package,
             installation_manager,
@@ -185,7 +188,7 @@ impl DumpAutoloadCommand {
             .get_option("strict-ambiguous")
             .as_bool()
             .unwrap_or(false)
-            && !class_map.get_ambiguous_classes(false).is_empty()
+            && !class_map.get_ambiguous_classes(false)?.is_empty()
         {
             return Ok(2);
         }

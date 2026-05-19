@@ -51,7 +51,7 @@ pub struct CurlDownloader {
     /// @var IOInterface
     io: Box<dyn IOInterface>,
     /// @var Config
-    config: Config,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var AuthHelper
     auth_helper: AuthHelper,
     /// @var float
@@ -124,7 +124,7 @@ impl CurlDownloader {
     /// @param mixed[] $options
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         _options: IndexMap<String, PhpMixed>,
         _disable_tls: bool,
     ) -> Self {
@@ -336,10 +336,11 @@ impl CurlDownloader {
         let original_options = options.clone();
 
         // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to $hashed providers as file integrity is verified with sha256
-        if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url)
+        if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url).unwrap_or(false)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
             self.config
+                .borrow_mut()
                 .prohibit_url_by_config(url, Some(&*self.io), &options)?;
         }
 
@@ -681,13 +682,13 @@ impl CurlDownloader {
         if attributes.get("redirects").and_then(|v| v.as_int()) == Some(0)
             && attributes.get("retries").and_then(|v| v.as_int()) == Some(0)
         {
-            self.io.write_error(
-                PhpMixed::String(format!(
+            self.io.write_error3(
+                &format!(
                     "Downloading {}{}{}",
                     Url::sanitize(url.to_string()),
                     using_proxy,
                     if_modified
-                )),
+                ),
                 true,
                 crate::io::io_interface::DEBUG,
             );
@@ -830,11 +831,8 @@ impl CurlDownloader {
                         && !TIMEOUT_WARNING.load(Ordering::Relaxed)
                     {
                         TIMEOUT_WARNING.store(true, Ordering::Relaxed);
-                        self.io.write_error(
-                            PhpMixed::String(
-                                "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>"
-                                    .to_string(),
-                            ),
+                        self.io.write_error3(
+                            "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>",
                             true,
                             crate::io::io_interface::NORMAL,
                         );
@@ -904,8 +902,8 @@ impl CurlDownloader {
                             // CURLE_COULDNT_CONNECT, retry forcing IPv4 if no IP stack was selected
                             attributes.insert("ipResolve".to_string(), PhpMixed::Int(4));
                         }
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "Retrying ({}) {} due to curl error {}",
                                 job.get("attributes")
                                     .and_then(|v| v.as_array())
@@ -920,7 +918,7 @@ impl CurlDownloader {
                                         .to_string()
                                 ),
                                 errno
-                            )),
+                            ),
                             true,
                             crate::io::io_interface::DEBUG,
                         );
@@ -936,8 +934,8 @@ impl CurlDownloader {
                     if errno == 55
                     /* CURLE_SEND_ERROR */
                     {
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "Retrying ({}) {} due to curl error {}",
                                 job.get("attributes")
                                     .and_then(|v| v.as_array())
@@ -952,7 +950,7 @@ impl CurlDownloader {
                                         .to_string()
                                 ),
                                 errno
-                            )),
+                            ),
                             true,
                             crate::io::io_interface::DEBUG,
                         );
@@ -1073,8 +1071,8 @@ impl CurlDownloader {
                             .map(|(k, v)| (k.clone(), (**v).clone()))
                             .collect(),
                     ));
-                    self.io.write_error(
-                        PhpMixed::String(format!(
+                    self.io.write_error3(
+                        &format!(
                             "[{}] {}",
                             status_code.unwrap_or(0),
                             Url::sanitize(
@@ -1083,7 +1081,7 @@ impl CurlDownloader {
                                     .unwrap_or("")
                                     .to_string()
                             )
-                        )),
+                        ),
                         true,
                         crate::io::io_interface::DEBUG,
                     );
@@ -1149,8 +1147,8 @@ impl CurlDownloader {
                             .map(|(k, v)| (k.clone(), (**v).clone()))
                             .collect(),
                     ));
-                    self.io.write_error(
-                        PhpMixed::String(format!(
+                    self.io.write_error3(
+                        &format!(
                             "[{}] {}",
                             status_code.unwrap_or(0),
                             Url::sanitize(
@@ -1159,7 +1157,7 @@ impl CurlDownloader {
                                     .unwrap_or("")
                                     .to_string()
                             )
-                        )),
+                        ),
                         true,
                         crate::io::io_interface::DEBUG,
                     );
@@ -1292,8 +1290,8 @@ impl CurlDownloader {
                             .unwrap_or(0)
                             < self.max_retries
                     {
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "Retrying ({}) {} due to status code {}",
                                 job.get("attributes")
                                     .and_then(|v| v.as_array())
@@ -1308,7 +1306,7 @@ impl CurlDownloader {
                                         .to_string()
                                 ),
                                 sc
-                            )),
+                            ),
                             true,
                             crate::io::io_interface::DEBUG,
                         );
@@ -1598,8 +1596,8 @@ impl CurlDownloader {
         }
 
         if !target_url.is_empty() {
-            self.io.write_error(
-                PhpMixed::String(sprintf(
+            self.io.write_error3(
+                &sprintf(
                     "Following redirect (%u) %s",
                     &[
                         PhpMixed::Int(
@@ -1612,7 +1610,7 @@ impl CurlDownloader {
                         ),
                         PhpMixed::String(Url::sanitize(target_url.clone())),
                     ],
-                )),
+                ),
                 true,
                 crate::io::io_interface::DEBUG,
             );
@@ -1697,7 +1695,7 @@ impl CurlDownloader {
         }
 
         // check for gitlab 404 when downloading archives
-        let gitlab_domains = self.config.get("gitlab-domains");
+        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let gitlab_domains_list: Vec<Box<PhpMixed>> = match gitlab_domains {
             PhpMixed::List(l) => l,
             _ => Vec::new(),
@@ -1788,7 +1786,7 @@ impl CurlDownloader {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
         };
-        let origin = Url::get_origin(&self.config, url);
+        let origin = Url::get_origin(&*self.config.borrow(), url);
 
         let copy_to = job
             .get("filename")

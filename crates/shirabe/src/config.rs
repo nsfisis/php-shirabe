@@ -6,13 +6,14 @@ pub mod json_config_source;
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, array_merge_recursive, array_reverse, array_search_mixed,
     array_unique, current, empty, filter_var, implode, in_array, is_array, is_int, is_string, key,
     max, parse_url, reset, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
 };
+use std::cell::RefCell;
 
 use crate::advisory::auditor::Auditor;
 use crate::config::config_source_interface::ConfigSourceInterface;
@@ -38,7 +39,8 @@ pub struct Config {
     /// @var array<string, true>
     ssl_verify_warned_hosts: IndexMap<String, bool>,
     /// @var array<string, string>
-    source_of_config_value: IndexMap<String, String>,
+    // TODO(phase-b): RefCell to allow `&self` access from Config::get / get_with_flags.
+    source_of_config_value: RefCell<IndexMap<String, String>>,
 }
 
 impl Config {
@@ -233,7 +235,7 @@ impl Config {
             local_auth_config_source: None,
             warned_hosts: IndexMap::new(),
             ssl_verify_warned_hosts: IndexMap::new(),
-            source_of_config_value: IndexMap::new(),
+            source_of_config_value: RefCell::new(IndexMap::new()),
         };
 
         let config_clone = this.config.clone();
@@ -380,6 +382,7 @@ impl Config {
                             m.insert("*".to_string(), Box::new(existing));
                             self.config.insert(key.clone(), PhpMixed::Array(m));
                             self.source_of_config_value
+                                .borrow_mut()
                                 .insert(format!("{}*", key), source.to_string());
                         }
                         let cur = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
@@ -549,11 +552,20 @@ impl Config {
     /// @throws \RuntimeException
     ///
     /// @return mixed
-    pub fn get(&mut self, key: &str) -> PhpMixed {
+    pub fn get(&self, key: &str) -> PhpMixed {
         self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
     }
 
-    pub fn get_with_flags(&mut self, key: &str, flags: i64) -> Result<PhpMixed> {
+    // TODO(phase-b): typed convenience; PHP's Config::get() returns mixed.
+    pub fn get_str(&self, key: &str) -> Result<String> {
+        Ok(self
+            .get_with_flags(key, 0)?
+            .as_string()
+            .unwrap_or_default()
+            .to_string())
+    }
+
+    pub fn get_with_flags(&self, key: &str, flags: i64) -> Result<PhpMixed> {
         match key {
             // strings/paths with env var and {$refs} support
             "vendor-dir" | "bin-dir" | "process-timeout" | "data-dir" | "cache-dir"
@@ -645,27 +657,27 @@ impl Config {
                     .and_then(|v| v.as_string())
                     .unwrap_or("")
                     .to_string();
-                let matches = Preg::is_match_strict_groups(
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if !Preg::is_match3(
                     r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i",
                     &raw,
-                );
-                let matches = match matches {
-                    Some(m) => m,
-                    None => {
-                        return Err(RuntimeException {
-                            message: format!("Could not parse the value of '{}': {}", key, raw),
-                            code: 0,
-                        }
-                        .into());
+                    Some(&mut matches),
+                )
+                .unwrap_or(false)
+                {
+                    return Err(RuntimeException {
+                        message: format!("Could not parse the value of '{}': {}", key, raw),
+                        code: 0,
                     }
-                };
+                    .into());
+                }
                 let mut size = matches
-                    .get(1)
+                    .get(&CaptureKey::ByIndex(1))
                     .cloned()
                     .unwrap_or_default()
                     .parse::<f64>()
                     .unwrap_or(0.0);
-                let unit = matches.get(2).cloned();
+                let unit = matches.get(&CaptureKey::ByIndex(2)).cloned();
                 if let Some(unit) = unit {
                     match strtolower(&unit).as_str() {
                         "g" => {
@@ -980,8 +992,9 @@ impl Config {
     }
 
     /// @param mixed  $configValue
-    fn set_source_of_config_value(&mut self, config_value: &PhpMixed, path: &str, source: &str) {
+    fn set_source_of_config_value(&self, config_value: &PhpMixed, path: &str, source: &str) {
         self.source_of_config_value
+            .borrow_mut()
             .insert(path.to_string(), source.to_string());
 
         if is_array(config_value.clone()) {
@@ -1033,7 +1046,7 @@ impl Config {
     /// @param  int          $flags Options (see class constants)
     ///
     /// @return string|mixed
-    fn process(&mut self, value: PhpMixed, flags: i64) -> PhpMixed {
+    fn process(&self, value: PhpMixed, flags: i64) -> PhpMixed {
         if !is_string(&value) {
             return value;
         }
@@ -1041,8 +1054,10 @@ impl Config {
         let value_str = value.as_string().unwrap_or("").to_string();
         // TODO(phase-b): Preg::replace_callback with a closure that calls &mut self.get_with_flags
         let mut result = value_str.clone();
-        if let Some(m) = Preg::is_match_strict_groups(r"#\{\$(.+)\}#", &value_str) {
-            let key_match = m.get(1).cloned().unwrap_or_default();
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(r"#\{\$(.+)\}#", &value_str, Some(&mut m)).unwrap_or(false)
+        {
+            let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
             let replacement = self
                 .get_with_flags(&key_match, flags)
                 .ok()
@@ -1164,12 +1179,12 @@ impl Config {
             if let Some(io) = io {
                 if let Some(ref hostname) = hostname {
                     if !self.warned_hosts.contains_key(hostname) {
-                        io.write_error(
-                            PhpMixed::String(format!(
+                        io.write_error3(
+                            &format!(
                                 "<warning>Warning: Accessing {} over {} which is an insecure protocol.</warning>",
                                 hostname,
                                 scheme.as_deref().unwrap_or("")
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -1207,11 +1222,11 @@ impl Config {
                     }
 
                     if let Some(w) = warning {
-                        io.write_error(
-                            PhpMixed::String(format!(
+                        io.write_error3(
+                            &format!(
                                 "<warning>Warning: Accessing {} with {} disabled.</warning>",
                                 hostname, w
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );

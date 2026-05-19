@@ -21,4 +21,12 @@ impl OutputFormatter {
     pub fn escape(_text: &str) -> String {
         todo!()
     }
+
+    pub fn set_style(
+        &mut self,
+        _name: &str,
+        _style: crate::symfony::console::formatter::output_formatter_style::OutputFormatterStyle,
+    ) {
+        todo!()
+    }
 }

@@ -12,6 +12,7 @@ use crate::event_dispatcher::event_dispatcher::EventDispatcher;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::package::loader::array_loader::ArrayLoader;
+use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::version::version_guesser::VersionGuesser;
 use crate::package::version::version_parser::VersionParser;
 use crate::repository::array_repository::ArrayRepository;
@@ -30,7 +31,7 @@ pub struct PathRepository {
     version_guesser: VersionGuesser,
     url: String,
     repo_config: IndexMap<String, PhpMixed>,
-    process: ProcessExecutor,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     options: IndexMap<String, PhpMixed>,
 }
 
@@ -44,10 +45,10 @@ impl PathRepository {
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: Option<HttpDownloader>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         dispatcher: Option<EventDispatcher>,
-        process: Option<ProcessExecutor>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key("url") {
             return Err(RuntimeException {
@@ -64,8 +65,17 @@ impl PathRepository {
             .unwrap_or("")
             .to_string();
         let url = Platform::expand_path(&url_str);
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
-        let version_guesser = VersionGuesser::new(&config, &process, VersionParser::new(), &*io);
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone_box(),
+            ))))
+        });
+        let version_guesser = VersionGuesser::new(
+            config,
+            std::rc::Rc::clone(&process),
+            shirabe_semver::version_parser::VersionParser,
+            Some(io.clone_box()),
+        );
         let mut options = repo_config
             .get("options")
             .and_then(|v| v.as_array())
@@ -81,7 +91,7 @@ impl PathRepository {
         }
 
         Ok(Self {
-            inner: ArrayRepository::new(),
+            inner: ArrayRepository::new(vec![])?,
             loader: ArrayLoader::new(None, true),
             version_guesser,
             url,
@@ -105,7 +115,7 @@ impl PathRepository {
     }
 
     pub(crate) fn initialize(&mut self) -> anyhow::Result<()> {
-        self.inner.initialize()?;
+        self.inner.initialize();
 
         let url_matches = self.get_url_matches()?;
 
@@ -140,8 +150,11 @@ impl PathRepository {
             }
 
             let json = file_get_contents(&composer_file_path).unwrap_or_default();
-            let mut package =
-                JsonFile::parse_json(&json, Some(&composer_file_path))?.unwrap_or_default();
+            let parsed = JsonFile::parse_json(Some(&json), Some(&composer_file_path))?;
+            let mut package: IndexMap<String, PhpMixed> = match parsed {
+                PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                _ => IndexMap::new(),
+            };
             let dist = {
                 let mut dist = IndexMap::new();
                 dist.insert(
@@ -213,20 +226,20 @@ impl PathRepository {
             if !package.contains_key("version") {
                 if let Some(root_version) = Platform::get_env("COMPOSER_ROOT_VERSION") {
                     if !root_version.is_empty() {
-                        let mut ref1 = String::new();
-                        let mut ref2 = String::new();
-                        if self.process.execute(
-                            &["git", "rev-parse", "HEAD"].map(|s| s.to_string()).to_vec(),
-                            &mut ref1,
-                            Some(path.clone()),
-                        ) == 0
-                            && self.process.execute(
-                                &["git", "rev-parse", "HEAD"].map(|s| s.to_string()).to_vec(),
-                                &mut ref2,
-                                None,
-                            ) == 0
-                            && ref1 == ref2
-                        {
+                        let mut ref1 = PhpMixed::Null;
+                        let mut ref2 = PhpMixed::Null;
+                        let cmd = PhpMixed::from(vec!["git", "rev-parse", "HEAD"]);
+                        let code1 = self
+                            .process
+                            .borrow_mut()
+                            .execute(cmd.clone(), Some(&mut ref1), Some(path.as_str()))
+                            .unwrap_or(1);
+                        let code2 = self
+                            .process
+                            .borrow_mut()
+                            .execute(cmd, Some(&mut ref2), None)
+                            .unwrap_or(1);
+                        if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                             package.insert(
                                 "version".to_string(),
                                 PhpMixed::String(self.version_guesser.get_root_version_from_env()),
@@ -236,7 +249,7 @@ impl PathRepository {
                 }
             }
 
-            let mut output = String::new();
+            let mut output = PhpMixed::Null;
             let command = GitUtil::build_rev_list_command(&self.process, {
                 let mut args = vec![
                     "-n1".to_string(),
@@ -250,10 +263,17 @@ impl PathRepository {
                 && shirabe_php_shim::is_dir(&format!("{}/.git", path.trim_end_matches('/')))
                 && self
                     .process
-                    .execute(&command, &mut output, Some(path.clone()))
+                    .borrow_mut()
+                    .execute(
+                        PhpMixed::from(command),
+                        Some(&mut output),
+                        Some(path.as_str()),
+                    )
+                    .unwrap_or(1)
                     == 0
             {
-                let ref_val = GitUtil::parse_rev_list_output(&output, &self.process)
+                let output_str = output.as_string().unwrap_or("").to_string();
+                let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)
                     .trim()
                     .to_string();
                 if let Some(PhpMixed::Array(ref mut dist)) = package.get_mut("dist") {

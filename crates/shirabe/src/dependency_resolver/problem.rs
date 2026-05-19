@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::{
     LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_to_string,
@@ -212,7 +212,8 @@ impl Problem {
                 installed_map,
                 learned_pool,
             );
-            let m_opt = if in_array(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let matched = if in_array(
                 PhpMixed::Int(rule.get_reason()),
                 &PhpMixed::List(
                     deduplicatable_rule_types
@@ -222,27 +223,29 @@ impl Problem {
                 ),
                 true,
             ) {
-                Preg::is_match_strict_groups(
+                Preg::is_match_strict_groups3(
                     r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}",
                     &message,
+                    Some(&mut m),
                 )
-                .unwrap_or(None)
+                .unwrap_or(false)
             } else {
-                None
+                false
             };
-            if let Some(m) = m_opt {
+            if matched {
                 message = str_replace("%", "%%", &message);
                 let template =
                     Preg::replace(r"{^\S+ \S+ }", "%s%s ", &message).unwrap_or(message.clone());
                 messages.push(template.clone());
-                let pkg_key = m[1].clone();
-                let version_key = parser.normalize(&m[2], "").unwrap_or_default();
+                let pkg_key = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
                 templates
                     .entry(template.clone())
                     .or_insert_with(IndexMap::new)
                     .entry(pkg_key.clone())
                     .or_insert_with(IndexMap::new)
-                    .insert(version_key, m[2].clone());
+                    .insert(version_key, m2.clone());
                 let source_package = rule.get_source_package(pool);
                 for (version, pretty_version) in
                     pool.get_removed_versions_by_package(&spl_object_hash(&source_package))
@@ -533,7 +536,7 @@ impl Problem {
             }
         }
 
-        let mut locked_package: Option<BasePackage> = None;
+        let mut locked_package: Option<Box<dyn BasePackage>> = None;
         for package in request.get_locked_packages() {
             if package.get_name() == package_name {
                 locked_package = Some(package.clone());
@@ -554,7 +557,7 @@ impl Problem {
         if let Some(c) = constraint {
             if c.is_constraint()
                 && c.get_operator() == Constraint::STR_OP_EQ
-                && Preg::is_match(r"{^dev-.*#.*}", &c.get_pretty_string(), None).unwrap_or(false)
+                && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None).unwrap_or(false)
             {
                 let new_constraint =
                     Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string())
@@ -606,7 +609,7 @@ impl Problem {
                 let filtered: Vec<&Box<dyn PackageInterface>> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[package_name].matches(&Constraint::new("==", &p.get_version()))
+                        root_reqs[package_name].matches(&Constraint::new("==", p.get_version()))
                     })
                     .collect();
                 if filtered.len() == 0 {
@@ -638,12 +641,12 @@ impl Problem {
 
             let temp_reqs = repository_set.get_temporary_constraints();
             let first_pkg = packages.first().unwrap();
-            for name in first_pkg.get_names() {
+            for name in first_pkg.get_names(true) {
                 if temp_reqs.contains_key(&name) {
                     let filtered: Vec<&Box<dyn PackageInterface>> = packages
                         .iter()
                         .filter(|p| {
-                            temp_reqs[&name].matches(&Constraint::new("==", &p.get_version()))
+                            temp_reqs[&name].matches(&Constraint::new("==", p.get_version()))
                         })
                         .collect();
                     if filtered.len() == 0 {
@@ -676,10 +679,10 @@ impl Problem {
             }
 
             if let Some(ref lp) = locked_package {
-                let fixed_constraint = Constraint::new("==", &lp.get_version());
+                let fixed_constraint = Constraint::new("==", lp.get_version());
                 let filtered: Vec<&Box<dyn PackageInterface>> = packages
                     .iter()
-                    .filter(|p| fixed_constraint.matches(&Constraint::new("==", &p.get_version())))
+                    .filter(|p| fixed_constraint.matches(&Constraint::new("==", p.get_version())))
                     .collect();
                 if filtered.len() == 0 {
                     return (
@@ -763,22 +766,22 @@ impl Problem {
                                 return format!(
                                     "<href={}>{}</>",
                                     OutputFormatter::escape(advisory.link.as_ref().unwrap()),
-                                    advisory.advisory_id
+                                    advisory.inner.advisory_id
                                 );
                             }
 
-                            if str_starts_with(&advisory.advisory_id, "PKSA-") {
+                            if str_starts_with(&advisory.inner.advisory_id, "PKSA-") {
                                 return format!(
                                     "<href={}>{}</>",
                                     OutputFormatter::escape(&format!(
                                         "https://packagist.org/security-advisories/{}",
-                                        advisory.advisory_id
+                                        advisory.inner.advisory_id
                                     )),
-                                    advisory.advisory_id
+                                    advisory.inner.advisory_id
                                 );
                             }
 
-                            advisory.advisory_id.clone()
+                            advisory.inner.advisory_id.clone()
                         })
                         .collect()
                 } else {
@@ -961,7 +964,7 @@ impl Problem {
             );
         }
 
-        if !Preg::is_match(r"{^[A-Za-z0-9_./-]+$}", package_name, None).unwrap_or(false) {
+        if !Preg::is_match3(r"{^[A-Za-z0-9_./-]+$}", package_name, None).unwrap_or(false) {
             let illegal_chars =
                 Preg::replace(r"{[A-Za-z0-9_./-]+}", "", package_name).unwrap_or_default();
 
@@ -1365,7 +1368,7 @@ impl Problem {
                 && c.get_operator() == Constraint::STR_OP_EQ
                 && !str_starts_with(&c.get_version(), "dev-")
             {
-                if !Preg::is_match(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None)
+                if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None)
                     .unwrap_or(false)
                 {
                     return format!(" {} (exact version match)", c.get_pretty_string());

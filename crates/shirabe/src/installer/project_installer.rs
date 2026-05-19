@@ -12,14 +12,14 @@ use shirabe_php_shim::InvalidArgumentException;
 pub struct ProjectInstaller {
     install_path: String,
     download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-    filesystem: Filesystem,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
 }
 
 impl ProjectInstaller {
     pub fn new(
         install_path: &str,
         dm: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-        fs: Filesystem,
+        fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
         let install_path = format!("{}/", install_path.replace('\\', "/").trim_end_matches('/'));
         Self {
@@ -50,7 +50,7 @@ impl InstallerInterface for ProjectInstaller {
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
         let install_path = &self.install_path;
         if std::path::Path::new(install_path).exists()
-            && !self.filesystem.is_dir_empty(install_path)
+            && !self.filesystem.borrow().is_dir_empty(install_path)
         {
             return Err(InvalidArgumentException {
                 message: format!("Project directory {} is not empty.", install_path),

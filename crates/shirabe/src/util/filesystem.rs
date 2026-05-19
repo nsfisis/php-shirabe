@@ -21,11 +21,11 @@ use crate::util::silencer::Silencer;
 
 #[derive(Debug)]
 pub struct Filesystem {
-    process_executor: Option<ProcessExecutor>,
+    process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
 }
 
 impl Filesystem {
-    pub fn new(executor: Option<ProcessExecutor>) -> Self {
+    pub fn new(executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>) -> Self {
         Self {
             process_executor: executor,
         }
@@ -191,7 +191,7 @@ impl Filesystem {
             return Ok(Some(true));
         }
 
-        if Preg::is_match("{^(?:[a-z]:)?[/\\\\]+$}i", directory, None).unwrap_or(false) {
+        if Preg::is_match3("{^(?:[a-z]:)?[/\\\\]+$}i", directory, None).unwrap_or(false) {
             return Err(RuntimeException {
                 message: format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory),
                 code: 0,
@@ -532,7 +532,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
+            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
         }
@@ -545,7 +545,7 @@ impl Filesystem {
         common_path = format!("{}/", rtrim(&common_path, "/"));
         let source_path_depth =
             substr_count(&substr(&from, strlen(&common_path) as isize, None), "/");
-        let common_path_code = str_repeat("../", source_path_depth);
+        let common_path_code = str_repeat("../", source_path_depth as usize);
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
@@ -593,7 +593,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
+            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
             && "." != common_path
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
@@ -692,7 +692,7 @@ impl Filesystem {
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         let mut prefix_match: Vec<String> = vec![];
-        if Preg::is_match_strict_groups(
+        if Preg::is_match_strict_groups3(
             "{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
             Some(&mut prefix_match),
@@ -734,7 +734,7 @@ impl Filesystem {
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
     pub fn trim_trailing_slash(path: &str) -> String {
         let mut path = path.to_string();
-        if !Preg::is_match("{^[/\\\\]+$}", &path, None).unwrap_or(false) {
+        if !Preg::is_match3("{^[/\\\\]+$}", &path, None).unwrap_or(false) {
             path = rtrim(&path, "/\\");
         }
 
@@ -746,7 +746,7 @@ impl Filesystem {
         // on windows, \\foo indicates network paths so we exclude those from local paths, however it is unsafe
         // on linux as file:////foo (which would be a network path \\foo on windows) will resolve to /foo which could be a local path
         if Platform::is_windows() {
-            return Preg::is_match(
+            return Preg::is_match3(
                 "{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i",
                 path,
                 None,
@@ -754,7 +754,7 @@ impl Filesystem {
             .unwrap_or(false);
         }
 
-        Preg::is_match(
+        Preg::is_match3(
             "{^(file://|/|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i",
             path,
             None,
@@ -809,12 +809,14 @@ impl Filesystem {
         size
     }
 
-    pub(crate) fn get_process(&mut self) -> &mut ProcessExecutor {
+    pub(crate) fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
         if self.process_executor.is_none() {
-            self.process_executor = Some(ProcessExecutor::new(None));
+            self.process_executor = Some(std::rc::Rc::new(std::cell::RefCell::new(
+                ProcessExecutor::new(None),
+            )));
         }
 
-        self.process_executor.as_mut().unwrap()
+        self.process_executor.as_ref().unwrap().borrow_mut()
     }
 
     /// delete symbolic link implementation (commonly known as "unlink()")
@@ -960,7 +962,7 @@ impl Filesystem {
         let stat = lstat(junction);
 
         // S_ISDIR test (S_IFDIR is 0x4000, S_IFMT is 0xF000 bitmask)
-        if let Some(arr) = stat.as_array() {
+        if let Some(arr) = stat {
             let mode = arr.get("mode").and_then(|v| v.as_int()).unwrap_or(0);
             return 0x4000 != (mode & 0xF000);
         }

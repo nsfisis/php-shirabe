@@ -14,32 +14,34 @@ use crate::repository::repository_interface::RepositoryInterface;
 use crate::util::http_downloader::HttpDownloader;
 use crate::util::process_executor::ProcessExecutor;
 
+#[derive(Debug)]
 pub struct RepositoryManager {
     local_repository: Option<Box<dyn InstalledRepositoryInterface>>,
     repositories: Vec<Box<dyn RepositoryInterface>>,
     repository_classes: IndexMap<String, String>,
     io: Box<dyn IOInterface>,
-    config: Config,
-    http_downloader: HttpDownloader,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     event_dispatcher: Option<EventDispatcher>,
-    process: ProcessExecutor,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
 impl RepositoryManager {
     pub fn new(
         io: &dyn IOInterface,
-        config: &Config,
-        http_downloader: HttpDownloader,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<EventDispatcher>,
-        process: Option<ProcessExecutor>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(io));
+        let process = process
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
         Self {
             local_repository: None,
             repositories: vec![],
             repository_classes: IndexMap::new(),
             io: io.clone_box(),
-            config: config.clone(),
+            config,
             http_downloader,
             event_dispatcher,
             process,

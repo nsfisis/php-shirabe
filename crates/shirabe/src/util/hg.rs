@@ -14,12 +14,16 @@ static VERSION: OnceLock<Option<String>> = OnceLock::new();
 #[derive(Debug)]
 pub struct Hg {
     io: Box<dyn IOInterface>,
-    config: Config,
-    process: ProcessExecutor,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
 impl Hg {
-    pub fn new(io: &dyn IOInterface, config: &Config, process: &ProcessExecutor) -> Self {
+    pub fn new(
+        io: &dyn IOInterface,
+        config: &Config,
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Self {
         todo!()
     }
 
@@ -29,14 +33,19 @@ impl Hg {
         url: String,
         cwd: Option<String>,
     ) -> Result<()> {
-        self.config.prohibit_url_by_config(&url, &*self.io)?;
+        self.config.borrow_mut().prohibit_url_by_config(
+            &url,
+            Some(&*self.io),
+            &indexmap::IndexMap::new(),
+        )?;
 
         // Try as is
         let command = command_callable(url.clone());
         let mut ignored_output = String::new();
         if self
             .process
-            .execute(&command, &mut ignored_output, cwd.clone())
+            .borrow_mut()
+            .execute_args(&command, &mut ignored_output, cwd.clone())
             == 0
         {
             return Ok(());
@@ -82,11 +91,16 @@ impl Hg {
 
                 let command = command_callable(authenticated_url);
                 let mut ignored_output = String::new();
-                if self.process.execute(&command, &mut ignored_output, cwd) == 0 {
+                if self
+                    .process
+                    .borrow_mut()
+                    .execute_args(&command, &mut ignored_output, cwd)
+                    == 0
+                {
                     return Ok(());
                 }
 
-                let error = self.process.get_error_output();
+                let error = self.process.borrow().get_error_output();
                 return self
                     .throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url);
             }
@@ -106,7 +120,7 @@ impl Hg {
                 Url::sanitize(&format!(
                     "Failed to clone {}, hg was not found, check that it is installed and in your PATH env.\n\n{}",
                     url,
-                    self.process.get_error_output()
+                    self.process.borrow().get_error_output()
                 ))
             );
         }
@@ -114,11 +128,13 @@ impl Hg {
         anyhow::bail!("{}", Url::sanitize(message));
     }
 
-    pub fn get_version(process: &ProcessExecutor) -> Option<&'static str> {
+    pub fn get_version(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Option<&'static str> {
         VERSION
             .get_or_init(|| {
                 let mut output = String::new();
-                if process.execute(
+                if process.borrow_mut().execute_args(
                     &["hg".to_string(), "--version".to_string()],
                     &mut output,
                     None,

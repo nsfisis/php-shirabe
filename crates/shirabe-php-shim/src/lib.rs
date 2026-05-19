@@ -55,6 +55,31 @@ impl PhpMixed {
         }
     }
 
+    pub fn as_array_mut(&mut self) -> Option<&mut IndexMap<String, Box<PhpMixed>>> {
+        match self {
+            PhpMixed::Array(a) => Some(a),
+            _ => None,
+        }
+    }
+
+    pub fn as_list_mut(&mut self) -> Option<&mut Vec<Box<PhpMixed>>> {
+        match self {
+            PhpMixed::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn as_object(&self) -> Option<&ArrayObject> {
+        match self {
+            PhpMixed::Object(o) => Some(o),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        self.as_string()
+    }
+
     pub fn is_null(&self) -> bool {
         matches!(self, PhpMixed::Null)
     }

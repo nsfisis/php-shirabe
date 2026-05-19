@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::application::Application;
 use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
 use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
@@ -65,7 +65,7 @@ pub struct EventDispatcher {
     pub(crate) composer: Box<PartialComposer>,
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) loader: Option<ClassLoader>,
-    pub(crate) process: ProcessExecutor,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub(crate) listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
     pub(crate) run_scripts: bool,
     event_stack: Vec<String>,
@@ -78,9 +78,11 @@ impl EventDispatcher {
     pub fn new(
         composer: PartialComposer,
         io: Box<dyn IOInterface>,
-        process: Option<ProcessExecutor>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(&*io));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+        });
         let event_stack: Vec<String> = Vec::new();
         let skip_scripts_env =
             Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_else(|| "".to_string());
@@ -202,15 +204,15 @@ impl EventDispatcher {
             // TODO(plugin): PackageEvent / CommandEvent / PreCommandRunEvent specialization
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
             let details: Option<String> = None;
-            self.io.write_error(
-                PhpMixed::String(format!(
+            self.io.write_error3(
+                &format!(
                     "Dispatching <info>{}</info>{} event",
                     event.get_name(),
                     details
                         .as_ref()
                         .map(|d| format!(" ({})", d))
                         .unwrap_or_default()
-                )),
+                ),
                 true,
                 crate::io::io_interface::NORMAL,
             );
@@ -318,14 +320,14 @@ impl EventDispatcher {
                     } else {
                         "?".to_string()
                     };
-                    self.io.write_error(
-                        PhpMixed::String(sprintf(
+                    self.io.write_error3(
+                        &sprintf(
                             "> %s: %s",
                             &[
                                 PhpMixed::String(formatted_event_name_with_args.clone()),
                                 PhpMixed::String(format!("{}->{}", prefix, method_name)),
                             ],
-                        )),
+                        ),
                         true,
                         crate::io::io_interface::VERBOSE,
                     );
@@ -335,14 +337,14 @@ impl EventDispatcher {
             } else {
                 match callable {
                     Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
-                        self.io.write_error(
-                            PhpMixed::String(sprintf(
+                        self.io.write_error3(
+                            &sprintf(
                                 "> %s: %s",
                                 &[
                                     PhpMixed::String(formatted_event_name_with_args.clone()),
                                     PhpMixed::String(callable_str.clone()),
                                 ],
-                            )),
+                            ),
                             true,
                             crate::io::io_interface::VERBOSE,
                         );
@@ -391,8 +393,7 @@ impl EventDispatcher {
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
-                                self.io.write_error(
-                                PhpMixed::String(sprintf(
+                                self.io.write_error3(&sprintf(
                                     &format!(
                                         "<error>Script %s handling the %s event returned with error code {}</error>",
                                         exit_code
@@ -401,16 +402,13 @@ impl EventDispatcher {
                                         PhpMixed::String(callable_str.clone()),
                                         PhpMixed::String(event.get_name().to_string()),
                                     ],
-                                )),
-                                true,
-                                crate::io::io_interface::QUIET,
-                            );
+                                ), true, crate::io::io_interface::QUIET);
 
                                 return Err(anyhow::anyhow!(ScriptExecutionException(
                                     RuntimeException {
                                         message: format!(
                                             "Error Output: {}",
-                                            self.process.get_error_output()
+                                            self.process.borrow().get_error_output()
                                         ),
                                         code: exit_code,
                                     }
@@ -425,14 +423,10 @@ impl EventDispatcher {
                                 ))
                                 .is_empty()
                             {
-                                self.io.write_error(
-                                PhpMixed::String(sprintf(
+                                self.io.write_error3(&sprintf(
                                     "<warning>You made a reference to a non-existent script %s</warning>",
                                     &[PhpMixed::String(callable_str.clone())],
-                                )),
-                                true,
-                                crate::io::io_interface::QUIET,
-                            );
+                                ), true, crate::io::io_interface::QUIET);
                             }
 
                             let composer_full = self.composer_as_full_or_panic();
@@ -458,14 +452,14 @@ impl EventDispatcher {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
                                     if e.downcast_ref::<ScriptExecutionException>().is_some() {
-                                        self.io.write_error(
-                                            PhpMixed::String(sprintf(
+                                        self.io.write_error3(
+                                            &sprintf(
                                                 "<error>Script %s was called via %s</error>",
                                                 &[
                                                     PhpMixed::String(callable_str.clone()),
                                                     PhpMixed::String(event.get_name().to_string()),
                                                 ],
-                                            )),
+                                            ),
                                             true,
                                             crate::io::io_interface::QUIET,
                                         );
@@ -482,27 +476,19 @@ impl EventDispatcher {
 
                         self.make_autoloader(event, &Callable::String(callable_str.clone()));
                         if !class_exists(&class_name) {
-                            self.io.write_error(
-                            PhpMixed::String(format!(
+                            self.io.write_error3(&format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
                             continue;
                         }
                         if !is_callable(&PhpMixed::String(callable_str.clone())) {
-                            self.io.write_error(
-                            PhpMixed::String(format!(
+                            self.io.write_error3(&format!(
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
                                 callable_str,
                                 event.get_name()
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
                             continue;
                         }
 
@@ -513,8 +499,8 @@ impl EventDispatcher {
                             Err(e) => {
                                 let message =
                                     "Script %s handling the %s event terminated with an exception";
-                                self.io.write_error(
-                                    PhpMixed::String(format!(
+                                self.io.write_error3(
+                                    &format!(
                                         "<error>{}</error>",
                                         sprintf(
                                             message,
@@ -523,7 +509,7 @@ impl EventDispatcher {
                                                 PhpMixed::String(event.get_name().to_string()),
                                             ],
                                         )
-                                    )),
+                                    ),
                                     true,
                                     crate::io::io_interface::QUIET,
                                 );
@@ -542,15 +528,11 @@ impl EventDispatcher {
                             ),
                         );
                         if !class_exists(&class_name) {
-                            self.io.write_error(
-                            PhpMixed::String(format!(
+                            self.io.write_error3(&format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
                             continue;
                         }
                         if !is_a(
@@ -558,29 +540,21 @@ impl EventDispatcher {
                             "Symfony\\Component\\Console\\Command\\Command",
                             true,
                         ) {
-                            self.io.write_error(
-                            PhpMixed::String(format!(
+                            self.io.write_error3(&format!(
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
                             continue;
                         }
                         if defined(&format!(
                             "Composer\\Script\\ScriptEvents::{}",
                             str_replace("-", "_", &strtoupper(event.get_name()))
                         )) {
-                            self.io.write_error(
-                            PhpMixed::String(format!(
+                            self.io.write_error3(&format!(
                                 "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
                                 event.get_name()
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
                             continue;
                         }
 
@@ -628,8 +602,8 @@ impl EventDispatcher {
                             Err(e) => {
                                 let message =
                                     "Script %s handling the %s event terminated with an exception";
-                                self.io.write_error(
-                                    PhpMixed::String(format!(
+                                self.io.write_error3(
+                                    &format!(
                                         "<error>{}</error>",
                                         sprintf(
                                             message,
@@ -638,7 +612,7 @@ impl EventDispatcher {
                                                 PhpMixed::String(event.get_name().to_string()),
                                             ],
                                         )
-                                    )),
+                                    ),
                                     true,
                                     crate::io::io_interface::QUIET,
                                 );
@@ -671,23 +645,20 @@ impl EventDispatcher {
                         };
 
                         if self.io.is_verbose() {
-                            self.io.write_error(
-                                PhpMixed::String(sprintf(
+                            self.io.write_error3(
+                                &sprintf(
                                     "> %s: %s",
                                     &[
                                         PhpMixed::String(event.get_name().to_string()),
                                         PhpMixed::String(exec.clone()),
                                     ],
-                                )),
+                                ),
                                 true,
                                 crate::io::io_interface::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
-                            self.io.write_error(
-                                PhpMixed::String(sprintf(
-                                    "> %s",
-                                    &[PhpMixed::String(exec.clone())],
-                                )),
+                            self.io.write_error3(
+                                &sprintf("> %s", &[PhpMixed::String(exec.clone())]),
                                 true,
                                 crate::io::io_interface::NORMAL,
                             );
@@ -744,16 +715,19 @@ impl EventDispatcher {
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
-                            let mat = Preg::is_match_strict_groups(
+                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            if Preg::is_match_strict_groups3(
                                 "{^[^\\'\"\\s/\\\\]+}",
                                 &path_and_args,
+                                Some(&mut m),
                             )
-                            .ok()
-                            .flatten();
-                            if let Some(m) = mat {
-                                if !file_exists(&m[0]) {
+                            .unwrap_or(false)
+                            {
+                                let m0 =
+                                    m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
+                                if !file_exists(&m0) {
                                     let finder = ExecutableFinder::new();
-                                    if let Some(path_to_exec) = finder.find(&m[0]) {
+                                    if let Some(path_to_exec) = finder.find(&m0) {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
                                             let exec_without_ext = Preg::replace(
@@ -809,8 +783,7 @@ impl EventDispatcher {
 
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
-                            self.io.write_error(
-                            PhpMixed::String(sprintf(
+                            self.io.write_error3(&sprintf(
                                 &format!(
                                     "<error>Script %s handling the %s event returned with error code {}</error>",
                                     exit_code
@@ -819,16 +792,13 @@ impl EventDispatcher {
                                     PhpMixed::String(callable_str.clone()),
                                     PhpMixed::String(event.get_name().to_string()),
                                 ],
-                            )),
-                            true,
-                            crate::io::io_interface::QUIET,
-                        );
+                            ), true, crate::io::io_interface::QUIET);
 
                             return Err(anyhow::anyhow!(ScriptExecutionException(
                                 RuntimeException {
                                     message: format!(
                                         "Error Output: {}",
-                                        self.process.get_error_output()
+                                        self.process.borrow().get_error_output()
                                     ),
                                     code: exit_code,
                                 }
@@ -878,10 +848,10 @@ impl EventDispatcher {
 
     fn execute_tty(&self, exec: &str) -> anyhow::Result<i64> {
         if self.io.is_interactive() {
-            return self.process.execute_tty(exec);
+            return self.process.borrow_mut().execute_tty(exec);
         }
 
-        self.process.execute(exec)
+        self.process.borrow_mut().execute(exec)
     }
 
     fn get_php_exec_command(&self) -> anyhow::Result<String> {
@@ -932,27 +902,27 @@ impl EventDispatcher {
         event: &Event,
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
-            self.io.write_error(
-                PhpMixed::String(sprintf(
+            self.io.write_error3(
+                &sprintf(
                     "> %s: %s::%s",
                     &[
                         PhpMixed::String(event.get_name().to_string()),
                         PhpMixed::String(class_name.to_string()),
                         PhpMixed::String(method_name.to_string()),
                     ],
-                )),
+                ),
                 true,
                 crate::io::io_interface::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
-            self.io.write_error(
-                PhpMixed::String(sprintf(
+            self.io.write_error3(
+                &sprintf(
                     "> %s::%s",
                     &[
                         PhpMixed::String(class_name.to_string()),
                         PhpMixed::String(method_name.to_string()),
                     ],
-                )),
+                ),
                 true,
                 crate::io::io_interface::NORMAL,
             );
@@ -1081,11 +1051,11 @@ impl EventDispatcher {
         };
 
         if self.skip_scripts.iter().any(|s| s == event.get_name()) {
-            self.io.write_error(
-                PhpMixed::String(format!(
+            self.io.write_error3(
+                &format!(
                     "Skipped script listeners for <info>{}</info> because of COMPOSER_SKIP_SCRIPTS",
                     event.get_name()
-                )),
+                ),
                 true,
                 crate::io::io_interface::VERBOSE,
             );
@@ -1168,11 +1138,10 @@ impl EventDispatcher {
         let bin_dir = self
             .composer
             .get_config()
+            .borrow_mut()
             .get("bin-dir")
-            .and_then(|v| match v {
-                PhpMixed::String(s) => Some(s),
-                _ => None,
-            })
+            .as_string()
+            .map(|s| s.to_string())
             .unwrap_or_default();
         if shirabe_php_shim::is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
@@ -1288,11 +1257,10 @@ impl EventDispatcher {
 
         let vendor_dir = composer
             .get_config()
+            .borrow_mut()
             .get("vendor-dir")
-            .and_then(|v| match v {
-                PhpMixed::String(s) => Some(s),
-                _ => None,
-            })
+            .as_string()
+            .map(|s| s.to_string())
             .unwrap_or_default();
         let mut loader = generator.create_loader(&map, &vendor_dir);
         loader.register(false);

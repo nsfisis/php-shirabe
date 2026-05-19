@@ -10,8 +10,8 @@ use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::root_package_repository::RootPackageRepository;
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, empty, in_array};
 
 #[derive(Debug)]
@@ -25,13 +25,13 @@ impl SuggestsCommand {
         self
             .set_name("suggests")
             .set_description("Shows package suggestions")
-            .set_definition(vec![
-                InputOption::new("by-package", None, Some(InputOption::VALUE_NONE), "Groups output by suggesting package (default)", None),
-                InputOption::new("by-suggestion", None, Some(InputOption::VALUE_NONE), "Groups output by suggested package", None),
-                InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show suggestions from all dependencies, including transitive ones", None),
-                InputOption::new("list", None, Some(InputOption::VALUE_NONE), "Show only list of suggested package names", None),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Exclude suggestions from require-dev packages", None),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that you want to list suggestions from.", None),
+            .set_definition(&[
+                InputOption::new("by-package", None, Some(InputOption::VALUE_NONE), "Groups output by suggesting package (default)", None).unwrap().into(),
+        InputOption::new("by-suggestion", None, Some(InputOption::VALUE_NONE), "Groups output by suggested package", None).unwrap().into(),
+        InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show suggestions from all dependencies, including transitive ones", None).unwrap().into(),
+        InputOption::new("list", None, Some(InputOption::VALUE_NONE), "Show only list of suggested package names", None).unwrap().into(),
+        InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Exclude suggestions from require-dev packages", None).unwrap().into(),
+        InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that you want to list suggestions from.", None).unwrap().into(),
             ])
             .set_help(
                 "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests",
@@ -61,7 +61,7 @@ impl SuggestsCommand {
         } else {
             installed_repos.push(Box::new(PlatformRepository::new(
                 vec![],
-                composer.get_config().get("platform"),
+                composer.get_config().borrow().get("platform"),
             )));
             installed_repos.push(Box::new(
                 composer.get_repository_manager().get_local_repository(),

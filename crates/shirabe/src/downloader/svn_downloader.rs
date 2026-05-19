@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Downloader/SvnDownloader.php
 
 use crate::io::io_interface;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
@@ -29,9 +30,9 @@ impl SvnDownloader {
         SvnUtil::clean_env();
         let util = SvnUtil::new(
             url,
-            &*self.inner.io,
-            &self.inner.config,
-            &self.inner.process,
+            self.inner.io.clone_box(),
+            std::rc::Rc::clone(&self.inner.config),
+            Some(std::rc::Rc::clone(&self.inner.process)),
         );
         if util.binary_version().is_none() {
             return Err(RuntimeException {
@@ -68,8 +69,8 @@ impl SvnDownloader {
             }
         }
 
-        self.inner.io.write_error(
-            PhpMixed::String(format!(" Checking out {}", package.get_source_reference())),
+        self.inner.io.write_error3(
+            &format!(" Checking out {}", package.get_source_reference()),
             true,
             io_interface::NORMAL,
         );
@@ -108,17 +109,17 @@ impl SvnDownloader {
 
         let util = SvnUtil::new(
             url,
-            &*self.inner.io,
-            &self.inner.config,
-            &self.inner.process,
+            self.inner.io.clone_box(),
+            std::rc::Rc::clone(&self.inner.config),
+            Some(std::rc::Rc::clone(&self.inner.process)),
         );
         let mut flags: Vec<String> = vec![];
         if version_compare(&util.binary_version().unwrap_or_default(), "1.7.0", ">=") {
             flags.push("--ignore-ancestry".to_string());
         }
 
-        self.inner.io.write_error(
-            PhpMixed::String(format!(" Checking out {}", r#ref)),
+        self.inner.io.write_error3(
+            &format!(" Checking out {}", r#ref),
             true,
             io_interface::NORMAL,
         );
@@ -142,7 +143,7 @@ impl SvnDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &["svn", "status", "--ignore-externals"]
                 .map(|s| s.to_string())
                 .to_vec(),
@@ -168,9 +169,9 @@ impl SvnDownloader {
     ) -> anyhow::Result<String> {
         let mut util = SvnUtil::new(
             base_url,
-            &*self.inner.io,
-            &self.inner.config,
-            &self.inner.process,
+            self.inner.io.clone_box(),
+            std::rc::Rc::clone(&self.inner.config),
+            Some(std::rc::Rc::clone(&self.inner.process)),
         );
         util.set_cache_credentials(self.cache_credentials);
         util.execute(command, url, cwd, path, self.inner.io.is_verbose())
@@ -195,7 +196,14 @@ impl SvnDownloader {
         }
 
         if !self.inner.io.is_interactive() {
-            if self.inner.config.get("discard-changes").as_bool() == Some(true) {
+            if self
+                .inner
+                .config
+                .borrow_mut()
+                .get("discard-changes")
+                .as_bool()
+                == Some(true)
+            {
                 return self.discard_changes(path);
             }
 
@@ -208,17 +216,17 @@ impl SvnDownloader {
             .map(|elem| format!("    {}", elem))
             .collect();
         let count_changes = changes.len() as i64;
-        self.inner.io.write_error(
-            PhpMixed::String(format!(
+        self.inner.io.write_error3(
+            &format!(
                 "    <error>{} has modified file{}:</error>",
                 package.get_pretty_name(),
                 if count_changes == 1 { "" } else { "s" }
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        self.inner.io.write_error(
+        self.inner.io.write_error3(
             PhpMixed::List(
                 changes[..slice_end]
                     .iter()
@@ -230,12 +238,12 @@ impl SvnDownloader {
         );
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
-            self.inner.io.write_error(
-                PhpMixed::String(format!(
+            self.inner.io.write_error3(
+                &format!(
                     "    <info>{} more file{} modified, choose \"v\" to view the full list</info>",
                     remaining_changes,
                     if remaining_changes == 1 { "" } else { "s" }
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -263,7 +271,7 @@ impl SvnDownloader {
                     .into());
                 }
                 Some("v") => {
-                    self.inner.io.write_error(
+                    self.inner.io.write_error3(
                         PhpMixed::List(
                             changes
                                 .iter()
@@ -275,7 +283,7 @@ impl SvnDownloader {
                     );
                 }
                 _ => {
-                    self.inner.io.write_error(
+                    self.inner.io.write_error3(
                         PhpMixed::List(vec![
                             Box::new(PhpMixed::String(format!(
                                 "    y - discard changes and apply the {}",
@@ -317,17 +325,17 @@ impl SvnDownloader {
                 path.to_string(),
             ];
             let mut output = String::new();
-            if self
-                .inner
-                .process
-                .execute(&command, &mut output, Some(path.to_string()))
-                != 0
+            if self.inner.process.borrow_mut().execute_args(
+                &command,
+                &mut output,
+                Some(path.to_string()),
+            ) != 0
             {
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to execute {}\n\n{}",
                         command.join(" "),
-                        self.inner.process.get_error_output()
+                        self.inner.process.borrow().get_error_output()
                     ),
                     code: 0,
                 }
@@ -335,8 +343,14 @@ impl SvnDownloader {
             }
 
             let url_pattern = "#<url>(.*)</url>#";
-            let base_url = if let Some(matches) = Preg::match_strict_groups(url_pattern, &output) {
-                matches.get("1").cloned().unwrap_or_default()
+            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            let base_url = if Preg::match_strict_groups3(url_pattern, &output, Some(&mut matches))
+                .unwrap_or(false)
+            {
+                matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default()
             } else {
                 return Err(RuntimeException {
                     message: format!("Unable to determine svn url for path {}", path),
@@ -346,8 +360,10 @@ impl SvnDownloader {
             };
 
             // strip paths from references and only keep the actual revision
-            let from_revision = Preg::replace(r"{.*@(\d+)$}", "$1", from_reference.to_string());
-            let to_revision = Preg::replace(r"{.*@(\d+)$}", "$1", to_reference.to_string());
+            let from_revision =
+                Preg::replace(r"{.*@(\d+)$}", "$1", &from_reference).unwrap_or_default();
+            let to_revision =
+                Preg::replace(r"{.*@(\d+)$}", "$1", &to_reference).unwrap_or_default();
 
             let command = vec![
                 "svn".to_string(),
@@ -359,9 +375,9 @@ impl SvnDownloader {
 
             let mut util = SvnUtil::new(
                 &base_url,
-                &*self.inner.io,
-                &self.inner.config,
-                &self.inner.process,
+                self.inner.io.clone_box(),
+                std::rc::Rc::clone(&self.inner.config),
+                Some(std::rc::Rc::clone(&self.inner.process)),
             );
             util.set_cache_credentials(self.cache_credentials);
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
@@ -382,7 +398,7 @@ impl SvnDownloader {
 
     pub(crate) fn discard_changes(&self, path: &str) -> anyhow::Result<Box<dyn PromiseInterface>> {
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
             &mut output,
             Some(path.to_string()),
@@ -391,7 +407,7 @@ impl SvnDownloader {
             return Err(RuntimeException {
                 message: format!(
                     "Could not reset changes\n\n:{}",
-                    self.inner.process.get_error_output()
+                    self.inner.process.borrow().get_error_output()
                 ),
                 code: 0,
             }

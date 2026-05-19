@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise::promise::Promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
@@ -79,7 +79,7 @@ impl ProcessExecutor {
     const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
         &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
 
-    pub fn new(io: Option<Box<dyn IOInterface>>, _: Option<()>) -> Self {
+    pub fn new(io: Option<Box<dyn IOInterface>>) -> Self {
         let mut this = Self {
             capture_output: false,
             error_output: String::new(),
@@ -116,6 +116,28 @@ impl ProcessExecutor {
         self.do_execute(command, cwd, false, None)
     }
 
+    /// Convenience wrapper used by phase-A code that calls
+    /// `process.execute(&[String], &mut String, Option<&str>) == 0`.
+    /// Forwards to `execute`, returning the status code (0 on Err for compatibility).
+    pub fn execute_args<C: AsRef<str>>(
+        &mut self,
+        command: &[String],
+        output: &mut String,
+        cwd: Option<C>,
+    ) -> i64 {
+        let cmd = PhpMixed::List(
+            command
+                .iter()
+                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .collect(),
+        );
+        let mut buf = PhpMixed::String(String::new());
+        let cwd_str: Option<&str> = cwd.as_ref().map(|s| s.as_ref());
+        let rc = self.execute(cmd, Some(&mut buf), cwd_str).unwrap_or(1);
+        *output = buf.as_string().unwrap_or("").to_string();
+        rc
+    }
+
     /// runs a process on the commandline in TTY mode
     pub fn execute_tty(&mut self, command: PhpMixed, cwd: Option<&str>) -> Result<i64> {
         if Platform::is_tty(None) {
@@ -142,14 +164,16 @@ impl ProcessExecutor {
         if is_string(&command) {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows() {
-                if let Some(m) = Preg::is_match_strict_groups(r"{^([^:/\\]++) }", &command_str) {
+                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(r"{^([^:/\\]++) }", &command_str, Some(&mut m))
+                    .unwrap_or(false)
+                {
+                    let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(
                         &command_str,
-                        &Self::escape(PhpMixed::String(Self::get_executable(
-                            m.get(1).cloned().unwrap_or_default().as_str(),
-                        ))),
+                        &Self::escape(PhpMixed::String(Self::get_executable(&m1))),
                         0,
-                        strlen(m.get(1).cloned().unwrap_or_default().as_str()) as usize,
+                        strlen(&m1) as usize,
                     );
                 }
             }
@@ -359,17 +383,15 @@ impl ProcessExecutor {
         }
 
         if Process::ERR == r#type {
-            self.io.as_ref().unwrap().write_error_raw(
-                PhpMixed::String(buffer.to_string()),
-                false,
-                io_interface::NORMAL,
-            );
+            self.io
+                .as_mut()
+                .unwrap()
+                .write_error_raw3(buffer, false, io_interface::NORMAL);
         } else {
-            self.io.as_ref().unwrap().write_raw(
-                PhpMixed::String(buffer.to_string()),
-                false,
-                io_interface::NORMAL,
-            );
+            self.io
+                .as_mut()
+                .unwrap()
+                .write_raw3(buffer, false, io_interface::NORMAL);
         }
     }
 
@@ -600,13 +622,17 @@ impl ProcessExecutor {
                 if Preg::is_match(
                     GitHub::GITHUB_TOKEN_REGEX,
                     m.get("user").cloned().unwrap_or_default().as_str(),
-                ) {
+                )
+                .unwrap_or(false)
+                {
                     return "://***:***@".to_string();
                 }
                 if Preg::is_match(
                     r"{^[a-f0-9]{12,}$}",
                     m.get("user").cloned().unwrap_or_default().as_str(),
-                ) {
+                )
+                .unwrap_or(false)
+                {
                     return "://***:***@".to_string();
                 }
 
@@ -668,7 +694,7 @@ impl ProcessExecutor {
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
         argument =
             Preg::replace_with_count(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes);
-        let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument);
+        let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument).unwrap_or(false);
 
         if !meta && !quote {
             quote = strpbrk(&argument, "^&|<>()").is_some();

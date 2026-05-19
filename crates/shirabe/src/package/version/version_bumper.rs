@@ -7,7 +7,7 @@ use crate::package::version::version_parser::VersionParser;
 use crate::util::platform::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::intervals::Intervals;
 
@@ -49,9 +49,9 @@ impl VersionBumper {
             return Ok(pretty_constraint);
         }
 
-        let major = Preg::replace(r"{^([1-9][0-9]*|0\.\d+).*}", "$1", version.clone())?;
+        let major = Preg::replace(r"{^([1-9][0-9]*|0\.\d+).*}", "$1", &version)?;
         let version_without_suffix =
-            Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", version.clone())?;
+            Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", &version)?;
         let new_pretty_constraint = format!("^{}", version_without_suffix);
 
         if !Preg::is_match(r"{^\^\d+(\.\d+)*$}", &new_pretty_constraint)? {
@@ -73,13 +73,16 @@ impl VersionBumper {
             major = major
         );
 
-        let mut matches: IndexMap<String, Vec<(String, i64)>> = IndexMap::new();
-        if Preg::is_match_all_with_offsets(&pattern, &pretty_constraint, &mut matches)? {
+        let mut matches: IndexMap<CaptureKey, Vec<(String, usize)>> = IndexMap::new();
+        if Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint, Some(&mut matches))? {
             let mut modified = pretty_constraint.clone();
-            let constraint_matches = matches.get("constraint").cloned().unwrap_or_default();
+            let constraint_matches = matches
+                .get(&CaptureKey::ByName("constraint".to_string()))
+                .cloned()
+                .unwrap_or_default();
             for match_ in constraint_matches.iter().rev() {
                 let match_str = &match_.0;
-                let match_offset = match_.1;
+                let match_offset = match_.1 as i64;
                 let suffix = if match_str.matches('.').count() == 2
                     && version_without_suffix.matches('.').count() == 1
                 {

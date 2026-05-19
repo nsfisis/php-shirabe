@@ -89,7 +89,7 @@ impl Solver {
         let rules_count = self.rules.count();
         let mut rule_index = 0_i64;
         while rule_index < rules_count {
-            let rule = self.rules.rule_by_id(rule_index).clone();
+            let rule = self.rules.rule_by_id(rule_index).clone_box();
 
             if !rule.is_assertion() || rule.is_disabled() {
                 rule_index += 1;
@@ -100,7 +100,7 @@ impl Solver {
             let literal = literals[0];
 
             if !self.decisions.decided(literal) {
-                self.decisions.decide(literal, 1, rule.clone());
+                self.decisions.decide(literal, 1, rule.clone_box());
                 rule_index += 1;
                 continue;
             }
@@ -118,12 +118,12 @@ impl Solver {
                 continue;
             }
 
-            let conflict = self.decisions.decision_rule(literal).clone();
+            let conflict = self.decisions.decision_rule(literal).clone_box();
 
             if RuleSet::TYPE_PACKAGE == conflict.get_type() {
                 let mut problem = Problem::new();
 
-                problem.add_rule(rule.clone());
+                problem.add_rule(rule.clone_box());
                 problem.add_rule(conflict);
                 self.rules.rule_by_id_mut(rule_index).disable()?;
                 self.problems.push(problem);
@@ -144,7 +144,7 @@ impl Solver {
                 .ids()
                 .collect();
             for assert_rule_id in request_rules {
-                let assert_rule = self.rules.rule_by_id(assert_rule_id).clone();
+                let assert_rule = self.rules.rule_by_id(assert_rule_id).clone_box();
                 if assert_rule.is_disabled() || !assert_rule.is_assertion() {
                     continue;
                 }
@@ -204,7 +204,7 @@ impl Solver {
                 // TODO(phase-b): store the constraint inside reason_data; PhpMixed needs to
                 // accept a `dyn ConstraintInterface` wrapper.
                 reason_data.insert("constraint".to_string(), PhpMixed::Null);
-                problem.add_rule(Rule::generic(GenericRule::new(
+                problem.add_rule(Box::new(GenericRule::new(
                     Vec::new(),
                     PhpMixed::Int(rule::RULE_ROOT_REQUIRE),
                     PhpMixed::Array(
@@ -213,7 +213,7 @@ impl Solver {
                             .map(|(k, v)| (k, Box::new(v)))
                             .collect(),
                     ),
-                )));
+                )) as Box<dyn Rule>);
                 self.problems.push(problem);
             }
         }
@@ -229,11 +229,8 @@ impl Solver {
 
         self.setup_fixed_map(request);
 
-        self.io.write_error(
-            PhpMixed::String("Generating rules".to_string()),
-            true,
-            crate::io::io_interface::DEBUG,
-        );
+        self.io
+            .write_error3("Generating rules", true, crate::io::io_interface::DEBUG);
         let mut rule_set_generator =
             RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
         self.rules =
@@ -253,23 +250,20 @@ impl Solver {
         // make decisions based on root require/fix assertions
         self.make_assertion_rule_decisions()?;
 
-        self.io.write_error(
-            PhpMixed::String("Resolving dependencies through SAT".to_string()),
+        self.io.write_error3(
+            "Resolving dependencies through SAT",
             true,
             crate::io::io_interface::DEBUG,
         );
         let before = microtime(true);
         self.run_sat()?;
-        self.io.write_error(
-            PhpMixed::String("".to_string()),
-            true,
-            crate::io::io_interface::DEBUG,
-        );
-        self.io.write_error(
-            PhpMixed::String(sprintf(
+        self.io
+            .write_error3("", true, crate::io::io_interface::DEBUG);
+        self.io.write_error3(
+            &sprintf(
                 "Dependency resolution completed in %.3f seconds",
                 &[PhpMixed::Float(microtime(true) - before)],
-            )),
+            ),
             true,
             crate::io::io_interface::VERBOSE,
         );
@@ -767,8 +761,8 @@ impl Solver {
             let mut rules_count = self.rules.count();
             let mut pass = 1_i64;
 
-            self.io.write_error(
-                PhpMixed::String("Looking at all rules.".to_string()),
+            self.io.write_error3(
+                "Looking at all rules.",
                 true,
                 crate::io::io_interface::DEBUG,
             );
@@ -777,20 +771,20 @@ impl Solver {
             while n < rules_count {
                 if i == rules_count {
                     if 1 == pass {
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "Something's changed, looking at all rules again (pass #{})",
                                 pass
-                            )),
+                            ),
                             false,
                             crate::io::io_interface::DEBUG,
                         );
                     } else {
-                        self.io.overwrite_error(
-                            PhpMixed::String(format!(
+                        self.io.overwrite_error4(
+                            &format!(
                                 "Something's changed, looking at all rules again (pass #{})",
                                 pass
-                            )),
+                            ),
                             false,
                             None,
                             crate::io::io_interface::DEBUG,
@@ -801,7 +795,7 @@ impl Solver {
                     pass += 1;
                 }
 
-                let rule = self.rules.rule_by_id(i).clone();
+                let rule = self.rules.rule_by_id(i).clone_box();
                 let literals = rule.get_literals().clone();
 
                 if rule.is_disabled() {

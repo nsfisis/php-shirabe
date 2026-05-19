@@ -3,9 +3,10 @@
 use std::any::Any;
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{LogicException, get_debug_type};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -15,6 +16,7 @@ use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
+use crate::package::archiver::archive_manager::ArchiveManager;
 use crate::package::base_package::BasePackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::version::version_parser::VersionParser;
@@ -43,13 +45,13 @@ impl ArchiveCommand {
         self
             .set_name("archive")
             .set_description("Creates an archive of this composer package")
-            .set_definition(vec![
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None),
-                InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None),
-                InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None),
-                InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None),
+            .set_definition(&[
+                InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None).unwrap().into(),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
+                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None).unwrap().into(),
+                InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
+                InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
+                InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
             ])
             .set_help(
                 "The <info>archive</info> command creates an archive of the specified format\n\
@@ -62,19 +64,12 @@ impl ArchiveCommand {
 
     pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
         let composer = self.try_composer(None, None);
-        let mut config: Option<Config> = None;
+        let mut config: Option<std::rc::Rc<std::cell::RefCell<Config>>> = None;
 
         if let Some(ref composer) = composer {
-            config = Some(composer.get_config().clone());
+            config = Some(std::rc::Rc::clone(composer.get_config()));
             // TODO(plugin): dispatch CommandEvent
-            let command_event = CommandEvent::new(
-                PluginEvents::COMMAND.to_string(),
-                "archive".to_string(),
-                input,
-                output,
-                vec![],
-                vec![],
-            );
+            let command_event = CommandEvent::new(PluginEvents::COMMAND, "archive", input, output);
             let event_dispatcher = composer.get_event_dispatcher();
             event_dispatcher.dispatch(Some(command_event.get_name()), None);
             event_dispatcher.dispatch_script(
@@ -87,7 +82,7 @@ impl ArchiveCommand {
 
         let config = match config {
             Some(c) => c,
-            None => Factory::create_config(None, None)?,
+            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
         };
 
         let format = input
@@ -96,6 +91,7 @@ impl ArchiveCommand {
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 config
+                    .borrow_mut()
                     .get("archive-format")
                     .as_string()
                     .unwrap_or("tar")
@@ -108,6 +104,7 @@ impl ArchiveCommand {
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 config
+                    .borrow_mut()
                     .get("archive-dir")
                     .as_string()
                     .unwrap_or(".")
@@ -155,7 +152,7 @@ impl ArchiveCommand {
     pub fn archive(
         &self,
         io: &dyn IOInterface,
-        config: &Config,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: Option<String>,
         version: Option<String>,
         format: &str,
@@ -164,19 +161,24 @@ impl ArchiveCommand {
         ignore_filters: bool,
         composer: Option<&Composer>,
     ) -> Result<i64> {
-        let archive_manager = if let Some(composer) = composer {
-            composer.get_archive_manager().clone_box()
+        let owned_archive_manager;
+        let archive_manager: &ArchiveManager = if let Some(composer) = composer {
+            composer.get_archive_manager()
         } else {
-            let factory = Factory::new();
-            let process = ProcessExecutor::new(None, None);
-            let http_downloader = Factory::create_http_downloader(io, config)?;
+            let factory = Factory;
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+            let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+                Factory::create_http_downloader(io, config, indexmap::IndexMap::new())?,
+            ));
             let download_manager =
-                factory.create_download_manager(io, config, &http_downloader, &process)?;
+                factory.create_download_manager(io, config, &http_downloader, &process, None)?;
             let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                http_downloader,
+                std::rc::Rc::clone(&http_downloader),
                 Some(process),
             )));
-            factory.create_archive_manager(config, &download_manager, &loop_)?
+            owned_archive_manager =
+                factory.create_archive_manager(&*config.borrow(), &download_manager, &loop_)?;
+            &owned_archive_manager
         };
 
         let package = if let Some(name) = package_name {
@@ -192,13 +194,17 @@ impl ArchiveCommand {
             "<info>Creating the archive into \"{}\".</info>",
             dest
         ));
-        let package_path = archive_manager.archive(
+        // TODO(phase-b): ArchiveManager.archive needs &mut self and &mut CompletePackageInterface;
+        // current composer.get_archive_manager() returns &ArchiveManager. Needs RefCell wrapper.
+        let _ = archive_manager;
+        let _ = (
             package.as_ref(),
             format,
             dest,
             file_name.as_deref(),
             ignore_filters,
-        )?;
+        );
+        let package_path: String = todo!("ArchiveManager.archive call");
         let fs = Filesystem::new(None);
         let short_path =
             fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false);
@@ -252,28 +258,57 @@ impl ArchiveCommand {
         }
 
         if let Some(version_str) = &version {
-            if let Some(matches) =
-                Preg::match_strict_groups(r"{@(stable|RC|beta|alpha|dev)$}i", version_str)
+            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::match_strict_groups3(
+                r"{@(stable|RC|beta|alpha|dev)$}i",
+                version_str,
+                Some(&mut matches),
+            )
+            .unwrap_or(false)
             {
-                min_stability = VersionParser::normalize_stability(&matches[1]);
-                let full_match_len = matches[0].len();
+                let m1 = matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default();
+                let m0 = matches
+                    .get(&CaptureKey::ByIndex(0))
+                    .cloned()
+                    .unwrap_or_default();
+                min_stability = VersionParser::normalize_stability(&m1)?;
+                let full_match_len = m0.len();
                 version = Some(version_str[..version_str.len() - full_match_len].to_string());
             }
         }
 
-        let mut repo_set = RepositorySet::new(&min_stability);
-        repo_set.add_repository(Box::new(repo));
+        let mut repo_set = RepositorySet::new(
+            &min_stability,
+            IndexMap::new(),
+            Vec::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+            IndexMap::new(),
+        );
+        repo_set.add_repository(Box::new(repo))?;
         let parser = VersionParser::new();
-        let constraint = version.as_deref().map(|v| parser.parse_constraints(v));
-        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint.as_deref());
+        let constraint: Option<
+            Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>,
+        > = match version.as_deref() {
+            Some(v) => Some(parser.parse_constraints(v)?.clone_box()),
+            None => None,
+        };
+        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0);
 
         let package = if packages.len() > 1 {
-            let version_selector = VersionSelector::new(&repo_set);
+            let mut version_selector = VersionSelector::new(repo_set, None)?;
             let best = version_selector.find_best_candidate(
                 &package_name.to_lowercase(),
                 version.as_deref(),
                 &min_stability,
-            );
+                None,
+                0,
+                None,
+                shirabe_php_shim::PhpMixed::Bool(true),
+            )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
             io.write_error(&format!(
@@ -298,34 +333,10 @@ impl ArchiveCommand {
             return Ok(None);
         };
 
-        if (package.as_any() as &dyn Any)
-            .downcast_ref::<dyn CompletePackageInterface>()
-            .is_none()
-        {
-            return Err(LogicException {
-                message: format!(
-                    "Expected a CompletePackageInterface instance but found {}",
-                    get_debug_type(package.as_php_mixed())
-                ),
-                code: 0,
-            }
-            .into());
-        }
-        if (package.as_any() as &dyn Any)
-            .downcast_ref::<BasePackage>()
-            .is_none()
-        {
-            return Err(LogicException {
-                message: format!(
-                    "Expected a BasePackage instance but found {}",
-                    get_debug_type(package.as_php_mixed())
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(Some(package.into_complete()))
+        // TODO(phase-b): instanceof CompletePackageInterface / BasePackage runtime
+        // checks require downcast support that BasePackage trait does not yet expose.
+        let _ = &package;
+        todo!("convert Box<dyn BasePackage> into Box<dyn CompletePackageInterface>")
     }
 }
 

@@ -37,6 +37,17 @@ pub struct Transaction {
     pub(crate) result_packages_by_name: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
 }
 
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            operations: vec![],
+            present_packages: vec![],
+            result_package_map: IndexMap::new(),
+            result_packages_by_name: IndexMap::new(),
+        }
+    }
+}
+
 impl Transaction {
     /// @param PackageInterface[] $presentPackages
     /// @param PackageInterface[] $resultPackages
@@ -67,12 +78,8 @@ impl Transaction {
         let _package_sort = |a: &dyn PackageInterface, b: &dyn PackageInterface| -> i64 {
             // sort alias packages by the same name behind their non alias version
             if a.get_name() == b.get_name() {
-                let a_is_alias = (a.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .is_some();
-                let b_is_alias = (b.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .is_some();
+                let a_is_alias = a.as_any().downcast_ref::<AliasPackage>().is_some();
+                let b_is_alias = b.as_any().downcast_ref::<AliasPackage>().is_some();
                 if a_is_alias != b_is_alias {
                     return if a_is_alias { -1 } else { 1 };
                 }
@@ -119,10 +126,7 @@ impl Transaction {
         let mut present_alias_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
         let mut remove_alias_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
         for package in &self.present_packages {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some()
-            {
+            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                 let key = format!("{}::{}", package.get_name(), package.get_version());
                 present_alias_map.insert(key.clone(), package.clone_package_box());
                 remove_alias_map.insert(key, package.clone_package_box());
@@ -151,7 +155,7 @@ impl Transaction {
                 visited.insert(spl_object_hash(package.as_ref()), true);
 
                 stack.push(package.clone_package_box());
-                if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+                if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                     stack.push(alias.get_alias_of().clone_package_box());
                 } else {
                     for link in package.get_requires().values() {
@@ -165,10 +169,7 @@ impl Transaction {
             } else if !processed.contains_key(&spl_object_hash(package.as_ref())) {
                 processed.insert(spl_object_hash(package.as_ref()), true);
 
-                if (package.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .is_some()
-                {
+                if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                     let alias_key = format!("{}::{}", package.get_name(), package.get_version());
                     if present_alias_map.contains_key(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
@@ -308,12 +309,10 @@ impl Transaction {
             let op = &operations[idx];
 
             let package: Box<dyn PackageInterface> = if let Some(install_op) =
-                (op.as_ref() as &dyn Any).downcast_ref::<InstallOperation>()
+                op.as_ref().as_any().downcast_ref::<InstallOperation>()
             {
                 install_op.get_package().clone_package_box()
-            } else if let Some(update_op) =
-                (op.as_ref() as &dyn Any).downcast_ref::<UpdateOperation>()
-            {
+            } else if let Some(update_op) = op.as_ref().as_any().downcast_ref::<UpdateOperation>() {
                 update_op.get_target_package().clone_package_box()
             } else {
                 continue;
@@ -415,10 +414,14 @@ impl Transaction {
         let mut uninst_ops: Vec<Box<dyn OperationInterface>> = vec![];
         let mut to_remove: Vec<usize> = vec![];
         for (idx, op) in operations.iter().enumerate() {
-            let is_uninstall = (op.as_ref() as &dyn Any)
+            let is_uninstall = op
+                .as_ref()
+                .as_any()
                 .downcast_ref::<UninstallOperation>()
                 .is_some()
-                || (op.as_ref() as &dyn Any)
+                || op
+                    .as_ref()
+                    .as_any()
                     .downcast_ref::<MarkAliasUninstalledOperation>()
                     .is_some();
             if is_uninstall {

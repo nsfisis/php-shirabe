@@ -4,7 +4,7 @@ use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
@@ -58,11 +58,14 @@ pub struct GitBitbucketDriver {
 impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn initialize(&mut self) -> Result<()> {
-        let matched = Preg::is_match_strict_groups(
+        let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
+        if !Preg::is_match_strict_groups3(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i",
             &self.inner.url,
-        );
-        if matched.is_none() {
+            Some(&mut m),
+        )
+        .unwrap_or(false)
+        {
             return Err(InvalidArgumentException {
                 message: sprintf(
                     "The Bitbucket repository URL %s is invalid. It must be the HTTPS URL of a Bitbucket repository.",
@@ -72,10 +75,9 @@ impl GitBitbucketDriver {
             }
             .into());
         }
-        let m = matched.unwrap();
 
-        self.owner = m.get(1).cloned().unwrap_or_default();
-        self.repository = m.get(2).cloned().unwrap_or_default();
+        self.owner = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+        self.repository = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
             &*self.inner.io,
@@ -84,6 +86,7 @@ impl GitBitbucketDriver {
                 &[
                     self.inner
                         .config
+                        .borrow_mut()
                         .get("cache-repo-dir")
                         .as_string()
                         .unwrap_or("")
@@ -98,6 +101,7 @@ impl GitBitbucketDriver {
         self.inner.cache.as_mut().unwrap().set_read_only(
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-read-only")
                 .as_bool()
                 .unwrap_or(false),
@@ -236,7 +240,12 @@ impl GitBitbucketDriver {
             } {
                 // composer already set above
             } else {
-                composer = self.inner.get_base_composer_information(identifier)?;
+                let file_content = self.get_file_content("composer.json", identifier)?;
+                composer = VcsDriverBase::finish_base_composer_information(
+                    identifier,
+                    file_content,
+                    || self.get_change_date(identifier),
+                )?;
 
                 if self.inner.should_cache(identifier) {
                     self.inner.cache.as_ref().unwrap().write(
@@ -664,16 +673,17 @@ impl GitBitbucketDriver {
         url: &str,
         fetching_repo_data: bool,
     ) -> Result<Response> {
-        match self.inner.get_contents(url, false) {
+        match self.inner.get_contents(url) {
             Ok(r) => Ok(r),
             Err(e) => {
                 // TODO(phase-b): only handle TransportException
-                let bitbucket_util = Bitbucket::new(
-                    &*self.inner.io,
-                    &self.inner.config,
-                    Some(self.inner.process.clone()),
-                    Some(self.inner.http_downloader.clone()),
-                );
+                let mut bitbucket_util = Bitbucket::new(
+                    self.inner.io.clone_box(),
+                    std::rc::Rc::clone(&self.inner.config),
+                    Some(std::rc::Rc::clone(&self.inner.process)),
+                    Some(std::rc::Rc::clone(&self.inner.http_downloader)),
+                    None,
+                )?;
 
                 if let Some(te) = e.downcast_ref::<TransportException>() {
                     let code = te.get_code();
@@ -693,7 +703,7 @@ impl GitBitbucketDriver {
                         if !self.inner.io.has_authentication(&self.inner.origin_url)
                             && bitbucket_util.authorize_oauth(&self.inner.origin_url)
                         {
-                            return self.inner.get_contents(url, false);
+                            return self.inner.get_contents(url);
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
@@ -833,7 +843,9 @@ impl GitBitbucketDriver {
         if !Preg::is_match(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
             url,
-        ) {
+        )
+        .unwrap_or(false)
+        {
             return false;
         }
 

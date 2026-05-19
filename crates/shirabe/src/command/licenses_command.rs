@@ -4,10 +4,10 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::helper::table::Table;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 
@@ -33,28 +33,34 @@ impl LicensesCommand {
     pub fn configure(&mut self) {
         self.set_name("licenses")
             .set_description("Shows information about licenses of dependencies")
-            .set_definition(vec![
+            .set_definition(&[
                 InputOption::new(
                     "format",
                     Some(PhpMixed::String("f".to_string())),
                     Some(InputOption::VALUE_REQUIRED),
                     "Format of the output: text, json or summary",
                     Some(PhpMixed::String("text".to_string())),
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-dev",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Disables search in require-dev packages.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "locked",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Shows licenses from the lock file instead of installed packages.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "The license command displays detailed information about the licenses of\n\
@@ -69,8 +75,7 @@ impl LicensesCommand {
         let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch COMMAND event for plugin hooks
-        let command_event =
-            CommandEvent::new(PluginEvents::COMMAND, "licenses".to_string(), input, output);
+        let command_event = CommandEvent::new(PluginEvents::COMMAND, "licenses", input, output);
         composer
             .get_event_dispatcher()
             .dispatch(Some(command_event.get_name()), None);
@@ -144,7 +149,7 @@ impl LicensesCommand {
                         package.get_pretty_name().to_string()
                     };
                     let pkg_licenses = if let Some(complete_pkg) =
-                        (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
+                        package.as_any().downcast_ref::<CompletePackage>()
                     {
                         complete_pkg.get_license()
                     } else {
@@ -168,7 +173,7 @@ impl LicensesCommand {
                     IndexMap::new();
                 for package in &packages {
                     let pkg_licenses = if let Some(complete_pkg) =
-                        (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
+                        package.as_any().downcast_ref::<CompletePackage>()
                     {
                         complete_pkg.get_license()
                     } else {
@@ -177,7 +182,7 @@ impl LicensesCommand {
                     let mut dep_info: IndexMap<String, PhpMixed> = IndexMap::new();
                     dep_info.insert(
                         "version".to_string(),
-                        PhpMixed::String(package.get_full_pretty_version().to_string()),
+                        PhpMixed::String(package.get_full_pretty_version(true, 0).to_string()),
                     );
                     dep_info.insert(
                         "license".to_string(),
@@ -198,7 +203,7 @@ impl LicensesCommand {
                 );
                 output_map.insert(
                     "version".to_string(),
-                    PhpMixed::String(root.get_full_pretty_version().to_string()),
+                    PhpMixed::String(root.get_full_pretty_version(true, 0).to_string()),
                 );
                 let root_licenses = root.get_license();
                 output_map.insert(
@@ -232,7 +237,7 @@ impl LicensesCommand {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();
                 for package in &packages {
                     let mut licenses = if let Some(complete_pkg) =
-                        (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
+                        package.as_any().downcast_ref::<CompletePackage>()
                     {
                         complete_pkg.get_license()
                     } else {

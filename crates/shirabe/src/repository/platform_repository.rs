@@ -4,7 +4,7 @@ use std::sync::{LazyLock, Mutex};
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn, array_slice,
@@ -337,14 +337,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // librabbitmq version => 0.9.0
-                    if let Ok(Some(librabbitmq_matches)) = Preg::is_match_strict_groups(
+                    let mut librabbitmq_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^librabbitmq version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut librabbitmq_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-librabbitmq", name),
-                            Some(&librabbitmq_matches["version"]),
+                            librabbitmq_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("AMQP librabbitmq version"),
                             &[],
                             &[],
@@ -352,14 +358,22 @@ impl PlatformRepository {
                     }
 
                     // AMQP protocol version => 0-9-1
-                    if let Ok(Some(protocol_matches)) = Preg::is_match_strict_groups(
+                    let mut protocol_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^AMQP protocol version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut protocol_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let version_str = protocol_matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
                         self.add_library(
                             &mut libraries,
                             &format!("{}-protocol", name),
-                            Some(&str_replace("-", ".", &protocol_matches["version"])),
+                            Some(&str_replace("-", ".", &version_str)),
                             Some("AMQP protocol version"),
                             &[],
                             &[],
@@ -371,13 +385,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // BZip2 Version => 1.0.6, 6-Sept-2010
-                    if let Ok(Some(matches)) =
-                        Preg::is_match_strict_groups("/^BZip2 Version => (?<version>.*),/im", &info)
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
+                        "/^BZip2 Version => (?<version>.*),/im",
+                        &info,
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
                     {
                         self.add_library(
                             &mut libraries,
                             name,
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             None,
                             &[],
                             &[],
@@ -402,16 +423,27 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // SSL Version => OpenSSL/1.0.1t
-                    if let Ok(Some(ssl_matches)) = Preg::is_match_strict_groups(
+                    let mut ssl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im",
                         &info,
-                    ) {
-                        let library = strtolower(&ssl_matches["library"]);
+                        Some(&mut ssl_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let ssl_library_raw = ssl_matches
+                            .get(&CaptureKey::ByName("library".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        let ssl_version = ssl_matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        let library = strtolower(&ssl_library_raw);
                         if library == "openssl" {
                             let mut is_fips = false;
-                            let parsed_version =
-                                Version::parse_openssl(&ssl_matches["version"], &mut is_fips)
-                                    .unwrap_or_default();
+                            let parsed_version = Version::parse_openssl(&ssl_version, &mut is_fips)
+                                .unwrap_or_default();
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-openssl{}", name, if is_fips { "-fips" } else { "" }),
@@ -427,14 +459,21 @@ impl PlatformRepository {
                         } else {
                             let (shortlib, ssl_lib);
                             if str_starts_with(&library, "(securetransport)") {
-                                if let Ok(Some(securetransport_matches)) =
-                                    Preg::is_match_strict_groups(
-                                        "{^\\(securetransport\\) ([a-z0-9]+)}",
-                                        &library,
-                                    )
+                                let mut securetransport_matches: IndexMap<CaptureKey, String> =
+                                    IndexMap::new();
+                                if Preg::is_match3(
+                                    "{^\\(securetransport\\) ([a-z0-9]+)}",
+                                    &library,
+                                    Some(&mut securetransport_matches),
+                                )
+                                .unwrap_or(false)
                                 {
                                     shortlib = "securetransport".to_string();
-                                    ssl_lib = format!("curl-{}", securetransport_matches["1"]);
+                                    let m1 = securetransport_matches
+                                        .get(&CaptureKey::ByIndex(1))
+                                        .cloned()
+                                        .unwrap_or_default();
+                                    ssl_lib = format!("curl-{}", m1);
                                 } else {
                                     shortlib = library.clone();
                                     ssl_lib = "curl-openssl".to_string();
@@ -446,11 +485,8 @@ impl PlatformRepository {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-{}", name, shortlib),
-                                Some(&ssl_matches["version"]),
-                                Some(&format!(
-                                    "curl {} version ({})",
-                                    library, &ssl_matches["version"]
-                                )),
+                                Some(&ssl_version),
+                                Some(&format!("curl {} version ({})", library, ssl_version)),
                                 &[ssl_lib],
                                 &[],
                             )?;
@@ -458,28 +494,47 @@ impl PlatformRepository {
                     }
 
                     // libSSH Version => libssh2/1.4.3
-                    if let Ok(Some(ssh_matches)) = Preg::is_match_strict_groups(
+                    let mut ssh_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im",
                         &info,
-                    ) {
+                        Some(&mut ssh_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let ssh_library = ssh_matches
+                            .get(&CaptureKey::ByName("library".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        let ssh_version = ssh_matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-{}", name, strtolower(&ssh_matches["library"])),
-                            Some(&ssh_matches["version"]),
-                            Some(&format!("curl {} version", &ssh_matches["library"])),
+                            &format!("{}-{}", name, strtolower(&ssh_library)),
+                            Some(&ssh_version),
+                            Some(&format!("curl {} version", &ssh_library)),
                             &[],
                             &[],
                         )?;
                     }
 
                     // ZLib Version => 1.2.8
-                    if let Ok(Some(zlib_matches)) =
-                        Preg::is_match_strict_groups("{^ZLib Version => (?<version>.+)$}im", &info)
+                    let mut zlib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
+                        "{^ZLib Version => (?<version>.+)$}im",
+                        &info,
+                        Some(&mut zlib_matches),
+                    )
+                    .unwrap_or(false)
                     {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-zlib", name),
-                            Some(&zlib_matches["version"]),
+                            zlib_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("curl zlib version"),
                             &[],
                             &[],
@@ -491,14 +546,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // timelib version => 2018.03
-                    if let Ok(Some(timelib_matches)) = Preg::is_match_strict_groups(
+                    let mut timelib_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^timelib version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut timelib_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-timelib", name),
-                            Some(&timelib_matches["version"]),
+                            timelib_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("date timelib version"),
                             &[],
                             &[],
@@ -506,21 +567,36 @@ impl PlatformRepository {
                     }
 
                     // Timezone Database => internal
-                    if let Ok(Some(zoneinfo_source_matches)) = Preg::is_match_strict_groups(
+                    let mut zoneinfo_source_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^Timezone Database => (?<source>internal|external)$/im",
                         &info,
-                    ) {
-                        let external = zoneinfo_source_matches["source"] == "external";
-                        if let Ok(Some(zoneinfo_matches)) = Preg::is_match_strict_groups(
+                        Some(&mut zoneinfo_source_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let external = zoneinfo_source_matches
+                            .get(&CaptureKey::ByName("source".to_string()))
+                            .map(|s| s == "external")
+                            .unwrap_or(false);
+                        let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match_strict_groups3(
                             "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im",
                             &info,
-                        ) {
+                            Some(&mut zoneinfo_matches),
+                        )
+                        .unwrap_or(false)
+                        {
+                            let zoneinfo_version = zoneinfo_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .cloned()
+                                .unwrap_or_default();
                             // If the timezonedb is provided by ext/timezonedb, register that version as a replacement
                             if external && loaded_extensions.iter().any(|n| n == "timezonedb") {
                                 self.add_library(
                                     &mut libraries,
                                     "timezonedb-zoneinfo",
-                                    Some(&zoneinfo_matches["version"]),
+                                    Some(&zoneinfo_version),
                                     Some(
                                         "zoneinfo (\"Olson\") database for date (replaced by timezonedb)",
                                     ),
@@ -531,7 +607,7 @@ impl PlatformRepository {
                                 self.add_library(
                                     &mut libraries,
                                     &format!("{}-zoneinfo", name),
-                                    Some(&zoneinfo_matches["version"]),
+                                    Some(&zoneinfo_version),
                                     Some("zoneinfo (\"Olson\") database for date"),
                                     &[],
                                     &[],
@@ -545,13 +621,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // libmagic => 537
-                    if let Ok(Some(magic_matches)) =
-                        Preg::is_match_strict_groups("/^libmagic => (?<version>.+)$/im", &info)
+                    let mut magic_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
+                        "/^libmagic => (?<version>.+)$/im",
+                        &info,
+                        Some(&mut magic_matches),
+                    )
+                    .unwrap_or(false)
                     {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmagic", name),
-                            Some(&magic_matches["version"]),
+                            magic_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("fileinfo libmagic version"),
                             &[],
                             &[],
@@ -576,12 +659,19 @@ impl PlatformRepository {
 
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(libjpeg_matches)) = Preg::is_match_strict_groups(
+                    let mut libjpeg_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im",
                         &info,
-                    ) {
-                        let parsed =
-                            Version::parse_libjpeg(&libjpeg_matches["version"]).unwrap_or_default();
+                        Some(&mut libjpeg_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let libjpeg_version = libjpeg_matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        let parsed = Version::parse_libjpeg(&libjpeg_version).unwrap_or_default();
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libjpeg", name),
@@ -592,41 +682,59 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    if let Ok(Some(libpng_matches)) = Preg::is_match_strict_groups(
+                    let mut libpng_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^libPNG Version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut libpng_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpng", name),
-                            Some(&libpng_matches["version"]),
+                            libpng_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libpng version for gd"),
                             &[],
                             &[],
                         )?;
                     }
 
-                    if let Ok(Some(freetype_matches)) = Preg::is_match_strict_groups(
+                    let mut freetype_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^FreeType Version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut freetype_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-freetype", name),
-                            Some(&freetype_matches["version"]),
+                            freetype_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("freetype version for gd"),
                             &[],
                             &[],
                         )?;
                     }
 
-                    if let Ok(Some(libxpm_matches)) = Preg::is_match_strict_groups(
+                    let mut libxpm_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^libXpm Version => (?<versionId>\\d+)$/im",
                         &info,
-                    ) {
-                        let version_id: i64 = libxpm_matches["versionId"].parse().unwrap_or(0);
-                        let converted =
-                            Version::convert_libxpm_version_id(version_id).unwrap_or_default();
+                        Some(&mut libxpm_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let version_id: i64 = libxpm_matches
+                            .get(&CaptureKey::ByName("versionId".to_string()))
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0);
+                        let converted = Version::convert_libxpm_version_id(version_id);
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libxpm", name),
@@ -689,27 +797,42 @@ impl PlatformRepository {
                             &[],
                             &[],
                         )?;
-                    } else if let Ok(Some(matches)) =
-                        Preg::is_match_strict_groups("/^ICU version => (?<version>.+)$/im", &info)
-                    {
-                        self.add_library(
-                            &mut libraries,
-                            "icu",
-                            Some(&matches["version"]),
-                            Some(description),
-                            &[],
-                            &[],
-                        )?;
+                    } else {
+                        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match3(
+                            "/^ICU version => (?<version>.+)$/im",
+                            &info,
+                            Some(&mut matches),
+                        )
+                        .unwrap_or(false)
+                        {
+                            self.add_library(
+                                &mut libraries,
+                                "icu",
+                                matches
+                                    .get(&CaptureKey::ByName("version".to_string()))
+                                    .map(|s| s.as_str()),
+                                Some(description),
+                                &[],
+                                &[],
+                            )?;
+                        }
                     }
 
                     // ICU TZData version => 2019c
-                    if let Ok(Some(zoneinfo_matches)) = Preg::is_match_strict_groups(
+                    let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^ICU TZData version => (?<version>.*)$/im",
                         &info,
-                    ) {
-                        if let Some(parsed) =
-                            Version::parse_zoneinfo_version(&zoneinfo_matches["version"])
-                        {
+                        Some(&mut zoneinfo_matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let zi_version = zoneinfo_matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        if let Some(parsed) = Version::parse_zoneinfo_version(&zi_version) {
                             self.add_library(
                                 &mut libraries,
                                 "icu-zoneinfo",
@@ -784,12 +907,19 @@ impl PlatformRepository {
                         Self::imagick_get_version_string(&image_magick_version);
                     // 6.x: ImageMagick 6.2.9 08/24/06 Q16 http://www.imagemagick.org
                     // 7.x: ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/",
                         &image_magick_version_str,
-                    ) {
-                        let mut version_built = matches["version"].clone();
-                        if let Some(patch) = matches.get("patch") {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let mut version_built = matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
+                        if let Some(patch) = matches.get(&CaptureKey::ByName("patch".to_string())) {
                             version_built = format!("{}.{}", version_built, patch);
                         }
 
@@ -807,21 +937,35 @@ impl PlatformRepository {
                 "ldap" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let (Ok(Some(matches)), Ok(Some(vendor_matches))) = (
-                        Preg::is_match_strict_groups(
-                            "/^Vendor Version => (?<versionId>\\d+)$/im",
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    let mut vendor_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
+                        "/^Vendor Version => (?<versionId>\\d+)$/im",
+                        &info,
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                        && Preg::is_match_strict_groups3(
+                            "/^Vendor Name => (?<vendor>.+)$/im",
                             &info,
-                        ),
-                        Preg::is_match_strict_groups("/^Vendor Name => (?<vendor>.+)$/im", &info),
-                    ) {
-                        let version_id: i64 = matches["versionId"].parse().unwrap_or(0);
-                        let converted =
-                            Version::convert_openldap_version_id(version_id).unwrap_or_default();
+                            Some(&mut vendor_matches),
+                        )
+                        .unwrap_or(false)
+                    {
+                        let version_id: i64 = matches
+                            .get(&CaptureKey::ByName("versionId".to_string()))
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0);
+                        let converted = Version::convert_openldap_version_id(version_id);
+                        let vendor = vendor_matches
+                            .get(&CaptureKey::ByName("vendor".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-{}", name, strtolower(&vendor_matches["vendor"])),
+                            &format!("{}-{}", name, strtolower(&vendor)),
                             Some(&converted),
-                            Some(&format!("{} version of ldap", &vendor_matches["vendor"])),
+                            Some(&format!("{} version of ldap", vendor)),
                             &[],
                             &[],
                         )?;
@@ -857,14 +1001,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // libmbfl version => 1.3.2
-                    if let Ok(Some(libmbfl_matches)) = Preg::is_match_strict_groups(
+                    let mut libmbfl_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^libmbfl version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut libmbfl_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmbfl", name),
-                            Some(&libmbfl_matches["version"]),
+                            libmbfl_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("mbstring libmbfl version"),
                             &[],
                             &[],
@@ -888,18 +1038,26 @@ impl PlatformRepository {
 
                     // Multibyte regex (oniguruma) version => 5.9.5
                     // oniguruma version => 6.9.0
-                    } else if let Ok(Some(oniguruma_matches)) = Preg::is_match_strict_groups(
-                        "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im",
-                        &info,
-                    ) {
-                        self.add_library(
-                            &mut libraries,
-                            &format!("{}-oniguruma", name),
-                            Some(&oniguruma_matches["version"]),
-                            Some("mbstring oniguruma version"),
-                            &[],
-                            &[],
-                        )?;
+                    } else {
+                        let mut oniguruma_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match3(
+                            "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im",
+                            &info,
+                            Some(&mut oniguruma_matches),
+                        )
+                        .unwrap_or(false)
+                        {
+                            self.add_library(
+                                &mut libraries,
+                                &format!("{}-oniguruma", name),
+                                oniguruma_matches
+                                    .get(&CaptureKey::ByName("version".to_string()))
+                                    .map(|s| s.as_str()),
+                                Some("mbstring oniguruma version"),
+                                &[],
+                                &[],
+                            )?;
+                        }
                     }
                 }
 
@@ -907,14 +1065,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // libmemcached version => 1.0.18
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^libmemcached version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmemcached", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libmemcached version"),
                             &[],
                             &[],
@@ -929,14 +1093,21 @@ impl PlatformRepository {
                         _ => "".to_string(),
                     };
                     // OpenSSL 1.1.1g  21 Apr 2020
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i",
                         &openssl_text_str,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let version = matches
+                            .get(&CaptureKey::ByName("version".to_string()))
+                            .cloned()
+                            .unwrap_or_default();
                         let mut is_fips = false;
                         let parsed_version =
-                            Version::parse_openssl(&matches["version"], &mut is_fips)
-                                .unwrap_or_default();
+                            Version::parse_openssl(&version, &mut is_fips).unwrap_or_default();
                         let mut provides_list: Vec<String> = Vec::new();
                         if is_fips {
                             provides_list.push(name.to_string());
@@ -965,14 +1136,20 @@ impl PlatformRepository {
                     let info = self.runtime.get_extension_info(name)?;
 
                     // PCRE Unicode Version => 12.1.0
-                    if let Ok(Some(pcre_unicode_matches)) = Preg::is_match_strict_groups(
+                    let mut pcre_unicode_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^PCRE Unicode Version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut pcre_unicode_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-unicode", name),
-                            Some(&pcre_unicode_matches["version"]),
+                            pcre_unicode_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("PCRE Unicode version support"),
                             &[],
                             &[],
@@ -983,14 +1160,20 @@ impl PlatformRepository {
                 "mysqlnd" | "pdo_mysql" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-mysqlnd", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some(&format!("mysqlnd library version for {}", name)),
                             &[],
                             &[],
@@ -1001,28 +1184,40 @@ impl PlatformRepository {
                 "mongodb" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(libmongoc_matches)) = Preg::is_match_strict_groups(
+                    let mut libmongoc_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^libmongoc bundled version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut libmongoc_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmongoc", name),
-                            Some(&libmongoc_matches["version"]),
+                            libmongoc_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libmongoc version of mongodb"),
                             &[],
                             &[],
                         )?;
                     }
 
-                    if let Ok(Some(libbson_matches)) = Preg::is_match_strict_groups(
+                    let mut libbson_matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         "/^libbson bundled version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut libbson_matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libbson", name),
-                            Some(&libbson_matches["version"]),
+                            libbson_matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libbson version of mongodb"),
                             &[],
                             &[],
@@ -1049,14 +1244,20 @@ impl PlatformRepository {
                         // intentional fall-through to next case...
                         let info = self.runtime.get_extension_info(name)?;
 
-                        if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match3(
                             "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
                             &info,
-                        ) {
+                            Some(&mut matches),
+                        )
+                        .unwrap_or(false)
+                        {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-libpq", name),
-                                Some(&matches["version"]),
+                                matches
+                                    .get(&CaptureKey::ByName("version".to_string()))
+                                    .map(|s| s.as_str()),
                                 Some(&format!("libpq for {}", name)),
                                 &[],
                                 &[],
@@ -1068,14 +1269,20 @@ impl PlatformRepository {
                 "pdo_pgsql" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some(&format!("libpq for {}", name)),
                             &[],
                             &[],
@@ -1088,14 +1295,20 @@ impl PlatformRepository {
 
                     // Used Library => Compiled => Linked
                     // libpq => 14.3 (Ubuntu 14.3-1.pgdg22.04+1) => 15.0.2
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^libpq => (?<compiled>.+) => (?<linked>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
-                            Some(&matches["linked"]),
+                            matches
+                                .get(&CaptureKey::ByName("linked".to_string()))
+                                .map(|s| s.as_str()),
                             Some(&format!("libpq for {}", name)),
                             &[],
                             &[],
@@ -1165,14 +1378,20 @@ impl PlatformRepository {
                 "sqlite3" | "pdo_sqlite" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^SQLite Library => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-sqlite", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             None,
                             &[],
                             &[],
@@ -1183,14 +1402,20 @@ impl PlatformRepository {
                 "ssh2" => {
                     let info = self.runtime.get_extension_info(name)?;
 
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^libssh2 version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libssh2", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             None,
                             &[],
                             &[],
@@ -1214,14 +1439,20 @@ impl PlatformRepository {
                     )?;
 
                     let info = self.runtime.get_extension_info("xsl")?;
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^libxslt compiled against libxml Version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             "libxslt-libxml",
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libxml version libxslt is compiled against"),
                             &[],
                             &[],
@@ -1232,14 +1463,20 @@ impl PlatformRepository {
                 "yaml" => {
                     let info = self.runtime.get_extension_info("yaml")?;
 
-                    if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                    let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match3(
                         "/^LibYAML Version => (?<version>.+)$/im",
                         &info,
-                    ) {
+                        Some(&mut matches),
+                    )
+                    .unwrap_or(false)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libyaml", name),
-                            Some(&matches["version"]),
+                            matches
+                                .get(&CaptureKey::ByName("version".to_string()))
+                                .map(|s| s.as_str()),
                             Some("libyaml version of yaml"),
                             &[],
                             &[],
@@ -1289,14 +1526,20 @@ impl PlatformRepository {
                     // Linked Version => 1.2.8
                     } else {
                         let info = self.runtime.get_extension_info(name)?;
-                        if let Ok(Some(matches)) = Preg::is_match_strict_groups(
+                        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match3(
                             "/^Linked Version => (?<version>.+)$/im",
                             &info,
-                        ) {
+                            Some(&mut matches),
+                        )
+                        .unwrap_or(false)
+                        {
                             self.add_library(
                                 &mut libraries,
                                 name,
-                                Some(&matches["version"]),
+                                matches
+                                    .get(&CaptureKey::ByName("version".to_string()))
+                                    .map(|s| s.as_str()),
                                 None,
                                 &[],
                                 &[],
@@ -1362,9 +1605,7 @@ impl PlatformRepository {
                 return Ok(());
             }
 
-            let overrider = self
-                .inner
-                .find_package(package.get_name().to_string(), "*".to_string());
+            let overrider = self.inner.find_package(package.get_name(), "*".to_string());
             let actual_text = if let Some(ref ov) = overrider {
                 if package.get_version() == ov.get_version() {
                     "same as actual".to_string()
@@ -1475,11 +1716,15 @@ impl PlatformRepository {
             Ok(v) => v,
             Err(_) => {
                 extra_description = Some(format!(" (actual version: {})", pretty_version));
-                if let Ok(Some(m)) = Preg::is_match_strict_groups(
+                let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(
                     "{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}",
                     &pretty_version,
-                ) {
-                    pretty_version = m["1"].clone();
+                    Some(&mut m),
+                )
+                .unwrap_or(false)
+                {
+                    pretty_version = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 } else {
                     pretty_version = "0".to_string();
                 }
@@ -1689,7 +1934,7 @@ impl crate::repository::repository_interface::RepositoryInterface for PlatformRe
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: crate::repository::repository_interface::FindPackageConstraint,
     ) -> Option<Box<dyn crate::package::base_package::BasePackage>> {
         self.inner.find_package(name, constraint)
@@ -1697,7 +1942,7 @@ impl crate::repository::repository_interface::RepositoryInterface for PlatformRe
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<crate::repository::repository_interface::FindPackageConstraint>,
     ) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
         self.inner.find_packages(name, constraint)

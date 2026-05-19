@@ -42,11 +42,7 @@ impl VersionParser {
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = Preg::replace(
-                r"{^([^=: ]+)[=: ](.*)$}",
-                "$1 $2",
-                pairs[i].trim().to_string(),
-            )?;
+            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", &pairs[i].trim())?;
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')

@@ -4,7 +4,7 @@ use crate::io::io_interface;
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
     sys_get_temp_dir,
@@ -32,7 +32,7 @@ impl GitDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", self.inner.url.clone())?;
+            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", &self.inner.url)?;
             if !is_dir(&self.inner.url) {
                 return Err(RuntimeException {
                     message: format!(
@@ -49,6 +49,7 @@ impl GitDriver {
             let cache_vcs_dir = self
                 .inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or("")
@@ -97,9 +98,9 @@ impl GitDriver {
 
             let git_util = GitUtil::new(
                 &*self.inner.io,
-                &self.inner.config,
-                &self.inner.process,
-                &Filesystem::new(None),
+                std::rc::Rc::clone(&self.inner.config),
+                std::rc::Rc::clone(&self.inner.process),
+                std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !git_util.sync_mirror(&self.inner.url, &self.repo_dir)? {
                 if !is_dir(&self.repo_dir) {
@@ -112,14 +113,10 @@ impl GitDriver {
                     }
                     .into());
                 }
-                self.inner.io.write_error(
-                    shirabe_php_shim::PhpMixed::String(format!(
-                        "<error>Failed to update {}, package information from this repository may be outdated</error>",
-                        self.inner.url
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error3(shirabe_php_shim::PhpMixed::String(format!(
+                    "<error>Failed to update {}, package information from this repository may be outdated</error>",
+                    self.inner.url
+                )), true, io_interface::NORMAL);
             }
 
             cache_url = self.inner.url.clone();
@@ -131,6 +128,7 @@ impl GitDriver {
         let cache_repo_dir = self
             .inner
             .config
+            .borrow_mut()
             .get("cache-repo-dir")
             .as_string()
             .unwrap_or("")
@@ -147,6 +145,7 @@ impl GitDriver {
             c.set_read_only(
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
@@ -162,9 +161,9 @@ impl GitDriver {
 
             let git_util = GitUtil::new(
                 &*self.inner.io,
-                &self.inner.config,
-                &self.inner.process,
-                &Filesystem::new(None),
+                std::rc::Rc::clone(&self.inner.config),
+                std::rc::Rc::clone(&self.inner.process),
+                std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
                 let default_branch =
@@ -176,7 +175,7 @@ impl GitDriver {
             }
 
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &[
                     "git".to_string(),
                     "branch".to_string(),
@@ -185,12 +184,15 @@ impl GitDriver {
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            let branches = self.inner.process.split_lines(&output);
+            let branches = self.inner.process.borrow().split_lines(&output);
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
                     if !branch.is_empty() {
-                        if let Some(caps) = Preg::match_strict_groups(r"{^\* +(\S+)}", branch) {
-                            if let Some(name) = caps.get("1") {
+                        let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::match_strict_groups3(r"{^\* +(\S+)}", branch, Some(&mut caps))
+                            .unwrap_or(false)
+                        {
+                            if let Some(name) = caps.get(&CaptureKey::ByIndex(1)) {
                                 self.root_identifier = Some(name.clone());
                                 break;
                             }
@@ -236,7 +238,7 @@ impl GitDriver {
         }
 
         let mut content = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "show".to_string(),
@@ -274,9 +276,11 @@ impl GitDriver {
             ],
         );
         let mut output = String::new();
-        self.inner
-            .process
-            .execute(&command, &mut output, Some(self.repo_dir.clone()));
+        self.inner.process.borrow_mut().execute_args(
+            &command,
+            &mut output,
+            Some(self.repo_dir.clone()),
+        );
 
         let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process);
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
@@ -288,7 +292,7 @@ impl GitDriver {
             self.tags = Some(IndexMap::new());
 
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &[
                     "git".to_string(),
                     "show-ref".to_string(),
@@ -298,13 +302,20 @@ impl GitDriver {
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            for tag in self.inner.process.split_lines(&output) {
+            for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
-                    if let Some(caps) = Preg::match_strict_groups(
+                    let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::match_strict_groups3(
                         r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
                         &tag,
-                    ) {
-                        if let (Some(hash), Some(name)) = (caps.get("1"), caps.get("2")) {
+                        Some(&mut caps),
+                    )
+                    .unwrap_or(false)
+                    {
+                        if let (Some(hash), Some(name)) = (
+                            caps.get(&CaptureKey::ByIndex(1)),
+                            caps.get(&CaptureKey::ByIndex(2)),
+                        ) {
                             self.tags
                                 .as_mut()
                                 .unwrap()
@@ -323,7 +334,7 @@ impl GitDriver {
             let mut branches = IndexMap::new();
 
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &[
                     "git".to_string(),
                     "branch".to_string(),
@@ -334,15 +345,22 @@ impl GitDriver {
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            for branch in self.inner.process.split_lines(&output) {
+            for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch).unwrap_or(false)
                 {
-                    if let Some(caps) = Preg::match_strict_groups(
+                    let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::match_strict_groups3(
                         r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
                         &branch,
-                    ) {
-                        if let (Some(name), Some(hash)) = (caps.get("1"), caps.get("2")) {
+                        Some(&mut caps),
+                    )
+                    .unwrap_or(false)
+                    {
+                        if let (Some(name), Some(hash)) = (
+                            caps.get(&CaptureKey::ByIndex(1)),
+                            caps.get(&CaptureKey::ByIndex(2)),
+                        ) {
                             if !name.starts_with('-') {
                                 branches.insert(name.clone(), hash.clone());
                             }
@@ -378,9 +396,9 @@ impl GitDriver {
                 return Ok(false);
             }
 
-            let process = ProcessExecutor::new(io);
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io)));
             let mut output = String::new();
-            if process.execute(
+            if process.borrow_mut().execute_args(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
                 Some(url.clone()),
@@ -388,15 +406,27 @@ impl GitDriver {
             {
                 return Ok(true);
             }
-            GitUtil::check_for_repo_ownership_error(&process.get_error_output(), &url);
+            GitUtil::check_for_repo_ownership_error(&process.borrow().get_error_output(), &url);
         }
 
         if !deep {
             return Ok(false);
         }
 
-        let process = ProcessExecutor::new(io);
-        let git_util = GitUtil::new(io, _config, &process, &Filesystem::new(None));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io)));
+        // TODO(phase-b): supports() takes &Config; GitUtil now needs Rc<RefCell<Config>>.
+        // Skipping clean Rc construction since we cannot reconstruct one from a borrowed &Config.
+        let _ = _config;
+        return Err(anyhow::anyhow!(
+            "GitDriver::supports requires Rc<RefCell<Config>>: not yet ported"
+        ));
+        #[allow(unreachable_code)]
+        let git_util = GitUtil::new(
+            io.clone_box(),
+            todo!(),
+            std::rc::Rc::clone(&process),
+            std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
+        );
         GitUtil::clean_env(&process);
 
         let result = git_util.run_commands(

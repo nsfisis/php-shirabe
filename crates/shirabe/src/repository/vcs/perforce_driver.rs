@@ -59,6 +59,7 @@ impl PerforceDriver {
         let cache_vcs_dir = self
             .inner
             .config
+            .borrow_mut()
             .get("cache-vcs-dir")
             .as_string()
             .unwrap_or("")

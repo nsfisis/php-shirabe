@@ -24,12 +24,12 @@ pub struct XzDownloader {
 impl XzDownloader {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: HttpDownloader,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<EventDispatcher>,
         cache: Option<Cache>,
-        filesystem: Filesystem,
-        process: ProcessExecutor,
+        filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: FileDownloader::new(
@@ -54,7 +54,7 @@ impl XzDownloader {
         let command = vec!["tar", "-xJf", file, "-C", path];
 
         let mut ignored_output = PhpMixed::Null;
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute(
             PhpMixed::List(
                 command
                     .iter()
@@ -71,7 +71,7 @@ impl XzDownloader {
         let process_error = format!(
             "Failed to execute {}\n\n{}",
             command.join(" "),
-            self.inner.process.get_error_output()
+            self.inner.process.borrow().get_error_output()
         );
 
         bail!(process_error);

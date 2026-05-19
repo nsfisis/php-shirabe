@@ -28,7 +28,7 @@ impl InstalledFilesystemRepository {
         repository_file: JsonFile,
         dump_versions: bool,
         root_package: Option<Box<dyn RootPackageInterface>>,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Result<Self> {
         Ok(Self {
             inner: FilesystemRepository::new(
@@ -109,14 +109,14 @@ impl RepositoryInterface for InstalledFilesystemRepository {
     }
     fn find_package(
         &self,
-        _name: String,
+        _name: &str,
         _constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         todo!()
     }
     fn find_packages(
         &self,
-        _name: String,
+        _name: &str,
         _constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         todo!()

@@ -388,3 +388,10 @@ impl ConstraintInterface for Constraint {
         self
     }
 }
+
+impl std::fmt::Display for Constraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::constraint::constraint_interface::ConstraintInterface;
+        write!(f, "{}", ConstraintInterface::__to_string(self))
+    }
+}

@@ -165,10 +165,10 @@ impl RepositoryInterface for FilterRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
-        if !self.is_allowed(&name) {
+        if !self.is_allowed(name) {
             return None;
         }
 
@@ -177,10 +177,10 @@ impl RepositoryInterface for FilterRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
-        if !self.is_allowed(&name) {
+        if !self.is_allowed(name) {
             return Vec::new();
         }
 

@@ -29,7 +29,7 @@ pub struct DownloadManager {
     /// @var array<string, string>
     package_preferences: IndexMap<String, String>,
     /// @var Filesystem
-    filesystem: Filesystem,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var array<string, DownloaderInterface>
     downloaders: IndexMap<String, Box<dyn DownloaderInterface>>,
 }
@@ -43,9 +43,10 @@ impl DownloadManager {
     pub fn new(
         io: Box<dyn IOInterface>,
         prefer_source: bool,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
+        let filesystem = filesystem
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
             io,
             prefer_source,
@@ -202,6 +203,7 @@ impl DownloadManager {
     ) -> Result<Box<dyn PromiseInterface>> {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
+            .borrow_mut()
             .ensure_directory_exists(&dirname(&target_dir));
 
         let mut sources = self.get_available_sources(package, prev_package)?;
@@ -217,11 +219,11 @@ impl DownloadManager {
                 }
             };
             if retry_state {
-                self.io.write_error(
-                    PhpMixed::String(format!(
+                self.io.write_error3(
+                    &format!(
                         "    <warning>Now trying to download from {}</warning>",
                         source,
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -237,7 +239,7 @@ impl DownloadManager {
             };
 
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let result = match downloader.download(package, &target_dir, prev_package) {
+            let result = match downloader.download3(package, &target_dir, prev_package) {
                 Ok(r) => r,
                 Err(e) => {
                     // PHP closure handleError: rethrow if not RuntimeException or if IrrecoverableDownloadException
@@ -250,13 +252,13 @@ impl DownloadManager {
                             return Err(e);
                         }
 
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "    <warning>Failed to download {} from {}: {}</warning>",
                                 package.get_pretty_name(),
                                 source,
                                 e,
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -316,7 +318,7 @@ impl DownloadManager {
     ) -> Result<Box<dyn PromiseInterface>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.install(package, &target_dir);
+            return downloader.install2(package, &target_dir);
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -347,7 +349,7 @@ impl DownloadManager {
 
         // if we have a downloader present before, but not after, the package became a metapackage and its files should be removed
         if downloader.is_none() {
-            return initial_downloader.unwrap().remove(initial, &target_dir);
+            return initial_downloader.unwrap().remove2(initial, &target_dir);
         }
 
         let initial_type = self.get_downloader_type(initial_downloader.unwrap());
@@ -362,8 +364,8 @@ impl DownloadManager {
                     if !self.io.is_interactive() {
                         return Err(e);
                     }
-                    self.io.write_error(
-                        PhpMixed::String(format!("<error>    Update failed ({})</error>", e,)),
+                    self.io.write_error3(
+                        &format!("<error>    Update failed ({})</error>", e,),
                         true,
                         io_interface::NORMAL,
                     );
@@ -379,7 +381,7 @@ impl DownloadManager {
 
         // if downloader type changed, or update failed and user asks for reinstall,
         // we wipe the dir and do a new install instead of updating it
-        let promise = initial_downloader.unwrap().remove(initial, &target_dir)?;
+        let promise = initial_downloader.unwrap().remove2(initial, &target_dir)?;
 
         let target_dir_owned = target_dir.clone();
         // TODO(phase-b): capture self and target into the closure
@@ -402,7 +404,7 @@ impl DownloadManager {
     ) -> Result<Box<dyn PromiseInterface>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.remove(package, &target_dir);
+            return downloader.remove2(package, &target_dir);
         }
 
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -442,7 +444,7 @@ impl DownloadManager {
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", &preg_quote(pattern, None)),
             );
-            if Preg::is_match(&pattern_regex, package.get_name()) {
+            if Preg::is_match(&pattern_regex, package.get_name()).unwrap_or(false) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
                     return "dist".to_string();
                 }

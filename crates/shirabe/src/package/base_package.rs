@@ -168,7 +168,11 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     }
 }
 
-pub fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String {
+pub fn package_name_to_regexp(allow_pattern: &str) -> String {
+    package_name_to_regexp2(allow_pattern, "{^%s$}i")
+}
+
+pub fn package_name_to_regexp2(allow_pattern: &str, wrap: &str) -> String {
     let cleaned = preg_quote(allow_pattern, None).replace("\\*", ".*");
     wrap.replace("%s", &cleaned)
 }
@@ -176,7 +180,7 @@ pub fn package_name_to_regexp(allow_pattern: &str, wrap: &str) -> String {
 pub fn package_names_to_regexp(package_names: &[String], wrap: &str) -> String {
     let patterns: Vec<String> = package_names
         .iter()
-        .map(|name| package_name_to_regexp(name, "%s"))
+        .map(|name| package_name_to_regexp2(name, "%s"))
         .collect();
     wrap.replace("%s", &patterns.join("|"))
 }

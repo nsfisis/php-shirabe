@@ -29,9 +29,11 @@ impl FossilDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.inner
-            .config
-            .prohibit_url_by_config(&url, &self.inner.io)?;
+        self.inner.config.borrow_mut().prohibit_url_by_config(
+            &url,
+            Some(&self.inner.io),
+            &indexmap::IndexMap::new(),
+        )?;
 
         let repo_file = format!("{}.fossil", path);
         let real_path = shirabe_php_shim::realpath(&path);
@@ -85,9 +87,11 @@ impl FossilDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.inner
-            .config
-            .prohibit_url_by_config(&url, &self.inner.io)?;
+        self.inner.config.borrow_mut().prohibit_url_by_config(
+            &url,
+            Some(&self.inner.io),
+            &indexmap::IndexMap::new(),
+        )?;
 
         self.inner.io.write_error(&format!(
             " Updating to {}",
@@ -135,7 +139,7 @@ impl FossilDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &["fossil".to_string(), "changes".to_string()],
             &mut output,
             shirabe_php_shim::realpath(&path),
@@ -196,12 +200,18 @@ impl FossilDownloader {
         cwd: Option<String>,
         output: &mut String,
     ) -> Result<()> {
-        if self.inner.process.execute(&command, output, cwd) != 0 {
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, output, cwd)
+            != 0
+        {
             return Err(RuntimeException {
                 message: format!(
                     "Failed to execute {}\n\n{}",
                     command.join(" "),
-                    self.inner.process.get_error_output()
+                    self.inner.process.borrow().get_error_output()
                 ),
                 code: 0,
             }

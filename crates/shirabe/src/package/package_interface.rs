@@ -301,6 +301,12 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ) -> Option<&dyn crate::package::complete_package_interface::CompletePackageInterface> {
         None
     }
+
+    fn as_root_package_interface(
+        &self,
+    ) -> Option<&dyn crate::package::root_package_interface::RootPackageInterface> {
+        None
+    }
 }
 
 impl dyn PackageInterface {

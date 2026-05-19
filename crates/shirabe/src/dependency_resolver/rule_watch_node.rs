@@ -57,6 +57,12 @@ impl RuleWatchNode {
         self.rule.as_ref()
     }
 
+    /// Owned clone for callers that need a `Box<dyn Rule>`. Default impl in
+    /// `RuleLiterals` returns `todo!()`; concrete rule impls override it.
+    pub fn get_rule_boxed(&self) -> Box<dyn crate::dependency_resolver::rule::Rule> {
+        self.rule.clone_rule_box()
+    }
+
     pub fn get_other_watch(&self, literal: i64) -> i64 {
         if self.watch1 == literal {
             return self.watch2;

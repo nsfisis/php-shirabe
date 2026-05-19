@@ -35,161 +35,117 @@ impl RemoveCommand {
             .set_name("remove")
             .set_aliases(&["rm".to_string(), "uninstall".to_string()])
             .set_description("Removes a package from the require or require-dev")
-            .set_definition(vec![
-                InputArgument::new(
-                    "packages",
-                    Some(InputArgument::IS_ARRAY),
-                    "Packages that should be removed.",
-                    None,
-                ),
-                InputOption::new(
-                    "dev",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Removes a package from the require-dev section.",
-                    None,
-                ),
-                InputOption::new(
-                    "dry-run",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Outputs the operations but will not execute anything (implicitly enables --verbose).",
-                    None,
-                ),
-                InputOption::new(
-                    "no-progress",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Do not output download progress.",
-                    None,
-                ),
-                InputOption::new(
-                    "no-update",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Disables the automatic update of the dependencies (implies --no-install).",
-                    None,
-                ),
-                InputOption::new(
-                    "no-install",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Skip the install step after updating the composer.lock file.",
-                    None,
-                ),
-                InputOption::new(
-                    "no-audit",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).",
-                    None,
-                ),
-                InputOption::new(
-                    "audit-format",
-                    None,
-                    Some(InputOption::VALUE_REQUIRED),
-                    "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-                    Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())),
-                ),
-                InputOption::new(
-                    "no-security-blocking",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).",
-                    None,
-                ),
-                InputOption::new(
-                    "update-no-dev",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Run the dependency update with the --no-dev option.",
-                    None,
-                ),
-                InputOption::new(
-                    "update-with-dependencies",
-                    Some(PhpMixed::String("w".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Allows inherited dependencies to be updated with explicit dependencies (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var). (Deprecated, is now default behavior)",
-                    None,
-                ),
-                InputOption::new(
-                    "update-with-all-dependencies",
-                    Some(PhpMixed::String("W".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).",
-                    None,
-                ),
-                InputOption::new(
-                    "with-all-dependencies",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Alias for --update-with-all-dependencies",
-                    None,
-                ),
-                InputOption::new(
-                    "no-update-with-dependencies",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Does not allow inherited dependencies to be updated with explicit dependencies.",
-                    None,
-                ),
-                InputOption::new(
-                    "minimal-changes",
-                    Some(PhpMixed::String("m".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).",
-                    None,
-                ),
-                InputOption::new(
-                    "unused",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Remove all packages which are locked but not required by any other package.",
-                    None,
-                ),
-                InputOption::new(
-                    "ignore-platform-req",
-                    None,
-                    Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
-                    "Ignore a specific platform requirement (php & ext- packages).",
-                    None,
-                ),
-                InputOption::new(
-                    "ignore-platform-reqs",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Ignore all platform requirements (php & ext- packages).",
-                    None,
-                ),
-                InputOption::new(
-                    "optimize-autoloader",
-                    Some(PhpMixed::String("o".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Optimize autoloader during autoloader dump",
-                    None,
-                ),
-                InputOption::new(
-                    "classmap-authoritative",
-                    Some(PhpMixed::String("a".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.",
-                    None,
-                ),
-                InputOption::new(
-                    "apcu-autoloader",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Use APCu to cache found/not-found classes.",
-                    None,
-                ),
-                InputOption::new(
-                    "apcu-autoloader-prefix",
-                    None,
-                    Some(InputOption::VALUE_REQUIRED),
-                    "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader",
-                    None,
-                ),
-            ])
+            .set_definition(&[
+                InputArgument::new("packages",
+            Some(InputArgument::IS_ARRAY),
+            "Packages that should be removed.",
+            None,).unwrap().into(),
+        InputOption::new("dev",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Removes a package from the require-dev section.",
+        None,).unwrap().into(),
+        InputOption::new("dry-run",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Outputs the operations but will not execute anything (implicitly enables --verbose).",
+        None,).unwrap().into(),
+        InputOption::new("no-progress",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Do not output download progress.",
+        None,).unwrap().into(),
+        InputOption::new("no-update",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Disables the automatic update of the dependencies (implies --no-install).",
+        None,).unwrap().into(),
+        InputOption::new("no-install",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Skip the install step after updating the composer.lock file.",
+        None,).unwrap().into(),
+        InputOption::new("no-audit",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).",
+        None,).unwrap().into(),
+        InputOption::new("audit-format",
+        None,
+        Some(InputOption::VALUE_REQUIRED),
+        "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
+        Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())),).unwrap().into(),
+        InputOption::new("no-security-blocking",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).",
+        None,).unwrap().into(),
+        InputOption::new("update-no-dev",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Run the dependency update with the --no-dev option.",
+        None,).unwrap().into(),
+        InputOption::new("update-with-dependencies",
+        Some(PhpMixed::String("w".to_string())),
+        Some(InputOption::VALUE_NONE),
+        "Allows inherited dependencies to be updated with explicit dependencies (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var). (Deprecated, is now default behavior)",
+        None,).unwrap().into(),
+        InputOption::new("update-with-all-dependencies",
+        Some(PhpMixed::String("W".to_string())),
+        Some(InputOption::VALUE_NONE),
+        "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).",
+        None,).unwrap().into(),
+        InputOption::new("with-all-dependencies",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Alias for --update-with-all-dependencies",
+        None,).unwrap().into(),
+        InputOption::new("no-update-with-dependencies",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Does not allow inherited dependencies to be updated with explicit dependencies.",
+        None,).unwrap().into(),
+        InputOption::new("minimal-changes",
+        Some(PhpMixed::String("m".to_string())),
+        Some(InputOption::VALUE_NONE),
+        "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).",
+        None,).unwrap().into(),
+        InputOption::new("unused",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Remove all packages which are locked but not required by any other package.",
+        None,).unwrap().into(),
+        InputOption::new("ignore-platform-req",
+        None,
+        Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
+        "Ignore a specific platform requirement (php & ext- packages).",
+        None,).unwrap().into(),
+        InputOption::new("ignore-platform-reqs",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Ignore all platform requirements (php & ext- packages).",
+        None,).unwrap().into(),
+        InputOption::new("optimize-autoloader",
+        Some(PhpMixed::String("o".to_string())),
+        Some(InputOption::VALUE_NONE),
+        "Optimize autoloader during autoloader dump",
+        None,).unwrap().into(),
+        InputOption::new("classmap-authoritative",
+        Some(PhpMixed::String("a".to_string())),
+        Some(InputOption::VALUE_NONE),
+        "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.",
+        None,).unwrap().into(),
+        InputOption::new("apcu-autoloader",
+        None,
+        Some(InputOption::VALUE_NONE),
+        "Use APCu to cache found/not-found classes.",
+        None,).unwrap().into(),
+        InputOption::new("apcu-autoloader-prefix",
+        None,
+        Some(InputOption::VALUE_REQUIRED),
+        "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader",
+        None,).unwrap().into(),
+        ])
             .set_help(
                 "The <info>remove</info> command removes a package from the current\n\
                 list of installed packages\n\n\
@@ -255,7 +211,7 @@ impl RemoveCommand {
                 let mut found = false;
                 let mut to_remove = vec![];
                 for (index, package) in locked_packages.iter().enumerate() {
-                    for name in package.get_names() {
+                    for name in package.get_names(true) {
                         if required.contains_key(name.as_str()) {
                             for link in package.get_requires().values() {
                                 required.insert(link.get_target().to_string(), true);
@@ -392,9 +348,12 @@ impl RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_type =
-                    Preg::grep(&base_package::package_name_to_regexp(package), &type_keys)
-                        .unwrap_or_default();
+                let type_keys_refs: Vec<&str> = type_keys.iter().map(|s| s.as_str()).collect();
+                let matches_in_type = Preg::grep(
+                    &base_package::package_name_to_regexp(package),
+                    &type_keys_refs,
+                )
+                .unwrap_or_default();
 
                 let alt_type_keys: Vec<String> = composer_data
                     .as_array()
@@ -402,9 +361,11 @@ impl RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
+                let alt_type_keys_refs: Vec<&str> =
+                    alt_type_keys.iter().map(|s| s.as_str()).collect();
                 let matches_in_alt_type = Preg::grep(
                     &base_package::package_name_to_regexp(package),
-                    &alt_type_keys,
+                    &alt_type_keys_refs,
                 )
                 .unwrap_or_default();
 
@@ -499,7 +460,7 @@ impl RemoveCommand {
             .get_event_dispatcher()
             .dispatch(command_event.get_name(), command_event);
 
-        let allow_plugins = composer.get_config().get("allow-plugins");
+        let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
         let removed_plugins: Vec<String> =
             if let Some(allow_map) = allow_plugins.as_ref().and_then(|v| v.as_array()) {
                 packages
@@ -542,8 +503,9 @@ impl RemoveCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
+                .borrow()
                 .get("optimize-autoloader")
-                .and_then(|v| v.as_bool())
+                .as_bool()
                 .unwrap_or(false);
         let authoritative = input
             .get_option("classmap-authoritative")
@@ -551,8 +513,9 @@ impl RemoveCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
+                .borrow()
                 .get("classmap-authoritative")
-                .and_then(|v| v.as_bool())
+                .as_bool()
                 .unwrap_or(false);
         let apcu_prefix = input
             .get_option("apcu-autoloader-prefix")
@@ -565,8 +528,9 @@ impl RemoveCommand {
                 .unwrap_or(false)
             || composer
                 .get_config()
+                .borrow()
                 .get("apcu-autoloader")
-                .and_then(|v| v.as_bool())
+                .as_bool()
                 .unwrap_or(false);
         let minimal_changes = input
             .get_option("minimal-changes")
@@ -574,8 +538,9 @@ impl RemoveCommand {
             .unwrap_or(false)
             || composer
                 .get_config()
+                .borrow()
                 .get("update-with-minimal-changes")
-                .and_then(|v| v.as_bool())
+                .as_bool()
                 .unwrap_or(false);
 
         let mut update_allow_transitive_dependencies =
@@ -617,7 +582,9 @@ impl RemoveCommand {
         install.set_update_allow_transitive_dependencies(update_allow_transitive_dependencies);
         install.set_platform_requirement_filter(self.get_platform_requirement_filter(input));
         install.set_dry_run(dry_run);
-        install.set_audit_config(self.create_audit_config(composer.get_config(), input));
+        install.set_audit_config(
+            self.create_audit_config(&mut *composer.get_config().borrow_mut(), input),
+        );
         install.set_minimal_update(minimal_changes);
 
         // if no lock is present, we do not do a partial update as
@@ -640,7 +607,7 @@ impl RemoveCommand {
                 if !composer
                     .get_repository_manager()
                     .get_local_repository()
-                    .find_packages(package)
+                    .find_packages(package, None)
                     .is_empty()
                 {
                     io.write_error(&format!(

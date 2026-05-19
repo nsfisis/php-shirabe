@@ -41,7 +41,7 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: crate::repository::repository_interface::FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         self.inner.find_package(name, constraint)
@@ -49,7 +49,7 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<crate::repository::repository_interface::FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         self.inner.find_packages(name, constraint)

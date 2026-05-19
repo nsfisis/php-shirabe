@@ -24,6 +24,12 @@ impl TransportException {
         }
     }
 
+    /// PHP exposes ($message, $code = 0) — alias of `new` used at call sites where the
+    /// status/exception code is provided up-front.
+    pub fn new_with_code(message: String, code: i64) -> Self {
+        Self::new(message, code)
+    }
+
     pub fn get_code(&self) -> i64 {
         self.code
     }

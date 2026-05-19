@@ -22,7 +22,7 @@ pub struct RepositoryFactory;
 impl RepositoryFactory {
     pub fn config_from_string(
         io: &dyn IOInterface,
-        config: &Config,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repository: &str,
         allow_filesystem: bool,
     ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
@@ -41,8 +41,10 @@ impl RepositoryFactory {
         if extension == "json" {
             let json = JsonFile::new(
                 repository.to_string(),
-                Some(Factory::create_http_downloader(io, config)?),
-                Some(io),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(
+                    Factory::create_http_downloader(io, config, IndexMap::new())?,
+                ))),
+                Some(io.clone_box()),
             )?;
             let data = json.read()?;
             let has_packages = data.get("packages").map_or(false, |v| !v.is_null());
@@ -92,7 +94,7 @@ impl RepositoryFactory {
 
     pub fn from_string(
         io: &dyn IOInterface,
-        config: &Config,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repository: &str,
         allow_filesystem: bool,
         rm: Option<&mut RepositoryManager>,
@@ -103,7 +105,7 @@ impl RepositoryFactory {
 
     pub fn create_repo(
         io: &dyn IOInterface,
-        config: &Config,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repo_config: IndexMap<String, PhpMixed>,
         rm: Option<&mut RepositoryManager>,
     ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
@@ -128,15 +130,15 @@ impl RepositoryFactory {
 
     pub fn default_repos(
         io: Option<&dyn IOInterface>,
-        config: Option<Config>,
+        config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut RepositoryManager>,
     ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
         let config = match config {
             Some(c) => c,
-            None => Factory::create_config(None, None)?,
+            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
         };
         if let Some(io) = io {
-            io.load_configuration(&config);
+            io.load_configuration(&mut *config.borrow_mut())?;
         }
 
         let mut owned_rm;
@@ -151,38 +153,50 @@ impl RepositoryFactory {
             owned_rm = Self::manager(
                 io,
                 &config,
-                Some(Factory::create_http_downloader(io, &config)?),
+                Some(std::rc::Rc::new(std::cell::RefCell::new(
+                    Factory::create_http_downloader(io, &config, IndexMap::new())?,
+                ))),
                 None,
                 None,
             )?;
             &mut owned_rm
         };
 
-        let repo_configs = config.get_repositories();
+        let repo_configs = config.borrow().get_repositories();
         Self::create_repos(rm, repo_configs)
     }
 
     pub fn manager(
         io: &dyn IOInterface,
-        config: &Config,
-        http_downloader: Option<HttpDownloader>,
+        config: &std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         event_dispatcher: Option<EventDispatcher>,
-        process: Option<ProcessExecutor>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<RepositoryManager> {
         let http_downloader = match http_downloader {
             Some(h) => h,
-            None => Factory::create_http_downloader(io, config)?,
+            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
+                io,
+                config,
+                IndexMap::new(),
+            )?)),
         };
         let process = match process {
             Some(p) => p,
             None => {
                 let mut p = ProcessExecutor::new(io);
                 p.enable_async();
-                p
+                std::rc::Rc::new(std::cell::RefCell::new(p))
             }
         };
 
-        let mut rm = RepositoryManager::new(io, config, http_downloader, event_dispatcher, process);
+        let mut rm = RepositoryManager::new(
+            io,
+            std::rc::Rc::clone(config),
+            http_downloader,
+            event_dispatcher,
+            Some(process),
+        );
         rm.set_repository_class("composer", "Composer\\Repository\\ComposerRepository");
         rm.set_repository_class("vcs", "Composer\\Repository\\VcsRepository");
         rm.set_repository_class("package", "Composer\\Repository\\PackageRepository");
@@ -205,9 +219,12 @@ impl RepositoryFactory {
     pub fn default_repos_with_default_manager(
         io: &dyn IOInterface,
     ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
-        let config = Factory::create_config(Some(io), None)?;
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
+            Some(io),
+            None,
+        )?));
         let mut manager = Self::manager(io, &config, None, None, None)?;
-        io.load_configuration(&config);
+        io.load_configuration(&mut *config.borrow_mut())?;
         Self::default_repos(Some(io), Some(config), Some(&mut manager))
     }
 

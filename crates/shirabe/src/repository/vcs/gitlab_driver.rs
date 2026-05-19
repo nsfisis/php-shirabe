@@ -4,7 +4,7 @@ use crate::io::io_interface;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array, is_array,
@@ -18,6 +18,7 @@ use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
 use crate::repository::vcs::vcs_driver::VcsDriverBase;
+use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
 use crate::util::gitlab::GitLab;
 use crate::util::http::response::Response;
 use crate::util::http_downloader::HttpDownloader;
@@ -57,30 +58,43 @@ impl GitLabDriver {
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> Result<()> {
-        let match_ = match Preg::is_match_strict_groups(Self::URL_REGEX, &self.inner.url) {
-            Some(m) => m,
-            None => {
-                return Err(InvalidArgumentException {
-                    message: sprintf(
-                        "The GitLab repository URL %s is invalid. It must be the HTTP URL of a GitLab project.",
-                        &[PhpMixed::String(self.inner.url.clone())],
-                    ),
-                    code: 0,
-                }
-                .into());
+        let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(Self::URL_REGEX, &self.inner.url, Some(&mut match_))
+            .unwrap_or(false)
+        {
+            return Err(InvalidArgumentException {
+                message: sprintf(
+                    "The GitLab repository URL %s is invalid. It must be the HTTP URL of a GitLab project.",
+                    &[PhpMixed::String(self.inner.url.clone())],
+                ),
+                code: 0,
             }
-        };
+            .into());
+        }
 
         let guessed_domain = match_
-            .get("domain")
+            .get(&CaptureKey::ByName("domain".to_string()))
             .cloned()
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| match_.get("domain2").cloned().unwrap_or_default());
-        let configured_domains = self.inner.config.get("gitlab-domains");
-        let mut url_parts: Vec<String> =
-            explode("/", &match_.get("parts").cloned().unwrap_or_default());
+            .unwrap_or_else(|| {
+                match_
+                    .get(&CaptureKey::ByName("domain2".to_string()))
+                    .cloned()
+                    .unwrap_or_default()
+            });
+        let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
+        let mut url_parts: Vec<String> = explode(
+            "/",
+            &match_
+                .get(&CaptureKey::ByName("parts".to_string()))
+                .cloned()
+                .unwrap_or_default(),
+        );
 
-        let scheme_match = match_.get("scheme").cloned().unwrap_or_default();
+        let scheme_match = match_
+            .get(&CaptureKey::ByName("scheme".to_string()))
+            .cloned()
+            .unwrap_or_default();
         self.scheme = if in_array(
             PhpMixed::String(scheme_match.clone()),
             &PhpMixed::List(vec![
@@ -101,7 +115,7 @@ impl GitLabDriver {
         } else {
             "https".to_string()
         };
-        let port = match_.get("port").cloned();
+        let port = match_.get(&CaptureKey::ByName("port".to_string())).cloned();
         let origin = Self::determine_origin(
             &configured_domains,
             guessed_domain,
@@ -123,7 +137,7 @@ impl GitLabDriver {
         };
         self.inner.origin_url = origin;
 
-        let protocol_value = self.inner.config.get("gitlab-protocol");
+        let protocol_value = self.inner.config.borrow_mut().get("gitlab-protocol");
         if let Some(protocol) = protocol_value
             .as_string()
             .filter(|_| is_string(&protocol_value))
@@ -161,8 +175,12 @@ impl GitLabDriver {
         self.repository = Preg::replace(
             r"#(\.git)$#",
             "",
-            match_.get("repo").cloned().unwrap_or_default(),
-        );
+            &match_
+                .get(&CaptureKey::ByName("repo".to_string()))
+                .cloned()
+                .unwrap_or_default(),
+        )
+        .unwrap_or_default();
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.as_ref(),
@@ -170,6 +188,7 @@ impl GitLabDriver {
                 "{}/{}/{}/{}",
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or(""),
@@ -185,6 +204,7 @@ impl GitLabDriver {
             c.set_read_only(
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
@@ -200,7 +220,10 @@ impl GitLabDriver {
     /// Mainly useful for tests.
     ///
     /// @internal
-    pub fn set_http_downloader(&mut self, http_downloader: HttpDownloader) {
+    pub fn set_http_downloader(
+        &mut self,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    ) {
         self.inner.http_downloader = http_downloader;
     }
 
@@ -229,7 +252,12 @@ impl GitLabDriver {
                     .unwrap_or_default();
                 JsonFile::parse_json(&res, None)?
             } else {
-                let composer = self.inner.get_base_composer_information(identifier)?;
+                let file_content = self.get_file_content("composer.json", identifier)?;
+                let composer = VcsDriverBase::finish_base_composer_information(
+                    identifier,
+                    file_content,
+                    || self.get_change_date(identifier),
+                )?;
 
                 if self.inner.should_cache(identifier) {
                     if let Some(ref composer_map) = composer {
@@ -679,11 +707,11 @@ impl GitLabDriver {
             Err(e) => {
                 self.git_driver = None;
 
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your credentials</error>",
                         url
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -721,8 +749,8 @@ impl GitLabDriver {
             repo_config,
             self.inner.io.clone(),
             self.inner.config.clone(),
-            self.inner.http_downloader.clone(),
-            self.inner.process.clone(),
+            std::rc::Rc::clone(&self.inner.http_downloader),
+            std::rc::Rc::clone(&self.inner.process),
         );
         git_driver.initialize()?;
         self.git_driver = Some(git_driver);
@@ -780,11 +808,8 @@ impl GitLabDriver {
                         }
 
                         if !more_than_guest_access {
-                            self.inner.io.write_error(
-                                PhpMixed::String(
-                                    "<warning>GitLab token with Guest or Planner only access detected</warning>"
-                                        .to_string(),
-                                ),
+                            self.inner.io.write_error3(
+                                "<warning>GitLab token with Guest or Planner only access detected</warning>",
                                 true,
                                 io_interface::NORMAL,
                             );
@@ -840,11 +865,11 @@ impl GitLabDriver {
             }
             Err(e) => {
                 let mut git_lab_util = GitLab::new(
-                    self.inner.io.as_ref(),
-                    &self.inner.config,
-                    &self.inner.process,
-                    &self.inner.http_downloader,
-                );
+                    self.inner.io.clone_box(),
+                    std::rc::Rc::clone(&self.inner.config),
+                    Some(std::rc::Rc::clone(&self.inner.process)),
+                    Some(std::rc::Rc::clone(&self.inner.http_downloader)),
+                )?;
 
                 match e.code {
                     401 | 404 => {
@@ -882,11 +907,11 @@ impl GitLabDriver {
                             .unwrap()
                             .unwrap());
                         }
-                        self.inner.io.write_error(
-                            PhpMixed::String(format!(
+                        self.inner.io.write_error3(
+                            &format!(
                                 "<warning>Failed to download {}/{}:{}</warning>",
                                 self.namespace, self.repository, e.message
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -938,25 +963,39 @@ impl GitLabDriver {
     /// Uses the config `gitlab-domains` to see if the driver supports the url for the
     /// repository given.
     pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, _deep: bool) -> bool {
-        let match_ = match Preg::is_match_strict_groups(Self::URL_REGEX, url) {
-            Some(m) => m,
-            None => return false,
-        };
+        let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(Self::URL_REGEX, url, Some(&mut match_)).unwrap_or(false)
+        {
+            return false;
+        }
 
-        let scheme = match_.get("scheme").cloned().unwrap_or_default();
+        let scheme = match_
+            .get(&CaptureKey::ByName("scheme".to_string()))
+            .cloned()
+            .unwrap_or_default();
         let guessed_domain = match_
-            .get("domain")
+            .get(&CaptureKey::ByName("domain".to_string()))
             .cloned()
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| match_.get("domain2").cloned().unwrap_or_default());
-        let mut url_parts: Vec<String> =
-            explode("/", &match_.get("parts").cloned().unwrap_or_default());
+            .unwrap_or_else(|| {
+                match_
+                    .get(&CaptureKey::ByName("domain2".to_string()))
+                    .cloned()
+                    .unwrap_or_default()
+            });
+        let mut url_parts: Vec<String> = explode(
+            "/",
+            &match_
+                .get(&CaptureKey::ByName("parts".to_string()))
+                .cloned()
+                .unwrap_or_default(),
+        );
 
         if Self::determine_origin(
             &config.get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
-            match_.get("port").cloned(),
+            match_.get(&CaptureKey::ByName("port".to_string())).cloned(),
         )
         .is_none()
         {
@@ -964,11 +1003,11 @@ impl GitLabDriver {
         }
 
         if scheme == "https" && !extension_loaded("openssl") {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "Skipping GitLab driver for {} because the OpenSSL PHP extension is missing.",
                     url
-                )),
+                ),
                 true,
                 io_interface::VERBOSE,
             );
@@ -993,8 +1032,16 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(match_) = Preg::is_match_strict_groups(r#"{<(.+?)>; *rel="next"}"#, link) {
-                return Some(match_.get(1).cloned().unwrap_or_default());
+            let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut match_))
+                .unwrap_or(false)
+            {
+                return Some(
+                    match_
+                        .get(&CaptureKey::ByIndex(1))
+                        .cloned()
+                        .unwrap_or_default(),
+                );
             }
         }
 
@@ -1048,7 +1095,7 @@ impl GitLabDriver {
                 false,
             ) || (port_number.is_some()
                 && in_array(
-                    PhpMixed::String(Preg::replace(r"{:\d+}", "", guessed_domain.clone())),
+                    PhpMixed::String(Preg::replace(r"{:\d+}", "", &guessed_domain)),
                     configured_domains,
                     false,
                 ))

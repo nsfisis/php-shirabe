@@ -36,7 +36,7 @@ impl JsonManipulator {
         if contents == "" {
             contents = "{}".to_string();
         }
-        if !Preg::is_match("#^\\{(.*)\\}$#s", &contents, None).unwrap_or(false) {
+        if !Preg::is_match3("#^\\{(.*)\\}$#s", &contents, None).unwrap_or(false) {
             return Err(InvalidArgumentException {
                 message: "The json file must be an object ({})".to_string(),
                 code: 0,
@@ -72,7 +72,7 @@ impl JsonManipulator {
         constraint: &str,
         sort_packages: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no link of that type yet
         if decoded.as_array().and_then(|a| a.get(r#type)).is_none() {
@@ -137,7 +137,7 @@ impl JsonManipulator {
             );
         } else {
             let mut groups: Vec<String> = vec![];
-            if Preg::is_match_strict_groups(
+            if Preg::is_match_strict_groups3(
                 "#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s",
                 &links,
                 Some(&mut groups),
@@ -178,7 +178,7 @@ impl JsonManipulator {
         }
 
         if sort_packages {
-            let mut requirements = json_decode(&links, true);
+            let mut requirements = json_decode(&links, true)?;
             Self::sort_packages(&mut requirements);
             links = self.format(&requirements, 0, false)?;
         }
@@ -262,7 +262,7 @@ impl JsonManipulator {
     }
 
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
-        let decoded = json_decode(&self.contents, false);
+        let decoded = json_decode(&self.contents, false)?;
 
         let repositories_value = decoded.as_object().and_then(|o| o.get("repositories"));
         let is_std_class = repositories_value
@@ -322,7 +322,7 @@ impl JsonManipulator {
     }
 
     pub fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let mut repository_index: Option<PhpMixed> = None;
 
         let repos = decoded
@@ -378,7 +378,7 @@ impl JsonManipulator {
         {
             // invalid match due to un-regexable content, abort
             let raw_repo = matches.get("repository").cloned().unwrap_or_default();
-            if json_decode(&raw_repo, false).as_bool() == Some(false) {
+            if json_decode(&raw_repo, false)?.as_bool() == Some(false) {
                 return Ok(false);
             }
 
@@ -398,8 +398,7 @@ impl JsonManipulator {
                             format!(
                                 "{}{}{}",
                                 repository_matches.get("start").cloned().unwrap_or_default(),
-                                JsonFile::encode(&PhpMixed::String(url_owned.clone()), 0)
-                                    .unwrap_or_default(),
+                                JsonFile::encode(&PhpMixed::String(url_owned.clone()), 0),
                                 repository_matches.get("end").cloned().unwrap_or_default()
                             )
                         }
@@ -431,7 +430,7 @@ impl JsonManipulator {
         }
 
         let mut index_to_insert: Option<i64> = None;
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         let repos = decoded
             .as_array()
@@ -499,7 +498,7 @@ impl JsonManipulator {
     }
 
     fn do_remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
-        let decoded = json_decode(&self.contents, false);
+        let decoded = json_decode(&self.contents, false)?;
         let repositories_value = decoded.as_object().and_then(|o| o.get("repositories"));
         let is_assoc = repositories_value
             .map(|v| v.as_any().is::<StdClass>())
@@ -623,7 +622,7 @@ impl JsonManipulator {
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         let mut name_owned = name.to_string();
         let mut sub_name: Option<String> = None;
@@ -690,8 +689,8 @@ impl JsonManipulator {
 
         let mut children = match_map.get("content").cloned().unwrap_or_default();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false).is_null()
-            || json_decode(&children, false).as_bool() == Some(false)
+        if json_decode(&children, false)?.is_null()
+            || json_decode(&children, false)?.as_bool() == Some(false)
         {
             return Ok(false);
         }
@@ -715,7 +714,8 @@ impl JsonManipulator {
                 Box::new(move |matches: &IndexMap<String, String>| -> String {
                     let mut value_local = value_capture.clone();
                     if sub_name_capture.is_some() && matches.get("content").is_some() {
-                        let mut cur_val = json_decode(matches.get("content").unwrap(), true);
+                        let mut cur_val = json_decode(matches.get("content").unwrap(), true)
+                            .unwrap_or(PhpMixed::Null);
                         if !is_array(&cur_val) {
                             cur_val = PhpMixed::Array(IndexMap::new());
                         }
@@ -846,7 +846,7 @@ impl JsonManipulator {
     }
 
     pub fn remove_sub_node(&mut self, main_node: &str, name: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
@@ -882,8 +882,8 @@ impl JsonManipulator {
         let children = match_map.get("content").cloned().unwrap_or_default();
 
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, true).is_null()
-            || json_decode(&children, true).as_bool() == Some(false)
+        if json_decode(&children, true)?.is_null()
+            || json_decode(&children, true)?.as_bool() == Some(false)
         {
             return Ok(false);
         }
@@ -926,11 +926,12 @@ impl JsonManipulator {
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
         let mut children_clean: Option<String> = None;
-        if Preg::is_match(&format!("{{\"{}\"\\s*:}}i", key_regex), &children, None).unwrap_or(false)
+        if Preg::is_match3(&format!("{{\"{}\"\\s*:}}i", key_regex), &children, None)
+            .unwrap_or(false)
         {
             // find best match for the value of "name"
             let mut all_matches: Vec<Vec<String>> = vec![];
-            if Preg::is_match_all(
+            if Preg::is_match_all3(
                 &format!(
                     "{{{}\"{}\"\\s*:\\s*(?:(?&json))}}x",
                     Self::DEFINES,
@@ -1009,7 +1010,7 @@ impl JsonManipulator {
 
                 // we have a subname, so we restore the rest of $name
                 if let Some(sub) = sub_name {
-                    let mut cur_val = json_decode(&children, true);
+                    let mut cur_val = json_decode(&children, true)?;
                     if let Some(arr) = cur_val.as_array_mut() {
                         if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut())
                         {
@@ -1052,7 +1053,8 @@ impl JsonManipulator {
                 let mut children_clean = children_clean_capture.clone();
                 if let Some(ref sub) = sub_name_capture {
                     let mut cur_val =
-                        json_decode(matches.get("content").unwrap_or(&String::new()), true);
+                        json_decode(matches.get("content").unwrap_or(&String::new()), true)
+                            .unwrap_or(PhpMixed::Null);
                     if let Some(arr) = cur_val.as_array_mut() {
                         if let Some(inner) =
                             arr.get_mut(&name_capture).and_then(|v| v.as_array_mut())
@@ -1093,7 +1095,7 @@ impl JsonManipulator {
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
         if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
@@ -1130,7 +1132,7 @@ impl JsonManipulator {
 
         let mut children = match_map.get("content").cloned().unwrap_or_default();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false).as_bool() == Some(false) {
+        if json_decode(&children, false)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1246,7 +1248,7 @@ impl JsonManipulator {
             return self.add_list_item(main_node, value, false);
         }
 
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
         if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
@@ -1293,7 +1295,7 @@ impl JsonManipulator {
 
         let mut children = match_map.get("content").cloned().unwrap_or_default();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false).as_bool() == Some(false) {
+        if json_decode(&children, false)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1348,7 +1350,7 @@ impl JsonManipulator {
             return Ok(true);
         }
 
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
@@ -1384,7 +1386,7 @@ impl JsonManipulator {
         let children = match_map.get("content").cloned().unwrap_or_default();
 
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, true).as_bool() == Some(false) {
+        if json_decode(&children, true)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1447,7 +1449,7 @@ impl JsonManipulator {
     }
 
     pub fn add_main_key(&mut self, key: &str, content: PhpMixed) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let content = self.format(&content, 0, false)?;
 
         // key exists already
@@ -1465,7 +1467,7 @@ impl JsonManipulator {
         {
             // invalid match due to un-regexable content, abort
             let key_match = matches.get("key").cloned().unwrap_or_default();
-            if json_decode(&format!("{{{}}}", key_match), false).is_null() {
+            if json_decode(&format!("{{{}}}", key_match), false)?.is_null() {
                 return Ok(false);
             }
 
@@ -1482,7 +1484,7 @@ impl JsonManipulator {
 
         // append at the end of the file and keep whitespace
         let mut tail_match: Vec<String> = vec![];
-        if Preg::is_match("#[^{\\s](\\s*)\\}$#", &self.contents, Some(&mut tail_match))
+        if Preg::is_match3("#[^{\\s](\\s*)\\}$#", &self.contents, Some(&mut tail_match))
             .unwrap_or(false)
         {
             self.contents = Preg::replace(
@@ -1524,7 +1526,7 @@ impl JsonManipulator {
     }
 
     pub fn remove_main_key(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(key, &decoded_arr) {
@@ -1544,21 +1546,21 @@ impl JsonManipulator {
         if Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false) {
             // invalid match due to un-regexable content, abort
             let removal = matches.get("removal").cloned().unwrap_or_default();
-            if json_decode(&format!("{{{}}}", removal), false).is_null() {
+            if json_decode(&format!("{{{}}}", removal), false)?.is_null() {
                 return Ok(false);
             }
 
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
             let mut start = matches.get("start").cloned().unwrap_or_default();
             let end = matches.get("end").cloned().unwrap_or_default();
-            if Preg::is_match_strict_groups("#,\\s*$#", &start, None).unwrap_or(false)
-                && Preg::is_match("#^\\}$#", &end, None).unwrap_or(false)
+            if Preg::is_match_strict_groups3("#,\\s*$#", &start, None).unwrap_or(false)
+                && Preg::is_match3("#^\\}$#", &end, None).unwrap_or(false)
             {
                 start = rtrim(&Preg::replace("#,(\\s*)$#", "$1", &start), &self.indent);
             }
 
             self.contents = format!("{}{}", start, end);
-            if Preg::is_match("#^\\{\\s*\\}\\s*$#", &self.contents, None).unwrap_or(false) {
+            if Preg::is_match3("#^\\{\\s*\\}\\s*$#", &self.contents, None).unwrap_or(false) {
                 self.contents = "{\n}".to_string();
             }
 
@@ -1569,7 +1571,7 @@ impl JsonManipulator {
     }
 
     pub fn change_empty_main_key_from_assoc_to_list(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(key, &decoded_arr) {
@@ -1588,7 +1590,7 @@ impl JsonManipulator {
         if Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false) {
             // invalid match due to un-regexable content, abort
             let removal = matches.get("removal").cloned().unwrap_or_default();
-            if json_decode(&removal, false).as_bool() == Some(false) {
+            if json_decode(&removal, false)?.as_bool() == Some(false) {
                 return Ok(false);
             }
 
@@ -1606,7 +1608,7 @@ impl JsonManipulator {
     }
 
     pub fn remove_main_key_if_empty(&mut self, key: &str) -> anyhow::Result<bool> {
-        let decoded = JsonFile::parse_json(&self.contents, "composer.json")?;
+        let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
         if !array_key_exists(key, &decoded_arr) {
@@ -1643,7 +1645,7 @@ impl JsonManipulator {
                     format!(
                         "{{{}{}}}",
                         self.newline,
-                        str_repeat(&self.indent, (depth + 1) as i64)
+                        str_repeat(&self.indent, (depth + 1) as usize)
                     )
                 } else {
                     "[]".to_string()
@@ -1665,7 +1667,7 @@ impl JsonManipulator {
                 for (key, val) in arr {
                     elems.push(format!(
                         "{}{}: {}",
-                        str_repeat(&self.indent, (depth + 2) as i64),
+                        str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()), 0)?,
                         self.format(val, depth + 1, false)?
                     ));
@@ -1677,7 +1679,7 @@ impl JsonManipulator {
                 out,
                 implode(&format!(",{}", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, (depth + 1) as i64)
+                str_repeat(&self.indent, (depth + 1) as usize)
             ));
         }
 
@@ -1714,7 +1716,7 @@ impl ManipulatorFormatter {
                     format!(
                         "{{{}{}}}",
                         self.newline,
-                        str_repeat(&self.indent, depth + 1)
+                        str_repeat(&self.indent, (depth + 1) as usize)
                     )
                 } else {
                     "[]".to_string()
@@ -1736,7 +1738,7 @@ impl ManipulatorFormatter {
                 for (key, val) in arr {
                     elems.push(format!(
                         "{}{}: {}",
-                        str_repeat(&self.indent, depth + 2),
+                        str_repeat(&self.indent, (depth + 2) as usize),
                         JsonFile::encode(&PhpMixed::String(key.clone()), 0)?,
                         self.format(val, depth + 1, false)?
                     ));
@@ -1748,7 +1750,7 @@ impl ManipulatorFormatter {
                 out,
                 implode(&format!(",{}", self.newline), &elems),
                 self.newline,
-                str_repeat(&self.indent, depth + 1)
+                str_repeat(&self.indent, (depth + 1) as usize)
             ));
         }
 

@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -21,21 +21,17 @@ impl ExecCommand {
         self
             .set_name("exec")
             .set_description("Executes a vendored binary/script")
-            .set_definition(vec![
-                InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None),
+            .set_definition(&[
+                InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
                 // TODO(cli-completion): suggest installed binary names (via get_binaries) for `binary` argument
-                InputArgument::new(
-                    "binary",
-                    Some(InputArgument::OPTIONAL),
-                    "The binary to run, e.g. phpunit",
-                    None,
-                ),
-                InputArgument::new(
-                    "args",
-                    Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-                    "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
-                    None,
-                ),
+                InputArgument::new("binary",
+                Some(InputArgument::OPTIONAL),
+                "The binary to run, e.g. phpunit",
+                None,).unwrap().into(),
+                InputArgument::new("args",
+                Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
+                None,).unwrap().into(),
             ])
             .set_help(
                 "Executes a vendored binary/script.\n\n\
@@ -44,7 +40,7 @@ impl ExecCommand {
     }
 
     pub fn interact(
-        &self,
+        &mut self,
         input: &mut dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<()> {
@@ -80,11 +76,11 @@ impl ExecCommand {
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
 
         if input.get_option("list").as_bool().unwrap_or(false)
             || input.get_argument("binary").as_string_opt().is_none()
@@ -92,7 +88,8 @@ impl ExecCommand {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
                 let bin_dir = composer
-                    .get_config()
+                    .get_config_mut()
+                    .borrow_mut()
                     .get("bin-dir")
                     .as_string()
                     .unwrap_or("")
@@ -126,14 +123,11 @@ impl ExecCommand {
         // TODO(phase-b): add_listener takes a Callable; wiring binary as callable not yet ported
         let _ = (dispatcher, &binary);
 
-        let initial_working_directory = self.get_application().get_initial_working_directory();
+        let initial_working_directory = self.get_application()?.get_initial_working_directory();
         if let Some(ref iwd) = initial_working_directory {
             if getcwd().as_deref() != Some(iwd.as_str()) {
                 chdir(iwd).map_err(|e| RuntimeException {
-                    message: format!(
-                        "Could not switch back to working directory \"{}\"",
-                        iwd.display()
-                    ),
+                    message: format!("Could not switch back to working directory \"{}\"", iwd),
                     code: 0,
                 })?;
             }
@@ -149,13 +143,14 @@ impl ExecCommand {
             })
             .unwrap_or_default();
 
-        Ok(dispatcher.dispatch_script("__exec_command", true, args)?)
+        Ok(dispatcher.dispatch_script("__exec_command", true, args, indexmap::IndexMap::new())?)
     }
 
-    fn get_binaries(&self, for_display: bool) -> Result<Vec<String>> {
-        let composer = self.require_composer(None, None)?;
+    fn get_binaries(&mut self, for_display: bool) -> Result<Vec<String>> {
+        let mut composer = self.require_composer(None, None)?;
         let bin_dir = composer
-            .get_config()
+            .get_config_mut()
+            .borrow_mut()
             .get("bin-dir")
             .as_string()
             .unwrap_or("")

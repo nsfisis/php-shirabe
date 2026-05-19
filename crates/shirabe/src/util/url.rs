@@ -2,7 +2,8 @@
 
 use crate::config::Config;
 use crate::util::github::GitHub;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array, parse_url};
 
 pub struct Url;
@@ -15,62 +16,80 @@ impl Url {
             .unwrap_or_default();
 
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
-            if let Some(m) = Preg::match_(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::match3(
                 r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$",
                 &url,
-            ) {
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get("1").unwrap_or(&String::new()),
-                    m.get("2").unwrap_or(&String::new()),
-                    m.get("3").unwrap_or(&String::new()),
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default(),
                     r#ref
                 );
-            } else if let Some(m) = Preg::match_(
+            } else if Preg::match3(
                 r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$",
                 &url,
-            ) {
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get("1").unwrap_or(&String::new()),
-                    m.get("2").unwrap_or(&String::new()),
-                    m.get("3").unwrap_or(&String::new()),
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default(),
                     r#ref
                 );
-            } else if let Some(m) = Preg::match_(
+            } else if Preg::match3(
                 r"(?i)^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$",
                 &url,
-            ) {
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get("1").unwrap_or(&String::new()),
-                    m.get("2").unwrap_or(&String::new()),
-                    m.get("3").unwrap_or(&String::new()),
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default(),
                     r#ref
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
-            if let Some(m) = Preg::match_(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::match3(
                 r"(?i)^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$",
                 &url,
-            ) {
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
-                    m.get("1").unwrap_or(&String::new()),
-                    m.get("2").unwrap_or(&String::new()),
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
                     r#ref,
-                    m.get("4").unwrap_or(&String::new())
+                    m.get(&CaptureKey::ByIndex(4)).cloned().unwrap_or_default()
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
-            if let Some(m) = Preg::match_(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::match3(
                 r"(?i)^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$",
                 &url,
-            ) {
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
-                    m.get("1").unwrap_or(&String::new()),
-                    m.get("2").unwrap_or(&String::new()),
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
                     r#ref
                 );
             }
@@ -82,8 +101,9 @@ impl Url {
             url = Preg::replace(
                 r"(?i)(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$",
                 &format!("$1/{}", r#ref),
-                url,
-            );
+                &url,
+            )
+            .unwrap_or(url);
         } else if in_array(
             PhpMixed::String(host.clone()),
             &config.get("gitlab-domains"),
@@ -92,8 +112,9 @@ impl Url {
             url = Preg::replace(
                 r"(?i)(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$",
                 &format!("${{1}}{}", r#ref),
-                url,
-            );
+                &url,
+            )
+            .unwrap_or(url);
         }
 
         assert!(!url.is_empty());
@@ -148,30 +169,29 @@ impl Url {
     pub fn sanitize(url: String) -> String {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", url);
+        let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", &url).unwrap_or(url);
 
         let url = Preg::replace_callback(
             r"(?i)^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@",
             |m| {
+                let user = m
+                    .get(&CaptureKey::ByName("user".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
+                let prefix = m
+                    .get(&CaptureKey::ByName("prefix".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if Preg::is_match(
-                    GitHub::GITHUB_TOKEN_REGEX,
-                    m.get("user").map(|s| s.as_str()).unwrap_or(""),
-                ) {
-                    format!(
-                        "{}***:***@",
-                        m.get("prefix").map(|s| s.as_str()).unwrap_or("")
-                    )
+                if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, &user).unwrap_or(false) {
+                    format!("{}***:***@", prefix)
                 } else {
-                    format!(
-                        "{}{}:***@",
-                        m.get("prefix").map(|s| s.as_str()).unwrap_or(""),
-                        m.get("user").map(|s| s.as_str()).unwrap_or("")
-                    )
+                    format!("{}{}:***@", prefix, user)
                 }
             },
-            url,
-        );
+            &url,
+        )
+        .unwrap_or(url);
 
         url
     }

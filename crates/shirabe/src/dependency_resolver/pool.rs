@@ -193,7 +193,7 @@ impl Pool {
         let mut id: i64 = 1;
 
         for mut package in packages {
-            package.id = id;
+            *package.id_mut() = id;
             id += 1;
 
             for provided in package.get_names(true) {
@@ -285,7 +285,7 @@ impl Pool {
     ) -> String {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(&package.id) {
+        let prefix = if installed_map.contains_key(&package.id()) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -391,7 +391,7 @@ impl fmt::Display for Pool {
         for package in &self.packages {
             str.push_str(&format!(
                 "- {}: {}\n",
-                str_pad(&package.id.to_string(), 6, " ", STR_PAD_LEFT),
+                str_pad(&package.id().to_string(), 6, " ", STR_PAD_LEFT),
                 package.get_name()
             ));
         }

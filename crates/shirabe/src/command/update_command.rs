@@ -6,8 +6,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::symfony::component::console::helper::table::Table;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge, array_search, count, empty, in_array, sprintf, strtolower,
@@ -50,7 +50,7 @@ impl UpdateCommand {
             .set_aliases(&["u".to_string(), "upgrade".to_string()])
             .set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file")
             // TODO(phase-b): set_definition with InputArgument/InputOption (see PHP UpdateCommand)
-            .set_definition(vec![])
+            .set_definition(&[])
             .set_help(
                 "The <info>update</info> command reads the composer.json file from the\n\
                 current directory, processes it, and updates, removes or installs all the\n\
@@ -78,31 +78,25 @@ impl UpdateCommand {
     ) -> Result<i64> {
         let io = self.get_io();
         if input.get_option("dev").as_bool().unwrap_or(false) {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>".to_string(),
-                ),
+            io.write_error3(
+                "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
                 true,
                 io_interface::NORMAL,
             );
         }
         if input.get_option("no-suggest").as_bool().unwrap_or(false) {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>".to_string(),
-                ),
+            io.write_error3(
+                "<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>",
                 true,
                 io_interface::NORMAL,
             );
         }
 
-        let composer = self.require_composer(None, None);
+        let composer = self.require_composer(None, None)?;
 
         if !HttpDownloader::is_curl_enabled() {
-            io.write_error(
-                PhpMixed::String(
-                    "<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>".to_string(),
-                ),
+            io.write_error3(
+                "<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>",
                 true,
                 io_interface::NORMAL,
             );
@@ -133,11 +127,10 @@ impl UpdateCommand {
         if packages.len() > 0 {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    Preg::is_match(r"{\S+[ =:]\S+}", pkg)
+                    Preg::is_match(r"{\S+[ =:]\S+}", pkg).unwrap_or(false)
                 });
-            for (package, constraint) in self
-                .inner
-                .format_requirements(allowlist_packages_with_requirements.clone())
+            for (package, constraint) in
+                self.format_requirements(allowlist_packages_with_requirements.clone())
             {
                 reqs.insert(package, constraint);
             }
@@ -184,26 +177,22 @@ impl UpdateCommand {
             let intersected = todo!("Intervals::haveIntersections check");
             if let Some(_root_req) = todo!("root_requirements.get(&package)") {
                 if !intersected {
-                    io.write_error(
-                        PhpMixed::String(format!(
+                    io.write_error3(
+                        &format!(
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
                             constraint,
                             package,
                             todo!("root_requirements[package].get_pretty_constraint()"),
-                        )),
+                        ),
                         true,
                         io_interface::NORMAL,
                     );
-                    io.write(
-                        PhpMixed::String(format!(
-                            "<info>Run `composer require {}` or `composer require {}:{}` instead to replace the constraint</info>",
-                            package, package, constraint,
-                        )),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    io.write(&format!(
+                        "<info>Run `composer require {}` or `composer require {}:{}` instead to replace the constraint</info>",
+                        package, package, constraint,
+                    ));
 
-                    return Ok(BaseCommand::FAILURE);
+                    return Ok(crate::command::base_command::FAILURE);
                 }
             }
         }
@@ -297,14 +286,7 @@ impl UpdateCommand {
         packages = filtered_packages;
 
         if update_mirrors && !packages.is_empty() {
-            io.write_error(
-                PhpMixed::String(
-                    "<error>You cannot simultaneously update only a selection of packages and regenerate the lock file metadata.</error>"
-                        .to_string(),
-                ),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error3("<error>You cannot simultaneously update only a selection of packages and regenerate the lock file metadata.</error>", true, io_interface::NORMAL);
 
             return Ok(-1);
         }
@@ -321,20 +303,23 @@ impl UpdateCommand {
         let mut install = Installer::create(io, &composer);
 
         let config = composer.get_config();
-        let (prefer_source, prefer_dist) = self
-            .inner
-            .get_preferred_install_options(config, input, false);
+        let (prefer_source, prefer_dist) = self.get_preferred_install_options(config, input, false);
 
         let optimize = input
             .get_option("optimize-autoloader")
             .as_bool()
             .unwrap_or(false)
-            || config.get("optimize-autoloader").as_bool().unwrap_or(false);
+            || config
+                .borrow_mut()
+                .get("optimize-autoloader")
+                .as_bool()
+                .unwrap_or(false);
         let authoritative = input
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
             || config
+                .borrow_mut()
                 .get("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false);
@@ -344,12 +329,17 @@ impl UpdateCommand {
                 .get_option("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false)
-            || config.get("apcu-autoloader").as_bool().unwrap_or(false);
+            || config
+                .borrow_mut()
+                .get("apcu-autoloader")
+                .as_bool()
+                .unwrap_or(false);
         let minimal_changes = input
             .get_option("minimal-changes")
             .as_bool()
             .unwrap_or(false)
             || config
+                .borrow_mut()
                 .get("update-with-minimal-changes")
                 .as_bool()
                 .unwrap_or(false);
@@ -403,12 +393,12 @@ impl UpdateCommand {
             let mut bump_after_update = input.get_option("bump-after-update");
             // PHP: false === $bumpAfterUpdate (strict)
             if matches!(bump_after_update, PhpMixed::Bool(false)) {
-                bump_after_update = composer.get_config().get("bump-after-update");
+                bump_after_update = composer.get_config().borrow().get("bump-after-update");
             }
 
             if !matches!(bump_after_update, PhpMixed::Bool(false)) {
-                io.write_error(
-                    PhpMixed::String("<info>Bumping dependencies</info>".to_string()),
+                io.write_error3(
+                    "<info>Bumping dependencies</info>",
                     true,
                     io_interface::NORMAL,
                 );
@@ -469,17 +459,16 @@ impl UpdateCommand {
             None
         };
 
-        io.write_error(
-            PhpMixed::String("<info>Loading packages that can be updated...</info>".to_string()),
+        io.write_error3(
+            "<info>Loading packages that can be updated...</info>",
             true,
             io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
         let installed_packages = if composer.get_locker().is_locked() {
-            composer
-                .get_locker()
-                .get_locked_repository(true)?
-                .get_packages()
+            CanonicalPackagesTrait::get_packages(
+                &composer.get_locker().get_locked_repository(true)?,
+            )
         } else {
             composer
                 .get_repository_manager()
@@ -489,7 +478,7 @@ impl UpdateCommand {
         let version_selector = self.create_version_selector(composer);
         for package in &installed_packages {
             if let Some(filter) = &filter {
-                if !Preg::is_match(filter, package.get_name()) {
+                if !Preg::is_match(filter, package.get_name()).unwrap_or(false) {
                     continue;
                 }
             }

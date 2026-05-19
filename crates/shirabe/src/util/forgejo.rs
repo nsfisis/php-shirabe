@@ -9,12 +9,16 @@ use crate::util::http_downloader::HttpDownloader;
 #[derive(Debug)]
 pub struct Forgejo {
     io: Box<dyn IOInterface>,
-    config: Config,
-    http_downloader: HttpDownloader,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl Forgejo {
-    pub fn new(io: Box<dyn IOInterface>, config: Config, http_downloader: HttpDownloader) -> Self {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    ) -> Self {
         Self {
             io,
             config,
@@ -39,7 +43,7 @@ impl Forgejo {
             io_interface::NORMAL,
         );
         self.io.write_error3(&url, true, io_interface::NORMAL);
-        let local_auth_config = self.config.get_local_auth_config_source();
+        let local_auth_config = self.config.borrow().get_local_auth_config_source();
         self.io.write_error3(
             &format!(
                 "Tokens will be stored in plain text in \"{}\" for future use by Composer.",
@@ -47,7 +51,7 @@ impl Forgejo {
                     .as_ref()
                     .map(|s| format!("{} OR ", s.get_name()))
                     .unwrap_or_default()
-                    + self.config.get_auth_config_source().get_name()
+                    + self.config.borrow().get_auth_config_source().get_name()
             ),
             true,
             io_interface::NORMAL,
@@ -92,7 +96,7 @@ impl Forgejo {
         self.io
             .set_authentication(origin_url.to_string(), username.clone(), token.clone());
 
-        match self.http_downloader.get(
+        match self.http_downloader.borrow_mut().get(
             &format!("https://{}/api/v1/version", origin_url),
             indexmap::indexmap! {
                 "retry-auth-failure".to_string() => false.into(),
@@ -117,15 +121,16 @@ impl Forgejo {
         }
 
         // store value in local/user config
-        let local_auth_config = self.config.get_local_auth_config_source();
+        let local_auth_config = self.config.borrow().get_local_auth_config_source();
         let auth_config_source = if store_in_local_auth_config {
             local_auth_config
                 .as_ref()
-                .unwrap_or_else(|| self.config.get_auth_config_source())
+                .unwrap_or_else(|| self.config.borrow().get_auth_config_source())
         } else {
-            self.config.get_auth_config_source()
+            self.config.borrow().get_auth_config_source()
         };
         self.config
+            .borrow()
             .get_config_source()
             .remove_config_setting(&format!("forgejo-token.{}", origin_url));
         auth_config_source.add_config_setting(

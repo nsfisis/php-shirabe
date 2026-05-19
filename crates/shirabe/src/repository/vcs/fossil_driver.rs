@@ -29,9 +29,11 @@ impl FossilDriver {
         self.check_fossil()?;
 
         // Ensure we are allowed to use this URL by config.
-        self.inner
-            .config
-            .prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
+        self.inner.config.borrow_mut().prohibit_url_by_config(
+            &self.inner.url,
+            Some(&*self.inner.io),
+            &indexmap::IndexMap::new(),
+        )?;
 
         // Only if url points to a locally accessible directory, assume it's the checkout directory.
         // Otherwise, it should be something fossil can clone from.
@@ -41,6 +43,7 @@ impl FossilDriver {
             let cache_repo_dir = self
                 .inner
                 .config
+                .borrow_mut()
                 .get("cache-repo-dir")
                 .as_string()
                 .unwrap_or("")
@@ -48,6 +51,7 @@ impl FossilDriver {
             let cache_vcs_dir = self
                 .inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or("")
@@ -60,7 +64,7 @@ impl FossilDriver {
                 .into());
             }
 
-            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", self.inner.url.clone());
+            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", &self.inner.url);
             self.repo_file = Some(format!("{}/{}.fossil", cache_repo_dir, local_name));
             self.checkout_dir = format!("{}/{}/", cache_vcs_dir, local_name);
 
@@ -75,7 +79,7 @@ impl FossilDriver {
 
     pub(crate) fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &["fossil", "version"].map(|s| s.to_string()).to_vec(),
             &mut ignored_output,
             None,
@@ -84,7 +88,7 @@ impl FossilDriver {
             return Err(RuntimeException {
                 message: format!(
                     "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
-                    self.inner.process.get_error_output()
+                    self.inner.process.borrow().get_error_output()
                 ),
                 code: 0,
             }
@@ -115,27 +119,23 @@ impl FossilDriver {
         // update the repo if it is a valid fossil repository
         if is_file(&repo_file)
             && is_dir(&self.checkout_dir)
-            && self.inner.process.execute(
+            && self.inner.process.borrow_mut().execute_args(
                 &["fossil", "info"].map(|s| s.to_string()).to_vec(),
                 &mut String::new(),
                 Some(self.checkout_dir.clone()),
             ) == 0
         {
-            if self.inner.process.execute(
+            if self.inner.process.borrow_mut().execute_args(
                 &["fossil", "pull"].map(|s| s.to_string()).to_vec(),
                 &mut String::new(),
                 Some(self.checkout_dir.clone()),
             ) != 0
             {
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>Failed to update {}, package information from this repository may be outdated ({})</error>",
-                        self.inner.url,
-                        self.inner.process.get_error_output()
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error3(&format!(
+                    "<error>Failed to update {}, package information from this repository may be outdated ({})</error>",
+                    self.inner.url,
+                    self.inner.process.borrow().get_error_output()
+                ), true, io_interface::NORMAL);
             }
         } else {
             // clean up directory and do a fresh clone into it
@@ -144,7 +144,7 @@ impl FossilDriver {
             fs.ensure_directory_exists(&self.checkout_dir)?;
 
             let mut output = String::new();
-            if self.inner.process.execute(
+            if self.inner.process.borrow_mut().execute_args(
                 &["fossil", "clone", "--", &self.inner.url, &repo_file]
                     .map(|s| s.to_string())
                     .to_vec(),
@@ -152,7 +152,7 @@ impl FossilDriver {
                 None,
             ) != 0
             {
-                let output = self.inner.process.get_error_output();
+                let output = self.inner.process.borrow().get_error_output();
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to clone {} to repository {}\n\n{}",
@@ -163,7 +163,7 @@ impl FossilDriver {
                 .into());
             }
 
-            if self.inner.process.execute(
+            if self.inner.process.borrow_mut().execute_args(
                 &["fossil", "open", "--nested", "--", &repo_file]
                     .map(|s| s.to_string())
                     .to_vec(),
@@ -171,7 +171,7 @@ impl FossilDriver {
                 Some(self.checkout_dir.clone()),
             ) != 0
             {
-                let output = self.inner.process.get_error_output();
+                let output = self.inner.process.borrow().get_error_output();
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to open repository {} in {}\n\n{}",
@@ -222,7 +222,7 @@ impl FossilDriver {
         }
 
         let mut content = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &["fossil", "cat", "-r", identifier, "--", file]
                 .map(|s| s.to_string())
                 .to_vec(),
@@ -239,7 +239,7 @@ impl FossilDriver {
 
     pub fn get_change_date(&self, _identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &["fossil", "finfo", "-b", "-n", "1", "composer.json"]
                 .map(|s| s.to_string())
                 .to_vec(),
@@ -257,12 +257,12 @@ impl FossilDriver {
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["fossil", "tag", "list"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(self.checkout_dir.clone()),
             );
-            for tag in self.inner.process.split_lines(&output) {
+            for tag in self.inner.process.borrow().split_lines(&output) {
                 tags.insert(tag.clone(), tag);
             }
             self.tags = Some(tags);
@@ -274,13 +274,13 @@ impl FossilDriver {
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["fossil", "branch", "list"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(self.checkout_dir.clone()),
             );
-            for branch in self.inner.process.split_lines(&output) {
-                let branch = Preg::replace(r"/^\*/", "", branch.trim().to_string());
+            for branch in self.inner.process.borrow().split_lines(&output) {
+                let branch = Preg::replace(r"/^\*/", "", &branch.trim());
                 let branch = branch.trim().to_string();
                 branches.insert(branch.clone(), branch);
             }
@@ -312,7 +312,7 @@ impl FossilDriver {
 
             let process = ProcessExecutor::new(io);
             let mut output = String::new();
-            if process.execute(
+            if process.execute_args(
                 &["fossil", "info"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(url),

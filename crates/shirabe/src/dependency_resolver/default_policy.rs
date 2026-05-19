@@ -51,12 +51,8 @@ impl DefaultPolicy {
         ignore_replace: bool,
     ) -> i64 {
         if PackageInterface::get_name(a) == PackageInterface::get_name(b) {
-            let a_aliased = (a.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some();
-            let b_aliased = (b.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some();
+            let a_aliased = a.as_any().downcast_ref::<AliasPackage>().is_some();
+            let b_aliased = b.as_any().downcast_ref::<AliasPackage>().is_some();
             if a_aliased && !b_aliased {
                 return -1;
             }
@@ -87,11 +83,11 @@ impl DefaultPolicy {
             }
         }
 
-        if a.id == b.id {
+        if a.id() == b.id() {
             return 0;
         }
 
-        if a.id < b.id { -1 } else { 1 }
+        if a.id() < b.id() { -1 } else { 1 }
     }
 
     pub(crate) fn group_literals_by_name(
@@ -147,7 +143,7 @@ impl DefaultPolicy {
 
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
                 if alias_pkg.is_root_package_alias() {
                     has_local_alias = true;
                     break;
@@ -162,7 +158,7 @@ impl DefaultPolicy {
         let mut selected = vec![];
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
                 if alias_pkg.is_root_package_alias() {
                     selected.push(literal);
                 }
@@ -221,7 +217,7 @@ impl PolicyInterface for DefaultPolicy {
         CompilingMatcher::r#match(
             &Constraint::new(operator, b.get_version()),
             Constraint::OP_EQ,
-            a.get_version(),
+            a.get_version().to_string(),
         )
     }
 

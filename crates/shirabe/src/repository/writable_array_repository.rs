@@ -2,7 +2,9 @@
 
 use crate::installer::installation_manager::InstallationManager;
 use crate::repository::array_repository::ArrayRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use anyhow::Result;
+use shirabe_php_shim::Countable;
 
 #[derive(Debug)]
 pub struct WritableArrayRepository {
@@ -12,6 +14,16 @@ pub struct WritableArrayRepository {
 }
 
 impl WritableArrayRepository {
+    pub fn new(
+        packages: Vec<Box<dyn crate::package::package_interface::PackageInterface>>,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: ArrayRepository::new(packages)?,
+            dev_package_names: Vec::new(),
+            dev_mode: None,
+        })
+    }
+
     /// Returns true if dev requirements were installed, false if --no-dev was used, None if yet unknown.
     pub fn get_dev_mode(&self) -> Option<bool> {
         self.dev_mode
@@ -71,5 +83,13 @@ impl WritableArrayRepository {
     ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
         // TODO(phase-b): delegate to inner ArrayRepository::get_packages
         Vec::new()
+    }
+
+    pub fn get_repo_name(&self) -> String {
+        self.inner.get_repo_name()
+    }
+
+    pub fn count(&self) -> i64 {
+        Countable::count(&self.inner)
     }
 }

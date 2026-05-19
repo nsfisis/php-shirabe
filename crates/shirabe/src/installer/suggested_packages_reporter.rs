@@ -161,7 +161,7 @@ impl SuggestedPackagesReporter {
         let mut installed_names: Vec<String> = Vec::new();
         if installed_repo.is_some() && !suggested_packages.is_empty() {
             for package in installed_repo.unwrap().get_packages() {
-                installed_names.extend(package.get_names());
+                installed_names.extend(package.get_names(true));
             }
         }
 

@@ -8,6 +8,20 @@ pub struct MatchAllConstraint {
     pub(crate) pretty_string: Option<String>,
 }
 
+impl MatchAllConstraint {
+    pub fn new() -> Self {
+        Self {
+            pretty_string: None,
+        }
+    }
+}
+
+impl Default for MatchAllConstraint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConstraintInterface for MatchAllConstraint {
     fn matches(&self, _provider: &dyn ConstraintInterface) -> bool {
         true

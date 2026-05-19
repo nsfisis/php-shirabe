@@ -50,10 +50,10 @@ impl ProxyManager {
         request_url: &str,
     ) -> Result<RequestProxy, TransportException> {
         if let Some(ref error) = self.error {
-            return Err(TransportException::new(format!(
-                "Unable to use a proxy: {}",
-                error
-            )));
+            return Err(TransportException::new(
+                format!("Unable to use a proxy: {}", error),
+                0,
+            ));
         }
 
         let scheme = request_url.split("://").next().unwrap_or("").to_string();
@@ -85,19 +85,19 @@ impl ProxyManager {
         // PHP_SAPI is always 'cli' for this application
         let (env, name) = Self::get_proxy_env("http_proxy");
         if let Some(env) = env {
-            self.http_proxy = Some(ProxyItem::new(env, name));
+            self.http_proxy = Some(ProxyItem::new(env, name)?);
         }
 
         if self.http_proxy.is_none() {
             let (env, name) = Self::get_proxy_env("cgi_http_proxy");
             if let Some(env) = env {
-                self.http_proxy = Some(ProxyItem::new(env, name));
+                self.http_proxy = Some(ProxyItem::new(env, name)?);
             }
         }
 
         let (env, name) = Self::get_proxy_env("https_proxy");
         if let Some(env) = env {
-            self.https_proxy = Some(ProxyItem::new(env, name));
+            self.https_proxy = Some(ProxyItem::new(env, name)?);
         }
 
         let (env, _name) = Self::get_proxy_env("no_proxy");
@@ -122,7 +122,7 @@ impl ProxyManager {
     fn no_proxy(&self, request_url: &str) -> bool {
         match &self.no_proxy_handler {
             None => false,
-            Some(handler) => handler.test(request_url),
+            Some(handler) => handler.test(request_url).unwrap_or(false),
         }
     }
 }

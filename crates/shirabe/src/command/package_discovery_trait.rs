@@ -5,7 +5,7 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
@@ -354,26 +354,36 @@ pub trait PackageDiscoveryTrait {
                                 }
                             }
 
-                            if let Some(m) = Preg::is_match_strict_groups(
+                            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                            if Preg::is_match_strict_groups3(
                                 r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}",
                                 &selection,
-                            ) {
-                                if let Some(v) = m.get("version") {
+                                Some(&mut m),
+                            )
+                            .unwrap_or(false)
+                            {
+                                if let Some(v) =
+                                    m.get(&CaptureKey::ByName("version".to_string())).cloned()
+                                {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
                                     // TODO(phase-b): parse_constraints returns Result
-                                    let _ = version_parser_clone.parse_constraints(v);
+                                    let _ = version_parser_clone.parse_constraints(&v);
 
                                     return PhpMixed::String(format!(
                                         "{} {}",
-                                        m.get("name").cloned().unwrap_or_default(),
+                                        m.get(&CaptureKey::ByName("name".to_string()))
+                                            .cloned()
+                                            .unwrap_or_default(),
                                         v,
                                     ));
                                 }
 
                                 // parsing `acme/example`
                                 return PhpMixed::String(
-                                    m.get("name").cloned().unwrap_or_default(),
+                                    m.get(&CaptureKey::ByName("name".to_string()))
+                                        .cloned()
+                                        .unwrap_or_default(),
                                 );
                             }
 
@@ -537,7 +547,9 @@ pub trait PackageDiscoveryTrait {
             }
 
             // Check whether the package requirements were the problem
-            let is_ignore_all = (platform_requirement_filter.as_ref().as_any() as &dyn Any)
+            let is_ignore_all = platform_requirement_filter
+                .as_ref()
+                .as_any()
                 .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
                 .is_some();
             if !is_ignore_all {
@@ -861,7 +873,8 @@ pub trait PackageDiscoveryTrait {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key("config.platform");
-                let is_complete = (platform_pkg.as_any() as &dyn Any)
+                let is_complete = platform_pkg
+                    .as_any()
                     .downcast_ref::<dyn CompletePackageInterface>()
                     .is_some();
                 if has_config_platform && is_complete {

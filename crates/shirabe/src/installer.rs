@@ -64,6 +64,7 @@ use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::link::Link;
 use crate::package::loader::array_loader::ArrayLoader;
+use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::locker::Locker;
 use crate::package::package::Package;
 use crate::package::package_interface::PackageInterface;
@@ -90,7 +91,7 @@ use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 #[derive(Debug)]
 pub struct Installer {
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) config: Config,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub(crate) package: Box<dyn RootPackageInterface>,
     // TODO can we get rid of the below and just use the package itself?
     pub(crate) fixed_root_package: Box<dyn RootPackageInterface>,
@@ -147,7 +148,7 @@ impl Installer {
 
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         package: Box<dyn RootPackageInterface>,
         download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
         repository_manager: RepositoryManager,
@@ -158,7 +159,7 @@ impl Installer {
     ) -> Self {
         let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone_box());
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
-        let write_lock = config.get("lock").as_bool().unwrap_or(false);
+        let write_lock = config.borrow_mut().get("lock").as_bool().unwrap_or(false);
 
         Self {
             io,
@@ -290,6 +291,7 @@ impl Installer {
                     && self.install
                     && self
                         .config
+                        .borrow_mut()
                         .get("notify-on-install")
                         .as_bool()
                         .unwrap_or(false)
@@ -305,6 +307,7 @@ impl Installer {
             && self.install
             && self
                 .config
+                .borrow_mut()
                 .get("notify-on-install")
                 .as_bool()
                 .unwrap_or(false)
@@ -330,7 +333,7 @@ impl Installer {
 
         // Find abandoned packages and warn user
         let locked_repository = self.locker.get_locked_repository(true)?;
-        for package in locked_repository.get_packages() {
+        for package in CanonicalPackagesTrait::get_packages(&locked_repository) {
             let complete = match package.as_complete_package() {
                 Some(p) if p.is_abandoned() => p,
                 _ => continue,
@@ -369,7 +372,7 @@ impl Installer {
             self.autoload_generator
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone_box());
             self.autoload_generator.dump(
-                &self.config,
+                &*self.config.borrow(),
                 &local_repo,
                 &*self.package,
                 &self.installation_manager,
@@ -444,7 +447,7 @@ impl Installer {
                 (local_repo.get_canonical_packages(), "installed")
             };
             if count(&packages) > 0 {
-                let auditor = Auditor::new();
+                let auditor = Auditor;
                 let mut repo_set = RepositorySet::new(
                     "stable".to_string(),
                     IndexMap::new(),
@@ -538,7 +541,7 @@ impl Installer {
 
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
-            self.io.write_error(
+            self.io.write_error3(
                 &format!(
                     "<error>Cannot update {} without a lock file present. Run `composer update` to generate a lock file.</error>",
                     if self.update_mirrors {
@@ -621,14 +624,14 @@ impl Installer {
                         false,
                     );
 
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!("<error>{}</error>", err),
                         true,
                         io_interface::QUIET,
                     );
                     self.io.write_error(&pretty_problem);
                     if !self.dev_mode {
-                        self.io.write_error(
+                        self.io.write_error3(
                             "<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>",
                             true,
                             io_interface::QUIET,
@@ -645,7 +648,7 @@ impl Installer {
         }
         let _ = solver;
 
-        self.io.write_error(
+        self.io.write_error3(
             &format!(
                 "Analyzed {} packages to resolve dependencies",
                 count(&pool.as_ref().unwrap())
@@ -653,7 +656,7 @@ impl Installer {
             true,
             io_interface::VERBOSE,
         );
-        self.io.write_error(
+        self.io.write_error3(
             &format!("Analyzed {} rules to resolve dependencies", rule_set_size),
             true,
             io_interface::VERBOSE,
@@ -665,7 +668,10 @@ impl Installer {
         if lock_transaction.get_operations().is_empty() {
             self.io.write_error("Nothing to modify in lock file");
 
-            if self.minimal_update && self.update_allow_list.is_none() && self.locker.is_fresh() {
+            if self.minimal_update
+                && self.update_allow_list.is_none()
+                && self.locker.is_fresh().unwrap_or(false)
+            {
                 self.io.write_error("<warning>The --minimal-changes option should be used with package arguments or after modifying composer.json requirements, otherwise it will likely not yield any dependency changes.</warning>");
             }
         }
@@ -725,7 +731,13 @@ impl Installer {
                 }
             }
 
-            if self.config.get("lock").as_bool().unwrap_or(false) {
+            if self
+                .config
+                .borrow_mut()
+                .get("lock")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 self.io.write_error(&sprintf(
                     "<info>Lock file operations: %d install%s, %d update%s, %d removal%s</info>",
                     &[
@@ -738,21 +750,21 @@ impl Installer {
                     ],
                 ));
                 if !install_names.is_empty() {
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!("Installs: {}", implode(", ", &install_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!("Updates: {}", implode(", ", &update_names)),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!("Removals: {}", implode(", ", &uninstall_names)),
                         true,
                         io_interface::VERBOSE,
@@ -788,7 +800,12 @@ impl Installer {
             }
 
             // output op if lock file is enabled, but alias op only in debug verbosity
-            if self.config.get("lock").as_bool().unwrap_or(false)
+            if self
+                .config
+                .borrow_mut()
+                .get("lock")
+                .as_bool()
+                .unwrap_or(false)
                 && (strpos(operation.get_operation_type(), "Alias") == false || self.io.is_debug())
             {
                 let mut source_repo = String::new();
@@ -821,6 +838,7 @@ impl Installer {
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
             self.config
+                .borrow_mut()
                 .get("platform")
                 .as_array()
                 .cloned()
@@ -893,7 +911,7 @@ impl Installer {
                         true,
                     );
 
-                    self.io.write_error(
+                    self.io.write_error3(
                         &format!("<error>{}</error>", err),
                         true,
                         io_interface::QUIET,
@@ -923,7 +941,13 @@ impl Installer {
         local_repo: Box<dyn InstalledRepositoryInterface>,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
-        if self.config.get("lock").as_bool().unwrap_or(false) {
+        if self
+            .config
+            .borrow_mut()
+            .get("lock")
+            .as_bool()
+            .unwrap_or(false)
+        {
             self.io.write_error(&format!(
                 "<info>Installing dependencies from lock file{}</info>",
                 if self.dev_mode {
@@ -962,8 +986,8 @@ impl Installer {
                 Some(&*locked_repository),
             );
 
-            if !self.locker.is_fresh() {
-                self.io.write_error(
+            if !self.locker.is_fresh()? {
+                self.io.write_error3(
                     "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.</warning>",
                     true,
                     io_interface::QUIET,
@@ -978,6 +1002,7 @@ impl Installer {
 
                 if !self
                     .config
+                    .borrow_mut()
                     .get("allow-missing-requirements")
                     .as_bool()
                     .unwrap_or(false)
@@ -986,7 +1011,7 @@ impl Installer {
                 }
             }
 
-            for package in locked_repository.get_packages() {
+            for package in RepositoryInterface::get_packages(&locked_repository) {
                 request.fix_locked_package(package);
             }
 
@@ -1031,7 +1056,7 @@ impl Installer {
 
                     // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
                     if 0 != count(&lock_transaction.get_operations()) {
-                        self.io.write_error(
+                        self.io.write_error3(
                             "<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>",
                             true,
                             io_interface::QUIET,
@@ -1051,7 +1076,7 @@ impl Installer {
                             false,
                         );
 
-                        self.io.write_error(
+                        self.io.write_error3(
                             &format!("<error>{}</error>", err),
                             true,
                             io_interface::QUIET,
@@ -1114,21 +1139,21 @@ impl Installer {
                 ],
             ));
             if !installs.is_empty() {
-                self.io.write_error(
+                self.io.write_error3(
                     &format!("Installs: {}", implode(", ", &installs)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
-                self.io.write_error(
+                self.io.write_error3(
                     &format!("Updates: {}", implode(", ", &updates)),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
-                self.io.write_error(
+                self.io.write_error3(
                     &format!("Removals: {}", implode(", ", &uninstalls)),
                     true,
                     io_interface::VERBOSE,
@@ -1150,6 +1175,7 @@ impl Installer {
             if count(&local_repo_transaction.get_operations()) > 0 {
                 let vendor_dir = self
                     .config
+                    .borrow_mut()
                     .get("vendor-dir")
                     .as_string()
                     .unwrap_or("")
@@ -1176,6 +1202,7 @@ impl Installer {
     pub(crate) fn create_platform_repo(&self, for_update: bool) -> PlatformRepository {
         let platform_overrides = if for_update {
             self.config
+                .borrow_mut()
                 .get("platform")
                 .as_array()
                 .cloned()
@@ -1321,7 +1348,7 @@ impl Installer {
         let mut preferred_versions: Option<IndexMap<String, String>> = None;
         if for_update && self.minimal_update && locked_repo.is_some() {
             let mut versions: IndexMap<String, String> = IndexMap::new();
-            for pkg in locked_repo.unwrap().get_packages() {
+            for pkg in CanonicalPackagesTrait::get_packages(locked_repo.unwrap()) {
                 if pkg.as_alias_package().is_some()
                     || (self.update_allow_list.is_some()
                         && in_array(
@@ -1405,7 +1432,7 @@ impl Installer {
                 IndexMap::new()
             };
 
-            for locked_package in locked_repository.unwrap().get_packages() {
+            for locked_package in CanonicalPackagesTrait::get_packages(locked_repository.unwrap()) {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias_package().is_none()
@@ -1482,9 +1509,10 @@ impl Installer {
                 packages.insert(key, new_alias_package);
             }
         }
-        rm.set_local_repository(Box::new(InstalledArrayRepository::new_with_packages(
-            packages.into_values().collect(),
-        )));
+        rm.set_local_repository(Box::new(
+            InstalledArrayRepository::new_with_packages(packages.into_values().collect())
+                .expect("InstalledArrayRepository::new_with_packages should not fail"),
+        ));
     }
 
     fn create_pool_optimizer(&self, policy: &dyn PolicyInterface) -> Option<PoolOptimizer> {
@@ -1492,7 +1520,7 @@ impl Installer {
         // to configure from the outside of Installer but this is only
         // a debugging tool and should never be required in any other use case
         if Platform::get_env("COMPOSER_POOL_OPTIMIZER").as_deref() == Some("0") {
-            self.io.write(
+            self.io.write3(
                 "Pool Optimizer was disabled for debugging purposes.",
                 true,
                 io_interface::DEBUG,
@@ -1507,7 +1535,7 @@ impl Installer {
     fn get_audit_config(&mut self) -> anyhow::Result<&AuditConfig> {
         if self.audit_config.is_none() {
             self.audit_config = Some(AuditConfig::from_config(
-                &self.config,
+                &mut *self.config.borrow_mut(),
                 self.audit,
                 &self.audit_format,
             )?);
@@ -1523,7 +1551,7 @@ impl Installer {
 
         if audit_config.block_insecure && !self.update_mirrors {
             return Ok(Some(SecurityAdvisoryPoolFilter::new(
-                Auditor::new(),
+                Auditor,
                 audit_config.clone(),
             )));
         }
@@ -1689,7 +1717,7 @@ impl Installer {
     }
 
     /// set the config instance
-    pub fn set_config(&mut self, config: Config) -> &mut Self {
+    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) -> &mut Self {
         self.config = config;
 
         self

@@ -18,9 +18,9 @@ impl<'a> DownloaderOrManager<'a> {
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Box<dyn PromiseInterface> {
+    ) -> Result<Box<dyn PromiseInterface>> {
         match self {
-            Self::Interface(d) => d.download(package, path, prev_package),
+            Self::Interface(d) => d.download3(package, path, prev_package),
             Self::Manager(d) => d.borrow().download(package, path, prev_package),
         }
     }
@@ -31,16 +31,20 @@ impl<'a> DownloaderOrManager<'a> {
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Box<dyn PromiseInterface> {
+    ) -> Result<Box<dyn PromiseInterface>> {
         match self {
             Self::Interface(d) => d.prepare(r#type, package, path, prev_package),
             Self::Manager(d) => d.borrow().prepare(r#type, package, path, prev_package),
         }
     }
 
-    fn install(&self, package: &dyn PackageInterface, path: &str) -> Box<dyn PromiseInterface> {
+    fn install(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
         match self {
-            Self::Interface(d) => d.install(package, path),
+            Self::Interface(d) => d.install2(package, path),
             Self::Manager(d) => d.borrow().install(package, path),
         }
     }
@@ -50,7 +54,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: &dyn PackageInterface,
         prev_package: &dyn PackageInterface,
         path: &str,
-    ) -> Box<dyn PromiseInterface> {
+    ) -> Result<Box<dyn PromiseInterface>> {
         match self {
             Self::Interface(d) => d.update(package, prev_package, path),
             Self::Manager(d) => d.borrow().update(package, prev_package, path),
@@ -63,7 +67,7 @@ impl<'a> DownloaderOrManager<'a> {
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Box<dyn PromiseInterface> {
+    ) -> Result<Box<dyn PromiseInterface>> {
         match self {
             Self::Interface(d) => d.cleanup(r#type, package, path, prev_package),
             Self::Manager(d) => d.borrow().cleanup(r#type, package, path, prev_package),
@@ -90,18 +94,18 @@ impl SyncHelper {
         let result: Result<()> = (|| {
             Self::r#await(
                 r#loop,
-                Some(downloader.download(package, &path, prev_package)),
+                Some(downloader.download(package, &path, prev_package)?),
             )?;
             Self::r#await(
                 r#loop,
-                Some(downloader.prepare(r#type, package, &path, prev_package)),
+                Some(downloader.prepare(r#type, package, &path, prev_package)?),
             )?;
             if r#type == "update" {
                 if let Some(prev) = prev_package {
-                    Self::r#await(r#loop, Some(downloader.update(package, prev, &path)))?;
+                    Self::r#await(r#loop, Some(downloader.update(package, prev, &path)?))?;
                 }
             } else {
-                Self::r#await(r#loop, Some(downloader.install(package, &path)))?;
+                Self::r#await(r#loop, Some(downloader.install(package, &path)?))?;
             }
             Ok(())
         })();
@@ -109,14 +113,14 @@ impl SyncHelper {
         if result.is_err() {
             Self::r#await(
                 r#loop,
-                Some(downloader.cleanup(r#type, package, &path, prev_package)),
+                Some(downloader.cleanup(r#type, package, &path, prev_package)?),
             )?;
             return result;
         }
 
         Self::r#await(
             r#loop,
-            Some(downloader.cleanup(r#type, package, &path, prev_package)),
+            Some(downloader.cleanup(r#type, package, &path, prev_package)?),
         )?;
         Ok(())
     }

@@ -3,7 +3,7 @@
 use crate::dependency_resolver::pool::Pool;
 use crate::package::package_interface::PackageInterface;
 
-pub trait PolicyInterface {
+pub trait PolicyInterface: std::fmt::Debug {
     fn version_compare(
         &self,
         a: &dyn PackageInterface,

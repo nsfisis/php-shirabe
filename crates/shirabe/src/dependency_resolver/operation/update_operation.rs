@@ -79,6 +79,10 @@ impl SolverOperation for UpdateOperation {
 }
 
 impl OperationInterface for UpdateOperation {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_operation_type(&self) -> String {
         Self::TYPE.to_string()
     }
@@ -93,5 +97,9 @@ impl OperationInterface for UpdateOperation {
 
     fn to_string(&self) -> String {
         self.show(true)
+    }
+
+    fn as_update_operation(&self) -> Option<&UpdateOperation> {
+        Some(self)
     }
 }

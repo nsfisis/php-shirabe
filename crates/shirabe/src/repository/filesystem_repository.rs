@@ -19,6 +19,7 @@ use crate::json::json_file::JsonFile;
 use crate::package::alias_package::AliasPackage;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::loader::array_loader::ArrayLoader;
+use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_alias_package::RootAliasPackage;
 use crate::package::root_package_interface::RootPackageInterface;
@@ -39,7 +40,7 @@ pub struct FilesystemRepository {
     /// @var ?RootPackageInterface
     root_package: Option<Box<dyn RootPackageInterface>>,
     /// @var Filesystem
-    filesystem: Filesystem,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var bool|null
     dev_mode: Option<bool>,
 }
@@ -53,9 +54,10 @@ impl FilesystemRepository {
         repository_file: JsonFile,
         dump_versions: bool,
         root_package: Option<Box<dyn RootPackageInterface>>,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Result<Self> {
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
+        let filesystem = filesystem
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         if dump_versions && root_package.is_none() {
             return Err(InvalidArgumentException {
                 message: "Expected a root package instance if $dumpVersions is true".to_string(),
@@ -191,10 +193,13 @@ impl FilesystemRepository {
         // as realpath() does some additional normalizations with network paths that normalizePath does not
         // and we need to find shortest path correctly
         let repo_dir = dirname(self.file.get_path());
-        self.filesystem.ensure_directory_exists(&repo_dir);
+        self.filesystem
+            .borrow_mut()
+            .ensure_directory_exists(&repo_dir);
 
         let repo_dir = self
             .filesystem
+            .borrow()
             .normalize_path(&realpath(&repo_dir).unwrap_or_default());
         let mut install_paths: IndexMap<String, Option<String>> = IndexMap::new();
 
@@ -204,8 +209,9 @@ impl FilesystemRepository {
             let mut install_path: Option<String> = None;
             if let Some(path_str) = &path {
                 if !path_str.is_empty() {
-                    let normalized_path = self.filesystem.normalize_path(&if self
+                    let normalized_path = self.filesystem.borrow_mut().normalize_path(&if self
                         .filesystem
+                        .borrow()
                         .is_absolute_path(path_str)
                     {
                         path_str.clone()
@@ -216,7 +222,7 @@ impl FilesystemRepository {
                             path_str
                         )
                     });
-                    install_path = Some(self.filesystem.find_shortest_path(
+                    install_path = Some(self.filesystem.borrow_mut().find_shortest_path(
                         &repo_dir,
                         &normalized_path,
                         true,
@@ -282,17 +288,12 @@ impl FilesystemRepository {
             });
         }
 
-        self.file.write(
-            PhpMixed::Array(
-                data.clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            shirabe_php_shim::JSON_UNESCAPED_SLASHES
-                | shirabe_php_shim::JSON_PRETTY_PRINT
-                | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
-        )?;
+        self.file.write(PhpMixed::Array(
+            data.clone()
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v)))
+                .collect(),
+        ))?;
 
         if self.dump_versions {
             let versions = self.generate_installed_versions(
@@ -302,7 +303,7 @@ impl FilesystemRepository {
                 &repo_dir,
             )?;
 
-            self.filesystem.file_put_contents_if_modified(
+            self.filesystem.borrow_mut().file_put_contents_if_modified(
                 &format!("{}/installed.php", repo_dir),
                 &format!("<?php return {};\n", self.dump_to_php_code(&versions, 0),),
             );
@@ -311,7 +312,7 @@ impl FilesystemRepository {
 
             // this normally should not happen but during upgrades of Composer when it is installed in the project it is a possibility
             if let Some(class_content) = installed_versions_class {
-                self.filesystem.file_put_contents_if_modified(
+                self.filesystem.borrow_mut().file_put_contents_if_modified(
                     &format!("{}/InstalledVersions.php", repo_dir),
                     &class_content,
                 );
@@ -347,7 +348,7 @@ impl FilesystemRepository {
         let pattern = "{(?(DEFINE)\n   (?<number>  -? \\s*+ \\d++ (?:\\.\\d++)? )\n   (?<boolean> true | false | null )\n   (?<strings> (?&string) (?: \\s*+ \\. \\s*+ (?&string))*+ )\n   (?<string>  (?: \" (?:[^\"\\\\$]*+ | \\\\ [\"\\\\0] )* \" | ' (?:[^'\\\\]*+ | \\\\ ['\\\\] )* ' ) )\n   (?<array>   array\\( \\s*+ (?: (?:(?&number)|(?&strings)) \\s*+ => \\s*+ (?: (?:__DIR__ \\s*+ \\. \\s*+)? (?&strings) | (?&value) ) \\s*+, \\s*+ )*+  \\s*+ \\) )\n   (?<value>   (?: (?&number) | (?&boolean) | (?&strings) | (?&array) ) )\n)\n^<\\?php\\s++return\\s++(?&array)\\s*+;$}ix";
         if let Some(data) = installed_versions_data {
             let mixed = PhpMixed::String(data.clone());
-            if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)) {
+            if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)).unwrap_or(false) {
                 let replaced = Preg::replace(
                     r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#,
                     &format!(
@@ -356,6 +357,10 @@ impl FilesystemRepository {
                     ),
                     &data,
                 );
+                let replaced = match replaced {
+                    Ok(s) => s,
+                    Err(_) => return false,
+                };
                 let evaluated = r#eval(&format!("?>{}", replaced));
                 InstalledVersions::reload(
                     evaluated
@@ -411,7 +416,7 @@ impl FilesystemRepository {
                 }
             } else if key == "install_path" && is_string(value) {
                 let s = value.as_string().unwrap_or("").to_string();
-                if self.filesystem.is_absolute_path(&s) {
+                if self.filesystem.borrow_mut().is_absolute_path(&s) {
                     lines.push_str(&format!("{},\n", var_export(&PhpMixed::String(s), true),));
                 } else {
                     lines.push_str(&format!(
@@ -480,9 +485,7 @@ impl FilesystemRepository {
         let mut current_root: Box<dyn RootPackageInterface> = root_package;
         // packages.push(current_root.clone_box());
 
-        while let Some(_alias) =
-            (current_root.as_any() as &dyn Any).downcast_ref::<RootAliasPackage>()
-        {
+        while let Some(_alias) = current_root.as_any().downcast_ref::<RootAliasPackage>() {
             current_root =
                 todo!("RootAliasPackage::get_alias_of() returning Box<dyn RootPackageInterface>");
             // packages.push(current_root.clone_box());
@@ -507,10 +510,7 @@ impl FilesystemRepository {
 
         // add real installed packages
         for package in &packages {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some()
-            {
+            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                 continue;
             }
 
@@ -532,7 +532,7 @@ impl FilesystemRepository {
                 .as_array()
                 .map(|m| m.contains_key(package.get_name()))
                 .unwrap_or(false);
-            for replace in package.get_replaces() {
+            for (_, replace) in package.get_replaces() {
                 // exclude platform replaces as when they are really there we can not check for their presence
                 if PlatformRepository::is_platform_package(replace.get_target()) {
                     continue;
@@ -550,7 +550,7 @@ impl FilesystemRepository {
                     todo!("append replaced to versions['versions'][target]['replaced']");
                 }
             }
-            for provide in package.get_provides() {
+            for (_, provide) in package.get_provides() {
                 // exclude platform provides as when they are really there we can not check for their presence
                 if PlatformRepository::is_platform_package(provide.get_target()) {
                     continue;
@@ -571,12 +571,13 @@ impl FilesystemRepository {
 
         // add aliases
         for package in &packages {
-            let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() else {
+            let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() else {
                 continue;
             };
             // TODO(phase-b): mutate nested versions['versions'][name]['aliases']
             todo!("append alias->getPrettyVersion() to versions['versions'][name]['aliases']");
-            if (package.as_any() as &dyn Any)
+            if package
+                .as_any()
                 .downcast_ref::<dyn RootPackageInterface>()
                 .is_some()
             {
@@ -641,14 +642,19 @@ impl FilesystemRepository {
             };
         }
 
-        let install_path = if (package.as_any() as &dyn Any)
+        let install_path = if package
+            .as_any()
             .downcast_ref::<dyn RootPackageInterface>()
             .is_some()
         {
-            let to = self.filesystem.normalize_path(
+            let to = self.filesystem.borrow_mut().normalize_path(
                 &realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
             );
-            Some(self.filesystem.find_shortest_path(repo_dir, &to, true))
+            Some(
+                self.filesystem
+                    .borrow_mut()
+                    .find_shortest_path(repo_dir, &to, true),
+            )
         } else {
             install_paths.get(package.get_name()).cloned().flatten()
         };

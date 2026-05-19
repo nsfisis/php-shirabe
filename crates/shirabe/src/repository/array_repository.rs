@@ -53,10 +53,7 @@ impl ArrayRepository {
     /// Adds a new package to the repository
     pub fn add_package(&self, package: Box<dyn PackageInterface>) -> Result<()> {
         // PHP: if (!$package instanceof BasePackage) throw new \InvalidArgumentException(...)
-        if (package.as_any() as &dyn Any)
-            .downcast_ref::<BasePackage>()
-            .is_none()
-        {
+        if package.as_any().downcast_ref::<dyn BasePackage>().is_none() {
             return Err(InvalidArgumentException {
                 message: "Only subclasses of BasePackage are supported".to_string(),
                 code: 0,
@@ -74,7 +71,7 @@ impl ArrayRepository {
         package.set_repository(todo!("self as Box<dyn RepositoryInterface>"))?;
 
         let aliased_package: Option<Box<dyn BasePackage>> =
-            if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                 Some(alias.get_alias_of().clone_box())
             } else {
                 None
@@ -101,14 +98,11 @@ impl ArrayRepository {
         alias: String,
         pretty_alias: String,
     ) -> Box<dyn BasePackage> {
-        while let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+        while let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
             package = alias_pkg.get_alias_of().clone_box();
         }
 
-        if (package.as_any() as &dyn Any)
-            .downcast_ref::<CompletePackage>()
-            .is_some()
-        {
+        if package.as_any().downcast_ref::<CompletePackage>().is_some() {
             // TODO(phase-b): construct CompleteAliasPackage/AliasPackage and return as Box<BasePackage>
             return todo!("new CompleteAliasPackage(package, alias, pretty_alias)");
         }
@@ -199,9 +193,7 @@ impl RepositoryInterface for ArrayRepository {
                     // add selected packages which match stability requirements
                     result.insert(spl_object_hash(package.as_ref()), package.clone_box());
                     // add the aliased package for packages where the alias matches
-                    if let Some(alias) =
-                        (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
-                    {
+                    if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                         let aliased = alias.get_alias_of();
                         if !result.contains_key(&spl_object_hash(aliased.as_ref())) {
                             result.insert(spl_object_hash(aliased.as_ref()), aliased.clone_box());
@@ -218,7 +210,7 @@ impl RepositoryInterface for ArrayRepository {
 
         // add aliases of packages that were selected, even if the aliases did not match
         for package in &packages {
-            if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                 let aliased = alias.get_alias_of();
                 if result.contains_key(&spl_object_hash(aliased.as_ref())) {
                     result.insert(spl_object_hash(package.as_ref()), package.clone_box());
@@ -234,17 +226,16 @@ impl RepositoryInterface for ArrayRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
-        let name = strtolower(&name);
+        let name = strtolower(name);
 
         let constraint: Box<dyn ConstraintInterface> = match constraint {
             FindPackageConstraint::Constraint(c) => c,
             FindPackageConstraint::String(s) => {
                 let version_parser = VersionParser::new();
-                // TODO(phase-b): Arc<dyn ConstraintInterface + Send + Sync> -> Box<dyn ConstraintInterface>
-                Box::new(version_parser.parse_constraints(&s).unwrap())
+                version_parser.parse_constraints(&s).unwrap().clone_box()
             }
         };
 
@@ -262,11 +253,11 @@ impl RepositoryInterface for ArrayRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         // normalize name
-        let name = strtolower(&name);
+        let name = strtolower(name);
         let mut packages = vec![];
 
         let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
@@ -274,8 +265,7 @@ impl RepositoryInterface for ArrayRepository {
             Some(FindPackageConstraint::Constraint(c)) => Some(c),
             Some(FindPackageConstraint::String(s)) => {
                 let version_parser = VersionParser::new();
-                // TODO(phase-b): Arc<dyn ConstraintInterface + Send + Sync> -> Box<dyn ConstraintInterface>
-                Some(Box::new(version_parser.parse_constraints(&s).unwrap()))
+                Some(version_parser.parse_constraints(&s).unwrap().clone_box())
             }
         };
 
@@ -296,7 +286,7 @@ impl RepositoryInterface for ArrayRepository {
     }
 
     fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
-        let regex = if mode == Self::SEARCH_FULLTEXT {
+        let regex = if mode == crate::repository::repository_interface::SEARCH_FULLTEXT {
             format!(
                 "{{(?:{})}}i",
                 implode("|", &Preg::split("{\\s+}", &preg_quote(&query, None)))
@@ -309,7 +299,7 @@ impl RepositoryInterface for ArrayRepository {
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
         for package in self.get_packages() {
             let mut name = PackageInterface::get_name(package.as_ref()).to_string();
-            if mode == Self::SEARCH_VENDOR {
+            if mode == crate::repository::repository_interface::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
                 let parts: Vec<&str> = name.splitn(2, '/').collect();
                 name = parts[0].to_string();
@@ -323,9 +313,9 @@ impl RepositoryInterface for ArrayRepository {
                 }
             }
 
-            let complete = (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
+            let complete = package.as_any().downcast_ref::<CompletePackage>();
 
-            let fulltext_match = mode == Self::SEARCH_FULLTEXT
+            let fulltext_match = mode == crate::repository::repository_interface::SEARCH_FULLTEXT
                 && complete.is_some()
                 && Preg::is_match(
                     &regex,
@@ -334,10 +324,11 @@ impl RepositoryInterface for ArrayRepository {
                         implode(" ", &complete.unwrap().get_keywords()),
                         complete.unwrap().get_description().unwrap_or("")
                     ),
-                );
+                )
+                .unwrap_or(false);
 
-            if Preg::is_match(&regex, &name) || fulltext_match {
-                if mode == Self::SEARCH_VENDOR {
+            if Preg::is_match(&regex, &name).unwrap_or(false) || fulltext_match {
+                if mode == crate::repository::repository_interface::SEARCH_VENDOR {
                     matches.insert(
                         name.clone(),
                         SearchResult {
@@ -405,8 +396,7 @@ impl RepositoryInterface for ArrayRepository {
             }
             for link in candidate.get_provides().values() {
                 if package_name == link.get_target() {
-                    let complete =
-                        (candidate.as_any() as &dyn Any).downcast_ref::<CompletePackage>();
+                    let complete = candidate.as_any().downcast_ref::<CompletePackage>();
                     let description = complete.and_then(|c| c.get_description().map(String::from));
                     result.insert(
                         PackageInterface::get_name(candidate.as_ref()).to_string(),

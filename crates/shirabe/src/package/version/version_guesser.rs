@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::process::process::Process;
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
@@ -28,10 +28,10 @@ use crate::util::svn::Svn as SvnUtil;
 #[derive(Debug)]
 pub struct VersionGuesser {
     /// @var Config
-    config: Config,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
 
     /// @var ProcessExecutor
-    process: ProcessExecutor,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 
     /// @var SemverVersionParser
     version_parser: SemverVersionParser,
@@ -52,8 +52,8 @@ pub struct VersionData {
 
 impl VersionGuesser {
     pub fn new(
-        config: Config,
-        process: ProcessExecutor,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: SemverVersionParser,
         io: Option<Box<dyn IOInterface>>,
     ) -> Self {
@@ -130,6 +130,7 @@ impl VersionGuesser {
 
         if "-dev" == substr(version_data.version.as_deref().unwrap_or(""), -4, None)
             && Preg::is_match(r"{\.9{7}}", version_data.version.as_deref().unwrap_or(""))
+                .unwrap_or(false)
         {
             version_data.pretty_version = Some(Preg::replace(
                 r"{(\.9{7})+}",
@@ -154,6 +155,7 @@ impl VersionGuesser {
                 r"{\.9{7}}",
                 version_data.feature_version.as_deref().unwrap_or(""),
             )
+            .unwrap_or(false)
         {
             version_data.feature_pretty_version = Some(Preg::replace(
                 r"{(\.9{7})+}",
@@ -183,7 +185,7 @@ impl VersionGuesser {
 
         // try to fetch current version from git branch
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "branch".to_string(),
@@ -199,14 +201,24 @@ impl VersionGuesser {
             let mut is_feature_branch = false;
 
             // find current branch and collect all branch names
-            for branch in self.process.split_lines(&output) {
+            for branch in self.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    if let Some(m) = Preg::is_match_strict_groups(
+                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}",
                         &branch,
-                    ) {
-                        let g1 = m.get(1).cloned().unwrap_or_default();
-                        let g2 = m.get(2).cloned().unwrap_or_default();
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let g1 = m
+                            .get(&CaptureKey::ByIndex(1))
+                            .cloned()
+                            .unwrap_or_default();
+                        let g2 = m
+                            .get(&CaptureKey::ByIndex(2))
+                            .cloned()
+                            .unwrap_or_default();
                         if g1 == "(no branch)"
                             || strpos(&g1, "(detached ") == Some(0)
                             || strpos(&g1, "(HEAD detached at") == Some(0)
@@ -225,14 +237,20 @@ impl VersionGuesser {
                     }
                 }
 
-                if !branch.is_empty()
-                    && Preg::is_match_strict_groups(r"{^ *.+/HEAD }", &branch).is_none()
-                {
-                    if let Some(m) = Preg::is_match_strict_groups(
+                if !branch.is_empty() && {
+                    let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
+                    !Preg::is_match_strict_groups3(r"{^ *.+/HEAD }", &branch, Some(&mut tmp))
+                        .unwrap_or(false)
+                } {
+                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::is_match_strict_groups3(
                         r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}",
                         &branch,
-                    ) {
-                        branches.push(m.get(1).cloned().unwrap_or_default());
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false)
+                    {
+                        branches.push(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
                     }
                 }
             }
@@ -258,7 +276,7 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            &self.process.get_error_output(),
+            &self.process.borrow().get_error_output(),
             path,
             self.io.as_deref(),
         );
@@ -293,10 +311,11 @@ impl VersionGuesser {
                 .unwrap_or_default(),
             );
             let mut command_output = String::new();
-            if 0 == self
-                .process
-                .execute(&command, &mut command_output, Some(path.to_string()))
-            {
+            if 0 == self.process.borrow_mut().execute_args(
+                &command,
+                &mut command_output,
+                Some(path.to_string()),
+            ) {
                 let parsed = trim(
                     &GitUtil::parse_rev_list_output(&command_output, &self.process),
                     None,
@@ -322,7 +341,7 @@ impl VersionGuesser {
     fn version_from_git_tags(&mut self, path: &str) -> Result<Option<(String, String)>> {
         // try to fetch current version from git tags
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "describe".to_string(),
@@ -352,7 +371,7 @@ impl VersionGuesser {
     ) -> Result<Option<VersionData>> {
         // try to fetch current version from hg branch
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &["hg".to_string(), "branch".to_string()],
             &mut output,
             Some(path.to_string()),
@@ -392,8 +411,7 @@ impl VersionGuesser {
                 self.config.clone(),
                 // TODO(phase-b): HttpDownloader::new signature
                 todo!("HttpDownloader::new(io, config)"),
-                // TODO(phase-b): clone ProcessExecutor
-                todo!("self.process.clone()"),
+                std::rc::Rc::clone(&self.process),
             );
             let branches: Vec<String> =
                 array_map(|k: &String| k.clone(), &array_keys(driver.get_branches()));
@@ -495,7 +513,7 @@ impl VersionGuesser {
 
             let mut promises: Vec<Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>> =
                 vec![];
-            self.process.set_max_jobs(30);
+            self.process.borrow_mut().set_max_jobs(30);
             // TODO(phase-b): try/finally with resetMaxJobs
             let result: Result<()> = (|| -> Result<()> {
                 let mut last_index: i64 = -1;
@@ -519,7 +537,7 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let async_promise = self.process.execute_async(&cmd_line, path);
+                    let async_promise = self.process.borrow_mut().execute_async(&cmd_line, path);
                     promises.push(async_promise.then(Box::new(
                         move |process: Process| -> Result<()> {
                             if !process.is_successful() {
@@ -538,10 +556,10 @@ impl VersionGuesser {
                     )));
                 }
 
-                self.process.wait();
+                self.process.borrow_mut().wait();
                 Ok(())
             })();
-            self.process.reset_max_jobs();
+            self.process.borrow_mut().reset_max_jobs();
             result?;
         }
 
@@ -571,13 +589,11 @@ impl VersionGuesser {
             non_feature_branches = implode("|", &names);
         }
 
-        !Preg::is_match(
-            &format!(
-                r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
-                non_feature_branches,
-            ),
-            branch_name.unwrap_or(""),
-        )
+        !Preg::is_match(&format!(
+            r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
+            non_feature_branches,
+        ), branch_name.unwrap_or("")).unwrap_or(false)
+        .unwrap_or(false)
     }
 
     /// @return array{version: string|null, commit: '', pretty_version: string|null}
@@ -587,7 +603,7 @@ impl VersionGuesser {
 
         // try to fetch current version from fossil
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &[
                 "fossil".to_string(),
                 "branch".to_string(),
@@ -603,7 +619,7 @@ impl VersionGuesser {
 
         // try to fetch current version from fossil tags
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &["fossil".to_string(), "tag".to_string(), "list".to_string()],
             &mut output,
             Some(path.to_string()),
@@ -639,7 +655,7 @@ impl VersionGuesser {
 
         // try to fetch current version from svn
         let mut output = String::new();
-        if 0 == self.process.execute(
+        if 0 == self.process.borrow_mut().execute_args(
             &["svn".to_string(), "info".to_string(), "--xml".to_string()],
             &mut output,
             Some(path.to_string()),
@@ -720,8 +736,14 @@ impl VersionGuesser {
                 .into());
             }
         };
-        if let Some(m) = Preg::is_match_strict_groups(r"{^(\d+(?:\.\d+)*)-dev$}i", &version) {
-            return Ok(format!("{}.x-dev", m.get(1).cloned().unwrap_or_default()));
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(r"{^(\d+(?:\.\d+)*)-dev$}i", &version, Some(&mut m))
+            .unwrap_or(false)
+        {
+            return Ok(format!(
+                "{}.x-dev",
+                m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()
+            ));
         }
 
         Ok(version)

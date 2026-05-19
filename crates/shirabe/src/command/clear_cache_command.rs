@@ -4,8 +4,8 @@ use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandD
 use crate::composer::Composer;
 use crate::factory::Factory;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {

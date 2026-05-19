@@ -23,7 +23,7 @@ impl PluginInstaller {
     pub fn new(
         io: Box<dyn IOInterface>,
         composer: PartialComposer,
-        fs: Option<Filesystem>,
+        fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
         Self {

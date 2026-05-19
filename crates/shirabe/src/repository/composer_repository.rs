@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::metadata_minifier::metadata_minifier::MetadataMinifier;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, LogicException,
@@ -84,7 +84,7 @@ pub struct ComposerRepository {
     /// non-empty-string
     base_url: String,
     io: Box<dyn IOInterface>,
-    http_downloader: HttpDownloader,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     pub(crate) cache: Cache,
     pub(crate) notify_url: Option<String>,
@@ -148,7 +148,7 @@ impl ComposerRepository {
         mut repo_config: IndexMap<String, PhpMixed>,
         io: Box<dyn IOInterface>,
         config: &Config,
-        http_downloader: HttpDownloader,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<EventDispatcher>,
     ) -> anyhow::Result<Self> {
         // parent::__construct();
@@ -246,13 +246,16 @@ impl ComposerRepository {
             .to_string();
 
         // force url for packagist.org to repo.packagist.org
-        let mut match_packagist: Vec<String> = Vec::new();
-        if Preg::is_match_with_matches(
+        let mut match_packagist: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3(
             r"{^(?P<proto>https?)://packagist\.org/?$}i",
             &url,
-            &mut match_packagist,
+            Some(&mut match_packagist),
         )? {
-            let proto = match_packagist.get(1).cloned().unwrap_or_default();
+            let proto = match_packagist
+                .get(&CaptureKey::ByName("proto".to_string()))
+                .cloned()
+                .unwrap_or_default();
             url = format!("{}://repo.packagist.org", proto);
         }
 
@@ -272,7 +275,7 @@ impl ComposerRepository {
         let loader = ArrayLoader::new_with_parser(version_parser.clone());
 
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-            http_downloader.clone(),
+            std::rc::Rc::clone(&http_downloader),
             None,
         )));
 
@@ -336,10 +339,10 @@ impl ComposerRepository {
 
         let name = strtolower(&name);
         let constraint: Box<dyn ConstraintInterface> = match constraint {
-            PhpMixed::String(s) => self.version_parser.parse_constraints(&s)?,
+            PhpMixed::String(s) => self.version_parser.parse_constraints(&s)?.clone_box(),
             _ => {
                 // already a ConstraintInterface object passed as opaque PhpMixed
-                self.version_parser.parse_constraints("")?
+                self.version_parser.parse_constraints("")?.clone_box()
             }
         };
 
@@ -393,7 +396,10 @@ impl ComposerRepository {
             return Ok(None);
         }
 
-        Ok(self.inner.find_package(name, Some(constraint)))
+        Ok(self.inner.find_package(
+            &name,
+            crate::repository::repository_interface::FindPackageConstraint::Constraint(constraint),
+        ))
     }
 
     /// @inheritDoc
@@ -408,7 +414,9 @@ impl ComposerRepository {
         let name = strtolower(&name);
         let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
             None => None,
-            Some(PhpMixed::String(s)) => Some(self.version_parser.parse_constraints(&s)?),
+            Some(PhpMixed::String(s)) => {
+                Some(self.version_parser.parse_constraints(&s)?.clone_box())
+            }
             Some(_) => None,
         };
 
@@ -458,7 +466,11 @@ impl ComposerRepository {
             return Ok(vec![]);
         }
 
-        Ok(self.inner.find_packages(name, constraint))
+        Ok(self.inner.find_packages(
+            &name,
+            constraint
+                .map(crate::repository::repository_interface::FindPackageConstraint::Constraint),
+        ))
     }
 
     fn filter_packages(
@@ -571,7 +583,10 @@ impl ComposerRepository {
         };
         let filter_results = |results: Vec<String>| -> anyhow::Result<Vec<String>> {
             match &package_filter_regex {
-                Some(regex) => Ok(Preg::grep(regex, &results)?),
+                Some(regex) => {
+                    let results_refs: Vec<&str> = results.iter().map(|s| s.as_str()).collect();
+                    Ok(Preg::grep(regex, &results_refs)?)
+                }
                 None => Ok(results),
             }
         };
@@ -658,6 +673,7 @@ impl ComposerRepository {
                 url.push_str(&format!("?filter={}", urlencode(filter)));
                 let result = self
                     .http_downloader
+                    .borrow_mut()
                     .get(&url, &self.options)?
                     .decode_json()?;
                 let package_names: Vec<String> = result
@@ -689,6 +705,7 @@ impl ComposerRepository {
 
         let result = self
             .http_downloader
+            .borrow_mut()
             .get(&url, &self.options)?
             .decode_json()?;
         let package_names: Vec<String> = result
@@ -914,15 +931,21 @@ impl ComposerRepository {
 
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
-            let mut match_groups: Vec<String> = Vec::new();
-            if Preg::is_match_strict_groups(
+            let mut match_groups: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(
                 r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i",
                 &query,
-                &mut match_groups,
+                Some(&mut match_groups),
             )? && self.list_url.is_some()
             {
-                let q = match_groups.get(1).cloned().unwrap_or_default();
-                let vendor = match_groups.get(2).cloned().unwrap_or_default();
+                let q = match_groups
+                    .get(&CaptureKey::ByName("query".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
+                let vendor = match_groups
+                    .get(&CaptureKey::ByName("vendor".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
                 let url = format!(
                     "{}?vendor={}&filter={}",
                     self.list_url.as_ref().unwrap(),
@@ -931,6 +954,7 @@ impl ComposerRepository {
                 );
                 let result = self
                     .http_downloader
+                    .borrow_mut()
                     .get(&url, &self.options)?
                     .decode_json()?;
 
@@ -1179,7 +1203,7 @@ impl ComposerRepository {
                     http_map.insert("content".to_string(), Box::new(PhpMixed::String(body)));
                 }
 
-                let response = self.http_downloader.get(&api_url, &options)?;
+                let response = self.http_downloader.borrow_mut().get(&api_url, &options)?;
                 let mut warned = false;
                 let decoded = response.decode_json()?;
                 let advisories_response = decoded
@@ -1245,7 +1269,7 @@ impl ComposerRepository {
         let mut result: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
 
         if let Some(providers_api_url) = self.providers_api_url.clone() {
-            let api_result = match self.http_downloader.get(
+            let api_result = match self.http_downloader.borrow_mut().get(
                 &providers_api_url.replace("%package%", package_name),
                 &self.options,
             ) {
@@ -2514,11 +2538,14 @@ impl ComposerRepository {
         }
 
         if url.starts_with('/') {
-            let mut matches: Vec<String> = Vec::new();
-            if Preg::is_match_with_matches(r"{^[^:]++://[^/]*+}", &self.url, &mut matches)? {
+            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match3(r"{^[^:]++://[^/]*+}", &self.url, Some(&mut matches))? {
                 return Ok(format!(
                     "{}{}",
-                    matches.get(0).cloned().unwrap_or_default(),
+                    matches
+                        .get(&CaptureKey::ByIndex(0))
+                        .cloned()
+                        .unwrap_or_default(),
                     url
                 ));
             }
@@ -2823,7 +2850,7 @@ impl ComposerRepository {
                 if let Some(dispatcher) = self.event_dispatcher.as_mut() {
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
                         PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                        &self.http_downloader,
+                        std::rc::Rc::clone(&self.http_downloader),
                         filename.clone(),
                         "metadata".to_string(),
                         {
@@ -2842,7 +2869,7 @@ impl ComposerRepository {
                     options = pre_file_download_event.get_transport_options();
                 }
 
-                let response = self.http_downloader.get(&filename, &options)?;
+                let response = self.http_downloader.borrow_mut().get(&filename, &options)?;
                 let mut json = response.get_body().to_string();
                 if let Some(sha256_val) = sha256 {
                     if sha256_val != hash("sha256", &json) {
@@ -3004,7 +3031,7 @@ impl ComposerRepository {
             if let Some(dispatcher) = self.event_dispatcher.as_mut() {
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
                     PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                    &self.http_downloader,
+                    std::rc::Rc::clone(&self.http_downloader),
                     filename.clone(),
                     "metadata".to_string(),
                     {
@@ -3048,7 +3075,7 @@ impl ComposerRepository {
                 http_map.insert("header".to_string(), Box::new(PhpMixed::List(headers)));
             }
 
-            let response = self.http_downloader.get(&filename, &options)?;
+            let response = self.http_downloader.borrow_mut().get(&filename, &options)?;
             let mut json = response.get_body().to_string();
             if json.is_empty() && response.get_status_code() == 304 {
                 return Ok(FetchFileIfLastModifiedResult::NotModified);
@@ -3159,7 +3186,7 @@ impl ComposerRepository {
         if let Some(dispatcher) = self.event_dispatcher.as_mut() {
             let mut pre_file_download_event = PreFileDownloadEvent::new(
                 PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                &self.http_downloader,
+                std::rc::Rc::clone(&self.http_downloader),
                 filename.clone(),
                 "metadata".to_string(),
                 {
@@ -3332,7 +3359,7 @@ impl ComposerRepository {
             }
         };
 
-        let initial = self.http_downloader.add(&filename, &options)?;
+        let initial = self.http_downloader.borrow_mut().add(&filename, &options)?;
         Ok(initial.then_with_reject_boxed(Box::new(accept), Box::new(reject)))
     }
 

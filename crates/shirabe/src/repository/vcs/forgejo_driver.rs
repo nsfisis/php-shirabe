@@ -3,7 +3,7 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
 };
@@ -15,6 +15,7 @@ use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
 use crate::repository::vcs::git_driver::GitDriver;
 use crate::repository::vcs::vcs_driver::VcsDriverBase;
+use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
 use crate::util::forgejo::Forgejo;
 use crate::util::forgejo_repository_data::ForgejoRepositoryData;
 use crate::util::forgejo_url::ForgejoUrl;
@@ -39,6 +40,7 @@ impl ForgejoDriver {
             "{}/{}/{}/{}",
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-repo-dir")
                 .as_string()
                 .unwrap_or(""),
@@ -53,6 +55,7 @@ impl ForgejoDriver {
             c.set_read_only(
                 self.inner
                     .config
+                    .borrow_mut()
                     .get("cache-read-only")
                     .as_bool()
                     .unwrap_or(false),
@@ -313,7 +316,7 @@ impl ForgejoDriver {
         identifier: &str,
     ) -> Result<Option<IndexMap<String, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
-            return git_driver.inner.get_composer_information(identifier);
+            return git_driver.get_composer_information(identifier);
         }
 
         if !self.inner.info_cache.contains_key(identifier) {
@@ -321,7 +324,12 @@ impl ForgejoDriver {
                 if let Some(res) = self.inner.cache.as_ref().and_then(|c| c.read(identifier)) {
                     JsonFile::parse_json(&res, None)?
                 } else {
-                    let c = self.inner.get_base_composer_information(identifier)?;
+                    let file_content = self.get_file_content("composer.json", identifier)?;
+                    let c = VcsDriverBase::finish_base_composer_information(
+                        identifier,
+                        file_content,
+                        || self.get_change_date(identifier),
+                    )?;
                     if self.inner.should_cache(identifier) {
                         if let Some(ref composer_map) = c {
                             let encoded = JsonFile::encode_with_options(
@@ -338,7 +346,10 @@ impl ForgejoDriver {
                     c
                 }
             } else {
-                self.inner.get_base_composer_information(identifier)?
+                let file_content = self.get_file_content("composer.json", identifier)?;
+                VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
+                    self.get_change_date(identifier)
+                })?
             };
 
             let mut composer = composer;
@@ -484,11 +495,11 @@ impl ForgejoDriver {
         }
 
         if !extension_loaded("openssl") {
-            io.write_error(
-                PhpMixed::String(format!(
+            io.write_error3(
+                &format!(
                     "Skipping Forgejo driver for {} because the OpenSSL PHP extension is missing.",
                     url
-                )),
+                ),
                 true,
                 io_interface::VERBOSE,
             );
@@ -510,7 +521,7 @@ impl ForgejoDriver {
                 todo!("clone io for GitDriver setup"),
                 self.inner.config.clone(),
                 self.inner.http_downloader.clone(),
-                self.inner.process.clone(),
+                std::rc::Rc::clone(&self.inner.process),
             ),
             tags: None,
             branches: None,
@@ -556,8 +567,11 @@ impl ForgejoDriver {
 
         let links = explode(",", &header);
         for link in links {
-            if let Some(m) = Preg::match_strict_groups(r#"{<(.+?)>; *rel="next"}"#, &link) {
-                if let Some(url) = m.get("1") {
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::match_strict_groups3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m))
+                .unwrap_or(false)
+            {
+                if let Some(url) = m.get(&CaptureKey::ByIndex(1)) {
                     return Some(url.clone());
                 }
             }
@@ -650,14 +664,10 @@ impl ForgejoDriver {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
-                        "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
-                        ssh_url
-                    )),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner.io.write_error3(&format!(
+                    "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
+                    ssh_url
+                ), true, io_interface::NORMAL);
                 Err(e)
             }
         }

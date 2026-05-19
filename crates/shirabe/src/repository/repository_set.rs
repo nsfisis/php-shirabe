@@ -180,18 +180,17 @@ impl RepositorySet {
             .into());
         }
 
-        let repos: Vec<Box<dyn RepositoryInterface>> = if let Some(composite) =
-            (repo.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
-        {
-            // TODO(phase-b): clone composite.get_repositories() — Box<dyn RepositoryInterface> cloning
-            composite
-                .get_repositories()
-                .iter()
-                .map(|r| r.clone_box())
-                .collect()
-        } else {
-            vec![repo]
-        };
+        let repos: Vec<Box<dyn RepositoryInterface>> =
+            if let Some(composite) = repo.as_any().downcast_ref::<CompositeRepository>() {
+                // TODO(phase-b): clone composite.get_repositories() — Box<dyn RepositoryInterface> cloning
+                composite
+                    .get_repositories()
+                    .iter()
+                    .map(|r| r.clone_box())
+                    .collect()
+            } else {
+                vec![repo]
+            };
 
         for repo in repos {
             self.repositories.push(repo);
@@ -321,7 +320,7 @@ impl RepositorySet {
         let mut map: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
-            if let Some(alias) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                 if alias.is_root_package_alias() {
                     continue;
                 }
@@ -475,10 +474,12 @@ impl RepositorySet {
         pool_builder.set_allowed_types(allowed_types);
 
         for repo in &self.repositories {
-            let is_installed = (repo.as_any() as &dyn Any)
+            let is_installed = repo
+                .as_any()
                 .downcast_ref::<dyn InstalledRepositoryInterface>()
                 .is_some()
-                || (repo.as_any() as &dyn Any)
+                || repo
+                    .as_any()
                     .downcast_ref::<InstalledRepository>()
                     .is_some();
             if is_installed && !self.allow_installed_repositories {
@@ -500,10 +501,12 @@ impl RepositorySet {
     /// Create a pool for dependency resolution from the packages in this repository set.
     pub fn create_pool_with_all_packages(&mut self) -> Result<Pool> {
         for repo in &self.repositories {
-            let is_installed = (repo.as_any() as &dyn Any)
+            let is_installed = repo
+                .as_any()
                 .downcast_ref::<dyn InstalledRepositoryInterface>()
                 .is_some()
-                || (repo.as_any() as &dyn Any)
+                || repo
+                    .as_any()
                     .downcast_ref::<InstalledRepository>()
                     .is_some();
             if is_installed && !self.allow_installed_repositories {
@@ -527,12 +530,12 @@ impl RepositorySet {
 
                 if let Some(versions) = self.root_aliases.get(&name) {
                     if let Some(alias) = versions.get(&version) {
-                        while let Some(alias_pkg) =
-                            (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>()
+                        while let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>()
                         {
                             package = alias_pkg.get_alias_of().clone_box();
                         }
-                        let alias_package: Box<dyn BasePackage> = if (package.as_any() as &dyn Any)
+                        let alias_package: Box<dyn BasePackage> = if package
+                            .as_any()
                             .downcast_ref::<CompletePackage>()
                             .is_some()
                         {

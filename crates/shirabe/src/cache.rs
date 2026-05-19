@@ -23,7 +23,7 @@ pub struct Cache {
     root: String,
     enabled: Option<bool>,
     allowlist: String,
-    filesystem: Filesystem,
+    filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     read_only: bool,
 }
 
@@ -39,12 +39,13 @@ impl Cache {
         io: Box<dyn IOInterface>,
         cache_dir: &str,
         allowlist: Option<&str>,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         read_only: bool,
     ) -> Self {
         let allowlist = allowlist.unwrap_or("a-z0-9._").to_string();
         let root = format!("{}/", cache_dir.trim_end_matches(|c| c == '/' || c == '\\'));
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
+        let filesystem = filesystem
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let mut this = Self {
             io,
             root,
@@ -152,6 +153,7 @@ impl Cache {
                 .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             self.filesystem
+                .borrow_mut()
                 .ensure_directory_exists(&dirname(&full_path));
 
             if !file_exists(source) {
@@ -164,7 +166,11 @@ impl Cache {
                     .write_error(&format!("Writing {} into cache from {}", full_path, source));
             }
 
-            return self.filesystem.copy(source, &full_path).unwrap_or(false);
+            return self
+                .filesystem
+                .borrow_mut()
+                .copy(source, &full_path)
+                .unwrap_or(false);
         }
 
         false
@@ -197,7 +203,7 @@ impl Cache {
                 self.io
                     .write_error(&format!("Reading {} from cache", full_path));
 
-                return self.filesystem.copy(&full_path, target);
+                return self.filesystem.borrow_mut().copy(&full_path, target);
             }
         }
 
@@ -228,7 +234,11 @@ impl Cache {
                 .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                return self.filesystem.unlink(&full_path).unwrap_or(false);
+                return self
+                    .filesystem
+                    .borrow_mut()
+                    .unlink(&full_path)
+                    .unwrap_or(false);
             }
         }
 
@@ -237,7 +247,10 @@ impl Cache {
 
     pub fn clear(&mut self) -> bool {
         if self.is_enabled() && !self.read_only {
-            let _ = self.filesystem.empty_directory(&self.root, true);
+            let _ = self
+                .filesystem
+                .borrow_mut()
+                .empty_directory(&self.root, true);
 
             return true;
         }
@@ -271,16 +284,16 @@ impl Cache {
             let mut finder = self.get_finder();
             finder.date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
             for file in &mut finder {
-                let _ = self.filesystem.unlink(&file.get_pathname());
+                let _ = self.filesystem.borrow_mut().unlink(&file.get_pathname());
             }
 
-            let mut total_size = self.filesystem.size(&self.root).unwrap_or(0);
+            let mut total_size = self.filesystem.borrow_mut().size(&self.root).unwrap_or(0);
             if total_size > max_size {
                 let mut iterator = self.get_finder().sort_by_accessed_time().get_iterator();
                 while total_size > max_size && iterator.valid() {
                     let filepath = iterator.current().get_pathname();
-                    total_size -= self.filesystem.size(&filepath).unwrap_or(0);
-                    let _ = self.filesystem.unlink(&filepath);
+                    total_size -= self.filesystem.borrow_mut().size(&filepath).unwrap_or(0);
+                    let _ = self.filesystem.borrow_mut().unlink(&filepath);
                     iterator.next();
                 }
             }
@@ -305,7 +318,10 @@ impl Cache {
                 .depth(0)
                 .date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
             for file in &mut finder {
-                let _ = self.filesystem.remove_directory(&file.get_pathname());
+                let _ = self
+                    .filesystem
+                    .borrow_mut()
+                    .remove_directory(&file.get_pathname());
             }
 
             *CACHE_COLLECTED.lock().unwrap() = Some(true);

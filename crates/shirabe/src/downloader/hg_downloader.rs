@@ -37,7 +37,11 @@ impl HgDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        let hg_utils = HgUtils::new(&self.inner.io, &self.inner.config, &self.inner.process);
+        let hg_utils = HgUtils::new(
+            &*self.inner.io,
+            &*self.inner.config.borrow(),
+            &self.inner.process,
+        );
 
         let path_clone = path.clone();
         let clone_command = move |url: String| -> Vec<String> {
@@ -58,7 +62,7 @@ impl HgDownloader {
             package.get_source_reference().unwrap_or_default(),
         ];
         let mut ignored_output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &command,
             &mut ignored_output,
             shirabe_php_shim::realpath(&path),
@@ -68,7 +72,7 @@ impl HgDownloader {
                 message: format!(
                     "Failed to execute {}\n\n{}",
                     command.join(" "),
-                    self.inner.process.get_error_output()
+                    self.inner.process.borrow().get_error_output()
                 ),
                 code: 0,
             }
@@ -85,7 +89,11 @@ impl HgDownloader {
         path: String,
         url: String,
     ) -> Result<Box<dyn PromiseInterface>> {
-        let hg_utils = HgUtils::new(&self.inner.io, &self.inner.config, &self.inner.process);
+        let hg_utils = HgUtils::new(
+            &*self.inner.io,
+            &*self.inner.config.borrow(),
+            &self.inner.process,
+        );
 
         let ref_ = target.get_source_reference().unwrap_or_default();
         self.inner.io.write_error(&format!(
@@ -132,7 +140,7 @@ impl HgDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &["hg".to_string(), "st".to_string()],
             &mut output,
             shirabe_php_shim::realpath(&path),
@@ -163,17 +171,17 @@ impl HgDownloader {
         ];
 
         let mut output = String::new();
-        if self
-            .inner
-            .process
-            .execute(&command, &mut output, shirabe_php_shim::realpath(&path))
-            != 0
+        if self.inner.process.borrow_mut().execute_args(
+            &command,
+            &mut output,
+            shirabe_php_shim::realpath(&path),
+        ) != 0
         {
             return Err(RuntimeException {
                 message: format!(
                     "Failed to execute {}\n\n{}",
                     command.join(" "),
-                    self.inner.process.get_error_output()
+                    self.inner.process.borrow().get_error_output()
                 ),
                 code: 0,
             }

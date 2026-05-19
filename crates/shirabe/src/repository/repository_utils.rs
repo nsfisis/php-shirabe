@@ -23,7 +23,7 @@ impl RepositoryUtils {
         }
 
         for candidate in packages {
-            for name in candidate.get_names() {
+            for name in candidate.get_names(true) {
                 if requires.contains_key(&name) {
                     let already_in_bucket = bucket.iter().any(|b| {
                         std::ptr::eq(
@@ -52,10 +52,8 @@ impl RepositoryUtils {
         unwrap_filter_repos: bool,
     ) -> Vec<Box<dyn RepositoryInterface>> {
         let repo: Box<dyn RepositoryInterface> = if unwrap_filter_repos {
-            if let Some(filter_repo) =
-                (repo.as_any() as &dyn Any).downcast_ref::<FilterRepository>()
-            {
-                filter_repo.get_repository()
+            if let Some(filter_repo) = repo.as_any().downcast_ref::<FilterRepository>() {
+                filter_repo.get_repository().clone_box()
             } else {
                 repo
             }
@@ -63,12 +61,10 @@ impl RepositoryUtils {
             repo
         };
 
-        if let Some(composite_repo) =
-            (repo.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
-        {
+        if let Some(composite_repo) = repo.as_any().downcast_ref::<CompositeRepository>() {
             let mut repos = Vec::new();
             for r in composite_repo.get_repositories() {
-                for r2 in Self::flatten_repositories(r, unwrap_filter_repos) {
+                for r2 in Self::flatten_repositories(r.clone_box(), unwrap_filter_repos) {
                     repos.push(r2);
                 }
             }

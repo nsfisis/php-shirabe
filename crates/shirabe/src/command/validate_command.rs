@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
@@ -25,62 +25,78 @@ impl ValidateCommand {
     pub fn configure(&mut self) {
         self.set_name("validate")
             .set_description("Validates a composer.json and composer.lock")
-            .set_definition(vec![
+            .set_definition(&[
                 InputOption::new(
                     "no-check-all",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Do not validate requires for overly strict/loose constraints",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "check-lock",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Check if lock file is up to date (even when config.lock is false)",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-check-lock",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Do not check if lock file is up to date",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-check-publish",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Do not check for publish errors",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-check-version",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Do not report a warning if the version field is present",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "with-dependencies",
                     Some(shirabe_php_shim::PhpMixed::String("A".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Also validate the composer.json of all installed dependencies",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "strict",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Return a non-zero exit code for warnings as well as errors",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputArgument::new(
                     "file",
                     Some(InputArgument::OPTIONAL),
                     "path to composer.json file",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "The validate command validates a given composer.json and composer.lock\n\n\
@@ -136,15 +152,20 @@ impl ValidateCommand {
         let mut lock_errors: Vec<String> = vec![];
         let composer = self.create_composer_instance(input, io, vec![])?;
         let check_lock = (check_lock
-            && composer.get_config().get("lock").as_bool().unwrap_or(true))
+            && composer
+                .get_config()
+                .borrow_mut()
+                .get("lock")
+                .as_bool()
+                .unwrap_or(true))
             || input.get_option("check-lock").as_bool().unwrap_or(false);
         let locker = composer.get_locker();
-        if locker.is_locked() && !locker.is_fresh() {
+        if locker.is_locked() && !locker.is_fresh()? {
             lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `composer update` or `composer update <package name>`.".to_string());
         }
 
         if locker.is_locked() {
-            lock_errors.extend(locker.get_missing_requirement_info(composer.get_package(), true));
+            lock_errors.extend(locker.get_missing_requirement_info(composer.get_package(), true)?);
         }
 
         self.output_result(
@@ -214,14 +235,7 @@ impl ValidateCommand {
         }
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(
-            PluginEvents::COMMAND.to_string(),
-            "validate".to_string(),
-            input,
-            output,
-            vec![],
-            vec![],
-        );
+        let command_event = CommandEvent::new(PluginEvents::COMMAND, "validate", input, output);
         let event_code = composer
             .get_event_dispatcher()
             .dispatch(Some(command_event.get_name()), None)?;

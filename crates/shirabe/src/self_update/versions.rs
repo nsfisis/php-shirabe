@@ -12,8 +12,8 @@ use shirabe_php_shim::{
 
 pub struct Versions {
     pub channels: Vec<String>,
-    http_downloader: HttpDownloader,
-    config: Config,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     channel: Option<String>,
     versions_data: Option<PhpMixed>,
 }
@@ -30,7 +30,10 @@ impl Versions {
     pub const CHANNELS: &'static [&'static str] =
         &["stable", "preview", "snapshot", "1", "2", "2.2"];
 
-    pub fn new(config: Config, http_downloader: HttpDownloader) -> Self {
+    pub fn new(
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    ) -> Self {
         Self {
             channels: Self::CHANNELS.iter().map(|s| s.to_string()).collect(),
             http_downloader,
@@ -47,7 +50,11 @@ impl Versions {
 
         let channel_file = format!(
             "{}/update-channel",
-            self.config.get("home").as_string().unwrap_or("")
+            self.config
+                .borrow_mut()
+                .get("home")
+                .as_string()
+                .unwrap_or("")
         );
         if std::path::Path::new(&channel_file).exists() {
             let channel = std::fs::read_to_string(&channel_file)?.trim().to_string();
@@ -79,12 +86,16 @@ impl Versions {
 
         let channel_file = format!(
             "{}/update-channel",
-            self.config.get("home").as_string().unwrap_or("")
+            self.config
+                .borrow_mut()
+                .get("home")
+                .as_string()
+                .unwrap_or("")
         );
         self.channel = Some(channel.clone());
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned
-        let stored_channel = if Preg::is_match(r"^\d+$", &channel) {
+        let stored_channel = if Preg::is_match(r"^\d+$", &channel)? {
             "stable".to_string()
         } else {
             channel.clone()
@@ -148,7 +159,7 @@ impl Versions {
 
     fn get_versions_data(&mut self) -> anyhow::Result<PhpMixed> {
         if self.versions_data.is_none() {
-            let protocol = if self.config.get("disable-tls").as_bool() == Some(true) {
+            let protocol = if self.config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
                 "http"
             } else {
                 "https"
@@ -156,7 +167,11 @@ impl Versions {
 
             self.versions_data = Some(
                 self.http_downloader
-                    .get(&format!("{}://getcomposer.org/versions", protocol))?
+                    .borrow_mut()
+                    .get(
+                        &format!("{}://getcomposer.org/versions", protocol),
+                        IndexMap::new(),
+                    )?
                     .decode_json()?,
             );
         }

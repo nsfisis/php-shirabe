@@ -45,13 +45,13 @@ impl Compiler {
             shirabe_php_shim::unlink(phar_file);
         }
 
-        let process = ProcessExecutor::new(None, None);
+        let process = ProcessExecutor::new(None);
 
         let command = Git::build_rev_list_command(&process, &["-n1", "--format=%H", "HEAD"]);
         let mut output = String::new();
         // PHP: dirname(__DIR__, 2) - going up 2 levels from src/Composer to the repo root
         let repo_root = shirabe_php_shim::dirname_levels(file!(), 2);
-        if process.execute(&command, &mut output, Some(&repo_root)) != 0 {
+        if process.execute_args(&command, &mut output, Some(&repo_root)) != 0 {
             return Err(RuntimeException {
                 message: "Can't run git rev-list. You must ensure to run compile from composer git repository clone and that git binary is available.".to_string(),
                 code: 0,
@@ -63,7 +63,7 @@ impl Compiler {
 
         let command = Git::build_rev_list_command(&process, &["-n1", "--format=%ci", "HEAD"]);
         let mut output = String::new();
-        if process.execute(&command, &mut output, Some(&repo_root)) != 0 {
+        if process.execute_args(&command, &mut output, Some(&repo_root)) != 0 {
             return Err(RuntimeException {
                 message: "Can't run git rev-list. You must ensure to run compile from composer git repository clone and that git binary is available.".to_string(),
                 code: 0,
@@ -77,7 +77,7 @@ impl Compiler {
                 .unwrap_or_else(|_| chrono::Utc::now());
 
         let mut git_describe_output = String::new();
-        if process.execute(
+        if process.execute_args(
             &[
                 "git".to_string(),
                 "describe".to_string(),
@@ -225,11 +225,11 @@ impl Compiler {
         for file in finder.iter() {
             if let Some(index) = array_search(file.get_real_path(), &extra_files) {
                 extra_files.shift_remove(&index);
-            } else if !Preg::is_match(r"{(^LICENSE(?:\.txt)?$|\.php$)}", file.get_filename())? {
+            } else if !Preg::is_match(r"{(^LICENSE(?:\.txt)?$|\.php$)}", &file.get_filename())? {
                 unexpected_files.push(file.to_string());
             }
 
-            if Preg::is_match(r"{\.php[\d.]*$}", file.get_filename())? {
+            if Preg::is_match(r"{\.php[\d.]*$}", &file.get_filename())? {
                 self.add_file(&mut phar, &file, true)?;
             } else {
                 self.add_file(&mut phar, &file, false)?;

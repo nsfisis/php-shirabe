@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::Mutex;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     array_merge_recursive, clearstatcache, count, explode, implode, in_array, is_array,
@@ -28,10 +28,10 @@ use crate::util::url::Url;
 #[derive(Debug)]
 pub struct Git {
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) config: Config,
-    pub(crate) process: ProcessExecutor,
-    pub(crate) filesystem: Filesystem,
-    pub(crate) http_downloader: Option<HttpDownloader>,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    pub(crate) http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
 }
 
 /// @var string|false|null
@@ -40,9 +40,9 @@ static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
 impl Git {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        process: ProcessExecutor,
-        fs: Filesystem,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     ) -> Self {
         Self {
             io,
@@ -73,8 +73,8 @@ impl Git {
                     .into());
                 }
                 Some(io) => {
-                    io.write_error(
-                        PhpMixed::String(format!("<warning>{}</warning>", msg)),
+                    io.write_error3(
+                        &format!("<warning>{}</warning>", msg),
                         true,
                         io_interface::NORMAL,
                     );
@@ -84,7 +84,10 @@ impl Git {
         Ok(())
     }
 
-    pub fn set_http_downloader(&mut self, http_downloader: HttpDownloader) {
+    pub fn set_http_downloader(
+        &mut self,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    ) {
         self.http_downloader = Some(http_downloader);
     }
 
@@ -114,7 +117,7 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", url.to_string()),
+                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url),
                 );
 
                 array_map(
@@ -144,8 +147,11 @@ impl Git {
         let mut last_command: PhpMixed = PhpMixed::String(String::new());
 
         // Ensure we are allowed to use this URL by config
-        self.config
-            .prohibit_url_by_config(url, Some(self.io.as_ref()), &IndexMap::new())?;
+        self.config.borrow_mut().prohibit_url_by_config(
+            url,
+            Some(self.io.as_ref()),
+            &IndexMap::new(),
+        )?;
 
         let orig_cwd: Option<String> = if initial_clone {
             cwd.map(|s| s.to_string())
@@ -184,7 +190,7 @@ impl Git {
                 } else {
                     cwd_string.clone()
                 };
-                status = this_process.execute(&cmd, &mut local_output, exec_cwd);
+                status = this_process.execute_args(&cmd, &mut local_output, exec_cwd);
                 if collect_outputs {
                     outputs.push(local_output);
                 }
@@ -217,36 +223,46 @@ impl Git {
         if !initial_clone {
             // capture username/password from URL if there is one and we have no auth configured yet
             let mut output = String::new();
-            self.process.execute(
+            self.process.borrow_mut().execute_args(
                 &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
                 &mut output,
                 cwd.map(|s| s.to_string()),
             );
-            if let Some(m) = Preg::is_match_strict_groups(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(
                 r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im",
                 &output,
-            ) {
-                let m3 = m.get(3).cloned().unwrap_or_default();
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
+                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m3) {
                     self.io.set_authentication(
                         m3.clone(),
-                        rawurldecode(&m.get(1).cloned().unwrap_or_default()),
-                        Some(rawurldecode(&m.get(2).cloned().unwrap_or_default())),
+                        rawurldecode(&m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()),
+                        Some(rawurldecode(
+                            &m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                        )),
                     );
                 }
             }
         }
 
-        let protocols = self.config.get("github-protocols");
+        let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-        if let Some(m) = Preg::is_match_strict_groups(
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(
             &format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
-                Self::get_github_domains_regex(&self.config)
+                Self::get_github_domains_regex(&*self.config.borrow())
             ),
             url,
-        ) {
+            Some(&mut m),
+        )
+        .unwrap_or(false)
+        {
             let mut messages: Vec<String> = vec![];
             let protocols_list: Vec<String> = match &protocols {
                 PhpMixed::List(l) => l
@@ -256,8 +272,8 @@ impl Git {
                 _ => vec![],
             };
             for protocol in &protocols_list {
-                let m1 = m.get(1).cloned().unwrap_or_default();
-                let m2 = m.get(2).cloned().unwrap_or_default();
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let proto_url = if protocol == "ssh" {
                     format!("git@{}:{}", m1, m2)
                 } else {
@@ -266,7 +282,7 @@ impl Git {
 
                 if run_commands_inline(
                     &proto_url,
-                    &mut self.process,
+                    &mut *self.process.borrow_mut(),
                     &mut last_command,
                     command_output.as_deref_mut(),
                 ) == 0
@@ -276,12 +292,17 @@ impl Git {
                 messages.push(format!(
                     "- {}\n{}",
                     proto_url,
-                    Preg::replace(r"#^#m", "  ", self.process.get_error_output().to_string())
+                    Preg::replace(
+                        r"#^#m",
+                        "  ",
+                        &self.process.borrow().get_error_output().to_string()
+                    )
+                    .unwrap_or_default()
                 ));
 
                 if initial_clone {
                     if let Some(ref orig) = orig_cwd {
-                        self.filesystem.remove_directory(orig);
+                        self.filesystem.borrow_mut().remove_directory(orig);
                     }
                 }
             }
@@ -302,7 +323,7 @@ impl Git {
         }
 
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
-        let protocols_list: Vec<String> = match self.config.get("github-protocols") {
+        let protocols_list: Vec<String> = match self.config.borrow_mut().get("github-protocols") {
             PhpMixed::List(l) => l
                 .iter()
                 .filter_map(|v| v.as_string().map(|s| s.to_string()))
@@ -312,7 +333,7 @@ impl Git {
         let bypass_ssh_for_github = Preg::is_match(
             &format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
-                Self::get_github_domains_regex(&self.config)
+                Self::get_github_domains_regex(&*self.config.borrow())
             ),
             url,
         )
@@ -333,40 +354,43 @@ impl Git {
         if bypass_ssh_for_github
             || 0 != run_commands_inline(
                 url,
-                &mut self.process,
+                &mut *self.process.borrow_mut(),
                 &mut last_command,
                 command_output.as_deref_mut(),
             )
         {
-            let mut error_msg = self.process.get_error_output().to_string();
+            let mut error_msg = self.process.borrow().get_error_output().to_string();
             // private github repository without ssh key access, try https with auth
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-            let github_ssh_match = Preg::is_match_strict_groups(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            let github_matched = Preg::is_match_strict_groups3(
                 &format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
-                    Self::get_github_domains_regex(&self.config)
+                    Self::get_github_domains_regex(&*self.config.borrow())
                 ),
                 url,
-            );
-            let github_https_match = Preg::is_match_strict_groups(
-                &format!(
-                    "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                    Self::get_github_domains_regex(&self.config)
-                ),
-                url,
-            );
-            if let Some(m) = github_ssh_match.or(github_https_match) {
-                let m1 = m.get(1).cloned().unwrap_or_default();
-                let m2 = m.get(2).cloned().unwrap_or_default();
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+                || Preg::is_match_strict_groups3(
+                    &format!(
+                        "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
+                        Self::get_github_domains_regex(&*self.config.borrow())
+                    ),
+                    url,
+                    Some(&mut m),
+                )
+                .unwrap_or(false);
+            if github_matched {
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m1) {
                     let mut git_hub_util = GitHub::new(
-                        self.io.as_ref(),
-                        &self.config,
-                        &self.process,
-                        self.http_downloader
-                            .as_ref()
-                            .unwrap_or(&HttpDownloader::default()),
-                    );
+                        self.io.clone_box(),
+                        std::rc::Rc::clone(&self.config),
+                        Some(std::rc::Rc::clone(&self.process)),
+                        self.http_downloader.clone(),
+                    )?;
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
                     if !git_hub_util.authorize_oauth(&m1) && self.io.is_interactive() {
@@ -396,7 +420,7 @@ impl Git {
                     );
                     if run_commands_inline(
                         &auth_url,
-                        &mut self.process,
+                        &mut *self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -405,27 +429,35 @@ impl Git {
                     }
 
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
-                    error_msg = self.process.get_error_output().to_string();
+                    error_msg = self.process.borrow().get_error_output().to_string();
                 }
-            } else if let Some(m) = Preg::is_match_strict_groups(
-                r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
-                url,
-            )
-            .or_else(|| {
-                Preg::is_match_strict_groups(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i", url)
-            }) {
+            } else if {
+                let bb_matched = Preg::is_match_strict_groups3(
+                    r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
+                    url,
+                    Some(&mut m),
+                )
+                .unwrap_or(false)
+                    || Preg::is_match_strict_groups3(
+                        r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
+                        url,
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false);
+                bb_matched
+            } {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
-                    self.io.as_ref(),
-                    &self.config,
-                    &self.process,
-                    self.http_downloader
-                        .as_ref()
-                        .unwrap_or(&HttpDownloader::default()),
-                );
+                    self.io.clone_box(),
+                    std::rc::Rc::clone(&self.config),
+                    Some(std::rc::Rc::clone(&self.process)),
+                    self.http_downloader.clone(),
+                    None,
+                )?;
 
-                let domain = m.get(2).cloned().unwrap_or_default();
-                let mut repo_with_git_part = m.get(3).cloned().unwrap_or_default();
+                let domain = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let mut repo_with_git_part =
+                    m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !str_ends_with(&repo_with_git_part, ".git") {
                     repo_with_git_part.push_str(".git");
                 }
@@ -476,7 +508,7 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut self.process,
+                        &mut *self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -523,7 +555,7 @@ impl Git {
                     );
                     if run_commands_inline(
                         &auth_url,
-                        &mut self.process,
+                        &mut *self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -535,17 +567,14 @@ impl Git {
                 }
                 // Falling back to ssh
                 let ssh_url = format!("git@bitbucket.org:{}", repo_with_git_part);
-                self.io.write_error(
-                    PhpMixed::String(
-                        "    No bitbucket authentication configured. Falling back to ssh."
-                            .to_string(),
-                    ),
+                self.io.write_error3(
+                    "    No bitbucket authentication configured. Falling back to ssh.",
                     true,
                     io_interface::NORMAL,
                 );
                 if run_commands_inline(
                     &ssh_url,
-                    &mut self.process,
+                    &mut *self.process.borrow_mut(),
                     &mut last_command,
                     command_output.as_deref_mut(),
                 ) == 0
@@ -553,39 +582,42 @@ impl Git {
                     return Ok(());
                 }
 
-                error_msg = self.process.get_error_output().to_string();
-            } else if let Some(m) = Preg::is_match_strict_groups(
-                &format!(
-                    "{{^(git)@{}:(.+?\\.git)$}}i",
-                    Self::get_gitlab_domains_regex(&self.config)
-                ),
-                url,
-            )
-            .or_else(|| {
-                Preg::is_match_strict_groups(
+                error_msg = self.process.borrow().get_error_output().to_string();
+            } else if {
+                let gl_matched = Preg::is_match_strict_groups3(
                     &format!(
-                        "{{^(https?)://{}/(.*)}}i",
-                        Self::get_gitlab_domains_regex(&self.config)
+                        "{{^(git)@{}:(.+?\\.git)$}}i",
+                        Self::get_gitlab_domains_regex(&*self.config.borrow())
                     ),
                     url,
+                    Some(&mut m),
                 )
-            }) {
-                let mut m1 = m.get(1).cloned().unwrap_or_default();
-                let m2 = m.get(2).cloned().unwrap_or_default();
-                let m3 = m.get(3).cloned().unwrap_or_default();
+                .unwrap_or(false)
+                    || Preg::is_match_strict_groups3(
+                        &format!(
+                            "{{^(https?)://{}/(.*)}}i",
+                            Self::get_gitlab_domains_regex(&*self.config.borrow())
+                        ),
+                        url,
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false);
+                gl_matched
+            } {
+                let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if m1 == "git" {
                     m1 = "https".to_string();
                 }
 
                 if !self.io.has_authentication(&m2) {
                     let mut git_lab_util = GitLab::new(
-                        self.io.as_ref(),
-                        &self.config,
-                        &self.process,
-                        self.http_downloader
-                            .as_ref()
-                            .unwrap_or(&HttpDownloader::default()),
-                    );
+                        self.io.clone_box(),
+                        std::rc::Rc::clone(&self.config),
+                        Some(std::rc::Rc::clone(&self.process)),
+                        self.http_downloader.clone(),
+                    )?;
                     let message =
                         "Cloning failed, enter your GitLab credentials to access private repos";
 
@@ -635,7 +667,7 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut self.process,
+                        &mut *self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
@@ -644,13 +676,13 @@ impl Git {
                     }
 
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
-                    error_msg = self.process.get_error_output().to_string();
+                    error_msg = self.process.borrow().get_error_output().to_string();
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
                 // private non-github/gitlab/bitbucket repo that failed to authenticate
-                let mut m1 = m.get(1).cloned().unwrap_or_default();
-                let mut m2 = m.get(2).cloned().unwrap_or_default();
-                let m3 = m.get(3).cloned().unwrap_or_default();
+                let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let mut m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 let mut auth_parts: Option<String> = None;
                 if str_contains(&m2, "@") {
                     let parts = explode("@", &m2);
@@ -674,16 +706,13 @@ impl Git {
                         }
                     }
 
-                    self.io.write_error(
-                        PhpMixed::String(format!(
-                            "    Authentication required (<info>{}</info>):",
-                            m2
-                        )),
+                    self.io.write_error3(
+                        &format!("    Authentication required (<info>{}</info>):", m2),
                         true,
                         io_interface::NORMAL,
                     );
-                    self.io.write_error(
-                        PhpMixed::String(format!("<warning>{}</warning>", trim(&error_msg, None))),
+                    self.io.write_error3(
+                        &format!("<warning>{}</warning>", trim(&error_msg, None)),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -706,7 +735,7 @@ impl Git {
                         self.io.ask_and_hide_answer("      Password: ".to_string()),
                     );
                     auth = Some(auth_map);
-                    store_auth = self.config.get("store-auths");
+                    store_auth = self.config.borrow_mut().get("store-auths");
                 }
 
                 if let Some(auth_inner) = auth.as_ref() {
@@ -731,27 +760,28 @@ impl Git {
 
                     if run_commands_inline(
                         &auth_url,
-                        &mut self.process,
+                        &mut *self.process.borrow_mut(),
                         &mut last_command,
                         command_output.as_deref_mut(),
                     ) == 0
                     {
                         self.io
                             .set_authentication(m2.clone(), username, Some(password));
-                        let mut auth_helper = AuthHelper::new(self.io.as_ref(), &self.config);
+                        let mut auth_helper =
+                            AuthHelper::new(self.io.clone_box(), std::rc::Rc::clone(&self.config));
                         auth_helper.store_auth(&m2, &store_auth);
 
                         return Ok(());
                     }
 
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
-                    error_msg = self.process.get_error_output().to_string();
+                    error_msg = self.process.borrow().get_error_output().to_string();
                 }
             }
 
             if initial_clone {
                 if let Some(ref orig) = orig_cwd {
-                    self.filesystem.remove_directory(orig);
+                    self.filesystem.borrow_mut().remove_directory(orig);
                 }
             }
 
@@ -765,7 +795,7 @@ impl Git {
                 }
                 _ => last_command.as_string().unwrap_or("").to_string(),
             };
-            let mut error_msg = self.process.get_error_output().to_string();
+            let mut error_msg = self.process.borrow().get_error_output().to_string();
             if (credentials.len() as i64) > 0 {
                 last_command_str = self.mask_credentials(&last_command_str, &credentials);
                 error_msg = self.mask_credentials(&error_msg, &credentials);
@@ -787,11 +817,11 @@ impl Git {
             .unwrap_or(false)
             && composer_disable_network.as_deref() != Some("prime")
         {
-            self.io.write_error(
-                PhpMixed::String(format!(
+            self.io.write_error3(
+                &format!(
                     "<warning>Aborting git mirror sync of {} as network is disabled</warning>",
                     url
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -802,7 +832,7 @@ impl Git {
         // update the repo if it is a valid git repository
         let mut output = String::new();
         if is_dir(dir)
-            && self.process.execute(
+            && self.process.borrow_mut().execute_args(
                 &vec![
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -855,8 +885,8 @@ impl Git {
             );
 
             if let Err(e) = try_result {
-                self.io.write_error(
-                    PhpMixed::String(format!("<error>Sync mirror failed: {}</error>", e)),
+                self.io.write_error3(
+                    &format!("<error>Sync mirror failed: {}</error>", e),
                     true,
                     io_interface::DEBUG,
                 );
@@ -866,10 +896,10 @@ impl Git {
 
             return Ok(true);
         }
-        Self::check_for_repo_ownership_error(self.process.get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(self.process.borrow().get_error_output(), dir, None)?;
 
         // clean up directory and do a fresh clone into it
-        self.filesystem.remove_directory(dir);
+        self.filesystem.borrow_mut().remove_directory(dir);
 
         self.run_commands(
             vec![vec![
@@ -915,15 +945,12 @@ impl Git {
             if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref).unwrap_or(false)
                 && pretty_version.is_some()
             {
-                let branch = Preg::replace(
-                    r"{(?:^dev-|(?:\.x)?-dev$)}i",
-                    "",
-                    pretty_version.unwrap().to_string(),
-                );
+                let branch =
+                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap());
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
-                if self.process.execute(
+                if self.process.borrow_mut().execute_args(
                     &vec!["git".to_string(), "branch".to_string()],
                     &mut output,
                     Some(dir.to_string()),
@@ -932,7 +959,7 @@ impl Git {
                     branches = Some(output);
                 }
                 let mut output = String::new();
-                if self.process.execute(
+                if self.process.borrow_mut().execute_args(
                     &vec!["git".to_string(), "tag".to_string()],
                     &mut output,
                     Some(dir.to_string()),
@@ -972,7 +999,9 @@ impl Git {
         Ok(false)
     }
 
-    pub fn get_no_show_signature_flag(process: &ProcessExecutor) -> String {
+    pub fn get_no_show_signature_flag(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> String {
         let git_version = Self::get_version(process);
         if let Some(v) = git_version {
             if version_compare(&v, "2.10.0-rc0", ">=") {
@@ -984,7 +1013,9 @@ impl Git {
     }
 
     /// @return list<string>
-    pub fn get_no_show_signature_flags(process: &ProcessExecutor) -> Vec<String> {
+    pub fn get_no_show_signature_flags(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Vec<String> {
         let flags = Self::get_no_show_signature_flag(process);
         if flags.is_empty() {
             return vec![];
@@ -996,7 +1027,9 @@ impl Git {
     /// Checks if git version supports --no-commit-header flag (git 2.33+)
     ///
     /// @internal
-    pub fn supports_no_commit_header_flag(process: &ProcessExecutor) -> bool {
+    pub fn supports_no_commit_header_flag(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> bool {
         let git_version = Self::get_version(process);
 
         git_version
@@ -1010,7 +1043,7 @@ impl Git {
     /// @param list<string> $arguments Additional arguments for git rev-list
     /// @return non-empty-list<string>
     pub fn build_rev_list_command(
-        process: &ProcessExecutor,
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         arguments: Vec<String>,
     ) -> Vec<String> {
         let mut command = vec!["git".to_string(), "rev-list".to_string()];
@@ -1028,20 +1061,23 @@ impl Git {
     /// "commit <hash>" before formatted output. This removes those lines.
     ///
     /// @internal
-    pub fn parse_rev_list_output(output: &str, process: &ProcessExecutor) -> String {
+    pub fn parse_rev_list_output(
+        output: &str,
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> String {
         // If git supports --no-commit-header, output is already clean
         if Self::supports_no_commit_header_flag(process) {
             return output.to_string();
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output.to_string())
+        Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output).unwrap_or_default()
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> Result<bool> {
         let mut output = String::new();
         if is_dir(dir)
-            && self.process.execute(
+            && self.process.borrow_mut().execute_args(
                 &vec![
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -1053,7 +1089,7 @@ impl Git {
             && trim(&output, None) == "."
         {
             let mut ignored_output = String::new();
-            let exit_code = self.process.execute(
+            let exit_code = self.process.borrow_mut().execute_args(
                 &vec![
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -1068,14 +1104,19 @@ impl Git {
                 return Ok(true);
             }
         }
-        Self::check_for_repo_ownership_error(self.process.get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(self.process.borrow().get_error_output(), dir, None)?;
 
         Ok(false)
     }
 
     /// @return array<int, string>|null
-    fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<i32, String>> {
-        let m = Preg::is_match_strict_groups(r"{^(https?://)([^/]+)(.*)$}i", url)?;
+    fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m))
+            .unwrap_or(false)
+        {
+            return None;
+        }
 
         let auth_failures = [
             "fatal: Authentication failed",
@@ -1085,7 +1126,7 @@ impl Git {
             "fatal: could not read Username",
         ];
 
-        let error_output = self.process.get_error_output();
+        let error_output = self.process.borrow().get_error_output();
         for auth_failure in &auth_failures {
             if strpos(error_output, auth_failure).is_some() {
                 return Some(m);
@@ -1112,7 +1153,7 @@ impl Git {
             let mut output_mixed = PhpMixed::String(String::new());
             if is_local_path_repository {
                 let mut output = String::new();
-                self.process.execute(
+                self.process.borrow_mut().execute_args(
                     &vec![
                         "git".to_string(),
                         "remote".to_string(),
@@ -1154,12 +1195,23 @@ impl Git {
 
             let lines = self
                 .process
+                .borrow()
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
-                if let Some(matches) =
-                    Preg::is_match_strict_groups(r"{^\s*HEAD branch:\s(.+)\s*$}m", &line)
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(
+                    r"{^\s*HEAD branch:\s(.+)\s*$}m",
+                    &line,
+                    Some(&mut matches),
+                )
+                .unwrap_or(false)
                 {
-                    return Ok(Some(matches.get(1).cloned().unwrap_or_default()));
+                    return Ok(Some(
+                        matches
+                            .get(&CaptureKey::ByIndex(1))
+                            .cloned()
+                            .unwrap_or_default(),
+                    ));
                 }
             }
 
@@ -1168,11 +1220,11 @@ impl Git {
         match result {
             Ok(v) => v,
             Err(e) => {
-                self.io.write_error(
-                    PhpMixed::String(format!(
+                self.io.write_error3(
+                    &format!(
                         "<error>Failed to fetch root identifier from remote: {}</error>",
                         e
-                    )),
+                    ),
                     true,
                     io_interface::DEBUG,
                 );
@@ -1181,7 +1233,7 @@ impl Git {
         }
     }
 
-    pub fn clean_env(process: &ProcessExecutor) {
+    pub fn clean_env(process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>) {
         // PHP: $process ?? new ProcessExecutor()
         let git_version = Self::get_version(process);
         if let Some(v) = git_version {
@@ -1249,7 +1301,7 @@ impl Git {
         clearstatcache();
 
         let mut ignored_output = String::new();
-        if self.process.execute(
+        if self.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "--version".to_string()],
             &mut ignored_output,
             None,
@@ -1259,7 +1311,7 @@ impl Git {
                 message: Url::sanitize(format!(
                     "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
                     url,
-                    self.process.get_error_output()
+                    self.process.borrow().get_error_output()
                 )),
                 code: 0,
             }
@@ -1276,7 +1328,9 @@ impl Git {
     /// Retrieves the current git version.
     ///
     /// @return string|null The git version number, if present.
-    pub fn get_version(process: &ProcessExecutor) -> Option<String> {
+    pub fn get_version(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Option<String> {
         let mut version = VERSION.lock().unwrap();
         if version.is_none() {
             *version = Some(None);
@@ -1285,10 +1339,15 @@ impl Git {
             // For now, mimic the call signature (compilation fix is Phase B)
             let exit_code: i64 = 0; // process.execute(&["git", "--version"].map(String::from).to_vec(), &mut output, None);
             if exit_code == 0 {
-                if let Some(matches) =
-                    Preg::is_match_strict_groups(r"/^git version (\d+(?:\.\d+)+)/m", &output)
+                let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+                if Preg::is_match_strict_groups3(
+                    r"/^git version (\d+(?:\.\d+)+)/m",
+                    &output,
+                    Some(&mut matches),
+                )
+                .unwrap_or(false)
                 {
-                    *version = Some(matches.get(1).cloned());
+                    *version = Some(matches.get(&CaptureKey::ByIndex(1)).cloned());
                 }
             }
         }

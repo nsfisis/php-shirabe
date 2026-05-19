@@ -15,6 +15,7 @@ use shirabe_php_shim::{
     substr_count, trigger_error, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::bound::Bound;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
 use crate::autoload::class_loader::ClassLoader;
 use crate::config::Config;

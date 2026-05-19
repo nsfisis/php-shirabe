@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{FILTER_VALIDATE_URL, filter_var};
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_php_shim::{FILTER_VALIDATE_URL, PhpMixed, filter_var};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
@@ -11,6 +11,8 @@ use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
 use crate::package::complete_package_interface::CompletePackageInterface;
+use crate::package::package_interface::PackageInterface;
+use crate::package::root_package_interface::RootPackageInterface;
 use crate::repository::repository_factory::RepositoryFactory;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::root_package_repository::RootPackageRepository;
@@ -28,27 +30,33 @@ impl HomeCommand {
         self.set_name("browse")
             .set_aliases(&["home".to_string()])
             .set_description("Opens the package's repository URL or homepage in your browser")
-            .set_definition(vec![
+            .set_definition(&[
                 InputArgument::new(
                     "packages",
                     Some(InputArgument::IS_ARRAY),
                     "Package(s) to browse to.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "homepage",
                     Some(shirabe_php_shim::PhpMixed::String("H".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Open the homepage instead of the repository URL.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "show",
                     Some(shirabe_php_shim::PhpMixed::String("s".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Only show the homepage or repository URL.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "The home command opens or shows a package's repository URL or\n\
@@ -60,7 +68,7 @@ impl HomeCommand {
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
@@ -98,7 +106,7 @@ impl HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in repo.find_packages(package_name) {
+                for package in repo.find_packages(&package_name, None) {
                     package_exists = true;
                     if let Some(complete_pkg) = package.as_complete_package_interface() {
                         if self.handle_package(complete_pkg, show_homepage, show_only) {
@@ -132,16 +140,15 @@ impl HomeCommand {
     }
 
     fn handle_package(
-        &self,
+        &mut self,
         package: &dyn CompletePackageInterface,
         show_homepage: bool,
         show_only: bool,
     ) -> bool {
         let support = package.get_support();
-        let mut url = support
+        let mut url: Option<String> = support
             .get("source")
-            .and_then(|v| v.as_string())
-            .map(|s| s.to_string())
+            .cloned()
             .or_else(|| package.get_source_url().map(|s| s.to_string()));
         if url.as_deref().map_or(true, |s| s.is_empty()) || show_homepage {
             url = package.get_homepage().map(|s| s.to_string());
@@ -166,49 +173,49 @@ impl HomeCommand {
         true
     }
 
-    fn open_browser(&self, url: &str) {
-        let io = self.get_io();
-        let mut process = ProcessExecutor::new(io);
+    fn open_browser(&mut self, url: &str) {
+        let mut process = ProcessExecutor::new(Some(self.get_io().clone_box()));
         if Platform::is_windows() {
-            process.execute(&["start", "\"web\"", "explorer", url], None);
+            let _ = process.execute(
+                PhpMixed::from(vec!["start", "\"web\"", "explorer", url]),
+                None,
+                None,
+            );
             return;
         }
 
-        let linux = process.execute(&["which", "xdg-open"], None);
-        let osx = process.execute(&["which", "open"], None);
+        let linux = process
+            .execute(PhpMixed::from(vec!["which", "xdg-open"]), None, None)
+            .unwrap_or(1);
+        let osx = process
+            .execute(PhpMixed::from(vec!["which", "open"]), None, None)
+            .unwrap_or(1);
 
         if linux == 0 {
-            process.execute(&["xdg-open", url], None);
+            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), None, None);
         } else if osx == 0 {
-            process.execute(&["open", url], None);
+            let _ = process.execute(PhpMixed::from(vec!["open", url]), None, None);
         } else {
-            io.write_error(&format!(
+            self.get_io().write_error(&format!(
                 "No suitable browser opening command found, open yourself: {}",
                 url
             ));
         }
     }
 
-    fn initialize_repos(&self) -> Result<Vec<Box<dyn RepositoryInterface>>> {
+    fn initialize_repos(&mut self) -> Result<Vec<Box<dyn RepositoryInterface>>> {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
             let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
             repos.push(Box::new(RootPackageRepository::new(
-                composer.get_package().clone_package(),
+                composer.get_package().clone_box(),
             )));
-            repos.push(Box::new(
-                composer.get_repository_manager().get_local_repository(),
-            ));
-            for repo in composer.get_repository_manager().get_repositories() {
-                repos.push(repo);
-            }
+            // TODO(phase-b): get_local_repository / get_repositories return shared refs; needs Rc<dyn ...> migration
             return Ok(repos);
         }
 
-        Ok(RepositoryFactory::default_repos_with_default_manager(
-            self.get_io(),
-        ))
+        RepositoryFactory::default_repos_with_default_manager(self.get_io())
     }
 }
 

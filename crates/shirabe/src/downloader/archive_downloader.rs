@@ -69,7 +69,7 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = self.inner().config.get("vendor-dir");
+        let vendor_dir = self.inner().config.borrow_mut().get("vendor-dir");
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
@@ -77,15 +77,20 @@ pub trait ArchiveDownloader {
         if !self
             .inner()
             .filesystem
+            .borrow()
             .normalize_path(&vendor_dir)
             .contains(
                 &self
                     .inner()
                     .filesystem
+                    .borrow()
                     .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR)),
             )
         {
-            self.inner_mut().filesystem.empty_directory(path);
+            self.inner_mut()
+                .filesystem
+                .borrow_mut()
+                .empty_directory(path);
         }
 
         let temporary_dir;
@@ -105,6 +110,7 @@ pub trait ArchiveDownloader {
 
         self.inner_mut()
             .filesystem
+            .borrow_mut()
             .ensure_directory_exists(&temporary_dir);
         let file_name = self.inner().get_file_name(package, path);
 
@@ -115,9 +121,9 @@ pub trait ArchiveDownloader {
             self.inner_mut().clear_last_cache_write(package);
 
             // clean up
-            filesystem.remove_directory(&temporary_dir);
+            filesystem.borrow_mut().remove_directory(&temporary_dir);
             if is_dir(path) && realpath(path) != Platform::get_cwd(false).unwrap_or_default() {
-                filesystem.remove_directory(path);
+                filesystem.borrow_mut().remove_directory(path);
             }
             self.inner_mut()
                 .remove_cleanup_path(package, &temporary_dir);
@@ -138,7 +144,7 @@ pub trait ArchiveDownloader {
         Ok(promise.then(
             Box::new(move || -> Result<Box<dyn PromiseInterface>> {
                 if file_exists(&file_name) {
-                    filesystem.unlink(&file_name);
+                    filesystem.borrow_mut().unlink(&file_name);
                 }
 
                 let get_folder_content = |dir: &str| -> Vec<std::path::PathBuf> {
@@ -177,7 +183,7 @@ pub trait ArchiveDownloader {
                                 &format!("{}/{}", to, file_basename),
                             )?;
                         } else {
-                            filesystem.rename(&file, &format!("{}/{}", to, file_basename));
+                            filesystem.borrow_mut().rename(&file, &format!("{}/{}", to, file_basename));
                         }
                     }
 
@@ -187,8 +193,8 @@ pub trait ArchiveDownloader {
                 let mut rename_as_one = false;
                 if !file_exists(path) {
                     rename_as_one = true;
-                } else if filesystem.is_dir_empty(path) {
-                    match filesystem.remove_directory_php(path) {
+                } else if filesystem.borrow().is_dir_empty(path) {
+                    match filesystem.borrow_mut().remove_directory_php(path) {
                         Ok(true) => {
                             rename_as_one = true;
                         }
@@ -210,7 +216,7 @@ pub trait ArchiveDownloader {
                     } else {
                         temporary_dir.clone()
                     };
-                    filesystem.rename(&extracted_dir, path);
+                    filesystem.borrow_mut().rename(&extracted_dir, path);
                 } else {
                     // only one dir in the archive, extract its contents out of it
                     let from = if single_dir_at_top_level {
@@ -222,7 +228,7 @@ pub trait ArchiveDownloader {
                     rename_recursively.as_ref().unwrap()(&from, path)?;
                 }
 
-                let promise = filesystem.remove_directory_async(&temporary_dir);
+                let promise = filesystem.borrow_mut().remove_directory_async(&temporary_dir);
 
                 Ok(promise.then(
                     Box::new(move || -> Result<()> {

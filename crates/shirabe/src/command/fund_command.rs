@@ -5,9 +5,9 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
 
@@ -20,7 +20,9 @@ use crate::package::alias_package::AliasPackage;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::complete_package::CompletePackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
+use crate::package::package_interface::PackageInterface;
 use crate::repository::composite_repository::CompositeRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct FundCommand {
@@ -31,13 +33,15 @@ impl FundCommand {
     pub fn configure(&mut self) {
         self.set_name("fund")
             .set_description("Discover how to help fund the maintenance of your dependencies")
-            .set_definition(vec![InputOption::new(
+            .set_definition(&[InputOption::new(
                 "format",
                 Some(PhpMixed::String("f".to_string())),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
                 Some(PhpMixed::String("text".to_string())),
-            )]);
+            )
+            .unwrap()
+            .into()]);
     }
 
     pub fn execute(
@@ -54,10 +58,7 @@ impl FundCommand {
 
         let mut packages_to_load: IndexMap<String, Box<MatchAllConstraint>> = IndexMap::new();
         for package in repo.get_packages() {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some()
-            {
+            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                 continue;
             }
             packages_to_load.insert(
@@ -75,14 +76,9 @@ impl FundCommand {
 
         // collect funding data from default branches
         for package in &result.packages {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_none()
-            {
+            if package.as_any().downcast_ref::<AliasPackage>().is_none() {
                 // TODO: check for CompleteAliasPackage as well
-                if let Some(complete_pkg) =
-                    (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
-                {
+                if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
                     if complete_pkg.is_default_branch()
                         && !complete_pkg.get_funding().is_empty()
                         && packages_to_load.contains_key(complete_pkg.get_name())
@@ -96,17 +92,13 @@ impl FundCommand {
 
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages() {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some()
+            if package.as_any().downcast_ref::<AliasPackage>().is_some()
                 || !packages_to_load.contains_key(package.get_name())
             {
                 continue;
             }
             // TODO: check for CompleteAliasPackage as well
-            if let Some(complete_pkg) =
-                (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
-            {
+            if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
                 if !complete_pkg.get_funding().is_empty() {
                     Self::insert_funding_data(&mut fundings, complete_pkg)?;
                 }
@@ -158,7 +150,8 @@ impl FundCommand {
             );
             io.write("Thank you!");
         } else if format == "json" {
-            io.write(&JsonFile::encode(&fundings, 448));
+            let fundings_mixed: PhpMixed = fundings.clone().into();
+            io.write(&JsonFile::encode(&fundings_mixed, 448));
         } else {
             io.write("No funding links were found in your package dependencies. This doesn't mean they don't need your support!");
         }

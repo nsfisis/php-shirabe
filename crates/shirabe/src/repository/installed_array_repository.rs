@@ -20,6 +20,16 @@ pub struct InstalledArrayRepository {
 }
 
 impl InstalledArrayRepository {
+    pub fn new() -> anyhow::Result<Self> {
+        Self::new_with_packages(Vec::new())
+    }
+
+    pub fn new_with_packages(packages: Vec<Box<dyn PackageInterface>>) -> anyhow::Result<Self> {
+        Ok(Self {
+            inner: WritableArrayRepository::new(packages)?,
+        })
+    }
+
     pub fn get_repo_name(&self) -> String {
         format!("installed {}", self.inner.get_repo_name())
     }
@@ -89,14 +99,14 @@ impl RepositoryInterface for InstalledArrayRepository {
     }
     fn find_package(
         &self,
-        _name: String,
+        _name: &str,
         _constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         todo!()
     }
     fn find_packages(
         &self,
-        _name: String,
+        _name: &str,
         _constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         todo!()

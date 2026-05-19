@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID, PhpMixed,
     RuntimeException, array_replace_recursive, base64_encode, explode, extension_loaded,
@@ -33,7 +33,7 @@ pub enum GetResult {
 #[derive(Debug)]
 pub struct RemoteFilesystem {
     io: Box<dyn IOInterface>,
-    config: Config,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     scheme: String,
     bytes_max: i64,
     origin_url: String,
@@ -55,7 +55,7 @@ pub struct RemoteFilesystem {
 impl RemoteFilesystem {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
         disable_tls: bool,
         auth_helper: Option<AuthHelper>,
@@ -140,8 +140,14 @@ impl RemoteFilesystem {
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
-            if let Ok(Some(m)) = Preg::is_match_strict_groups("{^HTTP/\\S+ (\\d+)}i", header) {
-                value = Some(m["1"].parse().unwrap_or(0));
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3("{^HTTP/\\S+ (\\d+)}i", header, Some(&mut m))
+                .unwrap_or(false)
+            {
+                value = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .and_then(|s| s.parse().ok())
+                    .or(Some(0));
             }
         }
 
@@ -251,8 +257,8 @@ impl RemoteFilesystem {
 
         let proxy = ProxyManager::get_instance().get_proxy_for_request(&file_url);
         let using_proxy = proxy.get_status(" using proxy (%s)");
-        self.io.write_error(
-            PhpMixed::String(format!(
+        self.io.write_error3(
+            &format!(
                 "{}{}{}",
                 if strpos(&orig_file_url, "http") == Some(0) {
                     "Downloading "
@@ -261,7 +267,7 @@ impl RemoteFilesystem {
                 },
                 Url::sanitize(&orig_file_url),
                 using_proxy
-            )),
+            ),
             true,
             crate::io::io_interface::DEBUG,
         );
@@ -270,12 +276,16 @@ impl RemoteFilesystem {
             || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
             && !degraded_packagist
         {
-            self.config.prohibit_url_by_config(&file_url, &*self.io);
+            let _ = self.config.borrow_mut().prohibit_url_by_config(
+                &file_url,
+                Some(&*self.io),
+                &indexmap::IndexMap::new(),
+            );
         }
 
         if self.progress && !is_redirect {
-            self.io.write_error(
-                PhpMixed::String("Downloading (<comment>connecting...</comment>)".to_string()),
+            self.io.write_error3(
+                "Downloading (<comment>connecting...</comment>)",
                 false,
                 crate::io::io_interface::NORMAL,
             );
@@ -344,13 +354,13 @@ impl RemoteFilesystem {
                         .unwrap_or_else(|_| self.normalize_result(result.as_deref()));
                     e.set_response(decoded);
 
-                    self.io.write_error(
-                        PhpMixed::String(format!(
+                    self.io.write_error3(
+                        &format!(
                             "Content-Length mismatch, received {} out of {} bytes: ({})",
                             Platform::strlen(result.as_deref().unwrap_or("")),
                             cl_int,
                             base64_encode(result.as_deref().unwrap_or(""))
-                        )),
+                        ),
                         true,
                         crate::io::io_interface::DEBUG,
                     );
@@ -395,22 +405,15 @@ impl RemoteFilesystem {
                 let msg_owned = format!("{}", e);
                 if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                     self.degraded_mode = true;
-                    self.io.write_error(
-                        PhpMixed::String("".to_string()),
-                        true,
-                        crate::io::io_interface::NORMAL,
-                    );
-                    self.io.write_error(
-                        PhpMixed::List(vec![
-                            Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
-                            Box::new(PhpMixed::String(
-                                "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                                    .to_string(),
-                            )),
-                        ]),
-                        true,
-                        crate::io::io_interface::NORMAL,
-                    );
+                    self.io
+                        .write_error3("", true, crate::io::io_interface::NORMAL);
+                    self.io.write_error3(PhpMixed::List(vec![
+                        Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
+                        Box::new(PhpMixed::String(
+                            "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
+                                .to_string(),
+                        )),
+                    ]), true, crate::io::io_interface::NORMAL);
 
                     return self.get(
                         &self.origin_url.clone(),
@@ -460,6 +463,7 @@ impl RemoteFilesystem {
 
         let gitlab_domains: Vec<String> = self
             .config
+            .borrow_mut()
             .get("gitlab-domains")
             .and_then(|v| v.as_list())
             .map(|l| {
@@ -494,8 +498,8 @@ impl RemoteFilesystem {
             if code >= 400 && code <= 599 {
                 if !self.retry {
                     if self.progress && !is_redirect {
-                        self.io.overwrite_error(
-                            PhpMixed::String("Downloading (<error>failed</error>)".to_string()),
+                        self.io.overwrite_error4(
+                            "Downloading (<error>failed</error>)",
                             false,
                             None,
                             crate::io::io_interface::NORMAL,
@@ -522,15 +526,15 @@ impl RemoteFilesystem {
         }
 
         if self.progress && !self.retry && !is_redirect {
-            self.io.overwrite_error(
-                PhpMixed::String(format!(
+            self.io.overwrite_error4(
+                &format!(
                     "Downloading ({})",
                     if result.is_none() {
                         "<error>failed</error>"
                     } else {
                         "<comment>100%</comment>"
                     }
-                )),
+                ),
                 false,
                 None,
                 crate::io::io_interface::NORMAL,
@@ -552,21 +556,17 @@ impl RemoteFilesystem {
                     }
 
                     self.degraded_mode = true;
-                    self.io.write_error(
-                        PhpMixed::List(vec![
-                            Box::new(PhpMixed::String("".to_string())),
-                            Box::new(PhpMixed::String(format!(
-                                "<error>Failed to decode response: {}</error>",
-                                e
-                            ))),
-                            Box::new(PhpMixed::String(
-                                "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                                    .to_string(),
-                            )),
-                        ]),
-                        true,
-                        crate::io::io_interface::NORMAL,
-                    );
+                    self.io.write_error3(PhpMixed::List(vec![
+                        Box::new(PhpMixed::String("".to_string())),
+                        Box::new(PhpMixed::String(format!(
+                            "<error>Failed to decode response: {}</error>",
+                            e
+                        ))),
+                        Box::new(PhpMixed::String(
+                            "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
+                                .to_string(),
+                        )),
+                    ]), true, crate::io::io_interface::NORMAL);
 
                     return self.get(
                         &self.origin_url.clone(),
@@ -640,22 +640,15 @@ impl RemoteFilesystem {
             let msg_owned = format!("{}", e);
             if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                 self.degraded_mode = true;
-                self.io.write_error(
-                    PhpMixed::String("".to_string()),
-                    true,
-                    crate::io::io_interface::NORMAL,
-                );
-                self.io.write_error(
-                    PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
-                        Box::new(PhpMixed::String(
-                            "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                                .to_string(),
-                        )),
-                    ]),
-                    true,
-                    crate::io::io_interface::NORMAL,
-                );
+                self.io
+                    .write_error3("", true, crate::io::io_interface::NORMAL);
+                self.io.write_error3(PhpMixed::List(vec![
+                    Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
+                    Box::new(PhpMixed::String(
+                        "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
+                            .to_string(),
+                    )),
+                ]), true, crate::io::io_interface::NORMAL);
 
                 return self.get(
                     &self.origin_url.clone(),
@@ -771,11 +764,8 @@ impl RemoteFilesystem {
                         && Some(progression) != self.last_progress
                     {
                         self.last_progress = Some(progression);
-                        self.io.overwrite_error(
-                            PhpMixed::String(format!(
-                                "Downloading (<comment>{}%</comment>)",
-                                progression
-                            )),
+                        self.io.overwrite_error4(
+                            &format!("Downloading (<comment>{}%</comment>)", progression),
                             false,
                             None,
                             crate::io::io_interface::NORMAL,
@@ -944,19 +934,16 @@ impl RemoteFilesystem {
         if let Some(target_url) = target_url {
             self.redirects += 1;
 
-            self.io.write_error(
-                PhpMixed::String("".to_string()),
-                true,
-                crate::io::io_interface::DEBUG,
-            );
-            self.io.write_error(
-                PhpMixed::String(sprintf(
+            self.io
+                .write_error3("", true, crate::io::io_interface::DEBUG);
+            self.io.write_error3(
+                &sprintf(
                     "Following redirect (%u) %s",
                     &[
                         PhpMixed::Int(self.redirects),
                         PhpMixed::String(Url::sanitize(&target_url)),
                     ],
-                )),
+                ),
                 true,
                 crate::io::io_interface::DEBUG,
             );

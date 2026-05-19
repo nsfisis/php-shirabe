@@ -260,8 +260,7 @@ impl ArrayDumper {
             );
         }
 
-        if let Some(complete_pkg) = (package.as_any() as &dyn Any).downcast_ref::<CompletePackage>()
-        {
+        if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
             if let Some(archive_name) = complete_pkg.get_archive_name() {
                 let entry = data
                     .entry("archive".to_string())
@@ -422,7 +421,7 @@ impl ArrayDumper {
             }
         }
 
-        if let Some(root_pkg) = (package.as_any() as &dyn Any).downcast_ref::<RootPackage>() {
+        if let Some(root_pkg) = package.as_any().downcast_ref::<RootPackage>() {
             let minimum_stability = root_pkg.get_minimum_stability();
             if !minimum_stability.is_empty() {
                 data.insert(

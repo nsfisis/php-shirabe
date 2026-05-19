@@ -56,15 +56,26 @@ impl BufferIO {
 
         let output = Preg::replace_callback(
             r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
-            |matches: &[String]| -> String {
-                let pre = strip_tags(&matches[1]);
+            |matches: &indexmap::IndexMap<
+                shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                String,
+            >|
+             -> String {
+                let empty = String::new();
+                let g1 = matches
+                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(1))
+                    .unwrap_or(&empty);
+                let g2 = matches
+                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(2))
+                    .unwrap_or(&empty);
+                let pre = strip_tags(g1);
 
-                if pre.len() == matches[2].len() {
+                if pre.len() == g2.len() {
                     return String::new();
                 }
 
                 // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                format!("{}\n", matches[1].trim_end())
+                format!("{}\n", g1.trim_end())
             },
             &output,
         );

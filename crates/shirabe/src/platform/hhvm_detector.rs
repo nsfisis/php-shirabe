@@ -12,13 +12,13 @@ static HHVM_VERSION_CACHE: Mutex<Option<Option<String>>> = Mutex::new(None);
 #[derive(Debug)]
 pub struct HhvmDetector {
     executable_finder: Option<ExecutableFinder>,
-    process_executor: Option<ProcessExecutor>,
+    process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
 }
 
 impl HhvmDetector {
     pub fn new(
         executable_finder: Option<ExecutableFinder>,
-        process_executor: Option<ProcessExecutor>,
+        process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         Self {
             executable_finder,
@@ -50,9 +50,9 @@ impl HhvmDetector {
                 .get_or_insert_with(ExecutableFinder::new);
             let hhvm_path = finder.find("hhvm", None, &[]);
             if let Some(hhvm_path) = hhvm_path {
-                let executor = self
-                    .process_executor
-                    .get_or_insert_with(|| ProcessExecutor::new(None, None));
+                let executor = self.process_executor.get_or_insert_with(|| {
+                    std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
+                });
                 let mut version_output = shirabe_php_shim::PhpMixed::Null;
                 let cmd = shirabe_php_shim::PhpMixed::List(
                     [
@@ -68,6 +68,7 @@ impl HhvmDetector {
                     .collect(),
                 );
                 let exit_code = executor
+                    .borrow_mut()
                     .execute(cmd, Some(&mut version_output), None)
                     .unwrap_or(1);
                 if exit_code == 0 {

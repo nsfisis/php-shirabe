@@ -40,18 +40,24 @@ impl PackageRepository {
         };
 
         Self {
-            inner: ArrayRepository::new(),
+            inner: ArrayRepository::new(vec![])
+                .expect("ArrayRepository::new with empty vec cannot fail"),
             config: config_list,
             security_advisories,
         }
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<Result<(), InvalidRepositoryException>> {
-        self.inner.initialize()?;
+        self.inner.initialize();
 
-        let loader = ValidatingArrayLoader::new(ArrayLoader::new(None, true), true);
+        let mut loader =
+            ValidatingArrayLoader::new(Box::new(ArrayLoader::new(None, true)), true, None, 0);
         for package in &self.config {
-            let package = match loader.load(package) {
+            let config_map: IndexMap<String, Box<PhpMixed>> = match package {
+                PhpMixed::Array(m) => m.clone(),
+                _ => IndexMap::new(),
+            };
+            let package_loaded = match loader.load(config_map, "") {
                 Ok(p) => p,
                 Err(e) => {
                     let msg = format!(
@@ -65,13 +71,16 @@ impl PackageRepository {
                     })));
                 }
             };
-            self.inner.add_package(package)?;
+            // TODO(phase-b): add_package expects Box<dyn PackageInterface>; loader returns Box<dyn BasePackage>
+            let _ = package_loaded;
         }
         Ok(Ok(()))
     }
 
     pub fn get_repo_name(&self) -> String {
+        use crate::repository::repository_interface::RepositoryInterface;
         Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
+            .unwrap_or_else(|_| self.inner.get_repo_name())
     }
 }
 
@@ -91,42 +100,45 @@ impl AdvisoryProviderInterface for PackageRepository {
 
         let mut advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
-            if package_constraint_map.contains_key(package_name.as_str()) {
-                let items: anyhow::Result<Vec<PartialOrSecurityAdvisory>> = match package_advisories {
-                    PhpMixed::List(list) => list
-                        .iter()
-                        .filter_map(|data| {
-                            let data_map = match data.as_ref() {
-                                PhpMixed::Array(m) => m
-                                    .iter()
-                                    .map(|(k, v)| (k.clone(), *v.clone()))
-                                    .collect::<IndexMap<String, PhpMixed>>(),
-                                _ => return Ok(None),
-                            };
-                            let advisory =
-                                PartialSecurityAdvisory::create(package_name, &data_map, &semver_parser)
-                                    .ok()?;
-                            if !allow_partial_advisories
-                                && matches!(advisory, PartialOrSecurityAdvisory::Partial(_))
-                            {
-                                return Err(anyhow::anyhow!(RuntimeException { message: format!("Advisory for {} could not be loaded as a full advisory from {}\n{}", package_name, self.get_repo_name(), var_export(data, true)), code: 0 }));
-                            }
-                            let affected_versions = match &advisory {
-                                PartialOrSecurityAdvisory::Full(a) => &a.affected_versions,
-                                PartialOrSecurityAdvisory::Partial(a) => &a.affected_versions,
-                            };
-                            if !affected_versions
-                                .matches(package_constraint_map[package_name.as_str()].as_ref())
-                            {
-                                return Ok(None);
-                            }
-                            Ok(Some(advisory))
-                        })
-                        .collect(),
-                    _ => vec![],
-                };
-                advisories.insert(package_name.clone(), items?);
+            if !package_constraint_map.contains_key(package_name.as_str()) {
+                continue;
             }
+            let list = match package_advisories {
+                PhpMixed::List(list) => list,
+                _ => continue,
+            };
+            let mut items: Vec<PartialOrSecurityAdvisory> = Vec::new();
+            for data in list {
+                let data_map: IndexMap<String, PhpMixed> = match data.as_ref() {
+                    PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect(),
+                    _ => continue,
+                };
+                let advisory = match PartialSecurityAdvisory::create(
+                    package_name,
+                    &data_map,
+                    &semver_parser,
+                ) {
+                    Ok(a) => a,
+                    Err(_) => continue,
+                };
+                if !allow_partial_advisories
+                    && matches!(advisory, PartialOrSecurityAdvisory::Partial(_))
+                {
+                    return Err(anyhow::anyhow!(RuntimeException {
+                        message: format!(
+                            "Advisory for {} could not be loaded as a full advisory from {}\n{}",
+                            package_name,
+                            self.get_repo_name(),
+                            var_export(data, true)
+                        ),
+                        code: 0,
+                    }));
+                }
+                // TODO(phase-b): affected_versions is a method, not a field, and matches() return type may differ
+                let _ = (&advisory, &package_constraint_map);
+                items.push(advisory);
+            }
+            advisories.insert(package_name.clone(), items);
         }
 
         let names_found: Vec<String> = advisories.keys().cloned().collect();

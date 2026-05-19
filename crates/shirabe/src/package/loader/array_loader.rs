@@ -410,7 +410,7 @@ impl ArrayLoader {
         if let Some(time_value) = config.get("time") {
             if !shirabe_php_shim::empty(time_value) {
                 let time_str = time_value.as_string().unwrap_or("");
-                let time = if Preg::is_match(r"/^\d++$/D", time_str) {
+                let time = if Preg::is_match(r"/^\d++$/D", time_str).unwrap_or(false) {
                     format!("@{}", time_str)
                 } else {
                     time_str.to_string()

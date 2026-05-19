@@ -37,6 +37,21 @@ pub enum ReasonData {
     Fixed {
         package: Box<dyn BasePackage>,
     },
+    /// Phase B placeholder for an arbitrary PHP-side value not yet mapped to a real variant.
+    Mixed(PhpMixed),
+}
+
+impl From<PhpMixed> for ReasonData {
+    fn from(value: PhpMixed) -> Self {
+        // TODO(phase-b): callers should construct the appropriate variant directly;
+        // this catch-all keeps the rule constructors building while reason_data threading
+        // through PhpMixed in the resolver is still in transition.
+        match value {
+            PhpMixed::String(s) => ReasonData::String(s),
+            PhpMixed::Int(i) => ReasonData::Int(i),
+            other => ReasonData::Mixed(other),
+        }
+    }
 }
 
 // reason constants and // their reason data contents
@@ -54,7 +69,7 @@ pub const BITFIELD_TYPE: i64 = 0;
 pub const BITFIELD_REASON: i64 = 8;
 pub const BITFIELD_DISABLED: i64 = 16;
 
-pub trait Rule: std::fmt::Display {
+pub trait Rule: std::fmt::Display + std::fmt::Debug {
     fn bitfield(&self) -> i64;
     fn bitfield_mut(&mut self) -> &mut i64;
     fn request(&self) -> Option<&Request>;
@@ -67,14 +82,19 @@ pub trait Rule: std::fmt::Display {
     fn equals(&self, rule: &dyn Rule) -> bool;
     fn is_assertion(&self) -> bool;
 
+    fn clone_box(&self) -> Box<dyn Rule> {
+        todo!()
+    }
+
     /// @return self::RULE_*
     fn get_reason(&self) -> i64 {
-        (self.bitfield & (255 << Self::BITFIELD_REASON)) >> Self::BITFIELD_REASON
+        (self.bitfield() & (255 << BITFIELD_REASON)) >> BITFIELD_REASON
     }
 
     /// @phpstan-return ReasonData
     fn get_reason_data(&self) -> &ReasonData {
-        &self.reason_data()
+        // TODO(phase-b): reason_data() returns Option; PHP getReasonData unconditional
+        self.reason_data().unwrap()
     }
 
     fn get_required_package(&self) -> Option<String> {
@@ -97,29 +117,29 @@ pub trait Rule: std::fmt::Display {
 
     /// @param RuleSet::TYPE_* $type
     fn set_type(&mut self, r#type: i64) {
-        self.bitfield = (self.bitfield & !(255i64 << Self::BITFIELD_TYPE))
-            | ((255 & r#type) << Self::BITFIELD_TYPE);
+        *self.bitfield_mut() =
+            (self.bitfield() & !(255i64 << BITFIELD_TYPE)) | ((255 & r#type) << BITFIELD_TYPE);
     }
 
     fn get_type(&self) -> i64 {
-        (self.bitfield & (255 << Self::BITFIELD_TYPE)) >> Self::BITFIELD_TYPE
+        (self.bitfield() & (255 << BITFIELD_TYPE)) >> BITFIELD_TYPE
     }
 
     fn disable(&mut self) {
-        self.bitfield = (self.bitfield & !(255i64 << Self::BITFIELD_DISABLED))
-            | (1i64 << Self::BITFIELD_DISABLED);
+        *self.bitfield_mut() =
+            (self.bitfield() & !(255i64 << BITFIELD_DISABLED)) | (1i64 << BITFIELD_DISABLED);
     }
 
     fn enable(&mut self) {
-        self.bitfield &= !(255i64 << Self::BITFIELD_DISABLED);
+        *self.bitfield_mut() &= !(255i64 << BITFIELD_DISABLED);
     }
 
     fn is_disabled(&self) -> bool {
-        0 != ((self.bitfield & (255 << Self::BITFIELD_DISABLED)) >> Self::BITFIELD_DISABLED)
+        0 != ((self.bitfield() & (255 << BITFIELD_DISABLED)) >> BITFIELD_DISABLED)
     }
 
     fn is_enabled(&self) -> bool {
-        0 == ((self.bitfield & (255 << Self::BITFIELD_DISABLED)) >> Self::BITFIELD_DISABLED)
+        0 == ((self.bitfield() & (255 << BITFIELD_DISABLED)) >> BITFIELD_DISABLED)
     }
 
     fn is_caused_by_lock(
@@ -195,10 +215,12 @@ pub trait Rule: std::fmt::Display {
 
         match self.get_reason() {
             r if r == Self::RULE_PACKAGE_CONFLICT => {
-                let mut package1 =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
-                let mut package2 =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
+                let mut package1 = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[0]).clone_box(),
+                );
+                let mut package2 = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[1]).clone_box(),
+                );
 
                 let reason_data = self.get_reason_data();
                 // swap literals if they are not in the right order with package2 being the conflicter
@@ -213,8 +235,9 @@ pub trait Rule: std::fmt::Display {
 
             r if r == Self::RULE_PACKAGE_REQUIRES => {
                 let source_literal = literals[0];
-                let source_package =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(source_literal));
+                let source_package = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(source_literal).clone_box(),
+                );
 
                 Ok(source_package)
             }
@@ -264,11 +287,7 @@ pub trait Rule: std::fmt::Display {
                 // PHP: array_values(array_filter($packages, fn ($p) => !($p instanceof AliasPackage)))
                 let packages_non_alias: Vec<Box<dyn BasePackage>> = packages
                     .iter()
-                    .filter(|p| {
-                        (p.as_any() as &dyn Any)
-                            .downcast_ref::<AliasPackage>()
-                            .is_none()
-                    })
+                    .filter(|p| p.as_any().downcast_ref::<AliasPackage>().is_none())
                     .map(|p| p.clone_box())
                     .collect();
                 if packages_non_alias.len() == 1 {
@@ -320,10 +339,12 @@ pub trait Rule: std::fmt::Display {
             }
 
             r if r == Self::RULE_PACKAGE_CONFLICT => {
-                let mut package1 =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
-                let mut package2 =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
+                let mut package1 = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[0]).clone_box(),
+                );
+                let mut package2 = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[1]).clone_box(),
+                );
 
                 let mut conflict_target = package1.get_pretty_string();
                 let reason_data = self.get_reason_data();
@@ -386,8 +407,9 @@ pub trait Rule: std::fmt::Display {
             r if r == Self::RULE_PACKAGE_REQUIRES => {
                 assert!(literals.len() > 0);
                 let source_literal = array_shift(&mut literals).unwrap();
-                let source_package =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(source_literal));
+                let source_package = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(source_literal).clone_box(),
+                );
                 let reason_data = self.get_reason_data();
                 let link = match reason_data {
                     ReasonData::Link(l) => l,
@@ -522,7 +544,7 @@ pub trait Rule: std::fmt::Display {
                     let mut groups: IndexMap<String, Vec<Box<dyn BasePackage>>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
-                        let group = if installed_map.contains_key(&package.id) {
+                        let group = if installed_map.contains_key(&package.id()) {
                             if *literal > 0 { "keep" } else { "remove" }
                         } else {
                             if *literal > 0 {
@@ -565,8 +587,9 @@ pub trait Rule: std::fmt::Display {
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                     return String::new();
                 }
-                let package =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
+                let package = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[1]).clone_box(),
+                );
 
                 format!(
                     "{} is an alias of {} and thus requires it to be installed too.",
@@ -582,8 +605,9 @@ pub trait Rule: std::fmt::Display {
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                     return String::new();
                 }
-                let package =
-                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
+                let package = self.deduplicate_default_branch_alias(
+                    pool.literal_to_package(literals[0]).clone_box(),
+                );
 
                 format!(
                     "{} is an alias of {} and must be installed with it.",
@@ -656,7 +680,7 @@ pub trait Rule: std::fmt::Display {
         &self,
         package: Box<dyn BasePackage>,
     ) -> Box<dyn BasePackage> {
-        if let Some(alias_pkg) = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>() {
+        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
             if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                 return alias_pkg.get_alias_of().clone_box();
             }
@@ -666,21 +690,29 @@ pub trait Rule: std::fmt::Display {
     }
 }
 
+#[derive(Debug)]
 pub struct RuleBase {
-    bitfield: i64,
-    request: Option<Request>,
-    reason_data: Option<ReasonData>,
+    pub(crate) bitfield: i64,
+    pub(crate) request: Option<Request>,
+    pub(crate) reason_data: Option<ReasonData>,
 }
 
 impl RuleBase {
-    fn new(reason: i64, reason_data: ReasonData) -> Self {
-        let bitfield = (0i64 << Self::BITFIELD_DISABLED)
-            | (reason << Self::BITFIELD_REASON)
-            | (255i64 << Self::BITFIELD_TYPE);
+    pub const BITFIELD_DISABLED: i64 = BITFIELD_DISABLED;
+    pub const BITFIELD_REASON: i64 = BITFIELD_REASON;
+    pub const BITFIELD_TYPE: i64 = BITFIELD_TYPE;
+
+    pub fn new(reason: i64, reason_data: ReasonData) -> Self {
+        let bitfield =
+            (0i64 << BITFIELD_DISABLED) | (reason << BITFIELD_REASON) | (255i64 << BITFIELD_TYPE);
         Self {
             bitfield,
             request: None,
             reason_data: Some(reason_data),
         }
+    }
+
+    pub fn is_disabled(&self) -> bool {
+        0 != ((self.bitfield & (255 << BITFIELD_DISABLED)) >> BITFIELD_DISABLED)
     }
 }

@@ -116,10 +116,7 @@ impl LockTransaction {
             .map(|v| v.as_slice())
             .unwrap_or_default();
         for package in source {
-            if (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some()
-            {
+            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                 continue;
             }
 
@@ -152,9 +149,7 @@ impl LockTransaction {
                 continue;
             }
 
-            if let Some(concrete_pkg) =
-                (present_package.as_any() as &dyn Any).downcast_ref::<Package>()
-            {
+            if let Some(concrete_pkg) = present_package.as_any().downcast_ref::<Package>() {
                 concrete_pkg.set_source_url(package.get_source_url());
                 concrete_pkg.set_source_mirrors(package.get_source_mirrors());
             }
@@ -171,9 +166,9 @@ impl LockTransaction {
                     r"{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
                     present_package.get_dist_reference().unwrap(),
                     package.get_dist_url().unwrap(),
-                    -1,
-                ).unwrap_or_else(|_| package.get_dist_url().unwrap().to_string());
-                present_package.set_dist_url(&new_dist_url);
+                )
+                .unwrap_or_else(|_| package.get_dist_url().unwrap().to_string());
+                present_package.set_dist_url(Some(new_dist_url));
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());
 
@@ -192,10 +187,7 @@ impl LockTransaction {
 
         if let Some(all_packages) = self.result_packages.get("all") {
             for package in all_packages {
-                if (package.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .is_some()
-                {
+                if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                     let mut i = 0;
                     while i < remaining_aliases.len() {
                         if remaining_aliases[i].get("package").map(|s| s.as_str())

@@ -127,13 +127,17 @@ impl ConfigValidator {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if let Some(spdx_license) = spdx_license {
                     if spdx_license[3] {
-                        if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?\+$}i", license) {
+                        if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?\+$}i", license)
+                            .unwrap_or(false)
+                        {
                             warnings.push(format!(
                                 "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
                                 license,
                                 license.replace('+', "")
                             ));
-                        } else if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?$}i", license) {
+                        } else if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?$}i", license)
+                            .unwrap_or(false)
+                        {
                             warnings.push(format!(
                                 "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
                                 license, license, license
@@ -154,7 +158,7 @@ impl ConfigValidator {
         }
 
         if let Some(PhpMixed::String(name)) = manifest.get("name") {
-            if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name) {
+            if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name).unwrap_or(false) {
                 let suggest_name = Preg::replace(
                     r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
                     r"\1\3-\2\4",
@@ -230,7 +234,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version.as_ref() {
-                if Preg::is_match(r"{#}", version_str) {
+                if Preg::is_match(r"{#}", version_str).unwrap_or(false) {
                     warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
                         package

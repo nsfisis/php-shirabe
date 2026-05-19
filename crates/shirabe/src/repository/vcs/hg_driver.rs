@@ -30,6 +30,7 @@ impl HgDriver {
             let cache_vcs_dir = self
                 .inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or("")
@@ -58,30 +59,32 @@ impl HgDriver {
                 }.into());
             }
 
-            self.inner
-                .config
-                .prohibit_url_by_config(&self.inner.url, &*self.inner.io)?;
+            self.inner.config.borrow_mut().prohibit_url_by_config(
+                &self.inner.url,
+                Some(&*self.inner.io),
+                &indexmap::IndexMap::new(),
+            )?;
 
-            let hg_utils = HgUtils::new(&*self.inner.io, &self.inner.config, &self.inner.process);
+            let hg_utils = HgUtils::new(
+                &*self.inner.io,
+                &*self.inner.config.borrow(),
+                &self.inner.process,
+            );
 
             if is_dir(&self.repo_dir)
-                && self.inner.process.execute(
+                && self.inner.process.borrow_mut().execute_args(
                     &["hg", "summary"].map(|s| s.to_string()).to_vec(),
                     &mut String::new(),
                     Some(self.repo_dir.clone()),
                 ) == 0
             {
-                if self.inner.process.execute(
+                if self.inner.process.borrow_mut().execute_args(
                     &["hg", "pull"].map(|s| s.to_string()).to_vec(),
                     &mut String::new(),
                     Some(self.repo_dir.clone()),
                 ) != 0
                 {
-                    self.inner.io.write_error(
-                        format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.get_error_output()).into(),
-                        true,
-                        crate::io::io_interface::NORMAL,
-                    );
+                    self.inner.io.write_error3(format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()).into(), true, crate::io::io_interface::NORMAL);
                 }
             } else {
                 let fs2 = Filesystem::new(None);
@@ -112,14 +115,14 @@ impl HgDriver {
     pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if self.root_identifier.is_none() {
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["hg", "tip", "--template", "{node}"]
                     .map(|s| s.to_string())
                     .to_vec(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            let lines = self.inner.process.split_lines(&output);
+            let lines = self.inner.process.borrow().split_lines(&output);
             self.root_identifier = lines.into_iter().next();
         }
 
@@ -163,9 +166,11 @@ impl HgDriver {
             file.to_string(),
         ];
         let mut content = String::new();
-        self.inner
-            .process
-            .execute(&resource, &mut content, Some(self.repo_dir.clone()));
+        self.inner.process.borrow_mut().execute_args(
+            &resource,
+            &mut content,
+            Some(self.repo_dir.clone()),
+        );
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -187,7 +192,7 @@ impl HgDriver {
         }
 
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &[
                 "hg",
                 "log",
@@ -210,12 +215,12 @@ impl HgDriver {
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["hg", "tags"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            for tag in self.inner.process.split_lines(&output) {
+            for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
                     if let Some(m) = Preg::match_(r"^([^\s]+)\s+\d+:(.*)$", &tag) {
                         tags.insert(
@@ -239,12 +244,12 @@ impl HgDriver {
             let mut bookmarks: IndexMap<String, String> = IndexMap::new();
 
             let mut output = String::new();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["hg", "branches"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            for branch in self.inner.process.split_lines(&output) {
+            for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     if let Some(m) = Preg::match_(r"^([^\s]+)\s+\d+:([a-f0-9]+)", &branch) {
                         let name = m.get("1").cloned().unwrap_or_default();
@@ -256,12 +261,12 @@ impl HgDriver {
             }
 
             output.clear();
-            self.inner.process.execute(
+            self.inner.process.borrow_mut().execute_args(
                 &["hg", "bookmarks"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(self.repo_dir.clone()),
             );
-            for branch in self.inner.process.split_lines(&output) {
+            for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     if let Some(m) = Preg::match_(r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$", &branch) {
                         let name = m.get("1").cloned().unwrap_or_default();
@@ -298,7 +303,7 @@ impl HgDriver {
 
             let process = crate::util::process_executor::ProcessExecutor::new(io);
             let mut output = String::new();
-            if process.execute(
+            if process.execute_args(
                 &["hg", "summary"].map(|s| s.to_string()).to_vec(),
                 &mut output,
                 Some(url),
@@ -314,7 +319,7 @@ impl HgDriver {
 
         let process = crate::util::process_executor::ProcessExecutor::new(io);
         let mut ignored = String::new();
-        let exit = process.execute(
+        let exit = process.execute_args(
             &["hg", "identify", "--", url]
                 .map(|s| s.to_string())
                 .to_vec(),

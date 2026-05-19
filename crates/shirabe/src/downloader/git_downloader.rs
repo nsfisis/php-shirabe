@@ -3,7 +3,7 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
@@ -38,12 +38,17 @@ pub struct GitDownloader {
 impl GitDownloader {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        process: Option<ProcessExecutor>,
-        fs: Option<Filesystem>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
+        fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
         let inner = VcsDownloaderBase::new(io, config, process, fs);
-        let git_util = GitUtil::new(&*inner.io, &inner.config, &inner.process, &inner.filesystem);
+        let git_util = GitUtil::new(
+            inner.io.clone_box(),
+            std::rc::Rc::clone(&inner.config),
+            std::rc::Rc::clone(&inner.process),
+            std::rc::Rc::clone(&inner.filesystem),
+        );
         Self {
             inner,
             has_stashed_changes: IndexMap::new(),
@@ -71,10 +76,11 @@ impl GitDownloader {
             "{}/{}/",
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
         );
         let git_version = GitUtil::get_version(&self.inner.process);
 
@@ -83,20 +89,20 @@ impl GitDownloader {
             && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", ">=")
             && Cache::is_usable(&cache_path)
         {
-            self.inner.io.write_error(
-                PhpMixed::String(format!(
+            self.inner.io.write_error3(
+                &format!(
                     "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
                     package.get_name(),
                     package.get_full_pretty_version(),
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
-            self.inner.io.write_error(
-                PhpMixed::String(sprintf(
+            self.inner.io.write_error3(
+                &sprintf(
                     "    Cloning to cache at %s",
                     &[PhpMixed::String(cache_path.clone())],
-                )),
+                ),
                 true,
                 io_interface::DEBUG,
             );
@@ -136,10 +142,11 @@ impl GitDownloader {
             "{}/{}/",
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
         );
         let r#ref = package.get_source_reference().unwrap_or("").to_string();
 
@@ -252,7 +259,8 @@ impl GitDownloader {
 
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
-        self.git_util.run_commands(commands, url, &path, true);
+        self.git_util
+            .run_commands(commands, url, Some(&path), true, None)?;
 
         let source_url = package.get_source_url();
         if url != source_url.unwrap_or("") && source_url.is_some() {
@@ -299,10 +307,11 @@ impl GitDownloader {
             "{}/{}/",
             self.inner
                 .config
+                .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
         );
         let r#ref = target.get_source_reference().unwrap_or("").to_string();
 
@@ -335,7 +344,7 @@ impl GitDownloader {
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec![
                 "git".to_string(),
                 "rev-parse".to_string(),
@@ -369,7 +378,8 @@ impl GitDownloader {
                 ],
             ];
 
-            self.git_util.run_commands(commands, url, &path, false);
+            self.git_util
+                .run_commands(commands, url, Some(&path), false, None)?;
         }
 
         let command = vec![
@@ -380,7 +390,8 @@ impl GitDownloader {
             "--".to_string(),
             "%sanitizedUrl%".to_string(),
         ];
-        self.git_util.run_commands(vec![command], url, &path, false);
+        self.git_util
+            .run_commands(vec![command], url, Some(&path), false, None)?;
 
         if let Some(new_ref) =
             self.update_to_commit(target, &path, &r#ref, target.get_pretty_version())?
@@ -395,18 +406,35 @@ impl GitDownloader {
 
         let mut update_origin_url = false;
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
             &mut output,
             Some(path.clone()),
         ) == 0
         {
-            let origin_match = Preg::is_match_strict_groups(r"{^origin\s+(?P<url>\S+)}m", &output);
-            let composer_match =
-                Preg::is_match_strict_groups(r"{^composer\s+(?P<url>\S+)}m", &output);
-            if let (Some(origin_match), Some(composer_match)) = (origin_match, composer_match) {
-                let origin_url = origin_match.get("url").cloned().unwrap_or_default();
-                let composer_url = composer_match.get("url").cloned().unwrap_or_default();
+            let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut composer_match: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match3(
+                r"{^origin\s+(?P<url>\S+)}m",
+                &output,
+                Some(&mut origin_match),
+            )
+            .unwrap_or(false)
+                && Preg::is_match3(
+                    r"{^composer\s+(?P<url>\S+)}m",
+                    &output,
+                    Some(&mut composer_match),
+                )
+                .unwrap_or(false)
+            {
+                let origin_url = origin_match
+                    .get(&CaptureKey::ByName("url".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
+                let composer_url = composer_match
+                    .get(&CaptureKey::ByName("url".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
                 if origin_url == composer_url
                     && Some(composer_url.as_str()) != target.get_source_url()
                 {
@@ -434,11 +462,11 @@ impl GitDownloader {
             "--untracked-files=no".to_string(),
         ];
         let mut output = String::new();
-        if self
-            .inner
-            .process
-            .execute(&command, &mut output, Some(path.to_string()))
-            != 0
+        if self.inner.process.borrow_mut().execute_args(
+            &command,
+            &mut output,
+            Some(path.to_string()),
+        ) != 0
         {
             // TODO(phase-b): cannot throw from &self / non-Result fn; bubble error via Result later
             panic!(
@@ -446,7 +474,7 @@ impl GitDownloader {
                 format!(
                     "Failed to execute {}\n\n{}",
                     implode(" ", &command),
-                    self.inner.process.get_error_output(),
+                    self.inner.process.borrow().get_error_output(),
                 )
             );
         }
@@ -481,7 +509,8 @@ impl GitDownloader {
         if self
             .inner
             .process
-            .execute(&command, &mut output, Some(path.clone()))
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(path.clone()))
             != 0
         {
             // TODO(phase-b): bubble error via Result later
@@ -490,26 +519,39 @@ impl GitDownloader {
                 format!(
                     "Failed to execute {}\n\n{}",
                     implode(" ", &command),
-                    self.inner.process.get_error_output(),
+                    self.inner.process.borrow().get_error_output(),
                 )
             );
         }
 
         let mut refs = trim(&output, None);
-        let head_ref = match Preg::is_match_strict_groups(r"{^([a-f0-9]+) HEAD$}mi", &refs) {
-            Some(m) => m.get(1).cloned().unwrap_or_default(),
+        let mut head_match: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::is_match_strict_groups3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match))
+            .unwrap_or(false)
+        {
             // could not match the HEAD for some reason
-            None => return None,
-        };
+            return None;
+        }
+        let head_ref = head_match
+            .get(&CaptureKey::ByIndex(1))
+            .cloned()
+            .unwrap_or_default();
 
-        let candidate_branches: Vec<String> = match Preg::is_match_all_strict_groups(
+        let mut branches_match: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+        if !Preg::is_match_all_strict_groups3(
             &format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
-        ) {
-            Some(m) => m.get(1).cloned().unwrap_or_default(),
+            Some(&mut branches_match),
+        )
+        .unwrap_or(false)
+        {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
-            None => return None,
-        };
+            return None;
+        }
+        let candidate_branches: Vec<String> = branches_match
+            .get(&CaptureKey::ByIndex(1))
+            .cloned()
+            .unwrap_or_default();
 
         // use the first match as branch name for now
         let mut branch = candidate_branches[0].clone();
@@ -522,14 +564,19 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                if let Some(m) = Preg::is_match_all_strict_groups(
+                let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+                if Preg::is_match_all_strict_groups3(
                     &format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)
                     ),
                     &refs,
-                ) {
-                    let matches: Vec<String> = m.get(1).cloned().unwrap_or_default();
+                    Some(&mut m),
+                )
+                .unwrap_or(false)
+                {
+                    let matches: Vec<String> =
+                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for match_ in matches {
                         branch = candidate.clone();
                         remote_branches.push(match_);
@@ -562,11 +609,11 @@ impl GitDownloader {
                         "--".to_string(),
                     ];
                     let mut output = String::new();
-                    if self
-                        .inner
-                        .process
-                        .execute(&command, &mut output, Some(path.clone()))
-                        != 0
+                    if self.inner.process.borrow_mut().execute_args(
+                        &command,
+                        &mut output,
+                        Some(path.clone()),
+                    ) != 0
                     {
                         // TODO(phase-b): bubble error via Result later
                         panic!(
@@ -574,7 +621,7 @@ impl GitDownloader {
                             format!(
                                 "Failed to execute {}\n\n{}",
                                 implode(" ", &command),
-                                self.inner.process.get_error_output(),
+                                self.inner.process.borrow().get_error_output(),
                             )
                         );
                     }
@@ -593,7 +640,7 @@ impl GitDownloader {
             // remotes and then try again as outdated remotes can sometimes cause false-positives
             if unpushed_changes.is_some() && i == 0 {
                 let mut output = String::new();
-                self.inner.process.execute(
+                self.inner.process.borrow_mut().execute_args(
                     &vec!["git".to_string(), "fetch".to_string(), "--all".to_string()],
                     &mut output,
                     Some(path.clone()),
@@ -607,11 +654,11 @@ impl GitDownloader {
                     "-d".to_string(),
                 ];
                 let mut output = String::new();
-                if self
-                    .inner
-                    .process
-                    .execute(&command, &mut output, Some(path.clone()))
-                    != 0
+                if self.inner.process.borrow_mut().execute_args(
+                    &command,
+                    &mut output,
+                    Some(path.clone()),
+                ) != 0
                 {
                     // TODO(phase-b): bubble error via Result later
                     panic!(
@@ -619,7 +666,7 @@ impl GitDownloader {
                         format!(
                             "Failed to execute {}\n\n{}",
                             implode(" ", &command),
-                            self.inner.process.get_error_output(),
+                            self.inner.process.borrow().get_error_output(),
                         )
                     );
                 }
@@ -647,7 +694,13 @@ impl GitDownloader {
         let unpushed = self.get_unpushed_changes(package, &path);
         if let Some(unpushed) = unpushed.as_deref() {
             if self.inner.io.is_interactive()
-                || self.inner.config.get("discard-changes").as_bool() != Some(true)
+                || self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("discard-changes")
+                    .as_bool()
+                    != Some(true)
             {
                 return Err(RuntimeException {
                     message: format!(
@@ -666,7 +719,7 @@ impl GitDownloader {
         };
 
         if !self.inner.io.is_interactive() {
-            let discard_changes = self.inner.config.get("discard-changes");
+            let discard_changes = self.inner.config.borrow_mut().get("discard-changes");
             if discard_changes.as_bool() == Some(true) {
                 return self.discard_changes(&path);
             }
@@ -685,16 +738,16 @@ impl GitDownloader {
             |elem: &String| format!("    {}", elem),
             &Preg::split(r"{\s*\r?\n\s*}", &changes),
         );
-        self.inner.io.write_error(
-            PhpMixed::String(format!(
+        self.inner.io.write_error3(
+            &format!(
                 "    <error>{} has modified files:</error>",
                 package.get_pretty_name()
-            )),
+            ),
             true,
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        self.inner.io.write_error(
+        self.inner.io.write_error3(
             PhpMixed::List(
                 changes[..slice_end]
                     .iter()
@@ -705,11 +758,11 @@ impl GitDownloader {
             io_interface::NORMAL,
         );
         if (changes.len() as i64) > 10 {
-            self.inner.io.write_error(
-                PhpMixed::String(format!(
+            self.inner.io.write_error3(
+                &format!(
                     "    <info>{} more files modified, choose \"v\" to view the full list</info>",
                     changes.len() as i64 - 10
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -751,7 +804,7 @@ impl GitDownloader {
                     .into());
                 }
                 Some("v") => {
-                    self.inner.io.write_error(
+                    self.inner.io.write_error3(
                         PhpMixed::List(
                             changes
                                 .iter()
@@ -773,7 +826,7 @@ impl GitDownloader {
 
             if do_help {
                 // help:
-                self.inner.io.write_error(
+                self.inner.io.write_error3(
                     PhpMixed::List(vec![
                         Box::new(PhpMixed::String(format!(
                             "    y - discard changes and apply the {}",
@@ -792,20 +845,15 @@ impl GitDownloader {
                     io_interface::NORMAL,
                 );
                 if update {
-                    self.inner.io.write_error(
-                        PhpMixed::String(
-                            "    s - stash changes and try to reapply them after the update"
-                                .to_string(),
-                        ),
+                    self.inner.io.write_error3(
+                        "    s - stash changes and try to reapply them after the update",
                         true,
                         io_interface::NORMAL,
                     );
                 }
-                self.inner.io.write_error(
-                    PhpMixed::String("    ? - print help".to_string()),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.inner
+                    .io
+                    .write_error3("    ? - print help", true, io_interface::NORMAL);
             }
         }
 
@@ -821,13 +869,13 @@ impl GitDownloader {
             .unwrap_or(false)
         {
             self.has_stashed_changes.shift_remove(&path);
-            self.inner.io.write_error(
-                PhpMixed::String("    <info>Re-applying stashed changes</info>".to_string()),
+            self.inner.io.write_error3(
+                "    <info>Re-applying stashed changes</info>",
                 true,
                 io_interface::NORMAL,
             );
             let mut output = String::new();
-            if self.inner.process.execute(
+            if self.inner.process.borrow_mut().execute_args(
                 &vec!["git".to_string(), "stash".to_string(), "pop".to_string()],
                 &mut output,
                 Some(path.clone()),
@@ -836,7 +884,7 @@ impl GitDownloader {
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to apply stashed changes:\n\n{}",
-                        self.inner.process.get_error_output()
+                        self.inner.process.borrow().get_error_output()
                     ),
                     code: 0,
                 }
@@ -877,11 +925,7 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = Preg::replace(
-            r"{(?:^dev-|(?:\.x)?-dev$)}i",
-            "",
-            pretty_version.to_string(),
-        );
+        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version);
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -889,7 +933,7 @@ impl GitDownloader {
         let mut branches: Option<String> = None;
         {
             let mut output = String::new();
-            if self.inner.process.execute(
+            if self.inner.process.borrow_mut().execute_args(
                 &vec!["git".to_string(), "branch".to_string(), "-r".to_string()],
                 &mut output,
                 Some(path.to_string()),
@@ -926,17 +970,18 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok1 = self
-                .inner
-                .process
-                .execute(&command1, &mut output, Some(path.to_string()))
-                == 0;
+            let ok1 = self.inner.process.borrow_mut().execute_args(
+                &command1,
+                &mut output,
+                Some(path.to_string()),
+            ) == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .execute(&command2, &mut output, Some(path.to_string()))
-                    == 0
+                self.inner.process.borrow_mut().execute_args(
+                    &command2,
+                    &mut output,
+                    Some(path.to_string()),
+                ) == 0
             } else {
                 false
             };
@@ -986,26 +1031,28 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok_command =
-                self.inner
-                    .process
-                    .execute(&command, &mut output, Some(path.to_string()))
-                    == 0;
+            let ok_command = self.inner.process.borrow_mut().execute_args(
+                &command,
+                &mut output,
+                Some(path.to_string()),
+            ) == 0;
             let ok_fallback = if !ok_command {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .execute(&fallback_command, &mut output, Some(path.to_string()))
-                    == 0
+                self.inner.process.borrow_mut().execute_args(
+                    &fallback_command,
+                    &mut output,
+                    Some(path.to_string()),
+                ) == 0
             } else {
                 false
             };
             let ok_reset = if ok_command || ok_fallback {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .execute(&reset_command, &mut output, Some(path.to_string()))
-                    == 0
+                self.inner.process.borrow_mut().execute_args(
+                    &reset_command,
+                    &mut output,
+                    Some(path.to_string()),
+                ) == 0
             } else {
                 false
             };
@@ -1026,17 +1073,18 @@ impl GitDownloader {
         ];
         {
             let mut output = String::new();
-            let ok1 = self
-                .inner
-                .process
-                .execute(&command1, &mut output, Some(path.to_string()))
-                == 0;
+            let ok1 = self.inner.process.borrow_mut().execute_args(
+                &command1,
+                &mut output,
+                Some(path.to_string()),
+            ) == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .execute(&command2, &mut output, Some(path.to_string()))
-                    == 0
+                self.inner.process.borrow_mut().execute_args(
+                    &command2,
+                    &mut output,
+                    Some(path.to_string()),
+                ) == 0
             } else {
                 false
             };
@@ -1048,12 +1096,12 @@ impl GitDownloader {
         let mut exception_extra = String::new();
 
         // reference was not found (prints "fatal: reference is not a tree: $ref")
-        if strpos(self.inner.process.get_error_output(), reference).is_some() {
-            self.inner.io.write_error(
-                PhpMixed::String(format!(
+        if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
+            self.inner.io.write_error3(
+                &format!(
                     "    <warning>{} is gone (history was rewritten?)</warning>",
                     reference
-                )),
+                ),
                 true,
                 io_interface::NORMAL,
             );
@@ -1074,7 +1122,7 @@ impl GitDownloader {
             message: Url::sanitize(format!(
                 "Failed to execute {}\n\n{}{}",
                 command,
-                self.inner.process.get_error_output(),
+                self.inner.process.borrow().get_error_output(),
                 exception_extra,
             )),
             code: 0,
@@ -1084,7 +1132,7 @@ impl GitDownloader {
 
     pub(crate) fn update_origin_url(&mut self, path: &str, url: &str) {
         let mut output = String::new();
-        self.inner.process.execute(
+        self.inner.process.borrow_mut().execute_args(
             &vec![
                 "git".to_string(),
                 "remote".to_string(),
@@ -1101,17 +1149,30 @@ impl GitDownloader {
 
     pub(crate) fn set_push_url(&mut self, path: &str, url: &str) {
         // set push url for github projects
-        if let Some(match_) = Preg::is_match_strict_groups(
+        let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3(
             &format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
-                GitUtil::get_github_domains_regex(&self.inner.config)
+                GitUtil::get_github_domains_regex(&*self.inner.config.borrow())
             ),
             url,
-        ) {
-            let protocols = self.inner.config.get("github-protocols");
-            let m1 = match_.get(1).cloned().unwrap_or_default();
-            let m2 = match_.get(2).cloned().unwrap_or_default();
-            let m3 = match_.get(3).cloned().unwrap_or_default();
+            Some(&mut match_),
+        )
+        .unwrap_or(false)
+        {
+            let protocols = self.inner.config.borrow_mut().get("github-protocols");
+            let m1 = match_
+                .get(&CaptureKey::ByIndex(1))
+                .cloned()
+                .unwrap_or_default();
+            let m2 = match_
+                .get(&CaptureKey::ByIndex(2))
+                .cloned()
+                .unwrap_or_default();
+            let m3 = match_
+                .get(&CaptureKey::ByIndex(3))
+                .cloned()
+                .unwrap_or_default();
             let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
             if !in_array(PhpMixed::String("ssh".to_string()), &protocols, true) {
                 push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
@@ -1126,9 +1187,11 @@ impl GitDownloader {
                 push_url,
             ];
             let mut ignored_output = String::new();
-            self.inner
-                .process
-                .execute(&cmd, &mut ignored_output, Some(path.to_string()));
+            self.inner.process.borrow_mut().execute_args(
+                &cmd,
+                &mut ignored_output,
+                Some(path.to_string()),
+            );
         }
     }
 
@@ -1150,14 +1213,15 @@ impl GitDownloader {
         if self
             .inner
             .process
-            .execute(&command, &mut output, Some(path.clone()))
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(path.clone()))
             != 0
         {
             return Err(RuntimeException {
                 message: format!(
                     "Failed to execute {}\n\n{}",
                     implode(" ", &command),
-                    self.inner.process.get_error_output(),
+                    self.inner.process.borrow().get_error_output(),
                 ),
                 code: 0,
             }
@@ -1172,7 +1236,7 @@ impl GitDownloader {
     pub(crate) fn discard_changes(&mut self, path: &str) -> Result<Box<dyn PromiseInterface>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "clean".to_string(), "-df".to_string()],
             &mut output,
             Some(path.clone()),
@@ -1185,7 +1249,7 @@ impl GitDownloader {
             .into());
         }
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "reset".to_string(), "--hard".to_string()],
             &mut output,
             Some(path.clone()),
@@ -1208,7 +1272,7 @@ impl GitDownloader {
     pub(crate) fn stash_changes(&mut self, path: &str) -> Result<Box<dyn PromiseInterface>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec![
                 "git".to_string(),
                 "stash".to_string(),
@@ -1234,7 +1298,7 @@ impl GitDownloader {
     pub(crate) fn view_diff(&mut self, path: &str) {
         let path = self.normalize_path(path);
         let mut output = String::new();
-        if self.inner.process.execute(
+        if self.inner.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "diff".to_string(), "HEAD".to_string()],
             &mut output,
             Some(path.clone()),

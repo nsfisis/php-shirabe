@@ -4,7 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 
 use crate::util::silencer::Silencer;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise::promise::Promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
@@ -34,7 +34,7 @@ pub struct HttpDownloader {
     /// @var IOInterface
     io: Box<dyn IOInterface>,
     /// @var Config
-    config: Config,
+    config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var array<Job>
     jobs: IndexMap<i64, Job>,
     /// @var mixed[]
@@ -88,13 +88,12 @@ impl HttpDownloader {
     /// @param mixed[]     $options    The options
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
         disable_tls: bool,
     ) -> Self {
         let disabled = Platform::get_env("COMPOSER_DISABLE_NETWORK")
-            .as_bool()
-            .unwrap_or(false);
+            .map_or(false, |s| !s.is_empty() && s != "0");
 
         // Setup TLS options
         // The cafile option can be set via config.json
@@ -125,8 +124,8 @@ impl HttpDownloader {
 
         let curl = if Self::is_curl_enabled() {
             Some(CurlDownloader::new(
-                &*io,
-                &config,
+                io.clone_box(),
+                std::rc::Rc::clone(&config),
                 options.clone(),
                 disable_tls,
             ))
@@ -135,8 +134,8 @@ impl HttpDownloader {
         };
 
         let rfs = Some(RemoteFilesystem::new(
-            &*io,
-            &config,
+            io.clone_box(),
+            std::rc::Rc::clone(&config),
             options.clone(),
             disable_tls,
         ));
@@ -328,7 +327,7 @@ impl HttpDownloader {
 
         let id = self.id_gen;
         self.id_gen += 1;
-        let origin = Url::get_origin(&self.config, &request.url);
+        let origin = Url::get_origin(&*self.config.borrow(), &request.url);
 
         let job = Job {
             id,
@@ -354,13 +353,28 @@ impl HttpDownloader {
         }
 
         // capture username/password from URL if there is one
-        if let Some(m) =
-            Preg::is_match_strict_groups(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i", &request.url)
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(
+            r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i",
+            &request.url,
+            Some(&mut m),
+        )
+        .unwrap_or(false)
         {
             self.io.set_authentication(
                 origin.clone(),
-                rawurldecode(m.get(1).cloned().unwrap_or_default().as_str()),
-                Some(rawurldecode(m.get(2).cloned().unwrap_or_default().as_str())),
+                rawurldecode(
+                    m.get(&CaptureKey::ByIndex(1))
+                        .cloned()
+                        .unwrap_or_default()
+                        .as_str(),
+                ),
+                Some(rawurldecode(
+                    m.get(&CaptureKey::ByIndex(2))
+                        .cloned()
+                        .unwrap_or_default()
+                        .as_str(),
+                )),
             );
         }
 
@@ -723,7 +737,7 @@ impl HttpDownloader {
             return false;
         }
 
-        if !Preg::is_match(r"{^https?://}i", &job.request.url) {
+        if !Preg::is_match(r"{^https?://}i", &job.request.url).unwrap_or(false) {
             return false;
         }
 

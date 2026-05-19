@@ -34,6 +34,10 @@ impl SolverOperation for InstallOperation {
 }
 
 impl OperationInterface for InstallOperation {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_operation_type(&self) -> String {
         Self::TYPE.to_string()
     }
@@ -44,5 +48,9 @@ impl OperationInterface for InstallOperation {
 
     fn to_string(&self) -> String {
         self.show(true)
+    }
+
+    fn as_install_operation(&self) -> Option<&InstallOperation> {
+        Some(self)
     }
 }

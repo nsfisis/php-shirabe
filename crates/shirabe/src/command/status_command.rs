@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
@@ -31,8 +31,8 @@ impl StatusCommand {
         self
             .set_name("status")
             .set_description("Shows a list of locally modified packages")
-            .set_definition(vec![
-                InputOption::new("verbose", Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Show modified files for each directory that contains changes.", None),
+            .set_definition(&[
+                InputOption::new("verbose", Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Show modified files for each directory that contains changes.", None).unwrap().into(),
             ])
             .set_help(
                 "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status"
@@ -43,14 +43,7 @@ impl StatusCommand {
         let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(
-            PluginEvents::COMMAND.to_string(),
-            "status".to_string(),
-            input,
-            output,
-            vec![],
-            vec![],
-        );
+        let command_event = CommandEvent::new(PluginEvents::COMMAND, "status", input, output);
         composer
             .get_event_dispatcher()
             .dispatch(Some(command_event.get_name()), None);
@@ -93,9 +86,14 @@ impl StatusCommand {
             .get_loop()
             .borrow()
             .get_process_executor()
-            .cloned()
-            .unwrap_or_else(|| ProcessExecutor::new(io));
-        let guesser = VersionGuesser::new(composer.get_config(), &process_executor, &parser, io);
+            .map(std::rc::Rc::clone)
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
+        let guesser = VersionGuesser::new(
+            std::rc::Rc::clone(composer.get_config()),
+            std::rc::Rc::clone(&process_executor),
+            parser.clone(),
+            Some(io.clone_box()),
+        );
         let dumper = ArrayDumper::new();
 
         for package in installed_repo.get_canonical_packages() {

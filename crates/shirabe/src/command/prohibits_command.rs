@@ -5,8 +5,8 @@ use crate::command::base_dependency_command::BaseDependencyCommand;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 
 #[derive(Debug)]
 pub struct ProhibitsCommand {
@@ -21,40 +21,50 @@ impl ProhibitsCommand {
         self.set_name("prohibits")
             .set_aliases(&["why-not".to_string()])
             .set_description("Shows which packages prevent the given package from being installed")
-            .set_definition(vec![
+            .set_definition(&[
                 InputArgument::new(
-                    BaseDependencyCommand::ARGUMENT_PACKAGE,
+                    <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
                     Some(InputArgument::REQUIRED),
                     "Package to inspect",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputArgument::new(
-                    BaseDependencyCommand::ARGUMENT_CONSTRAINT,
+                    <Self as BaseDependencyCommand>::ARGUMENT_CONSTRAINT,
                     Some(InputArgument::REQUIRED),
                     "Version constraint, which version you expected to be installed",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
-                    BaseDependencyCommand::OPTION_RECURSIVE,
+                    <Self as BaseDependencyCommand>::OPTION_RECURSIVE,
                     Some(shirabe_php_shim::PhpMixed::String("r".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Recursively resolves up to the root package",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
-                    BaseDependencyCommand::OPTION_TREE,
+                    <Self as BaseDependencyCommand>::OPTION_TREE,
                     Some(shirabe_php_shim::PhpMixed::String("t".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Prints the results as a nested tree",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "locked",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Read dependency information from composer.lock",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "Displays detailed information about why a package cannot be installed.\n\n\
@@ -75,7 +85,7 @@ impl BaseDependencyCommand for ProhibitsCommand {
         &self.colors
     }
 
-    fn colors_mut(&mut self) -> &mut [String] {
+    fn colors_mut(&mut self) -> &mut Vec<String> {
         &mut self.colors
     }
 }

@@ -31,17 +31,16 @@ impl CompositeRepository {
         &self.repositories
     }
 
-    pub fn remove_package(&mut self, package: &dyn PackageInterface) {
-        for repository in &mut self.repositories {
-            // TODO(phase-b): only call remove_package on WritableRepositoryInterface implementors
-            let _ = repository.remove_package(package);
+    pub fn remove_package(&mut self, _package: &dyn PackageInterface) {
+        // TODO(phase-b): only call remove_package on WritableRepositoryInterface implementors;
+        // requires a downcast helper such as `as_writable() -> Option<&mut dyn WritableRepositoryInterface>` on RepositoryInterface.
+        for _repository in &mut self.repositories {
+            todo!()
         }
     }
 
     pub fn add_repository(&mut self, repository: Box<dyn RepositoryInterface>) {
-        if let Some(composite) =
-            (repository.as_any() as &dyn Any).downcast_ref::<CompositeRepository>()
-        {
+        if let Some(composite) = repository.as_any().downcast_ref::<CompositeRepository>() {
             for repo in composite.get_repositories() {
                 self.repositories.push(repo.clone_box());
             }
@@ -78,11 +77,11 @@ impl RepositoryInterface for CompositeRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         for repository in &self.repositories {
-            let package = repository.find_package(name.clone(), constraint.clone());
+            let package = repository.find_package(name, constraint.clone());
             if package.is_some() {
                 return package;
             }
@@ -92,12 +91,12 @@ impl RepositoryInterface for CompositeRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         let mut packages = vec![];
         for repository in &self.repositories {
-            packages.extend(repository.find_packages(name.clone(), constraint.clone()));
+            packages.extend(repository.find_packages(name, constraint.clone()));
         }
         packages
     }

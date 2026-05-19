@@ -45,7 +45,7 @@ pub struct VcsRepository {
     /// @var IOInterface
     pub(crate) io: Box<dyn IOInterface>,
     /// @var Config
-    pub(crate) config: Config,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var VersionParser
     pub(crate) version_parser: Option<VersionParser>,
     /// @var string
@@ -55,9 +55,9 @@ pub struct VcsRepository {
     /// @var array<string, mixed>
     pub(crate) repo_config: IndexMap<String, PhpMixed>,
     /// @var HttpDownloader
-    pub(crate) http_downloader: HttpDownloader,
+    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     /// @var ProcessExecutor
-    pub(crate) process_executor: ProcessExecutor,
+    pub(crate) process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var bool
     pub(crate) branch_error_occurred: bool,
     /// @var array<string, class-string<VcsDriverInterface>>
@@ -86,10 +86,10 @@ impl VcsRepository {
     pub fn new(
         mut repo_config: IndexMap<String, PhpMixed>,
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: HttpDownloader,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<EventDispatcher>,
-        process: Option<ProcessExecutor>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         drivers: Option<IndexMap<String, String>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,
     ) -> Result<Self> {
@@ -154,8 +154,11 @@ impl VcsRepository {
             .to_string();
         let is_verbose = io.is_verbose();
         let is_very_verbose = io.is_very_verbose();
-        let process_executor =
-            process.unwrap_or_else(|| ProcessExecutor::new(Some(Box::new(&*io)), None));
+        let process_executor = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                Box::new(&*io),
+            ))))
+        });
 
         Ok(Self {
             inner,
@@ -477,7 +480,7 @@ impl VcsRepository {
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
-                        if Preg::is_match(r"{(^dev-|[.-]?dev$)}i", &parsed_tag) {
+                        if Preg::is_match(r"{(^dev-|[.-]?dev$)}i", &parsed_tag).unwrap_or(false) {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag
@@ -706,7 +709,7 @@ impl VcsRepository {
                 }
                 // TODO(phase-b): Box<dyn BasePackage> -> Box<dyn PackageInterface> coercion
                 self.inner.add_package(
-                    crate::package::package_interface::PackageInterface::clone_box(&*package),
+                    <dyn crate::package::package_interface::PackageInterface>::clone_box(&*package),
                 )?;
                 Ok(())
             })();

@@ -25,6 +25,10 @@ impl SolverOperation for MarkAliasInstalledOperation {
 }
 
 impl OperationInterface for MarkAliasInstalledOperation {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn get_operation_type(&self) -> String {
         Self::TYPE.to_string()
     }

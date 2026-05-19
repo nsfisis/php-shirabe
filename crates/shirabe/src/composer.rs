@@ -28,6 +28,17 @@ impl Composer {
     pub const SOURCE_VERSION: &'static str = "";
     pub const RUNTIME_API_VERSION: &'static str = "2.2.2";
 
+    pub fn new() -> Self {
+        Self {
+            inner: PartialComposer::default(),
+            locker: None,
+            download_manager: None,
+            plugin_manager: None,
+            autoload_generator: None,
+            archive_manager: None,
+        }
+    }
+
     pub fn get_version() -> String {
         if Self::VERSION == "@package_version@" {
             return Self::SOURCE_VERSION.to_string();
@@ -89,8 +100,14 @@ impl Composer {
         self.inner.get_package()
     }
 
-    pub fn get_config(&self) -> &crate::config::Config {
+    pub fn get_config(&self) -> &std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
         self.inner.get_config()
+    }
+
+    pub fn get_config_mut(
+        &mut self,
+    ) -> &mut std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
+        self.inner.get_config_mut()
     }
 
     pub fn get_repository_manager(

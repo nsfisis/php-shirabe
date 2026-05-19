@@ -117,12 +117,12 @@ impl PathDownloader {
         if realpath(&path).as_deref() == Some(&real_url) {
             if output {
                 let appendix = self.get_install_operation_appendix(package, &path)?;
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "  - {}{}",
                         InstallOperation::format(package, false),
                         appendix
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -141,14 +141,11 @@ impl PathDownloader {
             self.compute_allowed_strategies(&transport_options)?;
 
         let symfony_filesystem = SymfonyFilesystem::new(None);
-        self.inner.filesystem.remove_directory(&path);
+        self.inner.filesystem.borrow_mut().remove_directory(&path);
 
         if output {
-            self.inner.io.write_error(
-                PhpMixed::String(format!(
-                    "  - {}: ",
-                    InstallOperation::format(package, false)
-                )),
+            self.inner.io.write_error3(
+                &format!("  - {}: ", InstallOperation::format(package, false)),
                 false,
                 io_interface::NORMAL,
             );
@@ -160,18 +157,22 @@ impl PathDownloader {
                 if Platform::is_windows() {
                     // Implement symlinks as NTFS junctions on Windows
                     if output {
-                        self.inner.io.write_error(
-                            PhpMixed::String(format!("Junctioning from {}", url)),
+                        self.inner.io.write_error3(
+                            &format!("Junctioning from {}", url),
                             false,
                             io_interface::NORMAL,
                         );
                     }
-                    Ok(self.inner.filesystem.junction(&real_url, &path))
+                    Ok(self
+                        .inner
+                        .filesystem
+                        .borrow_mut()
+                        .junction(&real_url, &path))
                 } else {
                     let path = path.trim_end_matches('/').to_string();
                     if output {
-                        self.inner.io.write_error(
-                            PhpMixed::String(format!("Symlinking from {}", url)),
+                        self.inner.io.write_error3(
+                            &format!("Symlinking from {}", url),
                             false,
                             io_interface::NORMAL,
                         );
@@ -181,17 +182,18 @@ impl PathDownloader {
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false)
                     {
-                        let absolute_path = if !self.inner.filesystem.is_absolute_path(&path) {
-                            format!(
-                                "{}{}{}",
-                                Platform::get_cwd(false),
-                                DIRECTORY_SEPARATOR,
-                                path
-                            )
-                        } else {
-                            path.clone()
-                        };
-                        let shortest_path = self.inner.filesystem.find_shortest_path(
+                        let absolute_path =
+                            if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
+                                format!(
+                                    "{}{}{}",
+                                    Platform::get_cwd(false),
+                                    DIRECTORY_SEPARATOR,
+                                    path
+                                )
+                            } else {
+                                path.clone()
+                            };
+                        let shortest_path = self.inner.filesystem.borrow_mut().find_shortest_path(
                             &absolute_path,
                             &real_url,
                             false,
@@ -209,16 +211,9 @@ impl PathDownloader {
                 Err(_e) => {
                     if allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
                         if output {
-                            self.inner.io.write_error(
-                                PhpMixed::String("".to_string()),
-                                true,
-                                io_interface::NORMAL,
-                            );
-                            self.inner.io.write_error(
-                                PhpMixed::String(
-                                    "    <error>Symlink failed, fallback to use mirroring!</error>"
-                                        .to_string(),
-                                ),
+                            self.inner.io.write_error3("", true, io_interface::NORMAL);
+                            self.inner.io.write_error3(
+                                "    <error>Symlink failed, fallback to use mirroring!</error>",
                                 true,
                                 io_interface::NORMAL,
                             );
@@ -241,15 +236,15 @@ impl PathDownloader {
 
         // Fallback if symlink failed or if symlink is not allowed for the package
         if Self::STRATEGY_MIRROR == current_strategy {
-            let real_url = self.inner.filesystem.normalize_path(&real_url);
+            let real_url = self.inner.filesystem.borrow_mut().normalize_path(&real_url);
 
             if output {
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "{}Mirroring from {}",
                         if is_fallback { "    " } else { "" },
                         url
-                    )),
+                    ),
                     false,
                     io_interface::NORMAL,
                 );
@@ -280,24 +275,24 @@ impl PathDownloader {
         // process inadvertently locks the file the removal will fail, but it would fall back to recursive
         // delete which is disastrous within a junction. So in that case we have no other real choice but
         // to fail hard.
-        if Platform::is_windows() && self.inner.filesystem.is_junction(&path) {
+        if Platform::is_windows() && self.inner.filesystem.borrow_mut().is_junction(&path) {
             if output {
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package, false),
                         path
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
             }
-            if !self.inner.filesystem.remove_junction(&path) {
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+            if !self.inner.filesystem.borrow_mut().remove_junction(&path)? {
+                self.inner.io.write_error3(
+                    &format!(
                         "    <warning>Could not remove junction at {} - is another process locking it?</warning>",
                         path
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -339,12 +334,12 @@ impl PathDownloader {
         };
         if fs.normalize_path(&abs_path) == fs.normalize_path(&abs_dist_url) {
             if output {
-                self.inner.io.write_error(
-                    PhpMixed::String(format!(
+                self.inner.io.write_error3(
+                    &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package, false),
                         path
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -360,10 +355,10 @@ impl PathDownloader {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
-            &self.inner.config,
-            &self.inner.process,
-            &parser,
-            Some(&*self.inner.io),
+            std::rc::Rc::clone(&self.inner.config),
+            std::rc::Rc::clone(&self.inner.process),
+            parser.clone(),
+            Some(self.inner.io.clone_box()),
         );
         let dumper = ArrayDumper::new();
 

@@ -51,7 +51,7 @@ impl InstalledRepository {
 
     pub fn find_packages_with_replacers_and_providers(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         let name = name.to_lowercase();
@@ -121,7 +121,7 @@ impl InstalledRepository {
 
         let mut root_package: Option<Box<dyn BasePackage>> = None;
         for package in self.inner.get_packages() {
-            if package.as_any().is::<dyn RootPackageInterface>() {
+            if package.as_root_package_interface().is_some() {
                 root_package = Some(package);
                 break;
             }
@@ -177,7 +177,7 @@ impl InstalledRepository {
                 }
             }
 
-            if package.as_any().is::<dyn RootPackageInterface>() {
+            if package.as_root_package_interface().is_some() {
                 for (k, v) in package.get_dev_requires() {
                     links.entry(k).or_insert(v);
                 }
@@ -222,7 +222,7 @@ impl InstalledRepository {
 
             if invert && needles.contains(&package.get_name().to_string()) {
                 for link in package.get_conflicts().values() {
-                    for pkg in self.find_packages(link.get_target().to_string(), None) {
+                    for pkg in self.find_packages(link.get_target(), None) {
                         let version = Constraint::new("=", pkg.get_version());
                         if link.get_constraint().matches(&version) == invert {
                             results.push(DependentsEntry(package.clone_box(), link.clone(), None));
@@ -233,7 +233,7 @@ impl InstalledRepository {
 
             for link in package.get_conflicts().values() {
                 if needles.contains(&link.get_target().to_string()) {
-                    for pkg in self.find_packages(link.get_target().to_string(), None) {
+                    for pkg in self.find_packages(link.get_target(), None) {
                         let version = Constraint::new("=", pkg.get_version());
                         if link.get_constraint().matches(&version) == invert {
                             results.push(DependentsEntry(package.clone_box(), link.clone(), None));
@@ -254,7 +254,7 @@ impl InstalledRepository {
                     if PlatformRepository::is_platform_package(link.get_target()) {
                         if self
                             .find_package(
-                                link.get_target().to_string(),
+                                link.get_target(),
                                 FindPackageConstraint::Constraint(
                                     link.get_constraint().clone_box(),
                                 ),
@@ -265,7 +265,7 @@ impl InstalledRepository {
                         }
 
                         let platform_pkg = self.find_package(
-                            link.get_target().to_string(),
+                            link.get_target(),
                             FindPackageConstraint::String("*".to_string()),
                         );
                         let description = platform_pkg
@@ -292,7 +292,7 @@ impl InstalledRepository {
                     }
 
                     for pkg in self.get_packages() {
-                        if !pkg.get_names().contains(&link.get_target().to_string()) {
+                        if !pkg.get_names(true).contains(&link.get_target().to_string()) {
                             continue;
                         }
 
@@ -320,7 +320,9 @@ impl InstalledRepository {
                                     root_reqs.entry(k).or_insert(v);
                                 }
                                 for root_req in root_reqs.values() {
-                                    if pkg.get_names().contains(&root_req.get_target().to_string())
+                                    if pkg
+                                        .get_names(true)
+                                        .contains(&root_req.get_target().to_string())
                                         && !root_req.get_constraint().matches(link.get_constraint())
                                     {
                                         results.push(DependentsEntry(
@@ -422,7 +424,7 @@ impl RepositoryInterface for InstalledRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         self.inner.find_package(name, constraint)
@@ -430,7 +432,7 @@ impl RepositoryInterface for InstalledRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         self.inner.find_packages(name, constraint)

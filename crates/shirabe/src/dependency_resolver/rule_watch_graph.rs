@@ -27,7 +27,10 @@ impl RuleWatchGraph {
             return;
         }
 
-        let is_multi_conflict = (node.borrow().get_rule().as_any() as &dyn Any)
+        let is_multi_conflict = node
+            .borrow()
+            .get_rule()
+            .as_any()
             .downcast_ref::<MultiConflictRule>()
             .is_some();
 
@@ -72,7 +75,10 @@ impl RuleWatchGraph {
         self.watch_chains.get_mut(&literal).unwrap().rewind();
         while self.watch_chains.get(&literal).unwrap().valid() {
             let node = self.watch_chains.get(&literal).unwrap().current().clone();
-            let is_multi_conflict = (node.borrow().get_rule().as_any() as &dyn Any)
+            let is_multi_conflict = node
+                .borrow()
+                .get_rule()
+                .as_any()
                 .downcast_ref::<MultiConflictRule>()
                 .is_some();
             if !is_multi_conflict {

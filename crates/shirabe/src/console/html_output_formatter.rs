@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
 
@@ -58,12 +58,18 @@ impl HtmlOutputFormatter {
             clear_escape_codes, clear_escape_codes
         );
 
-        Preg::replace_callback(&pattern, |matches| self.format_html(matches), formatted).ok()
+        Preg::replace_callback(&pattern, |matches| self.format_html(matches), &formatted).ok()
     }
 
-    fn format_html(&self, matches: Vec<Option<String>>) -> String {
-        let codes_str = matches[1].as_deref().unwrap_or("");
-        let content = matches[2].as_deref().unwrap_or("");
+    fn format_html(&self, matches: &IndexMap<CaptureKey, String>) -> String {
+        let codes_str = matches
+            .get(&CaptureKey::ByIndex(1))
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let content = matches
+            .get(&CaptureKey::ByIndex(2))
+            .map(|s| s.as_str())
+            .unwrap_or("");
         let mut out = String::from("<span style=\"");
 
         for code_str in codes_str.split(';') {

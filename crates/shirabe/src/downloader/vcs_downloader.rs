@@ -27,21 +27,24 @@ use crate::util::process_executor::ProcessExecutor;
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
     pub io: Box<dyn IOInterface>,
-    pub config: Config,
-    pub process: ProcessExecutor,
-    pub filesystem: Filesystem,
+    pub config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     pub has_cleaned_changes: IndexMap<String, bool>,
 }
 
 impl VcsDownloaderBase {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        process: Option<ProcessExecutor>,
-        fs: Option<Filesystem>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
+        fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(None, None));
-        let filesystem = fs.unwrap_or_else(|| Filesystem::new(None));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
+        });
+        let filesystem =
+            fs.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
             io,
             config,
@@ -57,12 +60,12 @@ pub trait VcsDownloader:
 {
     fn io(&self) -> &dyn IOInterface;
     fn io_mut(&mut self) -> &mut dyn IOInterface;
-    fn config(&self) -> &Config;
-    fn config_mut(&mut self) -> &mut Config;
-    fn process(&self) -> &ProcessExecutor;
-    fn process_mut(&mut self) -> &mut ProcessExecutor;
-    fn filesystem(&self) -> &Filesystem;
-    fn filesystem_mut(&mut self) -> &mut Filesystem;
+    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
+    fn config_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Config>>;
+    fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
+    fn process_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
+    fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
+    fn filesystem_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Filesystem>>;
     fn has_cleaned_changes(&self) -> &IndexMap<String, bool>;
     fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool>;
 
@@ -136,8 +139,8 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error(
-                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
+                        self.io_mut().write_error3(
+                            &format!("Failed: [{}] {}", get_class(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -147,8 +150,8 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error(
-                            PhpMixed::String("    Failed, trying the next URL".to_string()),
+                        self.io_mut().write_error3(
+                            "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
@@ -180,7 +183,7 @@ pub trait VcsDownloader:
             self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
-            self.filesystem_mut().empty_directory(path);
+            self.filesystem_mut().borrow_mut().empty_directory(path);
         } else if r#type == "uninstall" {
             self.clean_changes(package, path, false)?;
         }
@@ -227,11 +230,8 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io_mut().write_error(
-            PhpMixed::String(format!(
-                "  - {}: ",
-                InstallOperation::format(package, false)
-            )),
+        self.io_mut().write_error3(
+            &format!("  - {}: ", InstallOperation::format(package, false)),
             false,
             io_interface::NORMAL,
         );
@@ -250,8 +250,8 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error(
-                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
+                        self.io_mut().write_error3(
+                            &format!("Failed: [{}] {}", get_class(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -261,8 +261,8 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error(
-                            PhpMixed::String("    Failed, trying the next URL".to_string()),
+                        self.io_mut().write_error3(
+                            "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
@@ -299,11 +299,8 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io_mut().write_error(
-            PhpMixed::String(format!(
-                "  - {}: ",
-                UpdateOperation::format(initial, target, false),
-            )),
+        self.io_mut().write_error3(
+            &format!("  - {}: ", UpdateOperation::format(initial, target, false),),
             false,
             io_interface::NORMAL,
         );
@@ -328,8 +325,8 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error(
-                            PhpMixed::String(format!("Failed: [{}] {}", get_class(&e), e,)),
+                        self.io_mut().write_error3(
+                            &format!("Failed: [{}] {}", get_class(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -339,8 +336,8 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error(
-                            PhpMixed::String("    Failed, trying the next URL".to_string()),
+                        self.io_mut().write_error3(
+                            "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
@@ -379,11 +376,8 @@ pub trait VcsDownloader:
                 // escape angle brackets for proper output in the console
                 logs = str_replace("<", "\\<", &logs);
 
-                self.io_mut().write_error(
-                    PhpMixed::String(format!("    {}", message)),
-                    true,
-                    io_interface::NORMAL,
-                );
+                self.io_mut()
+                    .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
                 self.io_mut()
                     .write_error3(&logs, true, io_interface::NORMAL);
             }
@@ -403,16 +397,16 @@ pub trait VcsDownloader:
         package: &dyn PackageInterface,
         path: &str,
     ) -> Result<Box<dyn PromiseInterface>> {
-        self.io_mut().write_error(
-            PhpMixed::String(format!(
-                "  - {}",
-                UninstallOperation::format(package, false)
-            )),
+        self.io_mut().write_error3(
+            &format!("  - {}", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );
 
-        let promise = self.filesystem_mut().remove_directory_async(path);
+        let promise = self
+            .filesystem_mut()
+            .borrow_mut()
+            .remove_directory_async(path);
 
         let path = path.to_string();
         Ok(
@@ -432,7 +426,12 @@ pub trait VcsDownloader:
 
     fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let parser = VersionParser::new();
-        let guesser = VersionGuesser::new(self.config(), self.process(), &parser, self.io());
+        let guesser = VersionGuesser::new(
+            std::rc::Rc::clone(self.config()),
+            std::rc::Rc::clone(self.process()),
+            parser.clone(),
+            Some(self.io().clone_box()),
+        );
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);

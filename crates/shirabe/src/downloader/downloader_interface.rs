@@ -4,7 +4,7 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 
 use crate::package::package_interface::PackageInterface;
 
-pub trait DownloaderInterface {
+pub trait DownloaderInterface: std::fmt::Debug {
     fn get_installation_source(&self) -> String;
 
     fn download(
@@ -14,6 +14,16 @@ pub trait DownloaderInterface {
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
+
+    /// Convenience for the PHP default `$output = true` overload.
+    fn download3(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        self.download(package, path, prev_package, true)
+    }
 
     fn prepare(
         &self,
@@ -30,6 +40,15 @@ pub trait DownloaderInterface {
         output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
 
+    /// Convenience for the PHP default `$output = true` overload.
+    fn install2(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        self.install(package, path, true)
+    }
+
     fn update(
         &self,
         initial: &dyn PackageInterface,
@@ -43,6 +62,15 @@ pub trait DownloaderInterface {
         path: &str,
         output: bool,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
+
+    /// Convenience for the PHP default `$output = true` overload.
+    fn remove2(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        self.remove(package, path, true)
+    }
 
     fn cleanup(
         &self,

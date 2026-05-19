@@ -2,7 +2,7 @@
 
 // TODO(plugin): this event is part of the plugin API and is dispatched before a command runs
 use crate::event_dispatcher::event::Event;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 
 #[derive(Debug)]
 pub struct PreCommandRunEvent {

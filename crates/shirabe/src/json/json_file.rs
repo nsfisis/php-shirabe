@@ -3,7 +3,8 @@
 use crate::io::io_interface;
 use crate::util::silencer::Silencer;
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::json_schema::validator::Validator;
 use shirabe_external_packages::seld::json_lint::json_parser::JsonParser;
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
@@ -28,7 +29,7 @@ pub struct JsonFile {
     /// @var string
     path: String,
     /// @var ?HttpDownloader
-    http_downloader: Option<HttpDownloader>,
+    http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     /// @var ?IOInterface
     io: Option<Box<dyn IOInterface>>,
     /// @var string
@@ -67,10 +68,10 @@ impl JsonFile {
     /// @throws \InvalidArgumentException
     pub fn new(
         path: String,
-        http_downloader: Option<HttpDownloader>,
+        http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<Box<dyn IOInterface>>,
     ) -> Result<Self> {
-        if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path) {
+        if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path).unwrap_or(false) {
             return Err(InvalidArgumentException {
                 message: "http urls require a HttpDownloader instance to be passed".to_string(),
                 code: 0,
@@ -103,7 +104,11 @@ impl JsonFile {
         // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         let json: Option<String> = match (|| -> Result<Option<String>> {
             if let Some(http_downloader) = &self.http_downloader {
-                Ok(Some(http_downloader.get(&self.path)?.get_body()))
+                Ok(http_downloader
+                    .borrow_mut()
+                    .get(&self.path, indexmap::IndexMap::new())?
+                    .get_body()
+                    .map(|s| s.to_string()))
             } else {
                 if !Filesystem::is_readable(&self.path) {
                     return Err(RuntimeException {
@@ -120,8 +125,8 @@ impl JsonFile {
                                 realpath_info = format!(" ({})", realpath);
                             }
                         }
-                        io.write_error(
-                            PhpMixed::String(format!("Reading {}{}", self.path, realpath_info)),
+                        io.write_error3(
+                            &format!("Reading {}{}", self.path, realpath_info),
                             true,
                             io_interface::NORMAL,
                         );
@@ -160,18 +165,22 @@ impl JsonFile {
         Self::parse_json(Some(&json), Some(&self.path))
     }
 
+    pub fn write(&self, hash: PhpMixed) -> Result<()> {
+        self.write2(
+            hash,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        )
+    }
+
     /// Writes json file.
     ///
     /// @param  mixed[]                              $hash    writes hash into json file
     /// @param  int                                  $options json_encode options
     /// @throws \UnexpectedValueException|\Exception
     /// @return void
-    pub fn write(&self, hash: PhpMixed, options: i64) -> Result<()> {
+    pub fn write2(&self, hash: PhpMixed, options: i64) -> Result<()> {
         if self.path == "php://memory" {
-            file_put_contents(
-                &self.path,
-                Self::encode(&hash, options, &self.indent).as_bytes(),
-            );
+            file_put_contents(&self.path, Self::encode(&hash, options).as_bytes());
 
             return Ok(());
         }
@@ -207,7 +216,7 @@ impl JsonFile {
                     &self.path,
                     &format!(
                         "{}{}",
-                        Self::encode(&hash, options, &self.indent),
+                        Self::encode(&hash, options),
                         if options & JSON_PRETTY_PRINT != 0 {
                             "\n"
                         } else {
@@ -362,29 +371,13 @@ impl JsonFile {
         let mut validator = Validator::new();
         // convert assoc arrays to objects
         let data_converted = json_decode(&json_encode_ex(data, 0).unwrap_or_default(), false)?;
-        validator.validate(&data_converted, &schema_data);
+        validator.check(&data_converted, &schema_data)?;
 
         if !validator.is_valid() {
-            let mut errors: Vec<String> = vec![];
-            for error in validator.get_errors() {
-                let property = error
-                    .get("property")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("");
-                let message = error
-                    .get("message")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("");
-                errors.push(format!(
-                    "{}{}",
-                    if !property.is_empty() {
-                        format!("{} : ", property)
-                    } else {
-                        String::new()
-                    },
-                    message,
-                ));
-            }
+            // TODO(phase-b): Validator::get_errors currently returns Vec<String>; original PHP
+            // exposes [{property, message}, ...]. Until shim is enriched, surface raw error
+            // strings without prop/message splitting.
+            let errors: Vec<String> = validator.get_errors();
             return Err(JsonValidationException::new(
                 format!("\"{}\" does not match the expected JSON schema", source),
                 errors,
@@ -426,7 +419,7 @@ impl JsonFile {
                 move |m| -> String {
                     str_repeat(
                         &indent,
-                        (strlen(m.get(0).map(|s| s.as_str()).unwrap_or("")) / 4) as usize,
+                        (strlen(m.get(&0).map(|s| s.as_str()).unwrap_or("")) / 4) as usize,
                     )
                 },
                 &json,
@@ -545,8 +538,11 @@ impl JsonFile {
     }
 
     pub fn detect_indenting(json: Option<&str>) -> String {
-        if let Some(m) = Preg::is_match_strict_groups(r##"#^([ \t]+)"#m"##, json.unwrap_or("")) {
-            return m.get(1).cloned().unwrap_or_default();
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m))
+            .unwrap_or(false)
+        {
+            return m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
         }
 
         Self::INDENT_DEFAULT.to_string()

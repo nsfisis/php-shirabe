@@ -3,7 +3,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
@@ -21,6 +21,7 @@ use crate::package::complete_alias_package::CompleteAliasPackage;
 use crate::package::dumper::array_dumper::ArrayDumper;
 use crate::package::link::Link;
 use crate::package::loader::array_loader::ArrayLoader;
+use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_package_interface::RootPackageInterface;
 use crate::package::version::version_parser::VersionParser;
@@ -48,7 +49,7 @@ pub struct Locker {
     /// @var ArrayDumper
     dumper: ArrayDumper,
     /// @var ProcessExecutor
-    process: ProcessExecutor,
+    process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var mixed[]|null
     lock_data_cache: Option<IndexMap<String, PhpMixed>>,
     /// @var bool
@@ -62,9 +63,8 @@ impl Locker {
         lock_file: JsonFile,
         installation_manager: InstallationManager,
         composer_file_contents: &str,
-        process: Option<ProcessExecutor>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(Some(io), None));
         Self {
             lock_file,
             installation_manager,
@@ -606,10 +606,9 @@ impl Locker {
         };
         if !is_locked || Some(&lock) != current_data.as_ref() {
             if write {
-                self.lock_file.write(
-                    PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                    None,
-                )?;
+                self.lock_file.write(PhpMixed::Array(
+                    lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                ))?;
                 self.lock_data_cache = None;
                 self.virtual_file_written = false;
             } else {
@@ -639,7 +638,7 @@ impl Locker {
     /// Updates the lock file's hash in-place from a given composer.json's JsonFile
     pub fn update_hash<F>(
         &mut self,
-        composer_json: JsonFile,
+        composer_json: &JsonFile,
         data_processor: Option<F>,
     ) -> Result<()>
     where
@@ -670,15 +669,12 @@ impl Locker {
             lock_data = processor(lock_data);
         }
 
-        self.lock_file.write(
-            PhpMixed::Array(
-                self.fixup_json_data_type(lock_data)
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            None,
-        )?;
+        self.lock_file.write(PhpMixed::Array(
+            self.fixup_json_data_type(lock_data)
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v)))
+                .collect(),
+        ))?;
         self.lock_data_cache = None;
         self.virtual_file_written = false;
         if let Some(mtime) = lock_mtime {
@@ -838,7 +834,7 @@ impl Locker {
                     args.extend(no_show_signature_flags);
                     let command = GitUtil::build_rev_list_command(&self.process, args);
                     let mut output = PhpMixed::Null;
-                    if 0 == self.process.execute(
+                    if 0 == self.process.borrow_mut().execute(
                         PhpMixed::String(command),
                         Some(&mut output),
                         path.as_deref(),
@@ -850,7 +846,7 @@ impl Locker {
                             ),
                             None,
                         );
-                        if Preg::is_match(r"{^\s*\d+\s*$}", &output_str) {
+                        if Preg::is_match(r"{^\s*\d+\s*$}", &output_str).unwrap_or(false) {
                             // TODO(phase-b): new \DateTime('@'.trim($output), new \DateTimeZone('UTC'))
                             let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
@@ -859,7 +855,7 @@ impl Locker {
                 }
                 "hg" => {
                     let mut output = PhpMixed::Null;
-                    if 0 == self.process.execute(
+                    if 0 == self.process.borrow_mut().execute(
                         PhpMixed::List(vec![
                             Box::new(PhpMixed::String("hg".to_string())),
                             Box::new(PhpMixed::String("log".to_string())),
@@ -871,12 +867,16 @@ impl Locker {
                         Some(&mut output),
                         path.as_deref(),
                     )? {
-                        if let Some(m) = Preg::is_match_strict_groups(
+                        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                        if Preg::is_match_strict_groups3(
                             r"{^\s*(\d+)\s*}",
                             output.as_string().unwrap_or(""),
-                        ) {
+                            Some(&mut m),
+                        )
+                        .unwrap_or(false)
+                        {
                             let ts = m
-                                .get(1)
+                                .get(&CaptureKey::ByIndex(1))
                                 .cloned()
                                 .unwrap_or_default()
                                 .parse::<i64>()

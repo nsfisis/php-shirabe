@@ -17,9 +17,10 @@ use crate::util::bitbucket::Bitbucket;
 use crate::util::github::GitHub;
 use crate::util::gitlab::GitLab;
 
+#[derive(Debug)]
 pub struct AuthHelper {
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) config: Config,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var array<string, string> Map of origins to message displayed
     displayed_origin_authentications: IndexMap<String, String>,
     /// @var array<string, bool> Map of URLs and whether they already retried with authentication from Bitbucket
@@ -40,7 +41,7 @@ pub enum StoreAuth {
 }
 
 impl AuthHelper {
-    pub fn new(io: Box<dyn IOInterface>, config: Config) -> Self {
+    pub fn new(io: Box<dyn IOInterface>, config: std::rc::Rc<std::cell::RefCell<Config>>) -> Self {
         Self {
             io,
             config,
@@ -53,7 +54,8 @@ impl AuthHelper {
     pub fn store_auth(&self, origin: &str, store_auth: StoreAuth) -> Result<()> {
         // TODO(phase-b): config.get_auth_config_source() and ConfigSource methods are stubs
         let mut store: Option<()> = None;
-        let config_source = self.config.get_auth_config_source();
+        let config = self.config.borrow();
+        let config_source = config.get_auth_config_source();
         if matches!(store_auth, StoreAuth::Bool(true)) {
             store = Some(());
         } else if matches!(store_auth, StoreAuth::Prompt) {
@@ -120,7 +122,7 @@ impl AuthHelper {
     ) -> Result<PromptAuthResult> {
         let mut store_auth: StoreAuth = StoreAuth::Bool(false);
 
-        let github_domains = self.config.get("github-domains");
+        let github_domains = self.config.borrow_mut().get("github-domains");
         let github_domain_list = match github_domains.as_array() {
             Some(arr) => arr.clone(),
             None => IndexMap::new(),
@@ -129,7 +131,7 @@ impl AuthHelper {
             .values()
             .any(|v| v.as_string() == Some(origin));
 
-        let gitlab_domains = self.config.get("gitlab-domains");
+        let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let gitlab_domain_list = match gitlab_domains.as_array() {
             Some(arr) => arr.clone(),
             None => IndexMap::new(),
@@ -155,7 +157,7 @@ impl AuthHelper {
                 let sso_url = git_hub_util.get_sso_url(&headers);
                 message = format!(
                     "GitHub API token requires SSO authorization. Authorize this token at {}\n",
-                    sso_url,
+                    sso_url.as_deref().unwrap_or(""),
                 );
                 self.io.write_error3(&message, true, io_interface::NORMAL);
                 if !self.io.is_interactive() {
@@ -231,7 +233,7 @@ impl AuthHelper {
 
             if !git_hub_util.authorize_oauth(origin)
                 && (!self.io.is_interactive()
-                    || !git_hub_util.authorize_oauth_interactively(origin, &message))
+                    || !git_hub_util.authorize_oauth_interactively(origin, Some(&message))?)
             {
                 return Err(TransportException::new(
                     format!("Could not authenticate against {}", origin),
@@ -289,8 +291,8 @@ impl AuthHelper {
                     || !git_lab_util.authorize_oauth_interactively(
                         scheme.as_string().unwrap_or(""),
                         origin,
-                        &message,
-                    ))
+                        Some(&message),
+                    )?)
             {
                 return Err(TransportException::new(
                     format!("Could not authenticate against {}", origin),
@@ -379,7 +381,8 @@ impl AuthHelper {
                 )?;
                 if !bit_bucket_util.authorize_oauth(&origin)
                     && (!self.io.is_interactive()
-                        || !bit_bucket_util.authorize_oauth_interactively(&origin, &message))
+                        || !bit_bucket_util
+                            .authorize_oauth_interactively(&origin, Some(&message))?)
                 {
                     return Err(TransportException::new(
                         format!("Could not authenticate against {}", origin),
@@ -442,11 +445,8 @@ impl AuthHelper {
                 .into());
             }
 
-            self.io.write_error(
-                PhpMixed::String(format!(
-                    "    Authentication required (<info>{}</info>):",
-                    origin,
-                )),
+            self.io.write_error3(
+                &format!("    Authentication required (<info>{}</info>):", origin,),
                 true,
                 io_interface::NORMAL,
             );
@@ -459,7 +459,7 @@ impl AuthHelper {
             );
             // PHP: $this->config->get('store-auths') returns 'prompt'|bool
             // TODO(phase-b): decode the PhpMixed result into StoreAuth
-            store_auth = match self.config.get("store-auths") {
+            store_auth = match self.config.borrow_mut().get("store-auths") {
                 PhpMixed::Bool(b) => StoreAuth::Bool(b),
                 PhpMixed::String(ref s) if s == "prompt" => StoreAuth::Prompt,
                 _ => StoreAuth::Bool(false),
@@ -589,7 +589,7 @@ impl AuthHelper {
                 }
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
-                if Preg::is_match(r"{^https?://api\.github\.com/}", url) {
+                if Preg::is_match(r"{^https?://api\.github\.com/}", url)? {
                     headers.push(PhpMixed::String(format!(
                         "Authorization: token {}",
                         username,
@@ -609,6 +609,7 @@ impl AuthHelper {
                 PhpMixed::String(origin.to_string()),
                 &PhpMixed::List(
                     self.config
+                        .borrow_mut()
                         .get("gitlab-domains")
                         .as_array()
                         .map(|a| a.values().cloned().collect())
@@ -668,11 +669,8 @@ impl AuthHelper {
                 let already_displayed =
                     self.displayed_origin_authentications.get(origin) == Some(display_message);
                 if !already_displayed {
-                    self.io.write_error(
-                        PhpMixed::String(display_message.clone()),
-                        true,
-                        io_interface::DEBUG,
-                    );
+                    self.io
+                        .write_error3(display_message, true, io_interface::DEBUG);
                     self.displayed_origin_authentications
                         .insert(origin.to_string(), display_message.clone());
                 }

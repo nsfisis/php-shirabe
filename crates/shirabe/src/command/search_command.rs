@@ -13,9 +13,9 @@ use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_interface::{self, RepositoryInterface};
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
 
 #[derive(Debug)]
@@ -28,12 +28,12 @@ impl SearchCommand {
         self
             .set_name("search")
             .set_description("Searches for packages")
-            .set_definition(vec![
-                InputOption::new("only-name", Some(PhpMixed::String("N".to_string())), Some(InputOption::VALUE_NONE), "Search only in package names", None),
-                InputOption::new("only-vendor", Some(PhpMixed::String("O".to_string())), Some(InputOption::VALUE_NONE), "Search only for vendor / organization names, returns only \"vendor\" as result", None),
-                InputOption::new("type", Some(PhpMixed::String("t".to_string())), Some(InputOption::VALUE_REQUIRED), "Search for a specific package type", None),
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))),
-                InputArgument::new("tokens", Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED), "tokens to search for", None),
+            .set_definition(&[
+                InputOption::new("only-name", Some(PhpMixed::String("N".to_string())), Some(InputOption::VALUE_NONE), "Search only in package names", None).unwrap().into(),
+                InputOption::new("only-vendor", Some(PhpMixed::String("O".to_string())), Some(InputOption::VALUE_NONE), "Search only for vendor / organization names, returns only \"vendor\" as result", None).unwrap().into(),
+                InputOption::new("type", Some(PhpMixed::String("t".to_string())), Some(InputOption::VALUE_REQUIRED), "Search for a specific package type", None).unwrap().into(),
+                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))).unwrap().into(),
+                InputArgument::new("tokens", Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED), "tokens to search for", None).unwrap().into(),
             ])
             .set_help(
                 "The search command searches for packages by its name\n\
@@ -83,14 +83,7 @@ impl SearchCommand {
         let repos = CompositeRepository::new(all_repos);
 
         // TODO(plugin): dispatch CommandEvent for search command
-        let command_event = CommandEvent::new(
-            PluginEvents::COMMAND.to_string(),
-            "search".to_string(),
-            input,
-            output,
-            vec![],
-            vec![],
-        );
+        let command_event = CommandEvent::new(PluginEvents::COMMAND, "search", input, output);
         composer
             .get_event_dispatcher()
             .dispatch(Some(command_event.get_name()), None);

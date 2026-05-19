@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -47,48 +47,60 @@ impl RunScriptCommand {
         self.set_name("run-script")
             .set_aliases(&["run".to_string()])
             .set_description("Runs the scripts defined in composer.json")
-            .set_definition(vec![
+            .set_definition(&[
                 // TODO(cli-completion): script-name completion was provided via a closure suggesting runtime script names
                 InputArgument::new(
                     "script",
                     Some(InputArgument::OPTIONAL),
                     "Script name to run.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "timeout",
                     None,
                     Some(InputOption::VALUE_REQUIRED),
                     "Sets script timeout in seconds, or 0 for never.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "dev",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Sets the dev mode.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-dev",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Disables the dev mode.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "list",
                     Some(PhpMixed::String("l".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "List scripts.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
@@ -238,7 +250,6 @@ impl RunScriptCommand {
         let mut result: Vec<(String, String)> = vec![];
         for (name, _script) in scripts {
             let description = self
-                .inner
                 .get_application()
                 .find(&name)
                 .map(|cmd| cmd.get_description().unwrap_or("").to_string())

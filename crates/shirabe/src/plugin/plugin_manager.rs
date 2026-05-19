@@ -76,13 +76,13 @@ impl PluginManager {
         disable_plugins: DisablePlugins,
     ) -> Self {
         let allow_plugin_rules = Self::parse_allowed_plugins(
-            composer.get_config().get("allow-plugins").clone(),
+            composer.get_config().borrow().get("allow-plugins").clone(),
             Some(composer.get_locker()),
         );
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
             global_composer
                 .as_ref()
-                .map(|gc| gc.get_config().get("allow-plugins").clone())
+                .map(|gc| gc.get_config().borrow_mut().get("allow-plugins").clone())
                 .unwrap_or(PhpMixed::Bool(false)),
             None,
         );
@@ -224,7 +224,7 @@ impl PluginManager {
             }
 
             if package.get_name() == "symfony/flex"
-                && Preg::is_match("{^[0-9.]+$}", package.get_version(), None).unwrap_or(false)
+                && Preg::is_match3("{^[0-9.]+$}", package.get_version(), None).unwrap_or(false)
                 && version_compare(package.get_version(), "1.9.8", "<")
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
@@ -762,7 +762,7 @@ impl PluginManager {
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         for (pattern, allow) in &rules_snapshot {
-            if Preg::is_match(pattern, package, None).unwrap_or(false) {
+            if Preg::is_match3(pattern, package, None).unwrap_or(false) {
                 return Ok(*allow);
             }
         }
@@ -811,14 +811,18 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == "y" || answer_str == "n" {
-                            let allow_plugins_value =
-                                composer_ref.get_config().get("allow-plugins").clone();
+                            let allow_plugins_value = composer_ref
+                                .get_config()
+                                .borrow_mut()
+                                .get("allow-plugins")
+                                .clone();
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins
                                     .insert(package.to_string(), Box::new(PhpMixed::Bool(allow)));
                                 if composer_ref
                                     .get_config()
+                                    .borrow_mut()
                                     .get("sort-packages")
                                     .as_bool()
                                     .unwrap_or(false)
@@ -827,6 +831,7 @@ impl PluginManager {
                                 }
                                 composer_ref
                                     .get_config()
+                                    .borrow()
                                     .get_config_source()
                                     .add_config_setting(
                                         "allow-plugins",

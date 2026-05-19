@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/Vcs/VcsDriver.php
 
+use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
@@ -23,9 +24,9 @@ pub struct VcsDriverBase {
     pub origin_url: String,
     pub repo_config: IndexMap<String, PhpMixed>,
     pub io: Box<dyn IOInterface>,
-    pub config: Config,
-    pub process: ProcessExecutor,
-    pub http_downloader: HttpDownloader,
+    pub config: std::rc::Rc<std::cell::RefCell<Config>>,
+    pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    pub http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     pub info_cache: IndexMap<String, Option<IndexMap<String, PhpMixed>>>,
     pub cache: Option<Cache>,
 }
@@ -34,9 +35,9 @@ impl VcsDriverBase {
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: HttpDownloader,
-        process: ProcessExecutor,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         let url = repo_config
             .get("url")
@@ -74,7 +75,52 @@ impl VcsDriverBase {
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        self.http_downloader.get(url, &options)
+        self.http_downloader.borrow_mut().get(url, &options)
+    }
+
+    // Helper for concrete drivers: produces the same value as the trait default
+    // `get_base_composer_information`, but receives a pre-fetched composer.json
+    // body and a lazy change-date callback. Concrete drivers in the Rust port
+    // wrap `VcsDriverBase` as `self.inner` instead of inheriting from it, so
+    // they cannot dispatch back into a base method that calls `get_file_content`
+    // / `get_change_date` hooks; the caller threads those calls in itself.
+    pub fn finish_base_composer_information(
+        identifier: &str,
+        composer_file_content: Option<String>,
+        change_date: impl FnOnce() -> anyhow::Result<Option<DateTime<Utc>>>,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        let content = match composer_file_content {
+            None => return Ok(None),
+            Some(c) if c.is_empty() => return Ok(None),
+            Some(c) => c,
+        };
+
+        let parsed = JsonFile::parse_json(
+            Some(&content),
+            Some(&format!("{}:composer.json", identifier)),
+        )?;
+
+        let array = match parsed {
+            PhpMixed::Array(a) if !a.is_empty() => a,
+            _ => return Ok(None),
+        };
+
+        // PHP arrays own their nested values; the Rust representation wraps them
+        // in Box<PhpMixed>. Unbox the outer level so callers can mutate keys.
+        let mut composer: IndexMap<String, PhpMixed> =
+            array.into_iter().map(|(k, v)| (k, *v)).collect();
+
+        if !composer.contains_key("time")
+            || composer
+                .get("time")
+                .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()))
+        {
+            if let Some(d) = change_date()? {
+                composer.insert("time".to_string(), PhpMixed::String(d.to_rfc3339()));
+            }
+        }
+
+        Ok(Some(composer))
     }
 }
 
@@ -93,8 +139,7 @@ pub trait VcsDriver: VcsDriverInterface {
     fn config_mut(&mut self) -> &mut Config;
     fn process(&self) -> &ProcessExecutor;
     fn process_mut(&mut self) -> &mut ProcessExecutor;
-    fn http_downloader(&self) -> &HttpDownloader;
-    fn http_downloader_mut(&mut self) -> &mut HttpDownloader;
+    fn http_downloader(&self) -> &std::rc::Rc<std::cell::RefCell<HttpDownloader>>;
     fn info_cache(&self) -> &IndexMap<String, Option<IndexMap<String, PhpMixed>>>;
     fn info_cache_mut(&mut self) -> &mut IndexMap<String, Option<IndexMap<String, PhpMixed>>>;
     fn cache(&self) -> Option<&Cache>;
@@ -195,7 +240,7 @@ pub trait VcsDriver: VcsDriverInterface {
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        self.http_downloader().get(url, &options)
+        self.http_downloader().borrow_mut().get(url, &options)
     }
 
     fn cleanup(&self) {}

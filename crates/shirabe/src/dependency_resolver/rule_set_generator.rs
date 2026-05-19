@@ -123,16 +123,15 @@ impl RuleSetGenerator {
 
         if literals.len() == 2 {
             // Rule2Literals and MultiConflictRule both implement Rule (Phase B: define Rule type)
-            Rule::from(Rule2Literals::new(
+            Box::new(Rule2Literals::new(
                 literals[0],
                 literals[1],
                 PhpMixed::Int(reason),
                 reason_data,
-            ))
+            )) as Box<dyn Rule>
         } else {
-            Rule::from(
-                MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap(),
-            )
+            Box::new(MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap())
+                as Box<dyn Rule>
         }
     }
 
@@ -159,42 +158,45 @@ impl RuleSetGenerator {
                 continue;
             }
 
-            self.added_map.insert(package.get_id(), package.clone_box());
+            self.added_map
+                .insert(package.get_id(), package.clone_package_box());
 
-            let is_alias = (package.as_any() as &dyn Any)
-                .downcast_ref::<AliasPackage>()
-                .is_some();
+            let is_alias = package.as_any().downcast_ref::<AliasPackage>().is_some();
 
             if !is_alias {
                 for name in package.get_names(false) {
                     self.added_packages_by_names
                         .entry(name)
                         .or_default()
-                        .push(package.clone_box());
+                        .push(package.clone_package_box());
                 }
             } else {
-                let alias_pkg = (package.as_any() as &dyn Any)
-                    .downcast_ref::<AliasPackage>()
-                    .unwrap();
+                let alias_pkg = package.as_any().downcast_ref::<AliasPackage>().unwrap();
 
-                work_queue.push_back(alias_pkg.get_alias_of().clone_box());
+                work_queue.push_back(alias_pkg.get_alias_of().clone_package_box());
                 let alias_of = alias_pkg.get_alias_of();
                 let rule = self.create_require_rule(
                     &*package,
-                    &[alias_of.clone_box()],
+                    &[alias_of.clone_package_box()],
                     rule::RULE_PACKAGE_ALIAS,
                     PhpMixed::Null, // reasonData: $package (BasePackage)
                 );
-                self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
+                self.add_rule(
+                    RuleSet::TYPE_PACKAGE,
+                    rule.map(|r| Box::new(r) as Box<dyn Rule>),
+                );
 
                 // aliases must be installed with their main package, so create a rule the other way around as well
                 let inverse_rule = self.create_require_rule(
                     alias_of,
-                    &[package.clone_box()],
+                    &[package.clone_package_box()],
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
                     PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
                 );
-                self.add_rule(RuleSet::TYPE_PACKAGE, inverse_rule.map(Rule::from));
+                self.add_rule(
+                    RuleSet::TYPE_PACKAGE,
+                    inverse_rule.map(|r| Box::new(r) as Box<dyn Rule>),
+                );
 
                 // if alias package has no self.version requires, its requirements do not
                 // need to be added as the aliased package processing will take care of it
@@ -207,7 +209,8 @@ impl RuleSetGenerator {
                 let mut constraint = link.get_constraint().clone_box();
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
-                } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
+                } else if let Some(ignore_list_filter) = platform_requirement_filter
+                    .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
                     constraint = ignore_list_filter
@@ -223,7 +226,10 @@ impl RuleSetGenerator {
                     rule::RULE_PACKAGE_REQUIRES,
                     PhpMixed::Null, // reasonData: $link (Link)
                 );
-                self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
+                self.add_rule(
+                    RuleSet::TYPE_PACKAGE,
+                    rule.map(|r| Box::new(r) as Box<dyn Rule>),
+                );
 
                 for require in possible_requires {
                     work_queue.push_back(require);
@@ -252,7 +258,8 @@ impl RuleSetGenerator {
                 let mut constraint = link.get_constraint().clone_box();
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
-                } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
+                } else if let Some(ignore_list_filter) = platform_requirement_filter
+                    .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
                     constraint = ignore_list_filter
@@ -266,9 +273,8 @@ impl RuleSetGenerator {
                     // define the conflict rule for regular packages, for alias packages it's only needed if the name
                     // matches the conflict exactly, otherwise the name match is by provide/replace which means the
                     // package which this is an alias of will conflict anyway, so no need to create additional rules
-                    let conflict_is_alias = (conflict.as_any() as &dyn Any)
-                        .downcast_ref::<AliasPackage>()
-                        .is_some();
+                    let conflict_is_alias =
+                        conflict.as_any().downcast_ref::<AliasPackage>().is_some();
                     let conflict_name_matches = conflict.get_name() == link.get_target();
                     if !conflict_is_alias || conflict_name_matches {
                         let rule = self.create_rule2_literals(
@@ -277,7 +283,10 @@ impl RuleSetGenerator {
                             rule::RULE_PACKAGE_CONFLICT,
                             PhpMixed::Null, // reasonData: $link (Link)
                         );
-                        self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::from));
+                        self.add_rule(
+                            RuleSet::TYPE_PACKAGE,
+                            rule.map(|r| Box::new(r) as Box<dyn Rule>),
+                        );
                     }
                 }
             }
@@ -336,14 +345,15 @@ impl RuleSetGenerator {
                 rule::RULE_FIXED,
                 PhpMixed::Array(reason_data),
             );
-            self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::from(rule)));
+            self.add_rule(RuleSet::TYPE_REQUEST, Some(Box::new(rule) as Box<dyn Rule>));
         }
 
         for (package_name, constraint) in request.get_requires() {
             let mut constraint = constraint.clone_box();
             if platform_requirement_filter.is_ignored(package_name) {
                 continue;
-            } else if let Some(ignore_list_filter) = (platform_requirement_filter as &dyn Any)
+            } else if let Some(ignore_list_filter) = platform_requirement_filter
+                .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
                 constraint = ignore_list_filter
@@ -371,7 +381,7 @@ impl RuleSetGenerator {
                     rule::RULE_ROOT_REQUIRE,
                     PhpMixed::Array(reason_data),
                 );
-                self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::from(rule)));
+                self.add_rule(RuleSet::TYPE_REQUEST, Some(Box::new(rule) as Box<dyn Rule>));
             }
         }
 
@@ -387,7 +397,7 @@ impl RuleSetGenerator {
             // even if the alias itself isn't required, otherwise a package could be installed without its alias which
             // leads to unexpected behavior
             let is_not_added = !self.added_map.contains_key(&package.get_id());
-            let as_alias = (package.as_any() as &dyn Any).downcast_ref::<AliasPackage>();
+            let as_alias = package.as_any().downcast_ref::<AliasPackage>();
             if is_not_added {
                 if let Some(alias_pkg) = as_alias {
                     if alias_pkg.is_root_package_alias()

@@ -21,4 +21,9 @@ pub trait InputInterface {
     fn has_option(&self, name: &str) -> bool;
     fn is_interactive(&self) -> bool;
     fn set_interactive(&mut self, interactive: bool);
+
+    /// Equivalent to PHP `(string) $input` (Input::__toString).
+    fn to_input_string(&self) -> String {
+        todo!()
+    }
 }

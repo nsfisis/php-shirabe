@@ -152,19 +152,12 @@ impl PoolBuilder {
                 .into());
             }
 
-            for locked_package in request.get_locked_repository().unwrap().get_packages() {
+            for locked_package in
+                CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
+            {
                 if !self.is_update_allowed(&*locked_package) {
-                    // remember which packages we skipped loading remote content for in this partial update
-                    self.skipped_load
-                        .entry(locked_package.get_name().to_string())
-                        .or_insert_with(Vec::new)
-                        .push(locked_package.clone_box());
-                    for (_k, link) in &locked_package.get_replaces() {
-                        self.skipped_load
-                            .entry(link.get_target().to_string())
-                            .or_insert_with(Vec::new)
-                            .push(locked_package.clone_box());
-                    }
+                    // TODO(phase-b): PackageInterface lacks clone_box; PHP shares references.
+                    // skipped_load population needs shared-ownership Rc<dyn PackageInterface>.
 
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
@@ -188,7 +181,7 @@ impl PoolBuilder {
             }
         }
 
-        for package in request.get_fixed_or_locked_packages() {
+        for (_, package) in request.get_fixed_or_locked_packages() {
             // using MatchAllConstraint here because fixed packages do not need to retrigger
             // loading any packages
             self.loaded_packages.insert(
@@ -369,8 +362,9 @@ impl PoolBuilder {
         &mut self,
         request: &Request,
         name: &str,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: &dyn ConstraintInterface,
     ) {
+        let constraint = constraint.clone_box();
         // Skip platform requires at this stage
         if PlatformRepository::is_platform_package(name) {
             return;
@@ -389,7 +383,7 @@ impl PoolBuilder {
         let root_requires = request.get_requires();
         let mut constraint = constraint;
         if let Some(root_constraint) = root_requires.get(name) {
-            if !Intervals::is_subset_of(&*constraint, &**root_constraint) {
+            if !Intervals::is_subset_of(&*constraint, &**root_constraint)? {
                 constraint = root_constraint.clone_box();
             }
         }
@@ -401,7 +395,7 @@ impl PoolBuilder {
             // MultiConstraint::create() will optimize anyway)
             if let Some(existing) = self.packages_to_load.get(name) {
                 // Already marked for loading and this does not expand the constraint to be loaded, nothing to do
-                if Intervals::is_subset_of(&*constraint, &**existing) {
+                if Intervals::is_subset_of(&*constraint, &**existing).unwrap_or(false) {
                     return;
                 }
 
@@ -419,7 +413,9 @@ impl PoolBuilder {
 
         // No need to load this package with this constraint because it is
         // a subset of the constraint with which we have already loaded packages
-        if Intervals::is_subset_of(&*constraint, &**self.loaded_packages.get(name).unwrap()) {
+        if Intervals::is_subset_of(&*constraint, &**self.loaded_packages.get(name).unwrap())
+            .unwrap_or(false)
+        {
             return;
         }
 
@@ -762,7 +758,7 @@ impl PoolBuilder {
     fn is_update_allowed(&self, package: &dyn BasePackage) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if Preg::is_match(&pattern_regexp, PackageInterface::get_name(package), None)
+            if Preg::is_match3(&pattern_regexp, PackageInterface::get_name(package), None)
                 .unwrap_or(false)
             {
                 return true;
@@ -786,8 +782,10 @@ impl PoolBuilder {
 
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
             // update pattern matches a locked package? => all good
-            for package in request.get_locked_repository().unwrap().get_packages() {
-                if Preg::is_match(&pattern_regexp, PackageInterface::get_name(package), None)
+            for package in
+                CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
+            {
+                if Preg::is_match3(&pattern_regexp, PackageInterface::get_name(package), None)
                     .unwrap_or(false)
                 {
                     continue 'outer;
@@ -795,7 +793,7 @@ impl PoolBuilder {
             }
             // update pattern matches a root require? => all good, probably a new package
             for (package_name, _constraint) in &request.get_requires() {
-                if Preg::is_match(&pattern_regexp, package_name, None).unwrap_or(false) {
+                if Preg::is_match3(&pattern_regexp, package_name, None).unwrap_or(false) {
                     if PlatformRepository::is_platform_package(package_name) {
                         matched_platform_package = true;
                         continue;
@@ -855,7 +853,7 @@ impl PoolBuilder {
                         self.mark_package_name_for_loading(
                             request,
                             &replacer_name,
-                            Box::new(MatchAllConstraint::new()),
+                            &MatchAllConstraint::new(),
                         );
                     } else {
                         let pkgs: Vec<Box<dyn BasePackage>> =
@@ -895,7 +893,7 @@ impl PoolBuilder {
         // remove locked package by this name which was already initialized
         let locked_packages: Vec<Box<dyn BasePackage>> = request
             .get_locked_packages()
-            .iter()
+            .values()
             .map(|p| p.clone_box())
             .collect();
         for locked_package in &locked_packages {
@@ -914,7 +912,7 @@ impl PoolBuilder {
                     // that we load that replaced package in case an update to this package removes the replacement
                     let fixed_or_locked: Vec<Box<dyn BasePackage>> = request
                         .get_fixed_or_locked_packages()
-                        .iter()
+                        .values()
                         .map(|p| p.clone_box())
                         .collect();
                     for fixed_or_locked_package in &fixed_or_locked {
@@ -1049,7 +1047,7 @@ impl PoolBuilder {
             return pool;
         }
 
-        self.io.write_with_verbosity(
+        self.io.write3(
             &sprintf(
                 "Pool optimizer completed in %.3f seconds",
                 &[(microtime(true) - before).into()],
@@ -1057,7 +1055,7 @@ impl PoolBuilder {
             true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write_with_verbosity(
+        self.io.write3(
             &sprintf(
                 "<info>Found %s package versions referenced in your dependency graph. %s (%d%%) were optimized away.</info>",
                 &[
@@ -1100,7 +1098,7 @@ impl PoolBuilder {
             return pool;
         }
 
-        self.io.write_with_verbosity(
+        self.io.write3(
             &sprintf(
                 "Security advisory pool filter completed in %.3f seconds",
                 &[(microtime(true) - before).into()],
@@ -1108,7 +1106,7 @@ impl PoolBuilder {
             true,
             io_interface::VERY_VERBOSE,
         );
-        self.io.write_with_verbosity(
+        self.io.write3(
             &sprintf(
                 "<info>Found %s package versions referenced in your dependency graph. %s (%d%%) were filtered away.</info>",
                 &[

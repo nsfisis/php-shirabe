@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::version_compare;
 
 pub struct Version;
@@ -9,51 +10,102 @@ impl Version {
     pub fn parse_openssl(openssl_version: &str, is_fips: &mut bool) -> Option<String> {
         *is_fips = false;
 
-        let matches = Preg::match_strict_groups(
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::match_strict_groups3(
             r"^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$",
             openssl_version,
-        )?;
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
+            return None;
+        }
 
-        let patch = if version_compare(&matches["version"], "3.0.0", "<") {
+        let version = matches
+            .get(&CaptureKey::ByName("version".to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let patch_str = matches
+            .get(&CaptureKey::ByName("patch".to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let suffix_str = matches
+            .get(&CaptureKey::ByName("suffix".to_string()))
+            .cloned()
+            .unwrap_or_default();
+
+        let patch = if version_compare(&version, "3.0.0", "<") {
             format!(
                 ".{}",
-                Self::convert_alpha_version_to_int_version(&matches["patch"])
+                Self::convert_alpha_version_to_int_version(&patch_str)
             )
         } else {
             String::new()
         };
 
-        *is_fips = matches["suffix"].contains("fips");
-        let suffix = format!("-{}", matches["suffix"].trim_start_matches('-'))
+        *is_fips = suffix_str.contains("fips");
+        let suffix = format!("-{}", suffix_str.trim_start_matches('-'))
             .replace("-fips", "")
             .replace("-pre", "-alpha");
 
         Some(
-            format!("{}{}{}", matches["version"], patch, suffix)
+            format!("{}{}{}", version, patch, suffix)
                 .trim_end_matches('-')
                 .to_string(),
         )
     }
 
     pub fn parse_libjpeg(libjpeg_version: &str) -> Option<String> {
-        let matches =
-            Preg::match_strict_groups(r"^(?P<major>\d+)(?P<minor>[a-z]*)$", libjpeg_version)?;
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::match_strict_groups3(
+            r"^(?P<major>\d+)(?P<minor>[a-z]*)$",
+            libjpeg_version,
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
+            return None;
+        }
 
+        let major = matches
+            .get(&CaptureKey::ByName("major".to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let minor = matches
+            .get(&CaptureKey::ByName("minor".to_string()))
+            .cloned()
+            .unwrap_or_default();
         Some(format!(
             "{}.{}",
-            matches["major"],
-            Self::convert_alpha_version_to_int_version(&matches["minor"])
+            major,
+            Self::convert_alpha_version_to_int_version(&minor)
         ))
     }
 
     pub fn parse_zoneinfo_version(zoneinfo_version: &str) -> Option<String> {
-        let matches =
-            Preg::match_strict_groups(r"^(?P<year>\d{4})(?P<revision>[a-z]*)$", zoneinfo_version)?;
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if !Preg::match_strict_groups3(
+            r"^(?P<year>\d{4})(?P<revision>[a-z]*)$",
+            zoneinfo_version,
+            Some(&mut matches),
+        )
+        .unwrap_or(false)
+        {
+            return None;
+        }
 
+        let year = matches
+            .get(&CaptureKey::ByName("year".to_string()))
+            .cloned()
+            .unwrap_or_default();
+        let revision = matches
+            .get(&CaptureKey::ByName("revision".to_string()))
+            .cloned()
+            .unwrap_or_default();
         Some(format!(
             "{}.{}",
-            matches["year"],
-            Self::convert_alpha_version_to_int_version(&matches["revision"])
+            year,
+            Self::convert_alpha_version_to_int_version(&revision)
         ))
     }
 

@@ -412,8 +412,8 @@ impl InstallationManager {
             if !["update", "install", "uninstall"].contains(&op_type.as_str()) {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
-                    self.io.write_error(
-                        PhpMixed::String(format!("  - {}", operation.show(false))),
+                    self.io.write_error3(
+                        &format!("  - {}", operation.show(false)),
                         true,
                         io_interface::NORMAL,
                     );
@@ -696,12 +696,12 @@ impl InstallationManager {
                             ),
                         );
 
-                        promises.push(self.loop_.borrow().get_http_downloader().add(
+                        promises.push(self.loop_.borrow().get_http_downloader().borrow_mut().add(
                             &url,
                             &PhpMixed::Array(
                                 opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
                             ),
-                        ));
+                        )?);
                     }
 
                     continue;
@@ -767,10 +767,10 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 );
 
-                promises.push(self.loop_.borrow().get_http_downloader().add(
+                promises.push(self.loop_.borrow().get_http_downloader().borrow_mut().add(
                     repo_url,
                     &PhpMixed::Array(opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                ));
+                )?);
             }
 
             let _ = self.loop_.borrow_mut().wait(promises, None);

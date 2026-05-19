@@ -2,8 +2,8 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
 };
@@ -24,7 +24,7 @@ use crate::json::json_file::JsonFile;
 pub struct RepositoryCommand {
     base_command_data: BaseCommandData,
 
-    config: Option<Config>,
+    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
     config_file: Option<JsonFile>,
     config_source: Option<JsonConfigSource>,
 }
@@ -36,16 +36,16 @@ impl RepositoryCommand {
             .set_name("repository")
             .set_aliases(&["repo".to_string()])
             .set_description("Manages repositories")
-            .set_definition(vec![
-                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None),
-                InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None),
-                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lower priority) instead of prepending it", None),
-                InputOption::new("before", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it before the given repository name", None),
-                InputOption::new("after", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it after the given repository name", None),
-                InputArgument::new("action", Some(InputArgument::OPTIONAL), "Action to perform: list, add, remove, set-url, get-url, enable, disable", Some(PhpMixed::String("list".to_string()))),
-                InputArgument::new("name", Some(InputArgument::OPTIONAL), "Repository name (or special name packagist.org for enable/disable)", None),
-                InputArgument::new("arg1", Some(InputArgument::OPTIONAL), "Type for add, or new URL for set-url, or JSON config for add", None),
-                InputArgument::new("arg2", Some(InputArgument::OPTIONAL), "URL for add (if not using JSON)", None),
+            .set_definition(&[
+                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
+                InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None).unwrap().into(),
+                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lower priority) instead of prepending it", None).unwrap().into(),
+                InputOption::new("before", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it before the given repository name", None).unwrap().into(),
+                InputOption::new("after", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it after the given repository name", None).unwrap().into(),
+                InputArgument::new("action", Some(InputArgument::OPTIONAL), "Action to perform: list, add, remove, set-url, get-url, enable, disable", Some(PhpMixed::String("list".to_string()))).unwrap().into(),
+                InputArgument::new("name", Some(InputArgument::OPTIONAL), "Repository name (or special name packagist.org for enable/disable)", None).unwrap().into(),
+                InputArgument::new("arg1", Some(InputArgument::OPTIONAL), "Type for add, or new URL for set-url, or JSON config for add", None).unwrap().into(),
+                InputArgument::new("arg2", Some(InputArgument::OPTIONAL), "URL for add (if not using JSON)", None).unwrap().into(),
             ])
             .set_help(
                 "This command lets you manage repositories in your composer.json.\n\n\
@@ -91,19 +91,18 @@ impl RepositoryCommand {
             .as_string()
             .map(|s| s.to_string());
 
-        let config_data = self.config_file.as_ref().unwrap().read()?;
-        let config_file_path = self
-            .inner
-            .config_file
-            .as_ref()
-            .unwrap()
-            .get_path()
-            .to_string();
+        let config_data = self.config_file.as_mut().unwrap().read()?;
+        let config_file_path = self.config_file.as_ref().unwrap().get_path().to_string();
+        let config_data_map: IndexMap<String, PhpMixed> = match config_data {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
         self.config
             .as_mut()
             .unwrap()
-            .merge(config_data, &config_file_path);
-        let repos = self.config.as_ref().unwrap().get_repositories();
+            .borrow_mut()
+            .merge(&config_data_map, &config_file_path);
+        let repos = self.config.as_ref().unwrap().borrow().get_repositories();
 
         match action.as_str() {
             "list" | "ls" | "show" => {
@@ -165,9 +164,15 @@ impl RepositoryCommand {
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
+                    let repo_config_opt: Option<IndexMap<String, PhpMixed>> = match &repo_config {
+                        PhpMixed::Array(m) => {
+                            Some(m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect())
+                        }
+                        _ => None,
+                    };
                     self.config_source.as_mut().unwrap().insert_repository(
                         name.as_deref().unwrap(),
-                        repo_config,
+                        repo_config_opt,
                         reference_name,
                         offset,
                     );
@@ -175,9 +180,15 @@ impl RepositoryCommand {
                 }
 
                 let append = input.get_option("append").as_bool().unwrap_or(false);
+                let repo_config_opt: Option<IndexMap<String, PhpMixed>> = match &repo_config {
+                    PhpMixed::Array(m) => {
+                        Some(m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect())
+                    }
+                    _ => None,
+                };
                 self.config_source.as_mut().unwrap().add_repository(
                     name.as_deref().unwrap(),
-                    repo_config,
+                    repo_config_opt,
                     append,
                 );
                 Ok(0)
@@ -197,7 +208,7 @@ impl RepositoryCommand {
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     self.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
-                        PhpMixed::Bool(false),
+                        None,
                         false,
                     );
                 }
@@ -392,12 +403,12 @@ impl RepositoryCommand {
 }
 
 impl BaseConfigCommand for RepositoryCommand {
-    fn config(&self) -> Option<&Config> {
+    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>> {
         self.config.as_ref()
     }
 
-    fn config_mut(&mut self) -> Option<&mut Config> {
-        self.config.as_mut()
+    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+        &mut self.config
     }
 
     fn config_file(&self) -> Option<&JsonFile> {
@@ -414,6 +425,14 @@ impl BaseConfigCommand for RepositoryCommand {
 
     fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource> {
         self.config_source.as_mut()
+    }
+
+    fn set_config_file(&mut self, file: Option<JsonFile>) {
+        self.config_file = file;
+    }
+
+    fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
+        self.config_source = source;
     }
 }
 

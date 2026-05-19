@@ -20,6 +20,7 @@ use crate::command::self_update_command::SelfUpdateCommand;
 use crate::composer::Composer;
 use crate::config::Config;
 use crate::console::application::Application;
+use crate::console::input::InputDefinitionItem;
 use crate::console::input::input_argument::InputArgument;
 use crate::console::input::input_option::InputOption;
 use crate::factory::Factory;
@@ -31,6 +32,10 @@ use crate::package::version::version_parser::VersionParser;
 use crate::plugin::plugin_events::PluginEvents;
 use crate::plugin::pre_command_run_event::PreCommandRunEvent;
 use crate::util::platform::Platform;
+
+pub const SUCCESS: i64 = 0;
+pub const FAILURE: i64 = 1;
+pub const INVALID: i64 = 2;
 
 /// \Composer\Composer\Command\BaseCommand + \Symfony\Component\Console\Command\Command
 pub trait BaseCommand {
@@ -70,7 +75,7 @@ pub trait BaseCommand {
         todo!()
     }
 
-    fn set_definition(&mut self, _definition: PhpMixed) -> &mut Self
+    fn set_definition(&mut self, _definition: &[InputDefinitionItem]) -> &mut Self
     where
         Self: Sized,
     {
@@ -241,7 +246,7 @@ pub trait BaseCommand {
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
-        config: &Config,
+        config: &mut Config,
         input: &dyn InputInterface,
     ) -> Result<AuditConfig>;
 }
@@ -296,45 +301,26 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn require_composer(
         &mut self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
+        _disable_plugins: Option<bool>,
+        _disable_scripts: Option<bool>,
     ) -> Result<Composer> {
-        if self.composer().is_none() {
-            // TODO(phase-b): requires inner Symfony Application access
-            let application: Option<Application> = todo!();
-            if let Some(app) = application {
-                *self.composer_mut() =
-                    Some(app.get_composer(true, disable_plugins, disable_scripts)?);
-            } else {
-                return Err(RuntimeException {
-                    message:
-                        "Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance"
-                            .to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-        }
-
-        Ok(self.composer().clone().unwrap())
+        // TODO(phase-b): Composer is a PHP class (shared by reference). Returning owned
+        // `Composer` and the Application::get_composer -> &Composer mismatch require a
+        // shared-ownership wrapper (Rc<RefCell<Composer>>) before this can be wired up.
+        let _ = RuntimeException {
+            message: String::new(),
+            code: 0,
+        };
+        todo!("require_composer pending Composer shared-ownership refactor")
     }
 
     fn try_composer(
         &mut self,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
+        _disable_plugins: Option<bool>,
+        _disable_scripts: Option<bool>,
     ) -> Option<Composer> {
-        if self.composer().is_none() {
-            // TODO(phase-b): requires inner Symfony Application access
-            let application: Option<Application> = todo!();
-            if let Some(app) = application {
-                *self.composer_mut() = app
-                    .get_composer(false, disable_plugins, disable_scripts)
-                    .ok();
-            }
-        }
-
-        self.composer().clone()
+        // TODO(phase-b): same shared-ownership refactor as require_composer.
+        todo!("try_composer pending Composer shared-ownership refactor")
     }
 
     fn set_composer(&mut self, composer: Composer) {
@@ -383,12 +369,13 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         let io_ptr: *const dyn IOInterface = self.get_io();
         let io = unsafe { &*io_ptr };
 
+        let disable_plugins_kind = if disable_plugins {
+            crate::factory::DisablePlugins::All
+        } else {
+            crate::factory::DisablePlugins::None
+        };
         let composer = if composer.is_none() {
-            Some(Factory::create_global(
-                io,
-                Some(disable_plugins),
-                Some(disable_scripts),
-            )?)
+            Factory::create_global(io, disable_plugins_kind, disable_scripts)
         } else {
             composer
         };
@@ -400,10 +387,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 input,
                 command_name,
             );
-            composer.get_event_dispatcher().dispatch(
-                pre_command_run_event.get_name(),
-                Box::new(pre_command_run_event),
-            );
+            // TODO(phase-b): event_dispatcher.dispatch expects Option<Event>; need wrapper from
+            // PreCommandRunEvent.
+            let _ = composer.get_event_dispatcher();
+            let _ = pre_command_run_event.get_name();
         }
 
         if input.has_parameter_option(&["--no-ansi"], false) && input.has_option("no-progress") {
@@ -432,7 +419,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             for option_name in option_names {
                 if true == input.has_option(option_name) {
                     if false == input.get_option(option_name).as_bool().unwrap_or(false)
-                        && Platform::get_env(env_name).as_bool().unwrap_or(false)
+                        && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
                     {
                         input.set_option(option_name, PhpMixed::Bool(true));
                     }
@@ -446,8 +433,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 .as_bool()
                 .unwrap_or(false)
                 && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
-                    .as_bool()
-                    .unwrap_or(false)
+                    .map_or(false, |s| !s.is_empty() && s != "0")
             {
                 input.set_option("ignore-platform-reqs", PhpMixed::Bool(true));
 
@@ -463,12 +449,9 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                     .unwrap_or(false))
         {
             let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
-            let ignore_str = ignore_platform_req_env
-                .as_string()
-                .unwrap_or("")
-                .to_string();
+            let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
             if 0 == count(&input.get_option("ignore-platform-req"))
-                && is_string(&ignore_platform_req_env)
+                && ignore_platform_req_env.is_some()
                 && "" != ignore_str
             {
                 input.set_option(
@@ -500,14 +483,20 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> Result<Composer> {
-        let mut disable_plugins =
-            disable_plugins == Some(true) || input.has_parameter_option(&["--no-plugins"], false);
-        let mut disable_scripts =
-            disable_scripts == Some(true) || input.has_parameter_option(&["--no-scripts"], false);
+        let disable_plugins =
+            disable_plugins || input.has_parameter_option(&["--no-plugins"], false);
+        let disable_scripts = disable_scripts.unwrap_or(false)
+            || input.has_parameter_option(&["--no-scripts"], false);
 
         // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
-
-        Factory::create(io, config, disable_plugins, disable_scripts)
+        let disable_plugins_kind = if disable_plugins {
+            crate::factory::DisablePlugins::All
+        } else {
+            crate::factory::DisablePlugins::None
+        };
+        // TODO(phase-b): Option<IndexMap<String, PhpMixed>> -> Option<LocalConfigInput> conversion
+        let _ = config;
+        Factory::create(io, None, disable_plugins_kind, disable_scripts)
     }
 
     fn get_preferred_install_options(
@@ -619,7 +608,9 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
         let ignores = input.get_option("ignore-platform-req");
         if count(&ignores) > 0 {
-            return Ok(PlatformRequirementFilterFactory::from_bool_or_list(ignores));
+            return Ok(PlatformRequirementFilterFactory::from_bool_or_list(
+                ignores,
+            )?);
         }
 
         Ok(PlatformRequirementFilterFactory::ignore_nothing())
@@ -713,7 +704,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn create_audit_config(
         &self,
-        config: &Config,
+        config: &mut Config,
         input: &dyn InputInterface,
     ) -> Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
@@ -732,8 +723,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         let audit_config = AuditConfig::from_config(config, audit, &audit_format)?;
 
         if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
-            .as_bool()
-            .unwrap_or(false)
+            .map_or(false, |s| !s.is_empty() && s != "0")
             || (input.has_option("no-security-blocking")
                 && input
                     .get_option("no-security-blocking")

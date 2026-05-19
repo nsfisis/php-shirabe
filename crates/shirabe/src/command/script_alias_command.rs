@@ -8,8 +8,8 @@ use crate::io::io_interface::IOInterface;
 use crate::util::platform::Platform;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
 
 #[derive(Debug)]
@@ -53,27 +53,33 @@ impl ScriptAliasCommand {
         self.set_name(&self.script)
             .set_description(&self.description)
             .set_aliases(self.aliases.clone())
-            .set_definition(vec![
+            .set_definition(&[
                 InputOption::new(
                     "dev",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Sets the dev mode.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputOption::new(
                     "no-dev",
                     None,
                     Some(InputOption::VALUE_NONE),
                     "Disables the dev mode.",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
                 InputArgument::new(
                     "args",
                     Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                     "",
                     None,
-                ),
+                )
+                .unwrap()
+                .into(),
             ])
             .set_help(
                 "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
@@ -108,7 +114,7 @@ impl ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        let script_alias_input = Preg::replace_limit(r"^\S+ ?", "", &input.to_string(), 1);
+        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input.to_string(), 1)?;
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),

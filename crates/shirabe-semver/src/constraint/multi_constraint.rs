@@ -2,7 +2,6 @@
 
 use std::cell::RefCell;
 
-
 use crate::constraint::bound::Bound;
 use crate::constraint::constraint_interface::ConstraintInterface;
 use crate::constraint::match_all_constraint::MatchAllConstraint;

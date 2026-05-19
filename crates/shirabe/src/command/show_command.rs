@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::composer::semver::semver::Semver;
 use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException, array_search,
     date, extension_loaded, in_array, realpath, strtolower, version_compare,
@@ -62,7 +62,7 @@ impl ShowCommand {
         self.set_name("show")
             .set_aliases(&["info".to_string()])
             .set_description("Shows information about packages")
-            .set_definition(vec![
+            .set_definition(&[
                 // TODO(cli-completion): wire up suggest_package_based_on_mode / suggest_installed_package closures here.
             ])
             .set_help(
@@ -173,12 +173,18 @@ impl ShowCommand {
             return Ok(1);
         }
 
-        let platform_req_filter = self.get_platform_requirement_filter(input);
+        let platform_req_filter = self.get_platform_requirement_filter(input)?;
 
         // init repos
         let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
-            if let Some(p) = composer.get_config().get("platform").as_array().cloned() {
+            if let Some(p) = composer
+                .get_config()
+                .borrow()
+                .get("platform")
+                .as_array()
+                .cloned()
+            {
                 platform_overrides = p.into_iter().map(|(k, v)| (k, *v)).collect();
             }
         }
@@ -261,7 +267,7 @@ impl ShowCommand {
                 ]));
             }
             let mut composite_input: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(
-                FilterRepository::new(installed_repo.as_repository_interface().clone_box(), {
+                FilterRepository::new(installed_repo.clone_box(), {
                     let mut m = IndexMap::new();
                     m.insert("canonical".to_string(), PhpMixed::Bool(false));
                     m
@@ -282,7 +288,7 @@ impl ShowCommand {
                 platform_repo.clone(),
             )]));
             let mut composite_input: Vec<Box<dyn RepositoryInterface>> =
-                vec![installed_repo.as_repository_interface().clone_box()];
+                vec![installed_repo.clone_box()];
             for (_k, v) in default_repos.into_iter() {
                 composite_input.push(v);
             }
@@ -319,7 +325,7 @@ impl ShowCommand {
                 if input.get_option("self").as_bool() == Some(true) {
                     Box::new(RootPackageRepository::new(root_pkg.clone_box()))
                 } else {
-                    Box::new(InstalledArrayRepository::new())
+                    Box::new(InstalledArrayRepository::new()?)
                 };
             if input.get_option("no-dev").as_bool() == Some(true) {
                 let packages = RepositoryUtils::filter_required_packages(
@@ -333,11 +339,11 @@ impl ShowCommand {
                     packages.into_iter().map(|p| p.clone_box()).collect();
                 installed_repo = Box::new(InstalledRepository::new(vec![
                     root_repo.clone_box(),
-                    Box::new(InstalledArrayRepository::new_with_packages(cloned)),
+                    Box::new(InstalledArrayRepository::new_with_packages(cloned)?),
                 ]));
                 repos = Box::new(InstalledRepository::new(vec![
                     root_repo,
-                    Box::new(InstalledArrayRepository::new_with_packages(Vec::new())),
+                    Box::new(InstalledArrayRepository::new_with_packages(Vec::new())?),
                 ]));
             } else {
                 let lr = composer_local
@@ -365,12 +371,12 @@ impl ShowCommand {
         }
 
         if let Some(ref composer) = composer {
-            let mut command_event = CommandEvent::new(
-                PluginEvents::COMMAND.to_string(),
-                "show".to_string(),
+            let mut command_event = CommandEvent::new6(
+                PluginEvents::COMMAND,
+                "show",
                 input,
                 output,
-                None,
+                vec![],
                 IndexMap::new(),
             );
             composer
@@ -514,8 +520,11 @@ impl ShowCommand {
             if input.get_option("outdated").as_bool() == Some(true)
                 && input.get_option("strict").as_bool() == Some(true)
                 && latest_package.is_some()
-                && latest_package.as_ref().unwrap().get_full_pretty_version()
-                    != package.get_full_pretty_version()
+                && latest_package
+                    .as_ref()
+                    .unwrap()
+                    .get_full_pretty_version(true, 0)
+                    != package.get_full_pretty_version(true, 0)
                 && (latest_package
                     .as_ref()
                     .unwrap()
@@ -815,7 +824,8 @@ impl ShowCommand {
 
                         // Determine if Composer is checking outdated dependencies and if current package should trigger non-default exit code
                         let mut package_is_up_to_date = if let Some(latest) = latest_package {
-                            latest.get_full_pretty_version() == package.get_full_pretty_version()
+                            latest.get_full_pretty_version(true, 0)
+                                == package.get_full_pretty_version(true, 0)
                                 && latest
                                     .as_complete_package_interface()
                                     .map_or(true, |c| !c.is_abandoned())
@@ -878,7 +888,8 @@ impl ShowCommand {
                         }
                         name_length = name_length.max(package.get_pretty_name().len());
                         if write_version {
-                            let mut version_str = package.get_full_pretty_version().to_string();
+                            let mut version_str =
+                                package.get_full_pretty_version(true, 0).to_string();
                             if format == "text" {
                                 version_str = version_str.trim_start_matches('v').to_string();
                             }
@@ -915,7 +926,7 @@ impl ShowCommand {
                         if write_latest && latest_package.is_some() {
                             let latest = latest_package.unwrap();
                             let mut latest_version_str =
-                                latest.get_full_pretty_version().to_string();
+                                latest.get_full_pretty_version(true, 0).to_string();
                             if format == "text" {
                                 latest_version_str =
                                     latest_version_str.trim_start_matches('v').to_string();
@@ -1097,13 +1108,15 @@ impl ShowCommand {
                 let write_latest = meta.write_latest;
                 let write_release_date = meta.write_release_date;
 
-                let version_fits = name_length + version_length + 3 <= width;
-                let latest_fits = name_length + version_length + latest_length + 3 <= width;
+                let width_usize = width as usize;
+                let version_fits = name_length + version_length + 3 <= width_usize;
+                let latest_fits = name_length + version_length + latest_length + 3 <= width_usize;
                 let release_date_fits =
-                    name_length + version_length + latest_length + release_date_length + 3 <= width;
+                    name_length + version_length + latest_length + release_date_length + 3
+                        <= width_usize;
                 let description_fits =
                     name_length + version_length + latest_length + release_date_length + 24
-                        <= width;
+                        <= width_usize;
 
                 if latest_fits && !io.is_decorated() {
                     latest_length += 2;
@@ -1586,7 +1599,7 @@ impl ShowCommand {
         }
         io.write(&format!(
             "<info>names</info>    : {}",
-            package.get_names().join(", ")
+            package.get_names(true).join(", ")
         ));
 
         if let Some(c) = latest.as_complete_package_interface() {
@@ -1778,7 +1791,7 @@ impl ShowCommand {
             "names".to_string(),
             PhpMixed::List(
                 package
-                    .get_names()
+                    .get_names(true)
                     .into_iter()
                     .map(|n| Box::new(PhpMixed::String(n)))
                     .collect(),
@@ -1842,7 +1855,6 @@ impl ShowCommand {
             && installed_repo.has_package(package.as_package_interface())
         {
             let path = self
-                .inner
                 .require_composer(None, None)?
                 .get_installation_manager()
                 .get_install_path(package.as_package_interface());
@@ -2412,7 +2424,9 @@ impl ShowCommand {
         latest_package: &dyn PackageInterface,
         package: &dyn PackageInterface,
     ) -> String {
-        if latest_package.get_full_pretty_version() == package.get_full_pretty_version() {
+        if latest_package.get_full_pretty_version(true, 0)
+            == package.get_full_pretty_version(true, 0)
+        {
             return "up-to-date".to_string();
         }
 
@@ -2463,9 +2477,9 @@ impl ShowCommand {
         let mut stability = composer.get_package().get_minimum_stability().to_string();
         let flags = composer.get_package().get_stability_flags();
         if let Some(flag_value) = flags.get(name) {
-            let key_map: IndexMap<String, String> = BasePackage::STABILITIES
+            let key_map: IndexMap<String, String> = base_package::STABILITIES
                 .iter()
-                .map(|(k, v)| (k.clone(), v.to_string()))
+                .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect();
             let needle = flag_value.to_string();
             if let Some(found_key) = array_search(&needle, &key_map) {
@@ -2489,17 +2503,20 @@ impl ShowCommand {
         }
 
         if target_version.is_none() {
-            let mut groups: Vec<String> = Vec::new();
+            let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
             if major_only
-                && Preg::is_match_with_matches(
+                && Preg::is_match3(
                     r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}",
                     package.get_version(),
-                    &mut groups,
+                    Some(&mut groups),
                 )?
             {
-                let zero_major = groups.get(1).cloned().unwrap_or_default();
+                let zero_major = groups
+                    .get(&CaptureKey::ByName("zero_major".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
                 let first_meaningful = groups
-                    .get(2)
+                    .get(&CaptureKey::ByName("first_meaningful".to_string()))
                     .cloned()
                     .unwrap_or_default()
                     .parse::<i64>()

@@ -4,7 +4,7 @@ use crate::package::base_package::BasePackage;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-pub trait LoaderInterface {
+pub trait LoaderInterface: std::fmt::Debug {
     fn load(
         &self,
         config: IndexMap<String, PhpMixed>,

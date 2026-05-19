@@ -11,7 +11,9 @@ use shirabe_external_packages::symfony::component::console::helper::progress_bar
 use shirabe_external_packages::symfony::component::console::helper::table::Table;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::console_output_interface::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::{
+    self as output_interface, OutputInterface,
+};
 use shirabe_external_packages::symfony::component::console::question::choice_question::ChoiceQuestion;
 use shirabe_external_packages::symfony::component::console::question::question::Question;
 use shirabe_php_shim::{
@@ -19,6 +21,7 @@ use shirabe_php_shim::{
     is_array, is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat,
     strip_tags, strlen,
 };
+use std::cell::RefCell;
 
 use crate::io::base_io::BaseIO;
 use crate::io::io_interface::IOInterface;
@@ -33,8 +36,8 @@ pub struct ConsoleIO {
     pub(crate) input: Box<dyn InputInterface>,
     pub(crate) output: Box<dyn OutputInterface>,
     pub(crate) helper_set: HelperSet,
-    pub(crate) last_message: String,
-    pub(crate) last_message_err: String,
+    pub(crate) last_message: RefCell<String>,
+    pub(crate) last_message_err: RefCell<String>,
 
     /// @var float
     start_time: Option<f64>,
@@ -54,21 +57,21 @@ impl ConsoleIO {
         helper_set: HelperSet,
     ) -> Self {
         let mut verbosity_map = IndexMap::new();
-        verbosity_map.insert(io_interface::QUIET, OutputInterface::VERBOSITY_QUIET);
-        verbosity_map.insert(io_interface::NORMAL, OutputInterface::VERBOSITY_NORMAL);
-        verbosity_map.insert(io_interface::VERBOSE, OutputInterface::VERBOSITY_VERBOSE);
+        verbosity_map.insert(io_interface::QUIET, output_interface::VERBOSITY_QUIET);
+        verbosity_map.insert(io_interface::NORMAL, output_interface::VERBOSITY_NORMAL);
+        verbosity_map.insert(io_interface::VERBOSE, output_interface::VERBOSITY_VERBOSE);
         verbosity_map.insert(
             io_interface::VERY_VERBOSE,
-            OutputInterface::VERBOSITY_VERY_VERBOSE,
+            output_interface::VERBOSITY_VERY_VERBOSE,
         );
-        verbosity_map.insert(io_interface::DEBUG, OutputInterface::VERBOSITY_DEBUG);
+        verbosity_map.insert(io_interface::DEBUG, output_interface::VERBOSITY_DEBUG);
         Self {
             authentications: indexmap![],
             input,
             output,
             helper_set,
-            last_message: String::new(),
-            last_message_err: String::new(),
+            last_message: RefCell::new(String::new()),
+            last_message_err: RefCell::new(String::new()),
             start_time: None,
             verbosity_map,
         }
@@ -79,21 +82,14 @@ impl ConsoleIO {
     }
 
     /// @param string[]|string $messages
-    fn do_write(
-        &mut self,
-        messages: PhpMixed,
-        newline: bool,
-        stderr: bool,
-        verbosity: i64,
-        raw: bool,
-    ) {
+    fn do_write(&self, messages: PhpMixed, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
         if sf_verbosity > self.output.get_verbosity() {
             return;
         }
 
         if raw {
-            sf_verbosity |= OutputInterface::OUTPUT_RAW;
+            sf_verbosity |= output_interface::OUTPUT_RAW;
         }
 
         let messages = if let Some(start_time) = self.start_time {
@@ -137,9 +133,9 @@ impl ConsoleIO {
                 todo!("downcast self.output to ConsoleOutputInterface");
             console_output
                 .get_error_output()
-                .write(messages.clone(), newline, sf_verbosity);
+                .write3(messages.clone(), newline, sf_verbosity);
             // PHP: implode($newline ? "\n" : '', (array) $messages)
-            self.last_message_err = implode(
+            *self.last_message_err.borrow_mut() = implode(
                 if newline { "\n" } else { "" },
                 &Self::to_string_list(&messages),
             );
@@ -147,8 +143,8 @@ impl ConsoleIO {
             return;
         }
 
-        self.output.write(messages.clone(), newline, sf_verbosity);
-        self.last_message = implode(
+        self.output.write3(messages.clone(), newline, sf_verbosity);
+        *self.last_message.borrow_mut() = implode(
             if newline { "\n" } else { "" },
             &Self::to_string_list(&messages),
         );
@@ -156,7 +152,7 @@ impl ConsoleIO {
 
     /// @param string[]|string $messages
     fn do_overwrite(
-        &mut self,
+        &self,
         messages: PhpMixed,
         newline: bool,
         size: Option<i64>,
@@ -173,9 +169,9 @@ impl ConsoleIO {
         let size = size.unwrap_or_else(|| {
             // removing possible formatting of lastMessage with strip_tags
             strlen(&strip_tags(if stderr {
-                &self.last_message_err
+                &self.last_message_err.borrow()
             } else {
-                &self.last_message
+                &self.last_message.borrow()
             }))
         });
         // ...let's fill its length with backspaces
@@ -230,9 +226,9 @@ impl ConsoleIO {
         }
 
         if stderr {
-            self.last_message_err = messages_str;
+            *self.last_message_err.borrow_mut() = messages_str;
         } else {
-            self.last_message = messages_str;
+            *self.last_message.borrow_mut() = messages_str;
         }
     }
 
@@ -420,37 +416,31 @@ impl IOInterface for ConsoleIO {
         self.output.is_decorated()
     }
 
-    fn write3(&mut self, message: &str, newline: bool, verbosity: i64) {
+    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
         self.do_write(message, newline, false, verbosity, false);
     }
 
-    fn write_error3(&mut self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
         self.do_write(message, newline, true, verbosity, false);
     }
 
-    fn write_raw3(&mut self, message: &str, newline: bool, verbosity: i64) {
+    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
         self.do_write(message, newline, false, verbosity, true);
     }
 
-    fn write_error_raw3(&mut self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
         self.do_write(message, newline, true, verbosity, true);
     }
 
-    fn overwrite4(&mut self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
         self.do_overwrite(message, newline, size, false, verbosity);
     }
 
-    fn overwrite_error4(
-        &mut self,
-        message: &str,
-        newline: bool,
-        size: Option<i64>,
-        verbosity: i64,
-    ) {
+    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
         self.do_overwrite(message, newline, size, true, verbosity);
     }
 

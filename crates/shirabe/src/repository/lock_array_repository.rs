@@ -41,7 +41,7 @@ impl RepositoryInterface for LockArrayRepository {
 
     fn find_package(
         &self,
-        name: String,
+        name: &str,
         constraint: FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         self.inner.find_package(name, constraint)
@@ -49,7 +49,7 @@ impl RepositoryInterface for LockArrayRepository {
 
     fn find_packages(
         &self,
-        name: String,
+        name: &str,
         constraint: Option<FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         self.inner.find_packages(name, constraint)

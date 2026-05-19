@@ -3,9 +3,9 @@
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use crate::console::input::input_option::InputOption;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
@@ -37,7 +37,7 @@ use shirabe_semver::version_parser::VersionParser;
 pub struct ConfigCommand {
     base_command_data: BaseCommandData,
 
-    config: Option<Config>,
+    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
     config_file: Option<JsonFile>,
     config_source: Option<JsonConfigSource>,
 
@@ -64,24 +64,22 @@ impl ConfigCommand {
 
     pub(crate) fn configure(&mut self) {
         // TODO(cli-completion): suggest_setting_keys() for `setting-key` argument
-        self
-            .inner
-            .set_name("config")
+        self.set_name("config")
             .set_description("Sets config options")
-            .set_definition(vec![
-                InputOption::new("global", Some("g"), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None),
-                InputOption::new("editor", Some("e"), Some(InputOption::VALUE_NONE), "Open editor", None),
-                InputOption::new("auth", Some("a"), Some(InputOption::VALUE_NONE), "Affect auth config file (only used for --editor)", None),
-                InputOption::new("unset", None, Some(InputOption::VALUE_NONE), "Unset the given setting-key", None),
-                InputOption::new("list", Some("l"), Some(InputOption::VALUE_NONE), "List configuration settings", None),
-                InputOption::new("file", Some("f"), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None),
-                InputOption::new("absolute", None, Some(InputOption::VALUE_NONE), "Returns absolute paths when fetching *-dir config values instead of relative", None),
-                InputOption::new("json", Some("j"), Some(InputOption::VALUE_NONE), "JSON decode the setting value, to be used with extra.* keys", None),
-                InputOption::new("merge", Some("m"), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None),
-                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lowest priority) to the existing ones instead of prepending it (highest priority)", None),
-                InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None),
-                InputArgument::new("setting-key", None, "Setting key", None),
-                InputArgument::new("setting-value", Some(InputArgument::IS_ARRAY), "Setting value", None),
+            .set_definition(&[
+                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
+        InputOption::new("editor", Some(PhpMixed::String("e".to_string())), Some(InputOption::VALUE_NONE), "Open editor", None).unwrap().into(),
+        InputOption::new("auth", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Affect auth config file (only used for --editor)", None).unwrap().into(),
+        InputOption::new("unset", None, Some(InputOption::VALUE_NONE), "Unset the given setting-key", None).unwrap().into(),
+        InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "List configuration settings", None).unwrap().into(),
+        InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None).unwrap().into(),
+        InputOption::new("absolute", None, Some(InputOption::VALUE_NONE), "Returns absolute paths when fetching *-dir config values instead of relative", None).unwrap().into(),
+        InputOption::new("json", Some(PhpMixed::String("j".to_string())), Some(InputOption::VALUE_NONE), "JSON decode the setting value, to be used with extra.* keys", None).unwrap().into(),
+        InputOption::new("merge", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Merge the setting value with the current value, to be used with extra.* or audit.ignore[-abandoned] keys in combination with --json", None).unwrap().into(),
+        InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lowest priority) to the existing ones instead of prepending it (highest priority)", None).unwrap().into(),
+        InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None).unwrap().into(),
+        InputArgument::new("setting-key", None, "Setting key", None).unwrap().into(),
+        InputArgument::new("setting-value", Some(InputArgument::IS_ARRAY), "Setting value", None).unwrap().into(),
             ])
             .set_help(
                 "This command allows you to edit composer config settings and repositories\n\
@@ -127,15 +125,17 @@ impl ConfigCommand {
     ) -> anyhow::Result<()> {
         self.initialize(input, output)?;
 
-        let auth_config_file = self
-            .inner
-            .get_auth_config_file(input, self.config.as_ref().unwrap());
+        let auth_config_file =
+            self.get_auth_config_file(input, &*self.config.as_ref().unwrap().borrow());
 
-        self.auth_config_file = Some(JsonFile::new(auth_config_file, None, Some(self.get_io()))?);
-        self.auth_config_source = Some(JsonConfigSource::new_with_auth(
-            self.auth_config_file.as_ref().unwrap(),
-            true,
-        ));
+        self.auth_config_file = Some(JsonFile::new(
+            auth_config_file,
+            None,
+            Some(self.get_io().clone_box()),
+        )?);
+        // TODO(phase-b): JsonConfigSource::new takes owned JsonFile (PHP sharing semantics).
+        // Skipping auth_config_source assignment until Rc<RefCell<JsonFile>> refactor lands.
+        self.auth_config_source = None;
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
         if input.get_option("global").as_bool() == Some(true)
@@ -188,7 +188,10 @@ impl ConfigCommand {
                     editor = Some("notepad".to_string());
                 } else {
                     for candidate in &["editor", "vim", "vi", "nano", "pico", "ed"] {
-                        if !exec(&format!("which {}", candidate)).is_empty() {
+                        if !exec(&format!("which {}", candidate), None, None)
+                            .unwrap_or_default()
+                            .is_empty()
+                        {
                             editor = Some(candidate.to_string());
                             break;
                         }
@@ -207,22 +210,25 @@ impl ConfigCommand {
             } else {
                 self.config_file.as_ref().unwrap().get_path().to_string()
             };
-            system(&format!(
-                "{} {}{}",
-                editor.unwrap_or_default(),
-                file,
-                if Platform::is_windows() {
-                    ""
-                } else {
-                    " > `tty`"
-                }
-            ));
+            system(
+                &format!(
+                    "{} {}{}",
+                    editor.unwrap_or_default(),
+                    file,
+                    if Platform::is_windows() {
+                        ""
+                    } else {
+                        " > `tty`"
+                    }
+                ),
+                None,
+            );
 
             return Ok(0);
         }
 
         if input.get_option("global").as_bool() != Some(true) {
-            self.config.as_mut().unwrap().merge(
+            self.config.as_mut().unwrap().borrow_mut().merge(
                 self.config_file.as_ref().unwrap().read()?,
                 self.config_file.as_ref().unwrap().get_path(),
             );
@@ -233,21 +239,20 @@ impl ConfigCommand {
             };
             let mut wrap: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             wrap.insert("config".to_string(), Box::new(auth_data));
-            self.config.as_mut().unwrap().merge(
+            self.config.as_mut().unwrap().borrow_mut().merge(
                 PhpMixed::Array(wrap),
                 self.auth_config_file.as_ref().unwrap().get_path(),
             );
         }
 
-        self.inner
-            .get_io()
-            .load_configuration(self.config.as_ref().unwrap());
+        self.get_io()
+            .load_configuration(&mut *self.config.as_ref().unwrap().borrow_mut())?;
 
         // List the configuration of the file settings
         if input.get_option("list").as_bool() == Some(true) {
             self.list_configuration(
-                self.config.as_ref().unwrap().all(),
-                self.config.as_ref().unwrap().raw(),
+                self.config.as_ref().unwrap().borrow_mut().all(0)?,
+                self.config.as_ref().unwrap().borrow().raw(),
                 output,
                 None,
                 input.get_option("source").as_bool() == Some(true),
@@ -297,31 +302,33 @@ impl ConfigCommand {
             properties_defaults.insert("suggest".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("extra".to_string(), PhpMixed::List(vec![]));
             let raw_data = self.config_file.as_ref().unwrap().read()?;
-            let mut data = self.config.as_ref().unwrap().all();
+            let mut data = self.config.as_ref().unwrap().borrow_mut().all(0)?;
             let mut source = self
-                .inner
                 .config
                 .as_ref()
                 .unwrap()
                 .get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
-            let mut matches: Vec<String> = vec![];
-            if Preg::is_match(
+            let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match3(
                 "/^repos?(?:itories)?(?:\\.(.+))?/",
                 &setting_key,
                 Some(&mut matches),
             )
             .unwrap_or(false)
             {
-                if matches.get(1).is_none() {
+                if matches.get(&CaptureKey::ByIndex(1)).is_none() {
                     value = data
                         .as_array()
                         .and_then(|a| a.get("repositories"))
                         .map(|v| (**v).clone())
                         .unwrap_or_else(|| PhpMixed::Array(IndexMap::new()));
                 } else {
-                    let repo_key = matches[1].clone();
+                    let repo_key = matches
+                        .get(&CaptureKey::ByIndex(1))
+                        .cloned()
+                        .unwrap_or_default();
                     let repos = data
                         .as_array()
                         .and_then(|a| a.get("repositories"))
@@ -385,7 +392,7 @@ impl ConfigCommand {
                 .map(|c| c.contains_key(&setting_key))
                 .unwrap_or(false)
             {
-                value = self.config.as_ref().unwrap().get_with_flags(
+                value = self.config.as_ref().unwrap().borrow_mut().get_with_flags(
                     &setting_key,
                     if input.get_option("absolute").as_bool() == Some(true) {
                         0
@@ -396,8 +403,10 @@ impl ConfigCommand {
                 // ensure we get {} output for properties which are objects
                 if value.as_array().map(|a| a.is_empty()).unwrap_or(false) {
                     let schema = JsonFile::parse_json(
-                        &file_get_contents(JsonFile::COMPOSER_SCHEMA_PATH).unwrap_or_default(),
-                        "composer.schema.json",
+                        Some(
+                            &file_get_contents(JsonFile::COMPOSER_SCHEMA_PATH).unwrap_or_default(),
+                        ),
+                        Some("composer.schema.json"),
                     )?;
                     let type_value = schema
                         .as_array()
@@ -439,13 +448,7 @@ impl ConfigCommand {
                 && in_array(setting_key.as_str(), &properties, true)
             {
                 value = (**raw_data.as_array().unwrap().get(&setting_key).unwrap()).clone();
-                source = self
-                    .inner
-                    .config_file
-                    .as_ref()
-                    .unwrap()
-                    .get_path()
-                    .to_string();
+                source = self.config_file.as_ref().unwrap().get_path().to_string();
             } else if let Some(v) = properties_defaults.get(&setting_key) {
                 value = v.clone();
                 source = "defaults".to_string();
@@ -458,7 +461,7 @@ impl ConfigCommand {
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
-                JsonFile::encode(&value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)?
+                JsonFile::encode(&value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
             } else {
                 value.as_string().unwrap_or("").to_string()
             };
@@ -468,7 +471,7 @@ impl ConfigCommand {
                 source_of_config_value = format!(" ({})", source);
             }
 
-            self.get_io().write(
+            self.get_io().write3(
                 &format!("{}{}", value_str, source_of_config_value),
                 true,
                 io_interface::QUIET,
@@ -516,7 +519,6 @@ impl ConfigCommand {
         {
             if setting_key == "disable-tls"
                 && self
-                    .inner
                     .config
                     .as_ref()
                     .unwrap()
@@ -547,8 +549,8 @@ impl ConfigCommand {
             return Ok(0);
         }
         // handle preferred-install per-package config
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match(
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3(
             "/^preferred-install\\.(.+)/",
             &setting_key,
             Some(&mut matches),
@@ -588,8 +590,8 @@ impl ConfigCommand {
         }
 
         // handle allow-plugins config setting elements true or false to add/remove
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match(
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3(
             "{^allow-plugins\\.([a-zA-Z0-9/*-]+)}",
             &setting_key,
             Some(&mut matches),
@@ -660,8 +662,8 @@ impl ConfigCommand {
         }
 
         // handle repositories
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match_strict_groups(
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(
             "/^repos?(?:itories)?\\.(.+)/",
             &setting_key,
             Some(&mut matches),
@@ -712,7 +714,7 @@ impl ConfigCommand {
                         return Ok(0);
                     }
                 } else {
-                    let value = JsonFile::parse_json(&values[0], "composer.json")?;
+                    let value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                     self.config_source.as_mut().unwrap().add_repository(
                         &matches[1],
                         value,
@@ -731,8 +733,8 @@ impl ConfigCommand {
         }
 
         // handle extra
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match("/^extra\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -744,7 +746,7 @@ impl ConfigCommand {
 
             let mut value = PhpMixed::String(values[0].clone());
             if input.get_option("json").as_bool() == Some(true) {
-                value = JsonFile::parse_json(&values[0], "composer.json")?;
+                value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if input.get_option("merge").as_bool() == Some(true) {
                     let current_value_outer = self.config_file.as_ref().unwrap().read()?;
                     let bits = explode(".", &setting_key);
@@ -787,8 +789,8 @@ impl ConfigCommand {
         }
 
         // handle suggest
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -822,8 +824,9 @@ impl ConfigCommand {
         }
 
         // handle platform
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match("/^platform\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false)
+        {
             if input.get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -881,7 +884,7 @@ impl ConfigCommand {
                     .collect(),
             );
             if input.get_option("json").as_bool() == Some(true) {
-                value = JsonFile::parse_json(&values[0], "composer.json")?;
+                value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if !is_array(&value) {
                     return Err(RuntimeException {
                         message: format!("Expected an array or object for {}", setting_key),
@@ -942,12 +945,8 @@ impl ConfigCommand {
         }
 
         // handle auth
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match(
-            "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/",
-            &setting_key,
-            Some(&mut matches),
-        ).unwrap_or(false) {
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3("/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
                 self.auth_config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
                 self.config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
@@ -1023,8 +1022,8 @@ impl ConfigCommand {
                     }
 
                     // Check if the header is in correct "Name: Value" format
-                    let mut header_parts: Vec<String> = vec![];
-                    if !Preg::is_match("/^[^:]+:\\s*.+$/", header, Some(&mut header_parts)).unwrap_or(false) {
+                    let mut header_parts: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if !Preg::is_match3("/^[^:]+:\\s*.+$/", header, Some(&mut header_parts)).unwrap_or(false) {
                         return Err(RuntimeException {
                             message: format!("Header \"{}\" is not in \"Header-Name: Header-Value\" format", header),
                             code: 0,
@@ -1056,8 +1055,8 @@ impl ConfigCommand {
         }
 
         // handle script
-        let mut matches: Vec<String> = vec![];
-        if Preg::is_match("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
             if input.get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -1143,7 +1142,6 @@ impl ConfigCommand {
         if key == "disable-tls" {
             if !normalized_value.as_bool().unwrap_or(false)
                 && self
-                    .inner
                     .config
                     .as_ref()
                     .unwrap()
@@ -1156,7 +1154,6 @@ impl ConfigCommand {
                 );
             } else if normalized_value.as_bool().unwrap_or(false)
                 && !self
-                    .inner
                     .config
                     .as_ref()
                     .unwrap()
@@ -1252,7 +1249,9 @@ impl ConfigCommand {
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(&Preg::replace("{^config\\.}", "", &format!("{}.", key)));
+                new_k.push_str(
+                    &Preg::replace("{^config\\.}", "", &format!("{}.", key)).unwrap_or_default(),
+                );
                 k = Some(new_k);
                 self.list_configuration(value_inner, raw_val, output, k.clone(), show_source);
                 k = orig_k.clone();
@@ -1285,11 +1284,11 @@ impl ConfigCommand {
             let source = if show_source {
                 format!(
                     " ({})",
-                    self.config.as_ref().unwrap().get_source_of_value(&format!(
-                        "{}{}",
-                        k.clone().unwrap_or_default(),
-                        key
-                    ))
+                    self.config
+                        .as_ref()
+                        .unwrap()
+                        .borrow_mut()
+                        .get_source_of_value(&format!("{}{}", k.clone().unwrap_or_default(), key))
                 )
             } else {
                 String::new()
@@ -1304,13 +1303,14 @@ impl ConfigCommand {
                 } else {
                     k.clone().unwrap()
                 };
-                let id = Preg::replace("{\\..*$}", "", &id_source);
+                let id = Preg::replace("{\\..*$}", "", &id_source).unwrap_or_default();
                 let id = Preg::replace(
                     "{[^a-z0-9]}i",
                     "-",
                     &strtolower(&shirabe_php_shim::trim(&id, " \t\n\r\0\u{0B}")),
-                );
-                let id = Preg::replace("{-+}", "-", &id);
+                )
+                .unwrap_or_default();
+                let id = Preg::replace("{-+}", "-", &id).unwrap_or_default();
                 link = format!("https://getcomposer.org/doc/06-config.md#{}", id);
             }
             if is_string(&raw_val)
@@ -1320,7 +1320,7 @@ impl ConfigCommand {
                     .unwrap_or_default()
                     != value_display
             {
-                io.write(
+                io.write3(
                     &format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
                         link,
@@ -1334,7 +1334,7 @@ impl ConfigCommand {
                     io_interface::QUIET,
                 );
             } else {
-                io.write(
+                io.write3(
                     &format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{}</info>{}",
                         link,
@@ -1531,7 +1531,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|val| {
                 PhpMixed::Bool(
-                    Preg::is_match(
+                    Preg::is_match3(
                         "/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i",
                         val.as_string().unwrap_or(""),
                         None,
@@ -2008,12 +2008,12 @@ fn key_first_key(value: &PhpMixed) -> Option<String> {
 }
 
 impl BaseConfigCommand for ConfigCommand {
-    fn config(&self) -> Option<&Config> {
+    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>> {
         self.config.as_ref()
     }
 
-    fn config_mut(&mut self) -> Option<&mut Config> {
-        self.config.as_mut()
+    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>> {
+        &mut self.config
     }
 
     fn config_file(&self) -> Option<&JsonFile> {
@@ -2024,12 +2024,20 @@ impl BaseConfigCommand for ConfigCommand {
         self.config_file.as_mut()
     }
 
+    fn set_config_file(&mut self, file: Option<JsonFile>) {
+        self.config_file = file;
+    }
+
     fn config_source(&self) -> Option<&JsonConfigSource> {
         self.config_source.as_ref()
     }
 
     fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource> {
         self.config_source.as_mut()
+    }
+
+    fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
+        self.config_source = source;
     }
 }
 

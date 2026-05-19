@@ -7,14 +7,14 @@ use crate::package::root_package_interface::RootPackageInterface;
 use crate::repository::repository_manager::RepositoryManager;
 use crate::util::r#loop::Loop;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PartialComposer {
     global: bool,
     package: Option<Box<dyn RootPackageInterface>>,
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
     repository_manager: Option<RepositoryManager>,
     installation_manager: Option<InstallationManager>,
-    config: Option<Config>,
+    config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
     event_dispatcher: Option<EventDispatcher>,
 }
 
@@ -27,12 +27,16 @@ impl PartialComposer {
         self.package.as_deref().unwrap()
     }
 
-    pub fn set_config(&mut self, config: Config) {
+    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
         self.config = Some(config);
     }
 
-    pub fn get_config(&self) -> &Config {
+    pub fn get_config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
         self.config.as_ref().unwrap()
+    }
+
+    pub fn get_config_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Config>> {
+        self.config.as_mut().unwrap()
     }
 
     pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {

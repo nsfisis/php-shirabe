@@ -2,7 +2,8 @@
 
 use crate::io::io_interface;
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::component::finder::finder::Finder;
@@ -45,19 +46,19 @@ impl SelfUpdateCommand {
             .set_name("self-update")
             .set_aliases(&["selfupdate".to_string()])
             .set_description("Updates composer.phar to the latest version")
-            .set_definition(vec![
-                InputOption::new("rollback", Some(PhpMixed::String("r".to_string())), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None),
-                InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None),
-                InputOption::new("update-keys", None, Some(InputOption::VALUE_NONE), "Prompt user for a key update", None),
-                InputOption::new("stable", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel", None),
-                InputOption::new("preview", None, Some(InputOption::VALUE_NONE), "Force an update to the preview channel", None),
-                InputOption::new("snapshot", None, Some(InputOption::VALUE_NONE), "Force an update to the snapshot channel", None),
-                InputOption::new("1", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 1.x versions", None),
-                InputOption::new("2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.x versions", None),
-                InputOption::new("2.2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.2.x LTS versions", None),
-                InputOption::new("set-channel-only", None, Some(InputOption::VALUE_NONE), "Only store the channel as the default one and then exit", None),
+            .set_definition(&[
+                InputOption::new("rollback", Some(PhpMixed::String("r".to_string())), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
+                InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None).unwrap().into(),
+                InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None).unwrap().into(),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+                InputOption::new("update-keys", None, Some(InputOption::VALUE_NONE), "Prompt user for a key update", None).unwrap().into(),
+                InputOption::new("stable", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel", None).unwrap().into(),
+                InputOption::new("preview", None, Some(InputOption::VALUE_NONE), "Force an update to the preview channel", None).unwrap().into(),
+                InputOption::new("snapshot", None, Some(InputOption::VALUE_NONE), "Force an update to the snapshot channel", None).unwrap().into(),
+                InputOption::new("1", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 1.x versions", None).unwrap().into(),
+                InputOption::new("2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.x versions", None).unwrap().into(),
+                InputOption::new("2.2", None, Some(InputOption::VALUE_NONE), "Force an update to the stable channel, but only use 2.2.x LTS versions", None).unwrap().into(),
+                InputOption::new("set-channel-only", None, Some(InputOption::VALUE_NONE), "Only store the channel as the default one and then exit", None).unwrap().into(),
             ])
             .set_help(
                 "The <info>self-update</info> command checks getcomposer.org for newer\n\
@@ -132,18 +133,23 @@ impl SelfUpdateCommand {
         class_exists("Composer\\Util\\Platform");
         class_exists("Composer\\Downloader\\FilesystemException");
 
-        let config = Factory::create_config(None, None)?;
+        let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
 
-        let base_url = if config.get("disable-tls").as_bool() == Some(true) {
+        let base_url = if config.borrow_mut().get("disable-tls").as_bool() == Some(true) {
             format!("http://{}", Self::HOMEPAGE)
         } else {
             format!("https://{}", Self::HOMEPAGE)
         };
 
         let io = self.get_io();
-        let http_downloader = Factory::create_http_downloader(io, &config)?;
+        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+            Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
+        ));
 
-        let mut versions_util = Versions::new(config.clone(), http_downloader.clone());
+        let mut versions_util = Versions::new(
+            std::rc::Rc::clone(&config),
+            std::rc::Rc::clone(&http_downloader),
+        );
 
         // switch channel if requested
         let mut requested_channel: Option<String> = None;
@@ -164,12 +170,23 @@ impl SelfUpdateCommand {
         }
 
         let cache_dir = config
+            .borrow_mut()
             .get("cache-dir")
             .as_string()
             .unwrap_or("")
             .to_string();
-        let rollback_dir = config.get("data-dir").as_string().unwrap_or("").to_string();
-        let home = config.get("home").as_string().unwrap_or("").to_string();
+        let rollback_dir = config
+            .borrow_mut()
+            .get("data-dir")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        let home = config
+            .borrow_mut()
+            .get("home")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
         let local_filename = Phar::running(false);
         if local_filename.is_empty() {
             return Err(RuntimeException {
@@ -180,7 +197,7 @@ impl SelfUpdateCommand {
         }
 
         if input.get_option("update-keys").as_bool().unwrap_or(false) {
-            self.fetch_keys(io, &config)?;
+            self.fetch_keys(io, &*config.borrow())?;
 
             return Ok(0);
         }
@@ -275,17 +292,16 @@ impl SelfUpdateCommand {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| latest_version.clone());
-        let current_major_version = Preg::replace(r"{^(\d+).*}", "$1", Composer::get_version());
-        let update_major_version = Preg::replace(r"{^(\d+).*}", "$1", update_version.clone());
+        let current_major_version = Preg::replace(r"{^(\d+).*}", "$1", &Composer::get_version())?;
+        let update_major_version = Preg::replace(r"{^(\d+).*}", "$1", &update_version)?;
         let preview_major_version = Preg::replace(
             r"{^(\d+).*}",
             "$1",
             latest_preview
                 .get("version")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string(),
-        );
+                .unwrap_or(""),
+        )?;
 
         if versions_util.get_channel()? == "stable" && input.get_argument("version").is_null() {
             // if requesting stable channel and no specific version, avoid automatically upgrading to the next major
@@ -414,8 +430,8 @@ impl SelfUpdateCommand {
                 PhpMixed::String(Preg::replace(
                     r"{^([0-9a-f]{7})[0-9a-f]{33}$}",
                     "$1",
-                    Composer::VERSION.to_string(),
-                )),
+                    &Composer::VERSION,
+                )?),
                 PhpMixed::String(Self::OLD_INSTALL_EXT.to_string()),
             ],
         );
@@ -423,17 +439,13 @@ impl SelfUpdateCommand {
         let updating_to_tag =
             !Preg::is_match(r"{^[0-9a-f]{40}$}", &update_version).unwrap_or(false);
 
-        io.write3(
-            &sprintf(
-                "Upgrading to version <info>%s</info> (%s channel).",
-                &[
-                    PhpMixed::String(update_version.clone()),
-                    PhpMixed::String(channel_string.clone()),
-                ],
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write(&sprintf(
+            "Upgrading to version <info>%s</info> (%s channel).",
+            &[
+                PhpMixed::String(update_version.clone()),
+                PhpMixed::String(channel_string.clone()),
+            ],
+        ));
         let remote_filename = format!(
             "{}{}",
             base_url,
@@ -443,7 +455,7 @@ impl SelfUpdateCommand {
                 "/composer.phar".to_string()
             }
         );
-        let signature = match http_downloader.get(
+        let signature = match http_downloader.borrow_mut().get(
             &format!("{}.sig", remote_filename),
             &PhpMixed::Array(indexmap::IndexMap::new()),
         ) {
@@ -460,7 +472,9 @@ impl SelfUpdateCommand {
             }
         };
         io.write_error3("   ", false, io_interface::NORMAL);
-        http_downloader.copy(&remote_filename, &temp_filename)?;
+        http_downloader
+            .borrow_mut()
+            .copy(&remote_filename, &temp_filename)?;
         io.write_error3("", true, io_interface::NORMAL);
 
         if !file_exists(&temp_filename) || signature.is_none() || signature.as_deref() == Some("") {
@@ -475,7 +489,9 @@ impl SelfUpdateCommand {
         let signature = signature.unwrap_or_default();
 
         // verify phar signature
-        if !extension_loaded("openssl") && config.get("disable-tls").as_bool() == Some(true) {
+        if !extension_loaded("openssl")
+            && config.borrow_mut().get("disable-tls").as_bool() == Some(true)
+        {
             io.write_error3(
                 "<warning>Skipping phar signature verification as you have disabled OpenSSL via config.disable-tls</warning>",
                 true,
@@ -655,10 +671,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             .into());
         }
 
-        io.write3(
+        io.write(
             "Open <info>https://composer.github.io/pubkeys.html</info> to find the latest keys",
-            true,
-            io_interface::NORMAL,
         );
 
         // TODO(phase-b): closure captures none; PHP throws inside the closure on bad input
@@ -681,11 +695,16 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         let mut dev_key = String::new();
         let mut match_: Option<String> = None;
         loop {
-            let m = Preg::is_match_strict_groups(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(
                 r"{(-----BEGIN PUBLIC KEY-----.+?-----END PUBLIC KEY-----)}s",
                 &dev_key,
-            );
-            match_ = m.and_then(|m| m.get(0).cloned());
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
+                match_ = m.get(&CaptureKey::ByIndex(0)).cloned();
+            }
             if match_.is_some() {
                 break;
             }
@@ -717,23 +736,24 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             config.get("home").as_string().unwrap_or("")
         );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
-        io.write3(
-            &format!(
-                "Stored key with fingerprint: {}",
-                Keys::fingerprint(&key_path)?
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write(&format!(
+            "Stored key with fingerprint: {}",
+            Keys::fingerprint(&key_path)?
+        ));
 
         let mut tags_key = String::new();
         let mut match_: Option<String> = None;
         loop {
-            let m = Preg::is_match_strict_groups(
+            let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match_strict_groups3(
                 r"{(-----BEGIN PUBLIC KEY-----.+?-----END PUBLIC KEY-----)}s",
                 &tags_key,
-            );
-            match_ = m.and_then(|m| m.get(0).cloned());
+                Some(&mut m),
+            )
+            .unwrap_or(false)
+            {
+                match_ = m.get(&CaptureKey::ByIndex(0)).cloned();
+            }
             if match_.is_some() {
                 break;
             }
@@ -764,23 +784,15 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             config.get("home").as_string().unwrap_or("")
         );
         file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
-        io.write3(
-            &format!(
-                "Stored key with fingerprint: {}",
-                Keys::fingerprint(&key_path)?
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write(&format!(
+            "Stored key with fingerprint: {}",
+            Keys::fingerprint(&key_path)?
+        ));
 
-        io.write3(
-            &format!(
-                "Public keys stored in {}",
-                config.get("home").as_string().unwrap_or("")
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write(&format!(
+            "Public keys stored in {}",
+            config.get("home").as_string().unwrap_or("")
+        ));
 
         Ok(())
     }

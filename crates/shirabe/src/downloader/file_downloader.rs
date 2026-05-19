@@ -59,17 +59,17 @@ pub struct FileDownloader {
     /// @var IOInterface
     pub(crate) io: Box<dyn IOInterface>,
     /// @var Config
-    pub(crate) config: Config,
+    pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var HttpDownloader
-    pub(crate) http_downloader: HttpDownloader,
+    pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     /// @var Filesystem
-    pub(crate) filesystem: Filesystem,
+    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var ?Cache
     pub(crate) cache: Option<Cache>,
     /// @var ?EventDispatcher
     pub(crate) event_dispatcher: Option<EventDispatcher>,
     /// @var ProcessExecutor
-    pub(crate) process: ProcessExecutor,
+    pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var array<string, string> Map of package name to cache key
     last_cache_writes: IndexMap<String, String>,
     /// @var array<string, string[]> Map of package name to list of paths
@@ -80,15 +80,23 @@ impl FileDownloader {
     /// Constructor.
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: HttpDownloader,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<EventDispatcher>,
         cache: Option<Cache>,
-        filesystem: Option<Filesystem>,
-        process: Option<ProcessExecutor>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
+        process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| ProcessExecutor::new(Some(Box::new(&*io)), None));
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(Some(process.clone())));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                Box::new(&*io),
+            ))))
+        });
+        let filesystem = filesystem.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
+                std::rc::Rc::clone(&process),
+            ))))
+        });
 
         let mut this = Self {
             io,
@@ -106,8 +114,16 @@ impl FileDownloader {
             // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
             this.io.write_error("Running cache garbage collection");
             this.cache.as_mut().unwrap().gc(
-                this.config.get("cache-files-ttl").as_int().unwrap_or(0),
-                this.config.get("cache-files-maxsize").as_int().unwrap_or(0),
+                this.config
+                    .borrow_mut()
+                    .get("cache-files-ttl")
+                    .as_int()
+                    .unwrap_or(0),
+                this.config
+                    .borrow_mut()
+                    .get("cache-files-maxsize")
+                    .as_int()
+                    .unwrap_or(0),
             );
         }
 
@@ -168,9 +184,11 @@ impl DownloaderInterface for FileDownloader {
         debug_assert!(urls.len() > 0);
 
         let file_name = self.get_file_name(package, path);
-        self.filesystem.ensure_directory_exists(path)?;
+        self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         let dir_of_file = shirabe_php_shim::dirname(&file_name, 1);
-        self.filesystem.ensure_directory_exists(&dir_of_file)?;
+        self.filesystem
+            .borrow_mut()
+            .ensure_directory_exists(&dir_of_file)?;
 
         // TODO(plugin): inline closures rely on captured $accept/$reject/$urls/$retries. In Rust
         // we'd need a struct holding shared state — left as a phase-b refactor.
@@ -204,11 +222,12 @@ impl DownloaderInterface for FileDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         let file_name = self.get_file_name(package, path);
         if file_exists(&file_name) {
-            self.filesystem.unlink(&file_name)?;
+            self.filesystem.borrow_mut().unlink(&file_name)?;
         }
 
         let vendor_dir = self
             .config
+            .borrow_mut()
             .get("vendor-dir")
             .as_string()
             .unwrap_or("")
@@ -232,16 +251,16 @@ impl DownloaderInterface for FileDownloader {
             .cloned()
         {
             for path_to_clean in &paths {
-                self.filesystem.remove(path_to_clean)?;
+                self.filesystem.borrow_mut().remove(path_to_clean)?;
             }
         }
 
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
-                && self.filesystem.is_dir_empty(dir)?
+                && self.filesystem.borrow_mut().is_dir_empty(dir)?
                 && realpath(dir).as_deref() != Some(&Platform::get_cwd(false).unwrap_or_default())
             {
-                self.filesystem.remove_directory_php(dir)?;
+                self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }
         }
 
@@ -262,6 +281,7 @@ impl DownloaderInterface for FileDownloader {
 
         let vendor_dir = self
             .config
+            .borrow_mut()
             .get("vendor-dir")
             .as_string()
             .unwrap_or("")
@@ -271,16 +291,17 @@ impl DownloaderInterface for FileDownloader {
         // the file to be installed. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
         if false == {
-            let normalized_vendor = self.filesystem.normalize_path(&vendor_dir);
+            let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
             let normalized_path = self
                 .filesystem
+                .borrow()
                 .normalize_path(&format!("{}{}", path, DIRECTORY_SEPARATOR));
             strpos(&normalized_vendor, &normalized_path).is_some()
         } {
-            self.filesystem.empty_directory(path, true)?;
+            self.filesystem.borrow_mut().empty_directory(path, true)?;
         }
-        self.filesystem.ensure_directory_exists(path)?;
-        self.filesystem.rename(
+        self.filesystem.borrow_mut().ensure_directory_exists(path)?;
+        self.filesystem.borrow_mut().rename(
             &self.get_file_name(package, path),
             &format!(
                 "{}/{}",
@@ -338,7 +359,7 @@ impl DownloaderInterface for FileDownloader {
                 UninstallOperation::format(package, false)
             ));
         }
-        let _promise = self.filesystem.remove_directory_async(path)?;
+        let _promise = self.filesystem.borrow_mut().remove_directory_async(path)?;
 
         // TODO(phase-b): chain `.then(|result| if !result { throw RuntimeException })`
         let _ = path;
@@ -357,7 +378,7 @@ impl ChangeReportInterface for FileDownloader {
         // TODO(phase-b): swap self.io to NullIO and restore — needs a take/swap helper
 
         let mut null_io = NullIO::new();
-        null_io.load_configuration(&self.config);
+        null_io.load_configuration(&mut *self.config.borrow_mut())?;
         let mut e: Option<anyhow::Error> = None;
         let mut output: String = String::new();
 
@@ -365,7 +386,8 @@ impl ChangeReportInterface for FileDownloader {
         let result: Result<()> = (|| -> Result<()> {
             if is_dir(&format!("{}_compare", target_dir)) {
                 self.filesystem
-                    .remove_directory(&format!("{}_compare", target_dir), false)?;
+                    .borrow_mut()
+                    .remove_directory(&format!("{}_compare", target_dir))?;
             }
 
             let promise =
@@ -377,7 +399,7 @@ impl ChangeReportInterface for FileDownloader {
                     PhpMixed::Null
                 })),
             );
-            self.http_downloader.wait()?;
+            self.http_downloader.borrow_mut().wait()?;
             if e.is_some() {
                 return Err(e.unwrap());
             }
@@ -389,7 +411,7 @@ impl ChangeReportInterface for FileDownloader {
                     PhpMixed::Null
                 })),
             );
-            self.process.wait()?;
+            self.process.borrow_mut().wait()?;
             if e.is_some() {
                 return Err(e.unwrap());
             }
@@ -400,6 +422,7 @@ impl ChangeReportInterface for FileDownloader {
             comparer.do_compare();
             output = comparer.get_changed_as_string(true, false);
             self.filesystem
+                .borrow_mut()
                 .remove_directory(&format!("{}_compare", target_dir))?;
             Ok(())
         })();
@@ -491,7 +514,11 @@ impl FileDownloader {
         rtrim(
             &format!(
                 "{}/composer/tmp-{}.{}",
-                self.config.get("vendor-dir").as_string().unwrap_or(""),
+                self.config
+                    .borrow_mut()
+                    .get("vendor-dir")
+                    .as_string()
+                    .unwrap_or(""),
                 hash(
                     "md5",
                     &format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
@@ -525,10 +552,10 @@ impl FileDownloader {
         let mut url = url.to_string();
         if package.get_dist_reference().is_some() {
             url = UrlUtil::update_dist_reference(
-                &self.config,
+                &*self.config.borrow(),
                 &url,
                 package.get_dist_reference().unwrap(),
-            )?;
+            );
         }
 
         Ok(url)

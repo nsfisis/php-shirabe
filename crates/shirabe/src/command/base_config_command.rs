@@ -8,17 +8,19 @@ use crate::json::json_file::JsonFile;
 use crate::util::platform::Platform;
 use crate::util::silencer::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
 
 pub trait BaseConfigCommand: BaseCommand {
-    fn config(&self) -> Option<&Config>;
-    fn config_mut(&mut self) -> Option<&mut Config>;
+    fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>>;
+    fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>>;
     fn config_file(&self) -> Option<&JsonFile>;
     fn config_file_mut(&mut self) -> Option<&mut JsonFile>;
+    fn set_config_file(&mut self, file: Option<JsonFile>);
     fn config_source(&self) -> Option<&JsonConfigSource>;
     fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource>;
+    fn set_config_source(&mut self, source: Option<JsonConfigSource>);
 
     fn initialize(
         &mut self,
@@ -28,38 +30,47 @@ pub trait BaseConfigCommand: BaseCommand {
         // TODO(phase-b): BaseCommand::initialize chained via Self::initialize would recurse;
         // omitted until trait disambiguation is sorted.
 
-        if input.get_option("global").as_bool() && input.get_option("file").is_not_null() {
+        if input.get_option("global").as_bool().unwrap_or(false)
+            && !input.get_option("file").is_null()
+        {
             return Err(anyhow::anyhow!("--file and --global can not be combined"));
         }
 
         let io = self.get_io();
-        *self.config_mut() = Some(Factory::create_config(io)?);
-        let config = self.config().as_mut().unwrap();
+        *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            Factory::create_config(Some(&*io), None)?,
+        )));
+        let config_rc = std::rc::Rc::clone(self.config().unwrap());
 
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
-        if input.get_option("global").as_bool() {
-            let home = config.get("home").to_string();
-            config.set_base_dir(home);
+        if input.get_option("global").as_bool().unwrap_or(false) {
+            let home = config_rc.borrow_mut().get("home").to_string();
+            config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
-        let config_file = self.get_composer_config_file(input, config);
+        let config_file = self.get_composer_config_file(input, &*config_rc.borrow());
 
         // Create global composer.json if invoked using `composer global [config-cmd]`
         if (config_file == "composer.json" || config_file == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
             && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
-                == std::fs::canonicalize(config.get("home").to_string()).ok()
+                == std::fs::canonicalize(config_rc.borrow_mut().get("home").to_string()).ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
-
-        let config = self.config().as_ref().unwrap();
-        *self.config_file_mut() = Some(JsonFile::new(config_file.clone(), None, Some(io))?);
-        *self.config_source_mut() =
-            Some(JsonConfigSource::new(self.config_file().as_ref().unwrap()));
+        self.set_config_file(Some(JsonFile::new(
+            config_file.clone(),
+            None,
+            Some(io.clone_box()),
+        )?));
+        // TODO(phase-b): JsonConfigSource::new takes owned JsonFile, but PHP shares the same
+        // instance with $this->configFile. Needs Rc<RefCell<JsonFile>> refactor on both sides.
+        self.set_config_source(None);
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
-        if input.get_option("global").as_bool() && !self.config_file().as_ref().unwrap().exists() {
+        if input.get_option("global").as_bool().unwrap_or(false)
+            && !self.config_file().as_ref().unwrap().exists()
+        {
             let path = self.config_file().as_ref().unwrap().get_path().to_string();
             touch(&path);
             self.config_file_mut()
@@ -91,21 +102,21 @@ pub trait BaseConfigCommand: BaseCommand {
 
     /// Get the local composer.json, global config.json, or the file passed by the user
     fn get_composer_config_file(&self, input: &dyn InputInterface, config: &Config) -> String {
-        if input.get_option("global").as_bool() {
+        if input.get_option("global").as_bool().unwrap_or(false) {
             format!("{}/config.json", config.get("home"))
         } else {
             input
                 .get_option("file")
                 .as_string_opt()
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| Factory::get_composer_file())
+                .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default())
         }
     }
 
     /// Get the local auth.json or global auth.json, or if the user passed in a file to use,
     /// the corresponding auth.json
     fn get_auth_config_file(&self, input: &dyn InputInterface, config: &Config) -> String {
-        if input.get_option("global").as_bool() {
+        if input.get_option("global").as_bool().unwrap_or(false) {
             format!("{}/auth.json", config.get("home"))
         } else {
             let composer_config = self.get_composer_config_file(input, config);

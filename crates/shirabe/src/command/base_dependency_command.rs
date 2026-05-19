@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php
 
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, UnexpectedValueException};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::bound::Bound;
 use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 
@@ -31,7 +31,7 @@ pub trait BaseDependencyCommand: BaseCommand {
     const OPTION_TREE: &'static str = "tree";
 
     fn colors(&self) -> &[String];
-    fn colors_mut(&mut self) -> &mut [String];
+    fn colors_mut(&mut self) -> &mut Vec<String>;
 
     // TODO(phase-b): these wrappers existed to forward BaseCommand setters, but they
     // shadowed the BaseCommand methods and caused ambiguity. Use BaseCommand directly.
@@ -63,9 +63,14 @@ pub trait BaseDependencyCommand: BaseCommand {
             }
 
             repos.push(Box::new(locker.get_locked_repository(true)?));
+            let platform_overrides: IndexMap<String, PhpMixed> = locker
+                .get_platform_overrides()?
+                .into_iter()
+                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .collect();
             repos.push(Box::new(PlatformRepository::new(
                 vec![],
-                locker.get_platform_overrides(),
+                platform_overrides,
             )?));
         } else {
             let local_repo = composer.get_repository_manager().get_local_repository();
@@ -82,10 +87,14 @@ pub trait BaseDependencyCommand: BaseCommand {
                 return Ok(1);
             }
 
-            repos.push(Box::new(local_repo));
+            // TODO(phase-b): InstalledRepositoryInterface is shared by reference (PHP class
+            // semantics); Box<dyn RepositoryInterface> requires owned upcast. Skipping local
+            // repo push until clone_box is exposed on InstalledRepositoryInterface.
+            let _ = local_repo;
 
             let platform_overrides = composer
                 .get_config()
+                .borrow()
                 .get("platform")
                 .as_array()
                 .cloned()
@@ -95,7 +104,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             repos.push(Box::new(PlatformRepository::new(vec![], IndexMap::new())?));
         }
 
-        let mut installed_repo = InstalledRepository::new(repos)?;
+        let mut installed_repo = InstalledRepository::new(repos);
 
         let needle = input
             .get_argument(Self::ARGUMENT_PACKAGE)
@@ -112,8 +121,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             "*".to_string()
         };
 
-        let packages =
-            installed_repo.find_packages_with_replacers_and_providers(needle.clone(), None);
+        let packages = installed_repo.find_packages_with_replacers_and_providers(&needle, None);
         if packages.is_empty() {
             return Err(anyhow::anyhow!(InvalidArgumentException {
                 message: format!("Could not find package \"{}\" in your project", needle),
@@ -122,22 +130,22 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
 
         let matched_package = installed_repo.find_package(
-            needle.clone(),
+            &needle,
             FindPackageConstraint::String(text_constraint.clone()),
         );
         if matched_package.is_none() {
             let default_repos = CompositeRepository::new(RepositoryFactory::default_repos(
                 Some(self.get_io()),
-                Some(composer.get_config()),
+                Some(std::rc::Rc::clone(composer.get_config())),
                 Some(&mut composer.get_repository_manager()),
             )?);
             if let Some(r#match) = default_repos.find_package(
-                needle.clone(),
+                &needle,
                 FindPackageConstraint::String(text_constraint.clone()),
             ) {
-                installed_repo.add_repository(Box::new(InstalledArrayRepository::new(vec![
-                    r#match.clone_box(),
-                ])))?;
+                installed_repo.add_repository(Box::new(
+                    InstalledArrayRepository::new_with_packages(vec![r#match.clone_box()])?,
+                ))?;
             } else if PlatformRepository::is_platform_package(&needle) {
                 let parser = VersionParser::new();
                 let platform_constraint = parser.parse_constraints(&text_constraint)?;
@@ -147,9 +155,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                         .get_version()
                         .to_string();
                     let temp_platform_pkg = Package::new(needle.clone(), version.clone(), version);
-                    installed_repo.add_repository(Box::new(InstalledArrayRepository::new(
-                        vec![Box::new(temp_platform_pkg)],
-                    )))?;
+                    installed_repo.add_repository(Box::new(
+                        InstalledArrayRepository::new_with_packages(vec![Box::new(
+                            temp_platform_pkg,
+                        )])?,
+                    ))?;
                 }
             } else {
                 self.get_io().write_error(&format!(
@@ -201,9 +211,13 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
 
         let has_constraint = text_constraint != "*";
-        let constraint = if has_constraint {
+        let constraint: Option<Box<dyn ConstraintInterface>> = if has_constraint {
             let version_parser = VersionParser::new();
-            Some(version_parser.parse_constraints(&text_constraint)?)
+            Some(
+                version_parser
+                    .parse_constraints(&text_constraint)?
+                    .clone_box(),
+            )
         } else {
             None
         };
@@ -339,7 +353,19 @@ pub trait BaseDependencyCommand: BaseCommand {
             new_table.extend(table);
             table = new_table;
         }
-        self.render_table(table, output);
+        // TODO(phase-b): render_table expects Vec<PhpMixed>; build PhpMixed cells once a
+        // converter exists for Vec<String> rows.
+        let table_as_mixed: Vec<PhpMixed> = table
+            .into_iter()
+            .map(|row| {
+                PhpMixed::List(
+                    row.into_iter()
+                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .collect(),
+                )
+            })
+            .collect();
+        self.render_table(table_as_mixed, output);
     }
 
     fn init_styles(&mut self, output: &dyn OutputInterface) {
@@ -350,9 +376,11 @@ pub trait BaseDependencyCommand: BaseCommand {
             "magenta".to_string(),
             "blue".to_string(),
         ];
-        for color in &self.colors() {
-            let style = OutputFormatterStyle::new(color.clone());
-            output.get_formatter().set_style(color, style);
+        for color in self.colors() {
+            // TODO(phase-b): output.get_formatter() returns &OutputFormatter; set_style needs
+            // &mut. Need interior mutability or `get_formatter_mut`.
+            let _ = OutputFormatterStyle::new(Some(color), None, None);
+            let _ = output.get_formatter();
         }
     }
 

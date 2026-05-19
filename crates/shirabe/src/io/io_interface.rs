@@ -22,65 +22,65 @@ pub trait IOInterface: LoggerInterface + std::fmt::Debug {
 
     fn is_decorated(&self) -> bool;
 
-    fn write(&mut self, message: &str) {
+    fn write(&self, message: &str) {
         self.write3(message, true, NORMAL)
     }
-    fn write2(&mut self, message: &str, newline: bool) {
+    fn write2(&self, message: &str, newline: bool) {
         self.write3(message, newline, NORMAL)
     }
-    fn write_no_newline(&mut self, message: &str) {
+    fn write_no_newline(&self, message: &str) {
         self.write3(message, false, NORMAL)
     }
-    fn write3(&mut self, message: &str, newline: bool, verbosity: i64);
+    fn write3(&self, message: &str, newline: bool, verbosity: i64);
 
-    fn write_error(&mut self, message: &str) {
+    fn write_error(&self, message: &str) {
         self.write_error3(message, true, NORMAL)
     }
-    fn write_error2(&mut self, message: &str, newline: bool) {
+    fn write_error2(&self, message: &str, newline: bool) {
         self.write_error3(message, newline, NORMAL)
     }
-    fn write_error_no_newline(&mut self, message: &str) {
+    fn write_error_no_newline(&self, message: &str) {
         self.write_error3(message, false, NORMAL)
     }
-    fn write_error3(&mut self, message: &str, newline: bool, verbosity: i64);
+    fn write_error3(&self, message: &str, newline: bool, verbosity: i64);
 
-    fn write_raw(&mut self, message: &str) {
+    fn write_raw(&self, message: &str) {
         self.write_raw3(message, true, NORMAL)
     }
-    fn write_raw2(&mut self, message: &str, newline: bool) {
+    fn write_raw2(&self, message: &str, newline: bool) {
         self.write_raw3(message, newline, NORMAL)
     }
-    fn write_raw3(&mut self, message: &str, newline: bool, verbosity: i64);
+    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64);
 
-    fn write_error_raw(&mut self, message: &str) {
+    fn write_error_raw(&self, message: &str) {
         self.write_error_raw3(message, true, NORMAL)
     }
-    fn write_error_raw2(&mut self, message: &str, newline: bool) {
+    fn write_error_raw2(&self, message: &str, newline: bool) {
         self.write_error_raw3(message, newline, NORMAL)
     }
-    fn write_error_raw3(&mut self, message: &str, newline: bool, verbosity: i64);
+    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64);
 
-    fn overwrite(&mut self, message: &str) {
+    fn overwrite(&self, message: &str) {
         self.overwrite4(message, true, None, NORMAL)
     }
-    fn overwrite2(&mut self, message: &str, newline: bool) {
+    fn overwrite2(&self, message: &str, newline: bool) {
         self.overwrite4(message, newline, None, NORMAL)
     }
-    fn overwrite3(&mut self, message: &str, newline: bool, size: Option<i64>) {
+    fn overwrite3(&self, message: &str, newline: bool, size: Option<i64>) {
         self.overwrite4(message, newline, size, NORMAL)
     }
-    fn overwrite4(&mut self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn overwrite_error(&mut self, message: &str) {
+    fn overwrite_error(&self, message: &str) {
         self.overwrite_error4(message, true, None, NORMAL)
     }
-    fn overwrite_error2(&mut self, message: &str, newline: bool) {
+    fn overwrite_error2(&self, message: &str, newline: bool) {
         self.overwrite_error4(message, newline, None, NORMAL)
     }
-    fn overwrite_error3(&mut self, message: &str, newline: bool, size: Option<i64>) {
+    fn overwrite_error3(&self, message: &str, newline: bool, size: Option<i64>) {
         self.overwrite_error4(message, newline, size, NORMAL)
     }
-    fn overwrite_error4(&mut self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
 
     fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed;
 

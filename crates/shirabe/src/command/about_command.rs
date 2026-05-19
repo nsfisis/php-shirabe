@@ -5,8 +5,8 @@ use crate::command::base_command::BaseCommandData;
 use crate::command::base_command::HasBaseCommandData;
 use crate::composer::Composer;
 use crate::io::io_interface::IOInterface;
-use shirabe_external_packages::symfony::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 
 #[derive(Debug)]
 pub struct AboutCommand {

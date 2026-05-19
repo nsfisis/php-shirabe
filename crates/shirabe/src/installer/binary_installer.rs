@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php
 
 use crate::io::io_interface;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use indexmap::IndexMap;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir, substr,
@@ -21,7 +22,7 @@ pub struct BinaryInstaller {
     pub(crate) bin_dir: String,
     pub(crate) bin_compat: String,
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) filesystem: Filesystem,
+    pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     vendor_dir: Option<String>,
 }
 
@@ -30,10 +31,11 @@ impl BinaryInstaller {
         io: Box<dyn IOInterface>,
         bin_dir: String,
         bin_compat: String,
-        filesystem: Option<Filesystem>,
+        filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         vendor_dir: Option<String>,
     ) -> Self {
-        let filesystem = filesystem.unwrap_or_else(|| Filesystem::new(None));
+        let filesystem = filesystem
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
             bin_dir,
             bin_compat,
@@ -59,30 +61,30 @@ impl BinaryInstaller {
         for bin in &binaries {
             let mut bin_path = format!("{}/{}", install_path, bin);
             if !file_exists(&bin_path) {
-                self.io.write_error(
-                    PhpMixed::String(format!(
+                self.io.write_error3(
+                    &format!(
                         "    <warning>Skipped installation of bin {} for package {}: file not found in package</warning>",
                         bin,
                         package.get_name(),
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
                 continue;
             }
             if is_dir(&bin_path) {
-                self.io.write_error(
-                    PhpMixed::String(format!(
+                self.io.write_error3(
+                    &format!(
                         "    <warning>Skipped installation of bin {} for package {}: found a directory at that path</warning>",
                         bin,
                         package.get_name(),
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
                 continue;
             }
-            if !self.filesystem.is_absolute_path(&bin_path) {
+            if !self.filesystem.borrow_mut().is_absolute_path(&bin_path) {
                 // in case a custom installer returned a relative path for the
                 // $package, we can now safely turn it into a absolute path (as we
                 // already checked the binary's existence). The following helpers
@@ -94,12 +96,12 @@ impl BinaryInstaller {
             if file_exists(&link) {
                 if !is_link(&link) {
                     if warn_on_overwrite {
-                        self.io.write_error(
-                            PhpMixed::String(format!(
+                        self.io.write_error3(
+                            &format!(
                                 "    Skipped installation of bin {} for package {}: name conflicts with an existing file",
                                 bin,
                                 package.get_name(),
-                            )),
+                            ),
                             true,
                             io_interface::NORMAL,
                         );
@@ -108,7 +110,7 @@ impl BinaryInstaller {
                 }
                 if realpath(&link) == realpath(&bin_path) {
                     // It is a linked binary from a previous installation, which can be replaced with a proxy file
-                    self.filesystem.unlink(&link);
+                    self.filesystem.borrow_mut().unlink(&link);
                 }
             }
 
@@ -142,15 +144,17 @@ impl BinaryInstaller {
             let link = format!("{}/{}", self.bin_dir, basename(bin));
             if is_link(&link) || file_exists(&link) {
                 // still checking for symlinks here for legacy support
-                self.filesystem.unlink(&link);
+                self.filesystem.borrow_mut().unlink(&link);
             }
             if is_file(&format!("{}.bat", link)) {
-                self.filesystem.unlink(&format!("{}.bat", link));
+                self.filesystem
+                    .borrow_mut()
+                    .unlink(&format!("{}.bat", link));
             }
         }
 
         // attempt removing the bin dir in case it is left empty
-        if is_dir(&self.bin_dir) && self.filesystem.is_dir_empty(&self.bin_dir) {
+        if is_dir(&self.bin_dir) && self.filesystem.borrow_mut().is_dir_empty(&self.bin_dir) {
             let bin_dir = self.bin_dir.clone();
             let _ = Silencer::call(|| {
                 rmdir(&bin_dir);
@@ -167,10 +171,20 @@ impl BinaryInstaller {
         let handle = fopen(bin, "r");
         let line = fgets(handle.clone()).unwrap_or_default();
         fclose(handle);
-        if let Some(m) =
-            Preg::is_match_strict_groups(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m", &line)
+        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+        if Preg::is_match_strict_groups3(
+            r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",
+            &line,
+            Some(&mut m),
+        )
+        .unwrap_or(false)
         {
-            return trim(m.get(1).map(|s| s.as_str()).unwrap_or(""), None);
+            return trim(
+                m.get(&CaptureKey::ByIndex(1))
+                    .map(|s| s.as_str())
+                    .unwrap_or(""),
+                None,
+            );
         }
 
         "php".to_string()
@@ -194,12 +208,12 @@ impl BinaryInstaller {
             self.install_unixy_proxy_binaries(bin_path, &link);
             link.push_str(".bat");
             if file_exists(&link) {
-                self.io.write_error(
-                    PhpMixed::String(format!(
+                self.io.write_error3(
+                    &format!(
                         "    Skipped installation of bin {}.bat proxy for package {}: a .bat proxy was already installed",
                         bin,
                         package.get_name(),
-                    )),
+                    ),
                     true,
                     io_interface::NORMAL,
                 );
@@ -227,13 +241,18 @@ impl BinaryInstaller {
     }
 
     pub(crate) fn initialize_bin_dir(&mut self) {
-        self.filesystem.ensure_directory_exists(&self.bin_dir);
+        self.filesystem
+            .borrow_mut()
+            .ensure_directory_exists(&self.bin_dir);
         // TODO(phase-b): PHP assigns realpath(...) even when realpath returns false
         self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
     }
 
     pub(crate) fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> String {
-        let bin_path = self.filesystem.find_shortest_path(link, bin, false);
+        let bin_path = self
+            .filesystem
+            .borrow_mut()
+            .find_shortest_path(link, bin, false);
         let caller = Self::determine_binary_caller(bin);
 
         // if the target is a php file, we run the unixy proxy file
@@ -266,7 +285,10 @@ impl BinaryInstaller {
     }
 
     pub(crate) fn generate_unixy_proxy_code(&self, bin: &str, link: &str) -> String {
-        let bin_path = self.filesystem.find_shortest_path(link, bin, false);
+        let bin_path = self
+            .filesystem
+            .borrow_mut()
+            .find_shortest_path(link, bin, false);
 
         let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
         let bin_file = basename(&bin_path);
@@ -289,6 +311,7 @@ impl BinaryInstaller {
             };
             let bin_path_exported = self
                 .filesystem
+                .borrow()
                 .find_shortest_path_code(link, bin, false, true);
             let mut stream_proxy_code = String::new();
             let mut stream_hint = String::new();
@@ -301,7 +324,7 @@ impl BinaryInstaller {
                 let vendor_dir_real = realpath(vendor_dir).unwrap_or_else(|| vendor_dir.clone());
                 globals_code.push_str(&format!(
                     "$GLOBALS['_composer_autoload_path'] = {};\n",
-                    self.filesystem.find_shortest_path_code(
+                    self.filesystem.borrow_mut().find_shortest_path_code(
                         link,
                         &format!("{}/autoload.php", vendor_dir_real),
                         false,
@@ -311,9 +334,10 @@ impl BinaryInstaller {
             }
             // Add workaround for PHPUnit process isolation
             if let Some(vendor_dir) = &self.vendor_dir {
-                if self.filesystem.normalize_path(bin)
+                if self.filesystem.borrow().normalize_path(bin)
                     == self
                         .filesystem
+                        .borrow()
                         .normalize_path(&format!("{}/phpunit/phpunit/phpunit", vendor_dir))
                 {
                     // workaround issue on PHPUnit 6.5+ running on PHP 8+

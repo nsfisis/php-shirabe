@@ -10,21 +10,21 @@ use shirabe_php_shim::microtime;
 
 #[derive(Debug)]
 pub struct Loop {
-    http_downloader: HttpDownloader,
-    process_executor: Option<ProcessExecutor>,
+    http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+    process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     current_promises: IndexMap<i64, Vec<Box<dyn PromiseInterface>>>,
     wait_index: i64,
 }
 
 impl Loop {
     pub fn new(
-        mut http_downloader: HttpDownloader,
-        process_executor: Option<ProcessExecutor>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        http_downloader.enable_async();
+        http_downloader.borrow_mut().enable_async();
 
-        let process_executor = process_executor.map(|mut pe| {
-            pe.enable_async();
+        let process_executor = process_executor.map(|pe| {
+            pe.borrow_mut().enable_async();
             pe
         });
 
@@ -36,11 +36,13 @@ impl Loop {
         }
     }
 
-    pub fn get_http_downloader(&self) -> &HttpDownloader {
+    pub fn get_http_downloader(&self) -> &std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
         &self.http_downloader
     }
 
-    pub fn get_process_executor(&self) -> Option<&ProcessExecutor> {
+    pub fn get_process_executor(
+        &self,
+    ) -> Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>> {
         self.process_executor.as_ref()
     }
 
@@ -66,9 +68,9 @@ impl Loop {
 
         if let Some(ref progress) = progress {
             let mut total_jobs: i64 = 0;
-            total_jobs += self.http_downloader.count_active_jobs();
+            total_jobs += self.http_downloader.borrow_mut().count_active_jobs(None);
             if let Some(ref pe) = self.process_executor {
-                total_jobs += pe.count_active_jobs();
+                total_jobs += pe.borrow_mut().count_active_jobs(None);
             }
             progress.start(total_jobs);
         }
@@ -77,9 +79,9 @@ impl Loop {
         loop {
             let mut active_jobs: i64 = 0;
 
-            active_jobs += self.http_downloader.count_active_jobs();
+            active_jobs += self.http_downloader.borrow_mut().count_active_jobs(None);
             if let Some(ref pe) = self.process_executor {
-                active_jobs += pe.count_active_jobs();
+                active_jobs += pe.borrow_mut().count_active_jobs(None);
             }
 
             if let Some(ref progress) = progress {

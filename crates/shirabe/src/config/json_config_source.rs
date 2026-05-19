@@ -199,7 +199,7 @@ impl JsonConfigSource {
                     }
                 }
             }
-            self.file.write(
+            self.file.write2(
                 config,
                 shirabe_php_shim::JSON_UNESCAPED_SLASHES
                     | shirabe_php_shim::JSON_PRETTY_PRINT

@@ -25,12 +25,12 @@ pub struct TarDownloader {
 impl TarDownloader {
     pub fn new(
         io: Box<dyn IOInterface>,
-        config: Config,
-        http_downloader: HttpDownloader,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<EventDispatcher>,
         cache: Option<Cache>,
-        filesystem: Filesystem,
-        process: ProcessExecutor,
+        filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: FileDownloader::new(
