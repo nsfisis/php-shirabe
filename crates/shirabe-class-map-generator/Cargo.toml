@@ -8,3 +8,6 @@ shirabe-external-packages.workspace = true
 shirabe-php-shim.workspace = true
 anyhow.workspace = true
 indexmap.workspace = true
+
+[lints]
+workspace = true

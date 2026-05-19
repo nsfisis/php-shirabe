@@ -4,7 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+shirabe-php-shim.workspace = true
+shirabe-semver.workspace = true
 anyhow.workspace = true
 indexmap.workspace = true
-shirabe-php-shim = { path = "../shirabe-php-shim" }
-shirabe-semver = { path = "../shirabe-semver" }
+
+[lints]
+workspace = true
