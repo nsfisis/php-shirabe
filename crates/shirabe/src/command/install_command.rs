@@ -61,8 +61,14 @@ impl InstallCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let io = self.get_io();
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
+        // TODO(phase-b): clone_box to release self borrow held by get_io.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = io_box.as_ref();
 
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
@@ -94,9 +100,9 @@ impl InstallCommand {
             return Ok(1);
         }
 
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
 
-        if !composer.get_locker().is_locked() && !HttpDownloader::is_curl_enabled() {
+        if !composer.get_locker_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
             io.write_error("<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
         }
 
@@ -104,9 +110,10 @@ impl InstallCommand {
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "install", input, output);
         composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let install = Installer::create(io.clone_box(), &composer);
+        let mut install = Installer::create(io.clone_box(), &composer);
 
         let config = std::rc::Rc::clone(composer.get_config());
         let (prefer_source, prefer_dist) =
@@ -146,7 +153,7 @@ impl InstallCommand {
                 .unwrap_or(false);
 
         composer
-            .get_installation_manager()
+            .get_installation_manager_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
         install

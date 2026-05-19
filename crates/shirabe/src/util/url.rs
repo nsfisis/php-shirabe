@@ -131,7 +131,7 @@ impl Url {
             .as_string_opt()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        if let Some(port) = parse_url(url, PHP_URL_PORT).as_i64_opt() {
+        if let Some(port) = parse_url(url, PHP_URL_PORT).as_int() {
             origin = format!("{}:{}", origin, port);
         }
 
@@ -156,7 +156,14 @@ impl Url {
                 true,
             )
         {
-            for gitlab_domain in config.get("gitlab-domains").as_vec_string() {
+            let gitlab_domains: Vec<String> = match config.get("gitlab-domains") {
+                PhpMixed::List(list) => list
+                    .iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect(),
+                _ => vec![],
+            };
+            for gitlab_domain in gitlab_domains {
                 if !gitlab_domain.is_empty() && gitlab_domain.starts_with(&origin) {
                     return gitlab_domain;
                 }

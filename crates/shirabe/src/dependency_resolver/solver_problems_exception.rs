@@ -46,7 +46,7 @@ impl SolverProblemsException {
         &self,
         repository_set: &RepositorySet,
         request: &Request,
-        pool: &Pool,
+        pool: &mut Pool,
         is_verbose: bool,
         is_dev_extraction: bool,
     ) -> String {
@@ -58,16 +58,24 @@ impl SolverProblemsException {
         for problem in &self.problems {
             problems.push(format!(
                 "{}\n",
-                problem.get_pretty_string(
-                    repository_set,
-                    request,
-                    pool,
-                    is_verbose,
-                    &installed_map,
-                    &self.learned_pool
-                )
+                problem
+                    .get_pretty_string(
+                        repository_set,
+                        request,
+                        pool,
+                        is_verbose,
+                        &installed_map,
+                        &self.learned_pool
+                    )
+                    .unwrap_or_default()
             ));
-            missing_extensions.extend(self.get_extension_problems(problem.get_reasons()));
+            // TODO(phase-b): get_reasons returns an IndexMap; flatten its values into Vec<Vec<...>>.
+            let reasons_vec: Vec<Vec<Box<dyn crate::dependency_resolver::rule::Rule>>> = problem
+                .get_reasons()
+                .values()
+                .map(|v| v.iter().map(|r| r.clone_box()).collect())
+                .collect();
+            missing_extensions.extend(self.get_extension_problems(reasons_vec));
             is_caused_by_lock =
                 is_caused_by_lock || problem.is_caused_by_lock(repository_set, request, pool);
         }

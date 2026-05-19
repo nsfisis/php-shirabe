@@ -58,10 +58,10 @@ impl ArchiveManager {
     pub fn get_package_filename_parts(
         &self,
         package: &dyn CompletePackageInterface,
-    ) -> IndexMap<String, String> {
+    ) -> anyhow::Result<IndexMap<String, String>> {
         let base_name = match package.get_archive_name() {
             Some(name) => name.to_string(),
-            None => Preg::replace("#[^a-z0-9-_]#i", "-", package.get_name()),
+            None => Preg::replace("#[^a-z0-9-_]#i", "-", package.get_name())?,
         };
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
@@ -70,7 +70,7 @@ impl ArchiveManager {
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
             if Preg::is_match("{^[a-f0-9]{40}$}", dist_ref).unwrap_or(false) {
-                parts.insert("dist_reference".to_string(), dist_ref.clone());
+                parts.insert("dist_reference".to_string(), dist_ref.to_string());
                 if let Some(dist_type) = package.get_dist_type() {
                     parts.insert("dist_type".to_string(), dist_type.to_string());
                 }
@@ -79,7 +79,7 @@ impl ArchiveManager {
                     "version".to_string(),
                     package.get_pretty_version().to_string(),
                 );
-                parts.insert("dist_reference".to_string(), dist_ref.clone());
+                parts.insert("dist_reference".to_string(), dist_ref.to_string());
             }
         } else {
             parts.insert(
@@ -95,10 +95,10 @@ impl ArchiveManager {
 
         // array_filter removed null values; replace '/' with '-' in each value
         for val in parts.values_mut() {
-            *val = val.replace('/', '-');
+            *val = val.replace('/', "-");
         }
 
-        parts
+        Ok(parts)
     }
 
     pub fn get_package_filename_from_parts(&self, parts: &IndexMap<String, String>) -> String {
@@ -106,9 +106,12 @@ impl ArchiveManager {
         values.join("-")
     }
 
-    pub fn get_package_filename(&self, package: &dyn CompletePackageInterface) -> String {
-        let parts = self.get_package_filename_parts(package);
-        self.get_package_filename_from_parts(&parts)
+    pub fn get_package_filename(
+        &self,
+        package: &dyn CompletePackageInterface,
+    ) -> anyhow::Result<String> {
+        let parts = self.get_package_filename_parts(package)?;
+        Ok(self.get_package_filename_from_parts(&parts))
     }
 
     pub fn archive(
@@ -147,9 +150,9 @@ impl ArchiveManager {
             }
         };
 
-        let filesystem = Filesystem::new(None);
+        let mut filesystem = Filesystem::new(None);
 
-        let is_root = package.as_any().is::<dyn RootPackageInterface>();
+        let is_root = package.as_root_package_interface().is_some();
         let source_path: String;
 
         if is_root {
@@ -181,7 +184,7 @@ impl ArchiveManager {
 
             let composer_json_path = format!("{}/composer.json", source_path);
             if file_exists(&composer_json_path) {
-                let json_file = JsonFile::new(composer_json_path, None, None)?;
+                let mut json_file = JsonFile::new(composer_json_path, None, None)?;
                 let json_data = json_file.read()?;
                 if let Some(archive) = json_data.get("archive") {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_string()) {
@@ -206,7 +209,7 @@ impl ArchiveManager {
 
         let supported_formats = self.get_supported_formats();
         let package_name_parts = match file_name {
-            None => self.get_package_filename_parts(package),
+            None => self.get_package_filename_parts(package)?,
             Some(f) => {
                 let mut parts = IndexMap::new();
                 parts.insert("base".to_string(), f);

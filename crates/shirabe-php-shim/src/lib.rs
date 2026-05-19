@@ -1,7 +1,8 @@
 use indexmap::IndexMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum PhpMixed {
+    #[default]
     Null,
     Bool(bool),
     Int(i64),
@@ -84,6 +85,15 @@ impl PhpMixed {
         matches!(self, PhpMixed::Null)
     }
 
+    /// Treats PhpMixed::Null as None, everything else as Some.
+    pub fn is_none(&self) -> bool {
+        self.is_null()
+    }
+
+    pub fn is_some(&self) -> bool {
+        !self.is_null()
+    }
+
     pub fn as_string_opt(&self) -> Option<&str> {
         self.as_string()
     }
@@ -99,6 +109,49 @@ impl PhpMixed {
 
     pub fn unwrap_or(self, default: PhpMixed) -> PhpMixed {
         if self.is_null() { default } else { self }
+    }
+
+    pub fn unwrap_or_default(self) -> PhpMixed {
+        if self.is_null() { PhpMixed::Null } else { self }
+    }
+
+    pub fn unwrap(self) -> PhpMixed {
+        if self.is_null() {
+            panic!("called `PhpMixed::unwrap()` on a `Null` value");
+        }
+        self
+    }
+
+    pub fn as_ref(&self) -> Option<&PhpMixed> {
+        self.as_opt()
+    }
+
+    /// Treats PhpMixed::Null as None and applies the function for chaining.
+    pub fn and_then<U, F: FnOnce(&PhpMixed) -> Option<U>>(&self, f: F) -> Option<U> {
+        self.as_opt().and_then(f)
+    }
+
+    /// Counterpart to `Any::as_any` for trait-object call sites that downcast.
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    /// Treats `Null` and `Bool(false)` as the falsy case, anything else as Some.
+    pub fn ok_or_else<E, F: FnOnce() -> E>(self, err: F) -> Result<PhpMixed, E> {
+        match self {
+            PhpMixed::Null | PhpMixed::Bool(false) => Err(err()),
+            v => Ok(v),
+        }
+    }
+
+    /// PHP duck-typed helper-set entry. Real implementation lives in QuestionHelper.
+    pub fn ask(
+        &self,
+        _input: &dyn std::any::Any,
+        _output: &mut dyn std::any::Any,
+        _question: &dyn std::any::Any,
+    ) -> PhpMixed {
+        todo!()
     }
 }
 
@@ -164,6 +217,15 @@ where
             Some(v) => v.into(),
             None => PhpMixed::Null,
         }
+    }
+}
+
+impl<T> From<Box<T>> for PhpMixed
+where
+    T: Into<PhpMixed>,
+{
+    fn from(value: Box<T>) -> Self {
+        (*value).into()
     }
 }
 
@@ -425,6 +487,18 @@ pub fn method_exists(_object: &PhpMixed, _method_name: &str) -> bool {
 }
 
 pub fn get_class(_object: &PhpMixed) -> String {
+    todo!()
+}
+
+// Overload accepting an `anyhow::Error` (PHP's `get_class($e)` is commonly used on exceptions).
+pub fn get_class_err(_e: &anyhow::Error) -> String {
+    todo!()
+}
+
+/// Overload accepting any object reference. PHP's `get_class($obj)` returns the
+/// class name; in Rust we don't have a runtime class name, so this stub is left
+/// as `todo!()`.
+pub fn get_class_obj<T: ?Sized>(_object: &T) -> String {
     todo!()
 }
 
@@ -1387,9 +1461,9 @@ pub fn reset<T: Clone>(_array: &[T]) -> Option<T> {
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
 
 pub fn array_intersect_key(
-    _array1: &IndexMap<String, Box<PhpMixed>>,
-    _array2: &IndexMap<String, Box<PhpMixed>>,
-) -> IndexMap<String, Box<PhpMixed>> {
+    _array1: &IndexMap<String, PhpMixed>,
+    _array2: &IndexMap<String, PhpMixed>,
+) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 
@@ -1658,6 +1732,16 @@ where
     todo!()
 }
 
+pub fn array_filter_map<F>(
+    _array: &IndexMap<String, Box<PhpMixed>>,
+    _callback: F,
+) -> IndexMap<String, PhpMixed>
+where
+    F: Fn(&PhpMixed) -> bool,
+{
+    todo!()
+}
+
 pub fn array_all<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
@@ -1695,6 +1779,10 @@ pub fn clearstatcache() {
     todo!()
 }
 
+pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: &str) {
+    todo!()
+}
+
 pub fn disk_free_space(_directory: &str) -> Option<f64> {
     todo!()
 }
@@ -1714,6 +1802,10 @@ pub fn require_php_file(_filename: &str) -> PhpMixed {
 }
 
 pub fn array_flip(_array: &PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+pub fn array_flip_strings(_array: &[String]) -> IndexMap<String, PhpMixed> {
     todo!()
 }
 
@@ -1945,6 +2037,44 @@ pub struct RecursiveIteratorIterator;
 impl RecursiveIteratorIterator {
     pub const SELF_FIRST: i64 = 0;
     pub const CHILD_FIRST: i64 = 16;
+
+    pub fn get_sub_pathname(&self) -> String {
+        todo!()
+    }
+}
+
+impl IntoIterator for &RecursiveIteratorIterator {
+    type Item = RecursiveIteratorFileInfo;
+    type IntoIter = std::vec::IntoIter<RecursiveIteratorFileInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct RecursiveIteratorFileInfo;
+
+impl RecursiveIteratorFileInfo {
+    pub fn is_dir(&self) -> bool {
+        todo!()
+    }
+
+    pub fn is_file(&self) -> bool {
+        todo!()
+    }
+
+    pub fn is_link(&self) -> bool {
+        todo!()
+    }
+
+    pub fn get_pathname(&self) -> String {
+        todo!()
+    }
+
+    pub fn get_size(&self) -> i64 {
+        todo!()
+    }
 }
 
 pub fn recursive_directory_iterator(_path: &str, _flags: i64) -> RecursiveDirectoryIterator {
@@ -2161,6 +2291,10 @@ impl ArrayObject {
     pub fn new(_array: Option<PhpMixed>) -> Self {
         todo!()
     }
+
+    pub fn to_array(&self) -> IndexMap<String, Box<PhpMixed>> {
+        self.data.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -2175,3 +2309,23 @@ pub struct StdClass {
 
 #[derive(Debug)]
 pub struct PhpResource;
+
+pub fn gethostbyname(_hostname: &str) -> String {
+    todo!()
+}
+
+pub fn http_get_last_response_headers() -> Option<Vec<String>> {
+    todo!()
+}
+
+pub fn http_clear_last_response_headers() {
+    todo!()
+}
+
+pub fn zlib_decode(_data: &str) -> Option<String> {
+    todo!()
+}
+
+pub const STREAM_NOTIFY_FAILURE: i64 = 9;
+pub const STREAM_NOTIFY_FILE_SIZE_IS: i64 = 5;
+pub const STREAM_NOTIFY_PROGRESS: i64 = 7;

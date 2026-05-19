@@ -25,7 +25,7 @@ use crate::repository::configurable_repository_interface::ConfigurableRepository
 use crate::repository::invalid_repository_exception::InvalidRepositoryException;
 use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
-use crate::repository::version_cache_interface::VersionCacheInterface;
+use crate::repository::version_cache_interface::{VersionCacheInterface, VersionCacheResult};
 use crate::util::http_downloader::HttpDownloader;
 use crate::util::platform::Platform;
 use crate::util::process_executor::ProcessExecutor;
@@ -69,9 +69,11 @@ pub struct VcsRepository {
     /// @var list<string>
     empty_references: Vec<String>,
     /// @var array<'tags'|'branches', array<string, TransportException>>
-    version_transport_exceptions: IndexMap<String, IndexMap<String, TransportException>>,
+    // TODO(phase-b): TransportException is a PHP class; uses Rc<T> for shared ownership.
+    version_transport_exceptions:
+        IndexMap<String, IndexMap<String, std::rc::Rc<TransportException>>>,
     /// @var ?EventDispatcher (preserved for plugin events)
-    _dispatcher: Option<EventDispatcher>,
+    _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
 
 impl ConfigurableRepositoryInterface for VcsRepository {
@@ -88,7 +90,7 @@ impl VcsRepository {
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        dispatcher: Option<EventDispatcher>,
+        dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         drivers: Option<IndexMap<String, String>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,
@@ -156,7 +158,7 @@ impl VcsRepository {
         let is_very_verbose = io.is_very_verbose();
         let process_executor = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                Box::new(&*io),
+                io.clone_box(),
             ))))
         });
 
@@ -185,24 +187,28 @@ impl VcsRepository {
     }
 
     pub fn get_repo_name(&mut self) -> String {
-        let driver = self.get_driver().expect("driver should be available");
+        // Ensure the driver is initialized; we do not need a handle here.
+        let _ = self.get_driver().expect("driver should be available");
         let driver_class = get_class(&PhpMixed::Null); // TODO(phase-b): obtain runtime class name of $driver
+        let drivers_snapshot: IndexMap<String, Box<PhpMixed>> = self
+            .drivers
+            .iter()
+            .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+            .collect();
         let driver_type = array_search_mixed(
             &PhpMixed::String(driver_class.clone()),
-            &PhpMixed::Array(
-                self.drivers
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
-                    .collect(),
-            ),
+            &PhpMixed::Array(drivers_snapshot),
             false,
         )
         .map(|v| v.as_string().unwrap_or("").to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or(driver_class);
-        let _ = driver;
 
-        format!("vcs repo ({} {})", driver_type, Url::sanitize(&self.url))
+        format!(
+            "vcs repo ({} {})",
+            driver_type,
+            Url::sanitize(self.url.clone())
+        )
     }
 
     pub fn get_repo_config(&self) -> &IndexMap<String, PhpMixed> {
@@ -270,7 +276,7 @@ impl VcsRepository {
     /// @return array<'tags'|'branches', array<string, TransportException>>
     pub fn get_version_transport_exceptions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, TransportException>> {
+    ) -> &IndexMap<String, IndexMap<String, std::rc::Rc<TransportException>>> {
         &self.version_transport_exceptions
     }
 
@@ -378,13 +384,19 @@ impl VcsRepository {
                 is_very_verbose,
                 false,
             )?;
-            if let CachedPackageResult::Package(pkg) = cached_package {
-                self.inner.add_package(pkg)?;
-                continue;
-            }
-            if matches!(cached_package, CachedPackageResult::Missing) {
-                self.empty_references.push(identifier.clone());
-                continue;
+            match cached_package {
+                CachedPackageResult::Package(pkg) => {
+                    // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
+                    let pkg_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                        pkg.clone_package_box();
+                    self.inner.add_package(pkg_pi)?;
+                    continue;
+                }
+                CachedPackageResult::Missing => {
+                    self.empty_references.push(identifier.clone());
+                    continue;
+                }
+                CachedPackageResult::None => {}
             }
 
             let parsed_tag = self.validate_tag(&tag);
@@ -402,16 +414,12 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io.overwrite_error(
-                    PhpMixed::String(msg.clone()),
-                    false,
-                    None,
-                    io_interface::NORMAL,
-                );
+                self.io
+                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
             let result: Result<()> = (|| -> Result<()> {
-                let driver = self.driver.as_mut().unwrap();
+                let driver = self.driver.as_ref().unwrap();
                 let data_opt = driver.get_composer_information(&identifier)?;
                 if data_opt.is_none() {
                     if is_very_verbose {
@@ -455,7 +463,7 @@ impl VcsRepository {
                         data.get("version")
                             .and_then(|v| v.as_string())
                             .unwrap_or(""),
-                    )),
+                    )?),
                 );
                 data.insert(
                     "version_normalized".to_string(),
@@ -465,7 +473,7 @@ impl VcsRepository {
                         data.get("version_normalized")
                             .and_then(|v| v.as_string())
                             .unwrap_or(""),
-                    )),
+                    )?),
                 );
 
                 // make sure tag do not contain the default-branch marker
@@ -507,7 +515,9 @@ impl VcsRepository {
                     });
                 if let Some(existing_package) = self.inner.find_package(
                     &tag_package_name,
-                    Box::new(Constraint::new("=", &version_normalized)),
+                    crate::repository::repository_interface::FindPackageConstraint::Constraint(
+                        Box::new(Constraint::new("=", &version_normalized)),
+                    ),
                 ) {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -523,18 +533,26 @@ impl VcsRepository {
                         .write_error(&format!("Importing tag {} ({})", tag, version_normalized));
                 }
 
-                let driver = self.driver.as_mut().unwrap();
+                let driver = self.driver.as_ref().unwrap();
                 let processed = self.pre_process(&**driver, data, &identifier)?;
                 let loaded = self.loader.as_ref().unwrap().load(processed, None)?;
-                self.inner.add_package(Box::new(loaded))?;
+                // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
+                let loaded_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                    loaded.clone_package_box();
+                self.inner.add_package(loaded_pi)?;
                 Ok(())
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
+                    // TODO(phase-b): TransportException is a PHP class (shared by ref). We only
+                    // have &TransportException from downcast_ref; obtaining the Rc requires the
+                    // anyhow::Error chain to carry an Rc. For now we insert a todo!() placeholder.
+                    let shared_te: std::rc::Rc<TransportException> =
+                        todo!("share TransportException via Rc through anyhow::Error chain");
                     self.version_transport_exceptions
                         .entry("tags".to_string())
                         .or_insert_with(IndexMap::new)
-                        .insert(tag.clone(), te.clone());
+                        .insert(tag.clone(), shared_te);
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
                     }
@@ -561,12 +579,8 @@ impl VcsRepository {
         }
 
         if !is_very_verbose {
-            self.io.overwrite_error(
-                PhpMixed::String(String::new()),
-                false,
-                None,
-                io_interface::NORMAL,
-            );
+            self.io
+                .overwrite_error4("", false, None, io_interface::NORMAL);
         }
 
         let mut branches = self.driver.as_mut().unwrap().get_branches()?;
@@ -597,12 +611,8 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io.overwrite_error(
-                    PhpMixed::String(msg.clone()),
-                    false,
-                    None,
-                    io_interface::NORMAL,
-                );
+                self.io
+                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
             let parsed_branch_opt = self.validate_branch(&branch);
@@ -633,7 +643,7 @@ impl VcsRepository {
                 version = format!(
                     "{}{}",
                     prefix,
-                    Preg::replace(r"{(\.9{7})+}", ".x", &parsed_branch)
+                    Preg::replace(r"{(\.9{7})+}", ".x", &parsed_branch)?
                 );
             }
 
@@ -645,17 +655,23 @@ impl VcsRepository {
                 is_very_verbose,
                 is_default_branch,
             )?;
-            if let CachedPackageResult::Package(pkg) = cached_package {
-                self.inner.add_package(pkg)?;
-                continue;
-            }
-            if matches!(cached_package, CachedPackageResult::Missing) {
-                self.empty_references.push(identifier.clone());
-                continue;
+            match cached_package {
+                CachedPackageResult::Package(pkg) => {
+                    // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
+                    let pkg_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                        pkg.clone_package_box();
+                    self.inner.add_package(pkg_pi)?;
+                    continue;
+                }
+                CachedPackageResult::Missing => {
+                    self.empty_references.push(identifier.clone());
+                    continue;
+                }
+                CachedPackageResult::None => {}
             }
 
             let result: Result<()> = (|| -> Result<()> {
-                let driver = self.driver.as_mut().unwrap();
+                let driver = self.driver.as_ref().unwrap();
                 let data_opt = driver.get_composer_information(&identifier)?;
                 if data_opt.is_none() {
                     if is_very_verbose {
@@ -707,18 +723,22 @@ impl VcsRepository {
                         );
                     }
                 }
-                // TODO(phase-b): Box<dyn BasePackage> -> Box<dyn PackageInterface> coercion
-                self.inner.add_package(
-                    <dyn crate::package::package_interface::PackageInterface>::clone_box(&*package),
-                )?;
+                // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
+                let package_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                    package.clone_package_box();
+                self.inner.add_package(package_pi)?;
                 Ok(())
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
+                    // TODO(phase-b): TransportException is a PHP class (shared by ref).
+                    // See the matching tags block above; same Rc story applies.
+                    let shared_te: std::rc::Rc<TransportException> =
+                        todo!("share TransportException via Rc through anyhow::Error chain");
                     self.version_transport_exceptions
                         .entry("branches".to_string())
                         .or_insert_with(IndexMap::new)
-                        .insert(branch.clone(), te.clone());
+                        .insert(branch.clone(), shared_te);
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
                     }
@@ -746,12 +766,8 @@ impl VcsRepository {
         self.driver.as_mut().unwrap().cleanup()?;
 
         if !is_very_verbose {
-            self.io.overwrite_error(
-                PhpMixed::String(String::new()),
-                false,
-                None,
-                io_interface::NORMAL,
-            );
+            self.io
+                .overwrite_error4("", false, None, io_interface::NORMAL);
         }
 
         if self.inner.get_packages().is_empty() {
@@ -794,7 +810,7 @@ impl VcsRepository {
         );
 
         if !data.contains_key("dist") {
-            let dist = driver.get_dist(identifier);
+            let dist = driver.get_dist(identifier)?;
             data.insert(
                 "dist".to_string(),
                 match dist {
@@ -808,7 +824,7 @@ impl VcsRepository {
             );
         }
         if !data.contains_key("source") {
-            let source = driver.get_source(identifier);
+            let source = driver.get_source(identifier)?;
             data.insert(
                 "source".to_string(),
                 PhpMixed::Array(
@@ -914,12 +930,8 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&msg);
             } else if is_verbose {
-                self.io.overwrite_error(
-                    PhpMixed::String(msg.clone()),
-                    false,
-                    None,
-                    io_interface::NORMAL,
-                );
+                self.io
+                    .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
             data.shift_remove("default-branch");
@@ -937,10 +949,12 @@ impl VcsRepository {
                 .and_then(|v| v.as_string())
                 .unwrap_or("")
                 .to_string();
-            if let Some(existing_package) = self
-                .inner
-                .find_package(&name, Box::new(Constraint::new("=", &version_normalized)))
-            {
+            if let Some(existing_package) = self.inner.find_package(
+                &name,
+                crate::repository::repository_interface::FindPackageConstraint::Constraint(
+                    Box::new(Constraint::new("=", &version_normalized)),
+                ),
+            ) {
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
@@ -977,11 +991,4 @@ enum CachedPackageResult {
     None,
     Missing,
     Package(Box<dyn BasePackage>),
-}
-
-#[derive(Debug)]
-enum VersionCacheResult {
-    None,
-    Missing,
-    Package(IndexMap<String, PhpMixed>),
 }

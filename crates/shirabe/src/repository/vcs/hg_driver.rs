@@ -10,7 +10,7 @@ use crate::util::hg::Hg as HgUtils;
 use crate::util::url::Url;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
@@ -43,10 +43,10 @@ impl HgDriver {
             }
 
             let sanitized =
-                Preg::replace(r"{[^a-z0-9]}i", "-", Url::sanitize(self.inner.url.clone()));
+                Preg::replace(r"{[^a-z0-9]}i", "-", &Url::sanitize(self.inner.url.clone()))?;
             self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
 
-            let fs = Filesystem::new(None);
+            let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&cache_vcs_dir)?;
 
             if !is_writable(&dirname(&self.repo_dir)) {
@@ -84,10 +84,10 @@ impl HgDriver {
                     Some(self.repo_dir.clone()),
                 ) != 0
                 {
-                    self.inner.io.write_error3(format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()).into(), true, crate::io::io_interface::NORMAL);
+                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::io_interface::NORMAL);
                 }
             } else {
-                let fs2 = Filesystem::new(None);
+                let mut fs2 = Filesystem::new(None);
                 fs2.remove_directory(&self.repo_dir)?;
 
                 let repo_dir = self.repo_dir.clone();
@@ -222,10 +222,13 @@ impl HgDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
-                    if let Some(m) = Preg::match_(r"^([^\s]+)\s+\d+:(.*)$", &tag) {
+                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::match_strict_groups3(r"^([^\s]+)\s+\d+:(.*)$", &tag, Some(&mut m))
+                        .unwrap_or(false)
+                    {
                         tags.insert(
-                            m.get("1").cloned().unwrap_or_default(),
-                            m.get("2").cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
                         );
                     }
                 }
@@ -251,10 +254,20 @@ impl HgDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    if let Some(m) = Preg::match_(r"^([^\s]+)\s+\d+:([a-f0-9]+)", &branch) {
-                        let name = m.get("1").cloned().unwrap_or_default();
+                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::match_strict_groups3(
+                        r"^([^\s]+)\s+\d+:([a-f0-9]+)",
+                        &branch,
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {
-                            branches.insert(name, m.get("2").cloned().unwrap_or_default());
+                            branches.insert(
+                                name,
+                                m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            );
                         }
                     }
                 }
@@ -268,10 +281,20 @@ impl HgDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
-                    if let Some(m) = Preg::match_(r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$", &branch) {
-                        let name = m.get("1").cloned().unwrap_or_default();
+                    let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
+                    if Preg::match_strict_groups3(
+                        r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$",
+                        &branch,
+                        Some(&mut m),
+                    )
+                    .unwrap_or(false)
+                    {
+                        let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {
-                            bookmarks.insert(name, m.get("2").cloned().unwrap_or_default());
+                            bookmarks.insert(
+                                name,
+                                m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            );
                         }
                     }
                 }
@@ -301,7 +324,7 @@ impl HgDriver {
                 return false;
             }
 
-            let process = crate::util::process_executor::ProcessExecutor::new(io);
+            let mut process = crate::util::process_executor::ProcessExecutor::new(io);
             let mut output = String::new();
             if process.execute_args(
                 &["hg", "summary"].map(|s| s.to_string()).to_vec(),
@@ -317,14 +340,14 @@ impl HgDriver {
             return false;
         }
 
-        let process = crate::util::process_executor::ProcessExecutor::new(io);
+        let mut process = crate::util::process_executor::ProcessExecutor::new(io);
         let mut ignored = String::new();
         let exit = process.execute_args(
             &["hg", "identify", "--", url]
                 .map(|s| s.to_string())
                 .to_vec(),
             &mut ignored,
-            None,
+            (),
         );
 
         exit == 0

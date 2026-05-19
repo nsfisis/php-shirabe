@@ -84,39 +84,27 @@ impl SelfUpdateCommand {
             if str_contains(&strtr(dir_path, "\\", "/"), "vendor/composer/composer") {
                 let proj_dir = shirabe_php_shim::dirname_levels(dir_path, 6);
                 output.writeln(
-                    PhpMixed::String(
-                        "<error>This instance of Composer does not have the self-update command.</error>"
-                            .to_string(),
-                    ),
+                    "<error>This instance of Composer does not have the self-update command.</error>",
                     io_interface::NORMAL,
                 );
                 output.writeln(
-                    PhpMixed::String(format!(
+                    &format!(
                         "<comment>You are running Composer installed as a package in your current project (\"{}\").</comment>",
                         proj_dir
-                    )),
+                    ),
                     io_interface::NORMAL,
                 );
                 output.writeln(
-                    PhpMixed::String(
-                        "<comment>To update Composer, download a composer.phar from https://getcomposer.org and then run `composer.phar update composer/composer` in your project.</comment>"
-                            .to_string(),
-                    ),
+                    "<comment>To update Composer, download a composer.phar from https://getcomposer.org and then run `composer.phar update composer/composer` in your project.</comment>",
                     io_interface::NORMAL,
                 );
             } else {
                 output.writeln(
-                    PhpMixed::String(
-                        "<error>This instance of Composer does not have the self-update command.</error>"
-                            .to_string(),
-                    ),
+                    "<error>This instance of Composer does not have the self-update command.</error>",
                     io_interface::NORMAL,
                 );
                 output.writeln(
-                    PhpMixed::String(
-                        "<comment>This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.</comment>"
-                            .to_string(),
-                    ),
+                    "<comment>This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.</comment>",
                     io_interface::NORMAL,
                 );
             }
@@ -197,8 +185,8 @@ impl SelfUpdateCommand {
         }
 
         if input.get_option("update-keys").as_bool().unwrap_or(false) {
-            self.fetch_keys(io, &*config.borrow())?;
-
+            // TODO(phase-b): re-borrow `io` after fetch_keys conflicts with the earlier `let io = self.get_io()` borrow
+            let _ = io;
             return Ok(0);
         }
 
@@ -239,7 +227,7 @@ impl SelfUpdateCommand {
         if function_exists("posix_getpwuid") && function_exists("posix_geteuid") {
             let composer_user = posix_getpwuid(posix_geteuid());
             let home_dir_owner_id = fileowner(&home);
-            if is_array(composer_user.clone()) && home_dir_owner_id.is_some() {
+            if is_array(&composer_user) && home_dir_owner_id.is_some() {
                 let home_owner = posix_getpwuid(home_dir_owner_id.unwrap_or(0));
                 let composer_user_name = composer_user
                     .as_array()
@@ -253,7 +241,7 @@ impl SelfUpdateCommand {
                     .and_then(|v| v.as_string())
                     .unwrap_or("")
                     .to_string();
-                if is_array(home_owner.clone()) && composer_user_name != home_owner_name {
+                if is_array(&home_owner) && composer_user_name != home_owner_name {
                     io.write_error3(
                         &format!(
                             "<warning>You are running Composer as \"{}\", while \"{}\" is owned by \"{}\"</warning>",
@@ -273,7 +261,7 @@ impl SelfUpdateCommand {
         if input.get_argument("command").as_string() == Some("self")
             && input.get_argument("version").as_string() == Some("update")
         {
-            input.set_argument("version", PhpMixed::Null);
+            // TODO(phase-b): set_argument requires &mut InputInterface; input is &dyn here
         }
 
         let latest = versions_util.get_latest(None)??;
@@ -345,7 +333,7 @@ impl SelfUpdateCommand {
             None => versions_util.get_channel()?,
             Some(c) => c.to_string(),
         };
-        if is_numeric(&effective_channel)
+        if is_numeric(&PhpMixed::String(effective_channel.clone()))
             && strpos(
                 latest_stable
                     .get("version")
@@ -390,7 +378,7 @@ impl SelfUpdateCommand {
         }
 
         let mut channel_string = versions_util.get_channel()?;
-        if is_numeric(&channel_string) {
+        if is_numeric(&PhpMixed::String(channel_string.clone())) {
             channel_string.push_str(".x");
         }
 
@@ -457,11 +445,12 @@ impl SelfUpdateCommand {
         );
         let signature = match http_downloader.borrow_mut().get(
             &format!("{}.sig", remote_filename),
-            &PhpMixed::Array(indexmap::IndexMap::new()),
+            indexmap::IndexMap::new(),
         ) {
             Ok(r) => r.get_body().map(|s| s.to_string()),
             Err(e) => {
-                if e.get_status_code() == Some(404) {
+                // TODO(phase-b): TransportException::get_status_code mapping from anyhow::Error
+                if false && e.to_string().contains("404") {
                     return Err(InvalidArgumentException {
                         message: format!("Version \"{}\" could not be found.", update_version),
                         code: 0,
@@ -472,9 +461,11 @@ impl SelfUpdateCommand {
             }
         };
         io.write_error3("   ", false, io_interface::NORMAL);
-        http_downloader
-            .borrow_mut()
-            .copy(&remote_filename, &temp_filename)?;
+        http_downloader.borrow_mut().copy(
+            &remote_filename,
+            &temp_filename,
+            indexmap::IndexMap::new(),
+        )?;
         io.write_error3("", true, io_interface::NORMAL);
 
         if !file_exists(&temp_filename) || signature.is_none() || signature.as_deref() == Some("") {
@@ -518,7 +509,7 @@ impl SelfUpdateCommand {
             if !file_exists(&sig_file) {
                 file_put_contents(
                     &format!("{}/keys.dev.pub", home),
-                    "-----BEGIN PUBLIC KEY-----\n\
+                    b"-----BEGIN PUBLIC KEY-----\n\
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAnBDHjZS6e0ZMoK3xTD7f\n\
 FNCzlXjX/Aie2dit8QXA03pSrOTbaMnxON3hUL47Lz3g1SC6YJEMVHr0zYq4elWi\n\
 i3ecFEgzLcj+pZM5X6qWu2Ozz4vWx3JYo1/a/HYdOuW9e3lwS8VtS0AVJA+U8X0A\n\
@@ -536,7 +527,7 @@ wSEuAuRm+pRqi8BRnQ/GKUcCAwEAAQ==\n\
 
                 file_put_contents(
                     &format!("{}/keys.tags.pub", home),
-                    "-----BEGIN PUBLIC KEY-----\n\
+                    b"-----BEGIN PUBLIC KEY-----\n\
 MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA0Vi/2K6apCVj76nCnCl2\n\
 MQUPdK+A9eqkYBacXo2wQBYmyVlXm2/n/ZsX6pCLYPQTHyr5jXbkQzBw8SKqPdlh\n\
 vA7NpbMeNCz7wP/AobvUXM8xQuXKbMDTY2uZ4O7sM+PfGbptKPBGLe8Z8d2sUnTO\n\
@@ -628,16 +619,20 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 
         // remove saved installations of composer
         if input.get_option("clean-backups").as_bool().unwrap_or(false) {
-            self.clean_backups(&rollback_dir, None);
+            // TODO(phase-b): self.clean_backups conflicts with earlier `self.get_io()` borrow
         }
 
-        if !self.set_local_phar(&local_filename, &temp_filename, Some(&backup_file))? {
+        // TODO(phase-b): self.set_local_phar mutable borrow conflicts with earlier `self.get_io()` borrow
+        let _set_phar_ok: bool = todo!("self.set_local_phar(...)");
+        if !_set_phar_ok {
             // @unlink
             let _ = unlink(&temp_filename);
 
             return Ok(1);
         }
 
+        // TODO(phase-b): re-borrow io because earlier borrow conflicts with the &mut self calls above
+        let io = self.get_io();
         if file_exists(&backup_file) {
             io.write_error3(
                 &sprintf(
@@ -735,7 +730,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             "{}/keys.dev.pub",
             config.get("home").as_string().unwrap_or("")
         );
-        file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
+        file_put_contents(&key_path, match_.as_deref().unwrap_or("").as_bytes());
         io.write(&format!(
             "Stored key with fingerprint: {}",
             Keys::fingerprint(&key_path)?
@@ -783,7 +778,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             "{}/keys.tags.pub",
             config.get("home").as_string().unwrap_or("")
         );
-        file_put_contents(&key_path, match_.as_deref().unwrap_or(""));
+        file_put_contents(&key_path, match_.as_deref().unwrap_or("").as_bytes());
         io.write(&format!(
             "Stored key with fingerprint: {}",
             Keys::fingerprint(&key_path)?
@@ -872,7 +867,6 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         new_filename: &str,
         backup_target: Option<&str>,
     ) -> Result<bool> {
-        let io = self.get_io();
         let perms = fileperms(local_filename);
         if perms >= 0 {
             // @chmod
@@ -881,7 +875,9 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
 
         // check phar validity
         let mut error: Option<String> = None;
-        if !self.validate_phar(new_filename, &mut error)? {
+        let phar_valid = self.validate_phar(new_filename, &mut error)?;
+        let io = self.get_io();
+        if !phar_valid {
             io.write_error3(
                 &format!(
                     "<error>The {} file is corrupted ({})</error>",
@@ -959,16 +955,17 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         }
     }
 
-    pub(crate) fn clean_backups(&self, rollback_dir: &str, except: Option<&str>) {
+    pub(crate) fn clean_backups(&mut self, rollback_dir: &str, except: Option<&str>) {
         let finder = self.get_old_installation_finder(rollback_dir);
         let io = self.get_io();
-        let fs = Filesystem::new(None);
+        let mut fs = Filesystem::new(None);
 
         for file in finder {
-            if file.get_basename(Self::OLD_INSTALL_EXT) == except.unwrap_or_default() {
+            if file.get_basename(Some(Self::OLD_INSTALL_EXT)) == except.unwrap_or_default() {
                 continue;
             }
-            let file_str = file.to_string();
+            // TODO(phase-b): SplFileInfo to string conversion (PHP __toString returns the path)
+            let file_str = format!("{:?}", file);
             io.write_error3(
                 &format!("<info>Removing: {}</info>", file_str),
                 true,
@@ -995,11 +992,14 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
     }
 
     pub(crate) fn get_old_installation_finder(&self, rollback_dir: &str) -> Finder {
-        Finder::create()
+        // TODO(phase-b): builder returns &mut Self; restructure to return owned Finder
+        let mut finder = Finder::create();
+        finder
             .depth(0)
             .files()
             .name(&format!("*{}", Self::OLD_INSTALL_EXT))
-            .in_(rollback_dir)
+            .r#in(rollback_dir);
+        finder
     }
 
     /// Validates the downloaded/backup phar file
@@ -1136,7 +1136,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             )
         };
 
-        file_put_contents(&script, &code);
+        file_put_contents(&script, code.as_bytes());
         let command = if using_sudo {
             sprintf("sudo \"%s\"", &[PhpMixed::String(script.clone())])
         } else {

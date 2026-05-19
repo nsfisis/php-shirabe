@@ -270,12 +270,20 @@ impl Config {
         self.config_source.as_ref().unwrap().as_ref()
     }
 
+    pub fn get_config_source_mut(&mut self) -> &mut dyn ConfigSourceInterface {
+        self.config_source.as_mut().unwrap().as_mut()
+    }
+
     pub fn set_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
         self.auth_config_source = Some(source);
     }
 
     pub fn get_auth_config_source(&self) -> &dyn ConfigSourceInterface {
         self.auth_config_source.as_ref().unwrap().as_ref()
+    }
+
+    pub fn get_auth_config_source_mut(&mut self) -> &mut dyn ConfigSourceInterface {
+        self.auth_config_source.as_mut().unwrap().as_mut()
     }
 
     pub fn set_local_auth_config_source(&mut self, source: Box<dyn ConfigSourceInterface>) {
@@ -286,13 +294,21 @@ impl Config {
         self.local_auth_config_source.as_deref()
     }
 
+    pub fn get_local_auth_config_source_mut(
+        &mut self,
+    ) -> Option<&mut (dyn ConfigSourceInterface + 'static)> {
+        self.local_auth_config_source
+            .as_mut()
+            .map(|b| &mut **b as &mut dyn ConfigSourceInterface)
+    }
+
     /// Merges new config values with the existing ones (overriding)
     ///
     /// @param array{config?: array<string, mixed>, repositories?: array<mixed>} $config
     pub fn merge(&mut self, config: &IndexMap<String, PhpMixed>, source: &str) {
         // override defaults with given config
         let config_section = config.get("config").cloned().unwrap_or(PhpMixed::Null);
-        if !empty(&config_section) && is_array(config_section.clone()) {
+        if !empty(&config_section) && is_array(&config_section) {
             let config_section_map = match config_section {
                 PhpMixed::Array(m) => m,
                 _ => IndexMap::new(),
@@ -327,8 +343,8 @@ impl Config {
                     ))]),
                     true,
                 ) && self.config.contains_key(key)
-                    && is_array(self.config.get(key).cloned().unwrap_or(PhpMixed::Null))
-                    && is_array(val.clone())
+                    && is_array(self.config.get(key).unwrap_or(&PhpMixed::Null))
+                    && is_array(&val)
                 {
                     // merging $val first to get the local config on top of the global one, then appending the global config,
                     // then merging local one again to make sure the values from local win over global ones for keys present in both
@@ -370,7 +386,7 @@ impl Config {
                 } else if key == "preferred-install" && self.config.contains_key(key) {
                     let mut val = val.clone();
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    if is_array(val.clone()) || is_array(existing.clone()) {
+                    if is_array(&val) || is_array(&existing) {
                         if is_string(&val) {
                             let mut m = IndexMap::new();
                             m.insert("*".to_string(), Box::new(val.clone()));
@@ -443,13 +459,19 @@ impl Config {
             .get("repositories")
             .cloned()
             .unwrap_or(PhpMixed::Null);
-        if !empty(&repositories_section) && is_array(repositories_section.clone()) {
-            self.repositories = array_reverse(&self.repositories, true);
-            let new_repos_map = match &repositories_section {
+        if !empty(&repositories_section) && is_array(&repositories_section) {
+            // PHP: array_reverse on IndexMap preserves keys (preserve_keys=true)
+            self.repositories = self
+                .repositories
+                .iter()
+                .rev()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            let new_repos_map: IndexMap<String, PhpMixed> = match &repositories_section {
                 PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
                 _ => IndexMap::new(),
             };
-            let new_repos = array_reverse(&new_repos_map, true);
+            let new_repos: IndexMap<String, PhpMixed> = new_repos_map.into_iter().rev().collect();
             for (name, repository) in &new_repos {
                 // disable a repository by name
                 // this is a code path, that will be used less as the next check will be preferred
@@ -459,7 +481,7 @@ impl Config {
                 }
 
                 // disable a repository with an anonymous {"name": false} repo
-                if is_array(repository.clone())
+                if is_array(&repository)
                     && repository.as_array().map(|m| m.len()).unwrap_or(0) == 1
                     && matches!(current(repository.clone()), PhpMixed::Bool(false))
                 {
@@ -537,7 +559,12 @@ impl Config {
                     );
                 }
             }
-            self.repositories = array_reverse(&self.repositories, true);
+            self.repositories = self
+                .repositories
+                .iter()
+                .rev()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
         }
     }
 
@@ -986,6 +1013,7 @@ impl Config {
         let _ = self.get(key);
 
         self.source_of_config_value
+            .borrow()
             .get(key)
             .cloned()
             .unwrap_or_else(|| Self::SOURCE_UNKNOWN.to_string())
@@ -997,7 +1025,7 @@ impl Config {
             .borrow_mut()
             .insert(path.to_string(), source.to_string());
 
-        if is_array(config_value.clone()) {
+        if is_array(config_value) {
             let map = match config_value {
                 PhpMixed::Array(m) => m
                     .iter()

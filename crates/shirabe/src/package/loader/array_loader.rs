@@ -860,7 +860,7 @@ impl ArrayLoader {
             && default_branch_is_true
             && self
                 .version_parser
-                .parse_numeric_alias_prefix(&Preg::replace(r"{^v}", "", &version_str))
+                .parse_numeric_alias_prefix(&Preg::replace(r"{^v}", "", &version_str)?)
                 .is_none()
         {
             return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()));

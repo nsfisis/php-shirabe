@@ -5,9 +5,11 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, array_replace_recursive, base64_encode, explode, extension_loaded,
-    file_put_contents, filter_var, ini_get, json_decode, parse_url, preg_quote,
-    restore_error_handler, set_error_handler, sprintf, strpos, strtolower, strtr, substr, trim,
+    RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
+    array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
+    filter_var, gethostbyname, http_clear_last_response_headers, http_get_last_response_headers,
+    ini_get, json_decode, parse_url, preg_quote, restore_error_handler, set_error_handler, sprintf,
+    strpos, strtolower, strtr, substr, trim, zlib_decode,
 };
 
 use crate::config::Config;
@@ -62,7 +64,9 @@ impl RemoteFilesystem {
     ) -> Self {
         let (computed_options, disable_tls_set) = if !disable_tls {
             (
-                StreamContextFactory::get_tls_defaults(&options, &*io),
+                // TODO(phase-b): logger is None placeholder; should pass `&*io` if a Logger view is available.
+                StreamContextFactory::get_tls_defaults(&options, None)
+                    .unwrap_or_else(|_| IndexMap::new()),
                 false,
             )
         } else {
@@ -240,7 +244,7 @@ impl RemoteFilesystem {
         if self.degraded_mode && strpos(&file_url, "http://repo.packagist.org/") == Some(0) {
             file_url = format!(
                 "http://{}{}",
-                Platform::gethostbyname("repo.packagist.org"),
+                gethostbyname("repo.packagist.org"),
                 substr(&file_url, 20, None)
             );
             degraded_packagist = true;
@@ -253,10 +257,20 @@ impl RemoteFilesystem {
         }
 
         // TODO(plugin): `Closure::fromCallable([$this, 'callbackGet'])` for stream notification.
-        let ctx = StreamContextFactory::get_context(&file_url, &options, &IndexMap::new());
+        let ctx = StreamContextFactory::get_context(&file_url, options.clone(), IndexMap::new())
+            .map_err(|e| anyhow::anyhow!(e))?;
 
-        let proxy = ProxyManager::get_instance().get_proxy_for_request(&file_url);
-        let using_proxy = proxy.get_status(" using proxy (%s)");
+        let using_proxy = {
+            let proxy_manager_guard = ProxyManager::get_instance().lock().unwrap();
+            let proxy = proxy_manager_guard
+                .as_ref()
+                .expect("ProxyManager instance")
+                .get_proxy_for_request(&file_url)
+                .map_err(|e| anyhow::anyhow!(e))?;
+            proxy
+                .get_status(Some(" using proxy (%s)"))
+                .unwrap_or_default()
+        };
         self.io.write_error3(
             &format!(
                 "{}{}{}",
@@ -265,7 +279,7 @@ impl RemoteFilesystem {
                 } else {
                     "Reading "
                 },
-                Url::sanitize(&orig_file_url),
+                Url::sanitize(orig_file_url.clone()),
                 using_proxy
             ),
             true,
@@ -319,7 +333,11 @@ impl RemoteFilesystem {
                             .as_deref()
                             .map(|s| json_decode(s, true).unwrap_or(PhpMixed::Null))
                             .unwrap_or(PhpMixed::Null);
-                        HttpDownloader::output_warnings(&*self.io, origin_url, &parsed);
+                        let parsed_map: IndexMap<String, PhpMixed> = match parsed {
+                            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                            _ => IndexMap::new(),
+                        };
+                        let _ = HttpDownloader::output_warnings(&*self.io, origin_url, &parsed_map);
                     }
 
                     if [401_i64, 403].contains(&code) && retry_auth_failure {
@@ -342,11 +360,14 @@ impl RemoteFilesystem {
             if let Some(cl) = content_length {
                 let cl_int: i64 = cl.parse().unwrap_or(0);
                 if cl_int > 0 && Platform::strlen(result.as_deref().unwrap_or("")) < cl_int {
-                    let mut e = TransportException::new(format!(
-                        "Content-Length mismatch, received {} bytes out of the expected {}",
-                        Platform::strlen(result.as_deref().unwrap_or("")),
-                        cl_int
-                    ));
+                    let mut e = TransportException::new(
+                        format!(
+                            "Content-Length mismatch, received {} bytes out of the expected {}",
+                            Platform::strlen(result.as_deref().unwrap_or("")),
+                            cl_int
+                        ),
+                        0,
+                    );
                     e.set_headers(http_response_header.clone());
                     e.set_status_code(Self::find_status_code(&http_response_header));
                     let decoded = self
@@ -407,13 +428,15 @@ impl RemoteFilesystem {
                     self.degraded_mode = true;
                     self.io
                         .write_error3("", true, crate::io::io_interface::NORMAL);
-                    self.io.write_error3(PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
-                        Box::new(PhpMixed::String(
-                            "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                                .to_string(),
-                        )),
-                    ]), true, crate::io::io_interface::NORMAL);
+                    // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
+                    self.io.write_error3(
+                        &format!(
+                            "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
+                            msg_owned,
+                        ),
+                        true,
+                        crate::io::io_interface::NORMAL,
+                    );
 
                     return self.get(
                         &self.origin_url.clone(),
@@ -461,11 +484,9 @@ impl RemoteFilesystem {
             }
         }
 
-        let gitlab_domains: Vec<String> = self
-            .config
-            .borrow_mut()
-            .get("gitlab-domains")
-            .and_then(|v| v.as_list())
+        let gitlab_domains_value = self.config.borrow_mut().get("gitlab-domains");
+        let gitlab_domains: Vec<String> = gitlab_domains_value
+            .as_list()
             .map(|l| {
                 l.iter()
                     .filter_map(|v| v.as_string().map(|s| s.to_string()))
@@ -556,17 +577,15 @@ impl RemoteFilesystem {
                     }
 
                     self.degraded_mode = true;
-                    self.io.write_error3(PhpMixed::List(vec![
-                        Box::new(PhpMixed::String("".to_string())),
-                        Box::new(PhpMixed::String(format!(
-                            "<error>Failed to decode response: {}</error>",
-                            e
-                        ))),
-                        Box::new(PhpMixed::String(
-                            "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                                .to_string(),
-                        )),
-                    ]), true, crate::io::io_interface::NORMAL);
+                    // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
+                    self.io.write_error3(
+                        &format!(
+                            "\n<error>Failed to decode response: {}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
+                            e,
+                        ),
+                        true,
+                        crate::io::io_interface::NORMAL,
+                    );
 
                     return self.get(
                         &self.origin_url.clone(),
@@ -582,10 +601,13 @@ impl RemoteFilesystem {
         if result.is_some() && file_name.is_some() && !is_redirect {
             let result_str = result.as_deref().unwrap();
             if result_str.is_empty() {
-                return Err(anyhow::anyhow!(TransportException::new(format!(
-                    "\"{}\" appears broken, and returned an empty 200 response",
-                    self.file_url
-                ))));
+                return Err(anyhow::anyhow!(TransportException::new(
+                    format!(
+                        "\"{}\" appears broken, and returned an empty 200 response",
+                        self.file_url
+                    ),
+                    0,
+                )));
             }
 
             let put_error_message = String::new();
@@ -595,12 +617,15 @@ impl RemoteFilesystem {
                 file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());
             restore_error_handler();
             if write_result.is_none() {
-                return Err(anyhow::anyhow!(TransportException::new(format!(
-                    "The \"{}\" file could not be written to {}: {}",
-                    self.file_url,
-                    file_name.as_deref().unwrap(),
-                    put_error_message
-                ))));
+                return Err(anyhow::anyhow!(TransportException::new(
+                    format!(
+                        "The \"{}\" file could not be written to {}: {}",
+                        self.file_url,
+                        file_name.as_deref().unwrap(),
+                        put_error_message
+                    ),
+                    0,
+                )));
             }
             let _ = put_error_message;
         }
@@ -617,8 +642,10 @@ impl RemoteFilesystem {
             )?;
 
             if self.store_auth {
-                self.auth_helper
-                    .store_auth(&self.origin_url, PhpMixed::Bool(self.store_auth));
+                let _ = self.auth_helper.store_auth(
+                    &self.origin_url,
+                    crate::util::auth_helper::StoreAuth::Bool(self.store_auth),
+                );
                 self.store_auth = false;
             }
 
@@ -642,13 +669,15 @@ impl RemoteFilesystem {
                 self.degraded_mode = true;
                 self.io
                     .write_error3("", true, crate::io::io_interface::NORMAL);
-                self.io.write_error3(PhpMixed::List(vec![
-                    Box::new(PhpMixed::String(format!("<error>{}</error>", msg_owned))),
-                    Box::new(PhpMixed::String(
-                        "<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>"
-                            .to_string(),
-                    )),
-                ]), true, crate::io::io_interface::NORMAL);
+                // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
+                self.io.write_error3(
+                    &format!(
+                        "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
+                        msg_owned,
+                    ),
+                    true,
+                    crate::io::io_interface::NORMAL,
+                );
 
                 return self.get(
                     &self.origin_url.clone(),
@@ -689,7 +718,7 @@ impl RemoteFilesystem {
         let mut result: Option<String> = None;
 
         if PHP_VERSION_ID >= 80400 {
-            Platform::http_clear_last_response_headers();
+            http_clear_last_response_headers();
         }
 
         let mut caught_e: Option<anyhow::Error> = None;
@@ -713,8 +742,8 @@ impl RemoteFilesystem {
         }
 
         if PHP_VERSION_ID >= 80400 {
-            *response_headers = Platform::http_get_last_response_headers().unwrap_or_default();
-            Platform::http_clear_last_response_headers();
+            *response_headers = http_get_last_response_headers().unwrap_or_default();
+            http_clear_last_response_headers();
         } else {
             // TODO(phase-b): read the magic `$http_response_header` PHP variable.
             *response_headers = Vec::new();
@@ -737,7 +766,7 @@ impl RemoteFilesystem {
         bytes_max: i64,
     ) -> anyhow::Result<()> {
         match notification_code {
-            x if x == Platform::STREAM_NOTIFY_FAILURE => {
+            x if x == STREAM_NOTIFY_FAILURE => {
                 if 400 == message_code {
                     return Err(anyhow::anyhow!(TransportException::new_with_code(
                         format!(
@@ -749,10 +778,10 @@ impl RemoteFilesystem {
                     )));
                 }
             }
-            x if x == Platform::STREAM_NOTIFY_FILE_SIZE_IS => {
+            x if x == STREAM_NOTIFY_FILE_SIZE_IS => {
                 self.bytes_max = bytes_max;
             }
-            x if x == Platform::STREAM_NOTIFY_PROGRESS => {
+            x if x == STREAM_NOTIFY_PROGRESS => {
                 if self.bytes_max > 0 && self.progress {
                     let progression = std::cmp::min(
                         100_i64,
@@ -784,28 +813,36 @@ impl RemoteFilesystem {
         reason: Option<String>,
         headers: Vec<String>,
     ) -> anyhow::Result<()> {
+        let file_url = self.file_url.clone();
+        let origin_url = self.origin_url.clone();
         let result = self.auth_helper.prompt_auth_if_needed(
-            &self.file_url,
-            &self.origin_url,
+            &file_url,
+            &origin_url,
             http_status,
-            reason,
+            reason.as_deref(),
             headers,
             1,
-        );
+            None,
+        )?;
 
-        self.store_auth = result.store_auth;
+        self.store_auth = matches!(
+            result.store_auth,
+            crate::util::auth_helper::StoreAuth::Bool(true)
+                | crate::util::auth_helper::StoreAuth::Prompt
+        );
         self.retry = result.retry;
 
         if self.retry {
             return Err(anyhow::anyhow!(TransportException::new(
-                "RETRY".to_string()
+                "RETRY".to_string(),
+                0,
             )));
         }
         Ok(())
     }
 
     fn get_options_for_url(
-        &self,
+        &mut self,
         origin_url: &str,
         additional_options: IndexMap<String, PhpMixed>,
     ) -> IndexMap<String, PhpMixed> {
@@ -842,7 +879,7 @@ impl RemoteFilesystem {
                 .as_string()
                 .unwrap_or("")
                 .to_string();
-            let split = explode("\r\n", &trim(&header_str, "\r\n"));
+            let split = explode("\r\n", &trim(&header_str, Some("\r\n")));
             if let Some(PhpMixed::Array(m)) = options.get_mut("http") {
                 m.insert(
                     "header".to_string(),
@@ -855,9 +892,11 @@ impl RemoteFilesystem {
                 );
             }
         }
+        let file_url = self.file_url.clone();
         options = self
             .auth_helper
-            .add_authentication_options(options, origin_url, &self.file_url);
+            .add_authentication_options(options, origin_url, &file_url)
+            .unwrap_or_else(|_| IndexMap::new());
 
         let http_entry = options
             .entry("http".to_string())
@@ -941,7 +980,7 @@ impl RemoteFilesystem {
                     "Following redirect (%u) %s",
                     &[
                         PhpMixed::Int(self.redirects),
-                        PhpMixed::String(Url::sanitize(&target_url)),
+                        PhpMixed::String(Url::sanitize(target_url.clone())),
                     ],
                 ),
                 true,
@@ -968,11 +1007,14 @@ impl RemoteFilesystem {
         }
 
         if !self.retry {
-            let mut e = TransportException::new(format!(
-                "The \"{}\" file could not be downloaded, got redirect without Location ({})",
-                self.file_url,
-                response_headers.first().map(|s| s.as_str()).unwrap_or("")
-            ));
+            let mut e = TransportException::new(
+                format!(
+                    "The \"{}\" file could not be downloaded, got redirect without Location ({})",
+                    self.file_url,
+                    response_headers.first().map(|s| s.as_str()).unwrap_or("")
+                ),
+                0,
+            );
             e.set_headers(response_headers.to_vec());
             let decoded = self.decode_result(result.as_deref(), response_headers)?;
             e.set_response(decoded);
@@ -998,13 +1040,14 @@ impl RemoteFilesystem {
                 .unwrap_or(false);
 
             if decode {
-                let decoded = Platform::zlib_decode(result.as_deref().unwrap_or(""));
+                let decoded = zlib_decode(result.as_deref().unwrap_or(""));
 
                 result = match decoded {
                     Some(d) => Some(d),
                     None => {
                         return Err(anyhow::anyhow!(TransportException::new(
-                            "Failed to decode zlib stream".to_string()
+                            "Failed to decode zlib stream".to_string(),
+                            0,
                         )));
                     }
                 };

@@ -56,7 +56,7 @@ impl BumpCommand {
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
@@ -70,18 +70,23 @@ impl BumpCommand {
             })
             .unwrap_or_default();
 
+        let dev_only = input.get_option("dev-only").as_bool().unwrap_or(false);
+        let no_dev_only = input.get_option("no-dev-only").as_bool().unwrap_or(false);
+        let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
+        // TODO(phase-b): do_bump expects &dyn IOInterface but get_io() requires &mut self; needs IO sharing refactor
+        let io_ref: &dyn IOInterface = todo!("share IOInterface across calls in do_bump");
         self.do_bump(
-            self.get_io(),
-            input.get_option("dev-only").as_bool().unwrap_or(false),
-            input.get_option("no-dev-only").as_bool().unwrap_or(false),
-            input.get_option("dry-run").as_bool().unwrap_or(false),
+            io_ref,
+            dev_only,
+            no_dev_only,
+            dry_run,
             packages_filter,
             "--dev-only".to_string(),
         )
     }
 
     pub fn do_bump(
-        &self,
+        &mut self,
         io: &dyn IOInterface,
         dev_only: bool,
         no_dev_only: bool,
@@ -100,7 +105,7 @@ impl BumpCommand {
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
+        let mut composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
         let contents = match file_get_contents(&composer_json.get_path()) {
             Some(c) => c,
             None => {
@@ -129,7 +134,7 @@ impl BumpCommand {
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
         let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
             || composer
                 .get_config()
@@ -139,9 +144,9 @@ impl BumpCommand {
                 .unwrap_or(true);
         let repo: Box<dyn crate::repository::repository_interface::RepositoryInterface> =
             if !has_lock_file_disabled {
-                Box::new(composer.get_locker().get_locked_repository(true)?)
-            } else if composer.get_locker().is_locked() {
-                if !composer.get_locker().is_fresh()? {
+                Box::new(composer.get_locker_mut().get_locked_repository(true)?)
+            } else if composer.get_locker_mut().is_locked() {
+                if !composer.get_locker_mut().is_fresh()? {
                     io.write_error3(
                     "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
                     true,
@@ -149,7 +154,7 @@ impl BumpCommand {
                 );
                     return Ok(Self::ERROR_LOCK_OUTDATED);
                 }
-                Box::new(composer.get_locker().get_locked_repository(true)?)
+                Box::new(composer.get_locker_mut().get_locked_repository(true)?)
             } else {
                 // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
                 // cloning into an owned Box requires clone_box on that trait.
@@ -304,7 +309,7 @@ impl BumpCommand {
         }
 
         if !dry_run
-            && composer.get_locker().is_locked()
+            && composer.get_locker_mut().is_locked()
             && composer
                 .get_config()
                 .borrow_mut()
@@ -314,7 +319,7 @@ impl BumpCommand {
             && change_count > 0
         {
             composer
-                .get_locker()
+                .get_locker_mut()
                 .update_hash(&composer_json, None::<fn(_) -> _>)?;
         }
 

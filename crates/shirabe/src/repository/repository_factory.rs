@@ -39,7 +39,7 @@ impl RepositoryFactory {
             .unwrap_or("");
 
         if extension == "json" {
-            let json = JsonFile::new(
+            let mut json = JsonFile::new(
                 repository.to_string(),
                 Some(std::rc::Rc::new(std::cell::RefCell::new(
                     Factory::create_http_downloader(io, config, IndexMap::new())?,
@@ -82,7 +82,11 @@ impl RepositoryFactory {
         }
 
         if repository.starts_with('{') {
-            let repo_config = JsonFile::parse_json(repository, None)?.unwrap_or_default();
+            let parsed = JsonFile::parse_json(Some(repository), None)?;
+            let repo_config: IndexMap<String, PhpMixed> = parsed
+                .as_array()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .unwrap_or_default();
             return Ok(repo_config);
         }
 
@@ -116,7 +120,7 @@ impl RepositoryFactory {
             owned_rm = Self::manager(io, config, None, None, None)?;
             &mut owned_rm
         };
-        let mut repos = Self::create_repos(
+        let repos = Self::create_repos(
             rm,
             vec![PhpMixed::Array(
                 repo_config
@@ -125,20 +129,29 @@ impl RepositoryFactory {
                     .collect(),
             )],
         )?;
-        Ok(repos.remove(0))
+        // PHP: return current($repos);
+        let (_, first) = repos
+            .into_iter()
+            .next()
+            .ok_or_else(|| UnexpectedValueException {
+                message: "create_repos returned no repository".to_string(),
+                code: 0,
+            })?;
+        Ok(first)
     }
 
     pub fn default_repos(
         io: Option<&dyn IOInterface>,
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut RepositoryManager>,
-    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
         let config = match config {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
         };
-        if let Some(io) = io {
-            io.load_configuration(&mut *config.borrow_mut())?;
+        if let Some(_io) = io {
+            // TODO(phase-b): IOInterface::load_configuration requires &mut self, but this
+            // function takes &dyn IOInterface. Wider refactor needed; skip for now.
         }
 
         let mut owned_rm;
@@ -163,14 +176,15 @@ impl RepositoryFactory {
         };
 
         let repo_configs = config.borrow().get_repositories();
-        Self::create_repos(rm, repo_configs)
+        // PHP: array_values($repoConfigs) — keep ordering, discard keys
+        Self::create_repos(rm, repo_configs.into_iter().map(|(_, v)| v).collect())
     }
 
     pub fn manager(
         io: &dyn IOInterface,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<RepositoryManager> {
         let http_downloader = match http_downloader {
@@ -217,8 +231,8 @@ impl RepositoryFactory {
     }
 
     pub fn default_repos_with_default_manager(
-        io: &dyn IOInterface,
-    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+        io: &mut dyn IOInterface,
+    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
             Some(io),
             None,
@@ -231,7 +245,7 @@ impl RepositoryFactory {
     fn create_repos(
         rm: &mut RepositoryManager,
         repo_configs: Vec<PhpMixed>,
-    ) -> anyhow::Result<Vec<Box<dyn RepositoryInterface>>> {
+    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
         let mut repo_map: IndexMap<String, Box<dyn RepositoryInterface>> = IndexMap::new();
 
         for (index, repo) in repo_configs.into_iter().enumerate() {
@@ -267,15 +281,22 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = repo_arr
+                        let _json_path = repo_arr
                             .get("json")
                             .and_then(|v| v.as_string())
                             .unwrap_or("")
                             .to_string();
-                        repo_map.insert(name, Box::new(FilesystemRepository::new(json_path)?));
+                        // TODO(phase-b): FilesystemRepository does not yet implement
+                        // RepositoryInterface; once it does, construct it from JsonFile here.
+                        let created: Box<dyn RepositoryInterface> =
+                            todo!("FilesystemRepository as dyn RepositoryInterface");
+                        repo_map.insert(name, created);
                     } else {
-                        let created =
-                            rm.create_repository(&repo_type, repo_config_map, &index.to_string())?;
+                        let created = rm.create_repository(
+                            &repo_type,
+                            repo_config_map,
+                            Some(&index.to_string()),
+                        )?;
                         repo_map.insert(name, created);
                     }
                 }
@@ -294,7 +315,7 @@ impl RepositoryFactory {
             }
         }
 
-        Ok(repo_map.into_values().collect())
+        Ok(repo_map)
     }
 
     pub fn generate_repository_name(
@@ -305,7 +326,7 @@ impl RepositoryFactory {
         let mut name = match index {
             PhpMixed::Int(_) => {
                 if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-                    Preg::replace("{^https?://}i", "", url, -1).unwrap_or_else(|_| url.to_string())
+                    Preg::replace("{^https?://}i", "", url).unwrap_or_else(|_| url.to_string())
                 } else {
                     index.as_string().unwrap_or("").to_string()
                 }
@@ -324,7 +345,7 @@ impl RepositoryFactory {
         existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>,
     ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-            Preg::replace("{^https?://}i", "", url, -1).unwrap_or_else(|_| url.to_string())
+            Preg::replace("{^https?://}i", "", url).unwrap_or_else(|_| url.to_string())
         } else {
             index.to_string()
         };

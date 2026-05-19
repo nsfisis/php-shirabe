@@ -45,13 +45,24 @@ impl Compiler {
             shirabe_php_shim::unlink(phar_file);
         }
 
-        let process = ProcessExecutor::new(None);
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())));
 
-        let command = Git::build_rev_list_command(&process, &["-n1", "--format=%H", "HEAD"]);
+        let command = Git::build_rev_list_command(
+            &process,
+            vec![
+                "-n1".to_string(),
+                "--format=%H".to_string(),
+                "HEAD".to_string(),
+            ],
+        );
         let mut output = String::new();
         // PHP: dirname(__DIR__, 2) - going up 2 levels from src/Composer to the repo root
         let repo_root = shirabe_php_shim::dirname_levels(file!(), 2);
-        if process.execute_args(&command, &mut output, Some(&repo_root)) != 0 {
+        if process
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(&repo_root))
+            != 0
+        {
             return Err(RuntimeException {
                 message: "Can't run git rev-list. You must ensure to run compile from composer git repository clone and that git binary is available.".to_string(),
                 code: 0,
@@ -61,9 +72,20 @@ impl Compiler {
             .trim()
             .to_string();
 
-        let command = Git::build_rev_list_command(&process, &["-n1", "--format=%ci", "HEAD"]);
+        let command = Git::build_rev_list_command(
+            &process,
+            vec![
+                "-n1".to_string(),
+                "--format=%ci".to_string(),
+                "HEAD".to_string(),
+            ],
+        );
         let mut output = String::new();
-        if process.execute_args(&command, &mut output, Some(&repo_root)) != 0 {
+        if process
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(&repo_root))
+            != 0
+        {
             return Err(RuntimeException {
                 message: "Can't run git rev-list. You must ensure to run compile from composer git repository clone and that git binary is available.".to_string(),
                 code: 0,
@@ -77,7 +99,7 @@ impl Compiler {
                 .unwrap_or_else(|_| chrono::Utc::now());
 
         let mut git_describe_output = String::new();
-        if process.execute_args(
+        if process.borrow_mut().execute_args(
             &[
                 "git".to_string(),
                 "describe".to_string(),
@@ -93,7 +115,7 @@ impl Compiler {
         } else {
             // get branch-alias defined in composer.json for dev-main (if any)
             let local_config_path = format!("{}/composer.json", repo_root);
-            let file = JsonFile::new(local_config_path.clone(), None, None)?;
+            let mut file = JsonFile::new(local_config_path.clone(), None, None)?;
             let local_config = file.read()?;
             if let Some(branch_alias) = local_config
                 .as_array()
@@ -123,8 +145,8 @@ impl Compiler {
 
         let finder_sort = |a: &SplFileInfo, b: &SplFileInfo| -> i64 {
             strcmp(
-                &strtr(a.get_real_path(), "\\", "/"),
-                &strtr(b.get_real_path(), "\\", "/"),
+                &strtr(&a.get_real_path().unwrap_or_default(), "\\", "/"),
+                &strtr(&b.get_real_path().unwrap_or_default(), "\\", "/"),
             )
         };
 
@@ -223,10 +245,11 @@ impl Compiler {
         let mut unexpected_files: Vec<String> = vec![];
 
         for file in finder.iter() {
-            if let Some(index) = array_search(file.get_real_path(), &extra_files) {
+            let real_path = file.get_real_path().unwrap_or_default();
+            if let Some(index) = array_search(&real_path, &extra_files) {
                 extra_files.shift_remove(&index);
             } else if !Preg::is_match(r"{(^LICENSE(?:\.txt)?$|\.php$)}", &file.get_filename())? {
-                unexpected_files.push(file.to_string());
+                unexpected_files.push(file.get_pathname());
             }
 
             if Preg::is_match(r"{\.php[\d.]*$}", &file.get_filename())? {
@@ -275,30 +298,30 @@ impl Compiler {
 
         // re-sign the phar with reproducible timestamp / signature
         let mut util = Timestamps::new(phar_file);
-        util.update_timestamps(&self.version_date);
-        util.save(phar_file, Phar::SHA512);
+        util.update_timestamps(&self.version_date.format("%Y-%m-%d %H:%M:%S").to_string())?;
+        util.save(phar_file, Phar::SHA512)?;
 
         Linter::lint(
             phar_file,
             &[
-                "vendor/symfony/console/Attribute/AsCommand.php",
-                "vendor/symfony/polyfill-intl-grapheme/bootstrap80.php",
-                "vendor/symfony/polyfill-intl-normalizer/bootstrap80.php",
-                "vendor/symfony/polyfill-mbstring/bootstrap80.php",
-                "vendor/symfony/polyfill-php73/Resources/stubs/JsonException.php",
-                "vendor/symfony/service-contracts/Attribute/SubscribedService.php",
-                "vendor/symfony/polyfill-php84/Resources/stubs/Deprecated.php",
-                "vendor/symfony/polyfill-php84/Resources/Deprecated.php",
-                "vendor/symfony/polyfill-php84/Resources/RoundingMode.php",
-                "vendor/symfony/polyfill-php84/bootstrap82.php",
+                "vendor/symfony/console/Attribute/AsCommand.php".to_string(),
+                "vendor/symfony/polyfill-intl-grapheme/bootstrap80.php".to_string(),
+                "vendor/symfony/polyfill-intl-normalizer/bootstrap80.php".to_string(),
+                "vendor/symfony/polyfill-mbstring/bootstrap80.php".to_string(),
+                "vendor/symfony/polyfill-php73/Resources/stubs/JsonException.php".to_string(),
+                "vendor/symfony/service-contracts/Attribute/SubscribedService.php".to_string(),
+                "vendor/symfony/polyfill-php84/Resources/stubs/Deprecated.php".to_string(),
+                "vendor/symfony/polyfill-php84/Resources/Deprecated.php".to_string(),
+                "vendor/symfony/polyfill-php84/Resources/RoundingMode.php".to_string(),
+                "vendor/symfony/polyfill-php84/bootstrap82.php".to_string(),
             ],
-        );
+        )?;
 
         Ok(())
     }
 
     fn get_relative_file_path(&self, file: &SplFileInfo) -> String {
-        let real_path = file.get_real_path();
+        let real_path = file.get_real_path().unwrap_or_default();
         // PHP: dirname(__DIR__, 2) . DIRECTORY_SEPARATOR - repo root + separator
         let repo_root = shirabe_php_shim::dirname_levels(file!(), 2);
         let path_prefix = format!("{}/", repo_root);
@@ -306,7 +329,7 @@ impl Compiler {
         let relative_path = if let Some(stripped) = real_path.strip_prefix(&path_prefix) {
             stripped.to_string()
         } else {
-            real_path.to_string()
+            real_path.clone()
         };
 
         strtr(&relative_path, "\\", "/")
@@ -314,7 +337,7 @@ impl Compiler {
 
     fn add_file(&self, phar: &mut Phar, file: &SplFileInfo, strip: bool) -> anyhow::Result<()> {
         let path = self.get_relative_file_path(file);
-        let content = file_get_contents(file.get_path()).unwrap_or_default();
+        let content = file_get_contents(&file.get_path()).unwrap_or_default();
         let mut content = if strip {
             self.strip_whitespace(&content)
         } else if file.get_filename() == "LICENSE" {

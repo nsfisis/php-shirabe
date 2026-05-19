@@ -50,11 +50,11 @@ impl CheckPlatformReqsCommand {
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
         let io = self.get_io();
 
         let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
@@ -69,7 +69,7 @@ impl CheckPlatformReqsCommand {
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            Box::new(composer.get_locker().get_locked_repository(!no_dev)?)
+            Box::new(composer.get_locker_mut().get_locked_repository(!no_dev)?)
         } else {
             let local_repo = composer.get_repository_manager().get_local_repository();
             if local_repo.get_packages().is_empty() {
@@ -77,7 +77,7 @@ impl CheckPlatformReqsCommand {
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                Box::new(composer.get_locker().get_locked_repository(!no_dev)?)
+                Box::new(composer.get_locker_mut().get_locked_repository(!no_dev)?)
                     as Box<dyn crate::repository::repository_interface::RepositoryInterface>
             } else {
                 if no_dev {
@@ -232,7 +232,7 @@ impl CheckPlatformReqsCommand {
         Ok(exit_code)
     }
 
-    fn print_table(&self, output: &dyn OutputInterface, results: &[CheckResult], format: &str) {
+    fn print_table(&mut self, output: &dyn OutputInterface, results: &[CheckResult], format: &str) {
         let io = self.get_io();
 
         if format == "json" {

@@ -79,4 +79,27 @@ pub trait DownloaderInterface: std::fmt::Debug {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
+
+    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
+    fn as_change_report_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::change_report_interface::ChangeReportInterface> {
+        None
+    }
+
+    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<
+        &dyn crate::downloader::vcs_capable_downloader_interface::VcsCapableDownloaderInterface,
+    > {
+        None
+    }
+
+    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
+    fn as_dvcs_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::dvcs_downloader_interface::DvcsDownloaderInterface> {
+        None
+    }
 }

@@ -1,7 +1,12 @@
 //! ref: composer/src/Composer/Downloader/FossilDownloader.php
 
+use crate::config::Config;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::vcs_downloader::VcsDownloaderBase;
+use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
+use crate::util::filesystem::Filesystem;
+use crate::util::process_executor::ProcessExecutor;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
@@ -13,6 +18,17 @@ pub struct FossilDownloader {
 }
 
 impl FossilDownloader {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    ) -> Self {
+        Self {
+            inner: VcsDownloaderBase::new(io, config, Some(process), Some(fs)),
+        }
+    }
+
     pub(crate) fn do_download(
         &self,
         _package: &dyn PackageInterface,
@@ -31,7 +47,7 @@ impl FossilDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&self.inner.io),
+            Some(self.inner.io.as_ref()),
             &indexmap::IndexMap::new(),
         )?;
 
@@ -71,7 +87,10 @@ impl FossilDownloader {
                 "fossil".to_string(),
                 "update".to_string(),
                 "--".to_string(),
-                package.get_source_reference().unwrap_or_default(),
+                package
+                    .get_source_reference()
+                    .unwrap_or_default()
+                    .to_string(),
             ],
             real_path,
             &mut output,
@@ -89,7 +108,7 @@ impl FossilDownloader {
     ) -> Result<Box<dyn PromiseInterface>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&self.inner.io),
+            Some(self.inner.io.as_ref()),
             &indexmap::IndexMap::new(),
         )?;
 
@@ -120,7 +139,10 @@ impl FossilDownloader {
                 "fossil".to_string(),
                 "up".to_string(),
                 "--".to_string(),
-                target.get_source_reference().unwrap_or_default(),
+                target
+                    .get_source_reference()
+                    .unwrap_or_default()
+                    .to_string(),
             ],
             real_path,
             &mut output,
@@ -204,7 +226,7 @@ impl FossilDownloader {
             .inner
             .process
             .borrow_mut()
-            .execute(&command, output, cwd)
+            .execute(&command, output, cwd)?
             != 0
         {
             return Err(RuntimeException {
@@ -223,5 +245,71 @@ impl FossilDownloader {
     pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {
         std::path::Path::new(&format!("{}/.fslckout", path)).is_file()
             || std::path::Path::new(&format!("{}/_FOSSIL_", path)).is_file()
+    }
+}
+
+// TODO(phase-b): wire up VcsDownloader trait properly. FossilDownloader extends VcsDownloader
+// which implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the
+// inner VcsDownloaderBase exposes the matching impl surface.
+impl DownloaderInterface for FossilDownloader {
+    fn get_installation_source(&self) -> String {
+        todo!()
+    }
+
+    fn download(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn prepare(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn install(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn update(
+        &self,
+        _initial: &dyn PackageInterface,
+        _target: &dyn PackageInterface,
+        _path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn remove(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
     }
 }

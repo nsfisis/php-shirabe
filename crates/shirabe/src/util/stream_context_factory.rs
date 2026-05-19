@@ -44,14 +44,14 @@ impl StreamContextFactory {
         );
         let default_options = {
             let mut o = default_options;
-            if let Some(PhpMixed::Array(ref mut http)) = o.get_mut("http") {
+            if let Some(PhpMixed::Array(http)) = o.get_mut("http") {
                 http.remove("header");
             }
             o
         };
         options = array_replace_recursive(options, default_options);
 
-        if let Some(PhpMixed::Array(ref mut http)) = options.get_mut("http") {
+        if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
             if let Some(header) = http.get("header").cloned() {
                 let fixed = Self::fix_http_header_field(&*header);
                 http.insert(
@@ -81,7 +81,7 @@ impl StreamContextFactory {
             .map(|a| a.contains_key("header"))
             .unwrap_or(false);
         if !has_header {
-            if let Some(PhpMixed::Array(ref mut http)) = options.get_mut("http") {
+            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
                 http.insert("header".to_string(), Box::new(PhpMixed::List(vec![])));
             }
         }
@@ -93,7 +93,7 @@ impl StreamContextFactory {
             .map(|v| matches!(**v, PhpMixed::String(_)))
             .unwrap_or(false);
         if header_is_string {
-            if let Some(PhpMixed::Array(ref mut http)) = options.get_mut("http") {
+            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
                 if let Some(PhpMixed::String(header_str)) = http.get("header").map(|v| *v.clone()) {
                     let parts: Vec<Box<PhpMixed>> = header_str
                         .split("\r\n")
@@ -118,27 +118,30 @@ impl StreamContextFactory {
                         return Err(TransportException::new(
                             "You must enable the openssl extension to use a secure proxy."
                                 .to_string(),
+                            0,
                         ));
                     }
                     if is_https_request {
                         return Err(TransportException::new(
                             "You must enable the curl extension to make https requests through a secure proxy.".to_string(),
+                            0,
                         ));
                     }
                 } else if is_https_request && !extension_loaded("openssl") {
                     return Err(TransportException::new(
                         "You must enable the openssl extension to make https requests through a proxy.".to_string(),
+                        0,
                     ));
                 }
 
                 // Header will be a Proxy-Authorization string or not set
                 let proxy_http = proxy_options.get("http");
                 if let Some(proxy_header) = proxy_http.and_then(|h| h.get("header")) {
-                    if let Some(PhpMixed::Array(ref mut http)) = options.get_mut("http") {
-                        if let Some(PhpMixed::List(ref mut headers)) =
+                    if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
+                        if let Some(PhpMixed::List(headers)) =
                             http.get_mut("header").map(|v| &mut **v)
                         {
-                            headers.push(Box::new(*proxy_header.clone()));
+                            headers.push(Box::new(proxy_header.clone()));
                         }
                     }
                 }
@@ -149,7 +152,7 @@ impl StreamContextFactory {
                         let inner: IndexMap<String, Box<PhpMixed>> = v
                             .iter()
                             .filter(|(ik, _)| ik.as_str() != "header")
-                            .map(|(ik, iv)| (ik.clone(), iv.clone()))
+                            .map(|(ik, iv)| (ik.clone(), Box::new(iv.clone())))
                             .collect();
                         (k.clone(), PhpMixed::Array(inner))
                     })
@@ -223,10 +226,8 @@ impl StreamContextFactory {
                     ""
                 },
             );
-            if let Some(PhpMixed::Array(ref mut http)) = options.get_mut("http") {
-                if let Some(PhpMixed::List(ref mut headers)) =
-                    http.get_mut("header").map(|v| &mut **v)
-                {
+            if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
+                if let Some(PhpMixed::List(headers)) = http.get_mut("header").map(|v| &mut **v) {
                     headers.push(Box::new(PhpMixed::String(user_agent)));
                 }
             }
@@ -339,11 +340,11 @@ impl StreamContextFactory {
         if !has_cafile && !has_capath {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
             if shirabe_php_shim::is_dir(&result) {
-                if let Some(PhpMixed::Array(ref mut ssl)) = defaults.get_mut("ssl") {
+                if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
                     ssl.insert("capath".to_string(), Box::new(PhpMixed::String(result)));
                 }
             } else {
-                if let Some(PhpMixed::Array(ref mut ssl)) = defaults.get_mut("ssl") {
+                if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
                     ssl.insert("cafile".to_string(), Box::new(PhpMixed::String(result)));
                 }
             }
@@ -359,6 +360,7 @@ impl StreamContextFactory {
             if !Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger) {
                 return Err(TransportException::new(
                     "The configured cafile was not valid or could not be read.".to_string(),
+                    0,
                 ));
             }
         }
@@ -373,12 +375,13 @@ impl StreamContextFactory {
             if !shirabe_php_shim::is_dir(capath) || !Filesystem::is_readable(capath) {
                 return Err(TransportException::new(
                     "The configured capath was not valid or could not be read.".to_string(),
+                    0,
                 ));
             }
         }
 
         // Disable TLS compression to prevent CRIME attacks where supported.
-        if let Some(PhpMixed::Array(ref mut ssl)) = defaults.get_mut("ssl") {
+        if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
             ssl.insert(
                 "disable_compression".to_string(),
                 Box::new(PhpMixed::Bool(true)),

@@ -50,7 +50,13 @@ impl ForgejoDriver {
         );
         self.forgejo_url = Some(forgejo_url);
 
-        self.inner.cache = Some(Cache::new(&*self.inner.io, cache_dir));
+        self.inner.cache = Some(Cache::new(
+            self.inner.io.clone_box(),
+            &cache_dir,
+            None,
+            None,
+            false,
+        ));
         self.inner.cache.as_mut().map(|c| {
             c.set_read_only(
                 self.inner
@@ -321,8 +327,10 @@ impl ForgejoDriver {
 
         if !self.inner.info_cache.contains_key(identifier) {
             let composer = if self.inner.should_cache(identifier) {
-                if let Some(res) = self.inner.cache.as_ref().and_then(|c| c.read(identifier)) {
-                    JsonFile::parse_json(&res, None)?
+                if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
+                    // TODO(phase-b): JsonFile::parse_json returns PhpMixed; convert into Option<IndexMap>
+                    let _ = JsonFile::parse_json(Some(res.as_str()), None)?;
+                    None
                 } else {
                     let file_content = self.get_file_content("composer.json", identifier)?;
                     let c = VcsDriverBase::finish_base_composer_information(
@@ -332,14 +340,21 @@ impl ForgejoDriver {
                     )?;
                     if self.inner.should_cache(identifier) {
                         if let Some(ref composer_map) = c {
-                            let encoded = JsonFile::encode_with_options(
-                                composer_map,
-                                shirabe_php_shim::JSON_UNESCAPED_UNICODE
-                                    | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
+                            // TODO(phase-b): JsonFile::encode_with_options does not exist; use encode
+                            let encoded = JsonFile::encode(
+                                &PhpMixed::Array(
+                                    composer_map
+                                        .iter()
+                                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                        .collect(),
+                                ),
+                                (shirabe_php_shim::JSON_UNESCAPED_UNICODE
+                                    | shirabe_php_shim::JSON_UNESCAPED_SLASHES)
+                                    as i64,
                             );
                             self.inner
                                 .cache
-                                .as_ref()
+                                .as_mut()
                                 .map(|c| c.write(identifier, &encoded));
                         }
                     }
@@ -394,8 +409,7 @@ impl ForgejoDriver {
                         format!("{}/commit/{}", html_url, identifier)
                     };
 
-                    if let Some(PhpMixed::Array(ref mut support)) = composer_map.get_mut("support")
-                    {
+                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
                         support
                             .insert("source".to_string(), Box::new(PhpMixed::String(source_url)));
                     }
@@ -419,8 +433,7 @@ impl ForgejoDriver {
                             .map(|r| r.html_url.clone())
                             .unwrap_or_default()
                     );
-                    if let Some(PhpMixed::Array(ref mut support)) = composer_map.get_mut("support")
-                    {
+                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
                         support
                             .insert("issues".to_string(), Box::new(PhpMixed::String(issues_url)));
                     }

@@ -15,7 +15,7 @@ pub struct PartialComposer {
     repository_manager: Option<RepositoryManager>,
     installation_manager: Option<InstallationManager>,
     config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    event_dispatcher: Option<EventDispatcher>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
 
 impl PartialComposer {
@@ -63,11 +63,18 @@ impl PartialComposer {
         self.installation_manager.as_ref().unwrap()
     }
 
-    pub fn set_event_dispatcher(&mut self, event_dispatcher: EventDispatcher) {
+    pub fn get_installation_manager_mut(&mut self) -> &mut InstallationManager {
+        self.installation_manager.as_mut().unwrap()
+    }
+
+    pub fn set_event_dispatcher(
+        &mut self,
+        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+    ) {
         self.event_dispatcher = Some(event_dispatcher);
     }
 
-    pub fn get_event_dispatcher(&self) -> &EventDispatcher {
+    pub fn get_event_dispatcher(&self) -> &std::rc::Rc<std::cell::RefCell<EventDispatcher>> {
         self.event_dispatcher.as_ref().unwrap()
     }
 
@@ -77,5 +84,19 @@ impl PartialComposer {
 
     pub fn set_global(&mut self) {
         self.global = true;
+    }
+
+    /// TODO(phase-b): Emulates PHP `$composer instanceof Composer` check.
+    /// PartialComposer cannot be a Composer here (Composer is a separate struct
+    /// that wraps PartialComposer via composition), so this always returns false.
+    pub fn is_full_composer(&self) -> bool {
+        false
+    }
+
+    /// TODO(phase-b): Emulates PHP downcast to `Composer`.
+    /// Returns self as `&dyn Any`; downcasting to Composer will always fail because
+    /// PartialComposer is not a Composer in this Rust port.
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

@@ -18,6 +18,7 @@ use crate::dependency_resolver::rule_set::RuleSet;
 use crate::package::alias_package::AliasPackage;
 use crate::package::base_package::BasePackage;
 use crate::package::link::Link;
+use crate::package::package_interface::PackageInterface;
 use crate::package::version::version_parser::VersionParser;
 use crate::repository::platform_repository::PlatformRepository;
 use crate::repository::repository_set::RepositorySet;
@@ -86,6 +87,14 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         todo!()
     }
 
+    /// PHP: `$rule instanceof MultiConflictRule`. Returns a borrow of the
+    /// underlying `MultiConflictRule` when this rule is one, otherwise `None`.
+    fn as_multi_conflict(
+        &self,
+    ) -> Option<&crate::dependency_resolver::multi_conflict_rule::MultiConflictRule> {
+        None
+    }
+
     /// @return self::RULE_*
     fn get_reason(&self) -> i64 {
         (self.bitfield() & (255 << BITFIELD_REASON)) >> BITFIELD_REASON
@@ -99,15 +108,15 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
 
     fn get_required_package(&self) -> Option<String> {
         match self.get_reason() {
-            r if r == Self::RULE_ROOT_REQUIRE => match self.get_reason_data() {
+            r if r == RULE_ROOT_REQUIRE => match self.get_reason_data() {
                 ReasonData::RootRequire { package_name, .. } => Some(package_name.clone()),
                 _ => None,
             },
-            r if r == Self::RULE_FIXED => match self.get_reason_data() {
+            r if r == RULE_FIXED => match self.get_reason_data() {
                 ReasonData::Fixed { package } => Some(package.get_name().to_string()),
                 _ => None,
             },
-            r if r == Self::RULE_PACKAGE_REQUIRES => match self.get_reason_data() {
+            r if r == RULE_PACKAGE_REQUIRES => match self.get_reason_data() {
                 ReasonData::Link(link) => Some(link.get_target().to_string()),
                 _ => None,
             },
@@ -148,14 +157,16 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         request: &Request,
         pool: &Pool,
     ) -> bool {
-        if self.get_reason() == Self::RULE_PACKAGE_REQUIRES {
+        if self.get_reason() == RULE_PACKAGE_REQUIRES {
             if let ReasonData::Link(link) = self.get_reason_data() {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     return false;
                 }
                 // TODO(phase-b): Request::get_locked_repository() signature
-                if let Some(locked_repo) = todo!("request.get_locked_repository()") {
-                    for package in todo!("locked_repo.get_packages()") {
+                let locked_repo: Option<()> = todo!("request.get_locked_repository()");
+                if let Some(_locked_repo) = locked_repo {
+                    let packages: Vec<Box<dyn BasePackage>> = todo!("locked_repo.get_packages()");
+                    for package in packages {
                         let p: &dyn BasePackage = todo!("package as BasePackage reference");
                         if p.get_name() == link.get_target() {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
@@ -179,7 +190,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
             }
         }
 
-        if self.get_reason() == Self::RULE_ROOT_REQUIRE {
+        if self.get_reason() == RULE_ROOT_REQUIRE {
             if let ReasonData::RootRequire {
                 package_name,
                 constraint,
@@ -189,8 +200,10 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     return false;
                 }
                 // TODO(phase-b): Request::get_locked_repository() signature
-                if let Some(locked_repo) = todo!("request.get_locked_repository()") {
-                    for package in todo!("locked_repo.get_packages()") {
+                let locked_repo: Option<()> = todo!("request.get_locked_repository()");
+                if let Some(_locked_repo) = locked_repo {
+                    let packages: Vec<Box<dyn BasePackage>> = todo!("locked_repo.get_packages()");
+                    for package in packages {
                         let p: &dyn BasePackage = todo!("package as BasePackage reference");
                         if p.get_name() == package_name {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
@@ -214,7 +227,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         let literals = self.get_literals();
 
         match self.get_reason() {
-            r if r == Self::RULE_PACKAGE_CONFLICT => {
+            r if r == RULE_PACKAGE_CONFLICT => {
                 let mut package1 = self.deduplicate_default_branch_alias(
                     pool.literal_to_package(literals[0]).clone_box(),
                 );
@@ -233,7 +246,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                 Ok(package2)
             }
 
-            r if r == Self::RULE_PACKAGE_REQUIRES => {
+            r if r == RULE_PACKAGE_REQUIRES => {
                 let source_literal = literals[0];
                 let source_package = self.deduplicate_default_branch_alias(
                     pool.literal_to_package(source_literal).clone_box(),
@@ -258,13 +271,13 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: IndexMap<i64, Box<dyn BasePackage>>,
-        _learned_pool: IndexMap<i64, Vec<Box<dyn Rule>>>,
+        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        _learned_pool: &Vec<Vec<Box<dyn Rule>>>,
     ) -> String {
         let mut literals = self.get_literals();
 
         match self.get_reason() {
-            r if r == Self::RULE_ROOT_REQUIRE => {
+            r if r == RULE_ROOT_REQUIRE => {
                 let reason_data = self.get_reason_data();
                 let (package_name, constraint): (&str, &dyn ConstraintInterface) = match reason_data
                 {
@@ -316,7 +329,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                 )
             }
 
-            r if r == Self::RULE_FIXED => {
+            r if r == RULE_FIXED => {
                 let package_in = match self.get_reason_data() {
                     ReasonData::Fixed { package } => package.clone_box(),
                     _ => return String::new(),
@@ -338,7 +351,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                 )
             }
 
-            r if r == Self::RULE_PACKAGE_CONFLICT => {
+            r if r == RULE_PACKAGE_CONFLICT => {
                 let mut package1 = self.deduplicate_default_branch_alias(
                     pool.literal_to_package(literals[0]).clone_box(),
                 );
@@ -404,7 +417,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                 )
             }
 
-            r if r == Self::RULE_PACKAGE_REQUIRES => {
+            r if r == RULE_PACKAGE_REQUIRES => {
                 assert!(literals.len() > 0);
                 let source_literal = array_shift(&mut literals).unwrap();
                 let source_package = self.deduplicate_default_branch_alias(
@@ -418,7 +431,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
 
                 let mut requires: Vec<Box<dyn BasePackage>> = vec![];
                 for literal in &literals {
-                    requires.push(pool.literal_to_package(*literal));
+                    requires.push(pool.literal_to_package(*literal).clone_box());
                 }
 
                 let text = link.get_pretty_string(&*source_package);
@@ -450,7 +463,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                 }
             }
 
-            r if r == Self::RULE_PACKAGE_SAME_NAME => {
+            r if r == RULE_PACKAGE_SAME_NAME => {
                 let mut package_names: IndexMap<String, bool> = IndexMap::new();
                 for literal in &literals {
                     let package = pool.literal_to_package(*literal);
@@ -489,10 +502,10 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     let mut installed_packages: Vec<Box<dyn BasePackage>> = vec![];
                     let mut removable_packages: Vec<Box<dyn BasePackage>> = vec![];
                     for literal in &literals {
-                        if installed_map.contains_key(&abs(*literal)) {
-                            installed_packages.push(pool.literal_to_package(*literal));
+                        if installed_map.contains_key(&abs(*literal).to_string()) {
+                            installed_packages.push(pool.literal_to_package(*literal).clone_box());
                         } else {
-                            removable_packages.push(pool.literal_to_package(*literal));
+                            removable_packages.push(pool.literal_to_package(*literal).clone_box());
                         }
                     }
 
@@ -533,7 +546,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     ),
                 )
             }
-            r if r == Self::RULE_LEARNED => {
+            r if r == RULE_LEARNED => {
                 /// @TODO currently still generates way too much output to be helpful, and in some cases can even lead to endless recursion
                 // (PHP commented-out alternative code preserved)
                 let learned_string = " (conflict analysis result)";
@@ -544,7 +557,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     let mut groups: IndexMap<String, Vec<Box<dyn BasePackage>>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
-                        let group = if installed_map.contains_key(&package.id()) {
+                        let group = if installed_map.contains_key(&package.id().to_string()) {
                             if *literal > 0 { "keep" } else { "remove" }
                         } else {
                             if *literal > 0 {
@@ -557,7 +570,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                         groups
                             .entry(group.to_string())
                             .or_insert_with(Vec::new)
-                            .push(self.deduplicate_default_branch_alias(package));
+                            .push(self.deduplicate_default_branch_alias(package.clone_box()));
                     }
                     let mut rule_texts: Vec<String> = vec![];
                     for (group, packages) in &groups {
@@ -580,7 +593,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
 
                 format!("Conclusion: {}{}", rule_text, learned_string)
             }
-            r if r == Self::RULE_PACKAGE_ALIAS => {
+            r if r == RULE_PACKAGE_ALIAS => {
                 let alias_package = pool.literal_to_package(literals[0]);
 
                 // avoid returning content like "9999999-dev is an alias of dev-master" as it is useless
@@ -597,7 +610,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     package.get_pretty_string(),
                 )
             }
-            r if r == Self::RULE_PACKAGE_INVERSE_ALIAS => {
+            r if r == RULE_PACKAGE_INVERSE_ALIAS => {
                 // inverse alias rules work the other way around than above
                 let alias_package = pool.literal_to_package(literals[1]);
 
@@ -646,9 +659,9 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         }
 
         Problem::get_package_list(
-            packages,
+            &packages,
             is_verbose,
-            pool,
+            Some(pool),
             constraint,
             use_removed_version_group,
         )
@@ -668,9 +681,9 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
             packages.push(pool.literal_to_package(*literal).clone_box());
         }
         Problem::get_package_list(
-            packages,
+            &packages,
             is_verbose,
-            pool,
+            Some(pool),
             constraint,
             use_removed_version_group,
         )

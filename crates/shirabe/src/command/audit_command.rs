@@ -51,8 +51,8 @@ impl AuditCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
-        let packages = self.get_packages(&composer, input)?;
+        let mut composer = self.require_composer(None, None)?;
+        let packages = self.get_packages(&mut composer, input)?;
 
         if packages.is_empty() {
             self.get_io().write_error("No packages - skipping audit.");
@@ -139,17 +139,17 @@ impl AuditCommand {
 
     fn get_packages(
         &self,
-        composer: &Composer,
+        composer: &mut Composer,
         input: &dyn InputInterface,
     ) -> Result<Vec<Box<dyn PackageInterface>>> {
         if input.get_option("locked").as_bool().unwrap_or(false) {
-            if !composer.get_locker().is_locked() {
+            let locker = composer.get_locker_mut();
+            if !locker.is_locked() {
                 return Err(UnexpectedValueException {
                     message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
                     code: 0,
                 }.into());
             }
-            let locker = composer.get_locker();
             return Ok(CanonicalPackagesTrait::get_packages(
                 &locker.get_locked_repository(
                     !input.get_option("no-dev").as_bool().unwrap_or(false),

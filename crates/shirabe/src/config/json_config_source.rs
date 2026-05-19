@@ -69,7 +69,7 @@ impl JsonConfigSource {
             contents = "{\n    \"config\": {\n    }\n}\n".to_string();
         }
 
-        let mut manipulator = JsonManipulator::new(&contents);
+        let mut manipulator = JsonManipulator::new(contents.clone())?;
 
         let new_file = !self.file.exists();
 
@@ -248,7 +248,8 @@ impl JsonConfigSource {
         // TODO(phase-b): retain reference semantics so later mutations of $value propagate
         array[0] = value.clone();
 
-        return_val.map(|_| 0).unwrap_or(0) + array.len() as i64
+        let _ = return_val;
+        array.len() as i64
     }
 }
 
@@ -257,14 +258,8 @@ impl ConfigSourceInterface for JsonConfigSource {
         self.file.get_path().to_string()
     }
 
-    fn add_repository(
-        &mut self,
-        name: &str,
-        config: Option<IndexMap<String, PhpMixed>>,
-        append: bool,
-    ) -> Result<()> {
+    fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> Result<()> {
         let name_owned = name.to_string();
-        let config_owned = config.clone();
         self.manipulate_json(
             "addRepository",
             Box::new(move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
@@ -272,27 +267,18 @@ impl ConfigSourceInterface for JsonConfigSource {
                 let _ = (cfg, args);
                 todo!("addRepository fallback closure body");
             }),
-            vec![
-                PhpMixed::String(name_owned),
-                config_owned
-                    .map(|m| {
-                        PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect())
-                    })
-                    .unwrap_or(PhpMixed::Bool(false)),
-                PhpMixed::Bool(append),
-            ],
+            vec![PhpMixed::String(name_owned), config, PhpMixed::Bool(append)],
         )
     }
 
     fn insert_repository(
         &mut self,
         name: &str,
-        config: Option<IndexMap<String, PhpMixed>>,
+        config: PhpMixed,
         reference_name: &str,
         offset: i64,
     ) -> Result<()> {
         let name_owned = name.to_string();
-        let config_owned = config.clone();
         let reference_name_owned = reference_name.to_string();
         self.manipulate_json(
             "insertRepository",
@@ -303,11 +289,7 @@ impl ConfigSourceInterface for JsonConfigSource {
             }),
             vec![
                 PhpMixed::String(name_owned),
-                config_owned
-                    .map(|m| {
-                        PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect())
-                    })
-                    .unwrap_or(PhpMixed::Bool(false)),
+                config,
                 PhpMixed::String(reference_name_owned),
                 PhpMixed::Int(offset),
             ],

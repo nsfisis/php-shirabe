@@ -36,6 +36,10 @@ impl PreFileDownloadEvent {
         }
     }
 
+    pub fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
     pub fn get_http_downloader(&self) -> &std::rc::Rc<std::cell::RefCell<HttpDownloader>> {
         &self.http_downloader
     }

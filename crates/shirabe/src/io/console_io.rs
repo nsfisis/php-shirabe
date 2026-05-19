@@ -29,7 +29,6 @@ use crate::question::strict_confirmation_question::StrictConfirmationQuestion;
 use crate::util::silencer::Silencer;
 
 /// The Input/Output helper.
-#[derive(Debug)]
 pub struct ConsoleIO {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 
@@ -43,6 +42,21 @@ pub struct ConsoleIO {
     start_time: Option<f64>,
     /// @var array<IOInterface::*, OutputInterface::VERBOSITY_*>
     verbosity_map: IndexMap<i64, i64>,
+}
+
+// TODO(phase-b): dyn InputInterface / dyn OutputInterface do not implement Debug,
+// so we cannot derive Debug. Provide a manual impl that omits those fields.
+impl std::fmt::Debug for ConsoleIO {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConsoleIO")
+            .field("authentications", &self.authentications)
+            .field("helper_set", &self.helper_set)
+            .field("last_message", &self.last_message)
+            .field("last_message_err", &self.last_message_err)
+            .field("start_time", &self.start_time)
+            .field("verbosity_map", &self.verbosity_map)
+            .finish()
+    }
 }
 
 impl ConsoleIO {
@@ -131,9 +145,11 @@ impl ConsoleIO {
             // TODO(phase-b): downcast Box<dyn OutputInterface> to ConsoleOutputInterface
             let console_output: &dyn ConsoleOutputInterface =
                 todo!("downcast self.output to ConsoleOutputInterface");
-            console_output
-                .get_error_output()
-                .write3(messages.clone(), newline, sf_verbosity);
+            console_output.get_error_output().write(
+                &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
+                newline,
+                sf_verbosity,
+            );
             // PHP: implode($newline ? "\n" : '', (array) $messages)
             *self.last_message_err.borrow_mut() = implode(
                 if newline { "\n" } else { "" },
@@ -143,7 +159,11 @@ impl ConsoleIO {
             return;
         }
 
-        self.output.write3(messages.clone(), newline, sf_verbosity);
+        self.output.write(
+            &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
+            newline,
+            sf_verbosity,
+        );
         *self.last_message.borrow_mut() = implode(
             if newline { "\n" } else { "" },
             &Self::to_string_list(&messages),
@@ -168,11 +188,12 @@ impl ConsoleIO {
         // since overwrite is supposed to overwrite last message...
         let size = size.unwrap_or_else(|| {
             // removing possible formatting of lastMessage with strip_tags
-            strlen(&strip_tags(if stderr {
-                &self.last_message_err.borrow()
+            let last = if stderr {
+                self.last_message_err.borrow().clone()
             } else {
-                &self.last_message.borrow()
-            }))
+                self.last_message.borrow().clone()
+            };
+            strlen(&strip_tags(&last))
         });
         // ...let's fill its length with backspaces
         self.do_write(
@@ -279,7 +300,7 @@ impl ConsoleIO {
         };
         if is_string(&messages) {
             let message = Self::ensure_valid_utf8(messages.as_string().unwrap_or(""));
-            return PhpMixed::String(Preg::replace(&pattern, "", &message));
+            return PhpMixed::String(Preg::replace(&pattern, "", &message).unwrap_or_default());
         }
 
         // PHP: $sanitized = []; foreach ($messages as $key => $message) { ... }
@@ -290,7 +311,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.to_string(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s).unwrap_or_default()),
                     );
                 }
             }
@@ -299,7 +320,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.clone(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s).unwrap_or_default()),
                     );
                 }
             }
@@ -358,40 +379,44 @@ impl ConsoleIO {
 }
 
 impl LoggerInterface for ConsoleIO {
-    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::emergency(self, message, context)
+    // TODO(phase-b): BaseIO's emergency/alert/.../log take PhpMixed and
+    // IndexMap<String, Box<PhpMixed>> while LoggerInterface takes &str and
+    // &[(&str, &str)]. Delegation requires reconciling signatures; for now,
+    // mirror NullIO and panic via todo!().
+    fn emergency(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn alert(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::alert(self, message, context)
+    fn alert(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn critical(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::critical(self, message, context)
+    fn critical(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::error(self, message, context)
+    fn error(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::warning(self, message, context)
+    fn warning(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn notice(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::notice(self, message, context)
+    fn notice(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn info(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::info(self, message, context)
+    fn info(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::debug(self, message, context)
+    fn debug(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 
-    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
-        <Self as BaseIO>::log(self, level, message, context)
+    fn log(&self, _level: &str, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
     }
 }
 
@@ -417,107 +442,142 @@ impl IOInterface for ConsoleIO {
     }
 
     fn write3(&self, message: &str, newline: bool, verbosity: i64) {
-        let message = Self::sanitize(message, true);
+        let message = Self::sanitize(PhpMixed::String(message.to_string()), true);
 
         self.do_write(message, newline, false, verbosity, false);
     }
 
     fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
-        let message = Self::sanitize(message, true);
+        let message = Self::sanitize(PhpMixed::String(message.to_string()), true);
 
         self.do_write(message, newline, true, verbosity, false);
     }
 
     fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.do_write(message, newline, false, verbosity, true);
+        self.do_write(
+            PhpMixed::String(message.to_string()),
+            newline,
+            false,
+            verbosity,
+            true,
+        );
     }
 
     fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.do_write(message, newline, true, verbosity, true);
+        self.do_write(
+            PhpMixed::String(message.to_string()),
+            newline,
+            true,
+            verbosity,
+            true,
+        );
     }
 
     fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.do_overwrite(message, newline, size, false, verbosity);
+        self.do_overwrite(
+            PhpMixed::String(message.to_string()),
+            newline,
+            size,
+            false,
+            verbosity,
+        );
     }
 
     fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.do_overwrite(message, newline, size, true, verbosity);
-    }
-
-    fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed {
-        // PHP: $helper = $this->helperSet->get('question');
-        let helper = self.helper_set.get("question");
-        let question = Question::new(
-            Self::sanitize(PhpMixed::String(question), true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
+        self.do_overwrite(
+            PhpMixed::String(message.to_string()),
+            newline,
+            size,
+            true,
+            verbosity,
         );
-
-        helper.ask(&*self.input, self.get_error_output(), &question)
     }
 
-    fn ask_confirmation(&mut self, question: String, default: bool) -> bool {
-        let helper = self.helper_set.get("question");
+    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
+        // PHP: $helper = $this->helperSet->get('question');
+        let _helper = self.helper_set.get("question");
+        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        let sanitized_default = if is_string(&default) {
+            Some(Self::sanitize(default, true))
+        } else {
+            Some(default)
+        };
+        let _question = Question::new(&sanitized_question, sanitized_default);
+
+        // TODO(phase-b): HelperSet::get returns PhpMixed; QuestionHelper::ask is
+        // not yet modeled. Returning a placeholder until helper types are wired up.
+        todo!("call QuestionHelper::ask on resolved helper")
+    }
+
+    fn ask_confirmation(&self, question: String, default: bool) -> bool {
+        let _helper = self.helper_set.get("question");
         // TODO(phase-b): Self::sanitize returns PhpMixed but new() expects String;
         // also true/false regexes need to come through composer/symfony defaults.
         let sanitized = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
             .to_string();
-        let question = StrictConfirmationQuestion::new(
+        let _question = StrictConfirmationQuestion::new(
             sanitized,
             default,
             "/^y(?:es)?$/i".to_string(),
             "/^no?$/i".to_string(),
         );
 
-        helper
-            .ask(&*self.input, self.get_error_output(), &question)
-            .as_bool()
-            .unwrap_or(false)
+        // TODO(phase-b): see ask() above; placeholder until QuestionHelper is modeled.
+        todo!("call QuestionHelper::ask on resolved helper and coerce to bool")
     }
 
     fn ask_and_validate(
-        &mut self,
+        &self,
         question: String,
         validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> PhpMixed {
-        let helper = self.helper_set.get("question");
-        let mut question = Question::new(
-            Self::sanitize(PhpMixed::String(question), true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
-        );
-        question.set_validator(validator);
+        let _helper = self.helper_set.get("question");
+        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        let sanitized_default = if is_string(&default) {
+            Some(Self::sanitize(default, true))
+        } else {
+            Some(default)
+        };
+        let mut question = Question::new(&sanitized_question, sanitized_default);
+        // TODO(phase-b): IOInterface validator type is Box<dyn Fn(PhpMixed) -> PhpMixed>
+        // but Question::set_validator expects Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed>>>.
+        // Bridge the signatures by adapting the input/output types.
+        let adapted: Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>> =
+            Box::new(move |answer: Option<PhpMixed>| {
+                Ok(validator(answer.unwrap_or(PhpMixed::Null)))
+            });
+        question.set_validator(Some(adapted));
         question.set_max_attempts(attempts);
 
-        helper.ask(&*self.input, self.get_error_output(), &question)
+        // TODO(phase-b): QuestionHelper::ask not yet modeled.
+        todo!("call QuestionHelper::ask on resolved helper")
     }
 
-    fn ask_and_hide_answer(&mut self, question: String) -> Option<String> {
-        let helper = self.helper_set.get("question");
-        let mut question = Question::new(
-            Self::sanitize(PhpMixed::String(question), true),
-            PhpMixed::Null,
-        );
+    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+        let _helper = self.helper_set.get("question");
+        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        let mut question = Question::new(&sanitized_question, Some(PhpMixed::Null));
         question.set_hidden(true);
 
-        helper
-            .ask(&*self.input, self.get_error_output(), &question)
-            .as_string()
-            .map(|s| s.to_string())
+        // TODO(phase-b): QuestionHelper::ask not yet modeled.
+        todo!("call QuestionHelper::ask on resolved helper and coerce to Option<String>")
     }
 
     fn select(
-        &mut self,
+        &self,
         question: String,
         choices: Vec<String>,
         default: PhpMixed,
@@ -532,27 +592,39 @@ impl IOInterface for ConsoleIO {
                 .map(|s| Box::new(PhpMixed::String(s)))
                 .collect(),
         );
-        let helper = self.helper_set.get("question");
-        let mut question = ChoiceQuestion::new(
-            Self::sanitize(PhpMixed::String(question), true),
-            Self::sanitize(choices.clone(), true),
-            if is_string(&default) {
-                Self::sanitize(default, true)
-            } else {
-                default
-            },
-        );
+        let _helper = self.helper_set.get("question");
+        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        // TODO(phase-b): ChoiceQuestion::new expects Vec<PhpMixed>; collect from the
+        // sanitized PhpMixed::List.
+        let sanitized_choices_mixed = Self::sanitize(choices.clone(), true);
+        let sanitized_choices: Vec<PhpMixed> = match sanitized_choices_mixed {
+            PhpMixed::List(l) => l.into_iter().map(|b| *b).collect(),
+            PhpMixed::Array(a) => a.into_values().map(|b| *b).collect(),
+            other => vec![other],
+        };
+        let sanitized_default = if is_string(&default) {
+            Some(Self::sanitize(default, true))
+        } else {
+            Some(default)
+        };
+        let mut question =
+            ChoiceQuestion::new(&sanitized_question, sanitized_choices, sanitized_default);
         // PHP: IOInterface requires false, and Question requires null or int
         let max_attempts = match attempts {
             PhpMixed::Bool(false) => None,
             PhpMixed::Int(i) => Some(i),
             _ => None,
         };
-        question.set_max_attempts(max_attempts);
+        // ChoiceQuestion delegates set_max_attempts to its inner Question.
+        question.0.set_max_attempts(max_attempts);
         question.set_error_message(&error_message);
         question.set_multiselect(multiselect);
 
-        let result = helper.ask(&*self.input, self.get_error_output(), &question);
+        // TODO(phase-b): QuestionHelper::ask not yet modeled.
+        let result: PhpMixed = todo!("call QuestionHelper::ask on resolved helper");
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
         let choice_keys: Vec<String> = match &choices {

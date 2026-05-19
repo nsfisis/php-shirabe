@@ -9,6 +9,7 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
 use shirabe_php_shim::PhpMixed;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -45,34 +46,44 @@ impl FundCommand {
     }
 
     pub fn execute(
-        &self,
+        &mut self,
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
 
         let repo = composer.get_repository_manager().get_local_repository();
-        let remote_repos =
-            CompositeRepository::new(composer.get_repository_manager().get_repositories());
+        let remote_repos = CompositeRepository::new(
+            composer
+                .get_repository_manager()
+                .get_repositories()
+                .iter()
+                .map(|r| r.clone_box())
+                .collect(),
+        );
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
 
-        let mut packages_to_load: IndexMap<String, Box<MatchAllConstraint>> = IndexMap::new();
+        let mut packages_to_load: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
+            IndexMap::new();
+        let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
         for package in repo.get_packages() {
             if package.as_any().downcast_ref::<AliasPackage>().is_some() {
                 continue;
             }
             packages_to_load.insert(
                 package.get_name().to_string(),
-                Box::new(MatchAllConstraint::new()),
+                Some(Box::new(MatchAllConstraint::new())),
             );
+            packages_to_load_names.insert(package.get_name().to_string());
         }
 
         // load all packages dev versions in parallel
         let result = remote_repos.load_packages(
-            &packages_to_load,
-            &IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
-            &IndexMap::new(),
-        )?;
+            packages_to_load,
+            IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
+            IndexMap::new(),
+            IndexMap::new(),
+        );
 
         // collect funding data from default branches
         for package in &result.packages {
@@ -81,10 +92,10 @@ impl FundCommand {
                 if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
                     if complete_pkg.is_default_branch()
                         && !complete_pkg.get_funding().is_empty()
-                        && packages_to_load.contains_key(complete_pkg.get_name())
+                        && packages_to_load_names.contains(complete_pkg.get_name())
                     {
                         Self::insert_funding_data(&mut fundings, complete_pkg)?;
-                        packages_to_load.remove(complete_pkg.get_name());
+                        packages_to_load_names.shift_remove(complete_pkg.get_name());
                     }
                 }
             }
@@ -93,7 +104,7 @@ impl FundCommand {
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages() {
             if package.as_any().downcast_ref::<AliasPackage>().is_some()
-                || !packages_to_load.contains_key(package.get_name())
+                || !packages_to_load_names.contains(package.get_name())
             {
                 continue;
             }

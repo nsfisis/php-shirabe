@@ -1,10 +1,15 @@
+use crate::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct Table;
 
 impl Table {
-    pub fn new(_output: &dyn std::any::Any) -> Self {
+    pub fn new(_output: &dyn OutputInterface) -> Self {
+        todo!()
+    }
+
+    pub fn set_style(&mut self, _style: &str) -> &mut Self {
         todo!()
     }
 

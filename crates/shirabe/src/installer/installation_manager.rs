@@ -42,7 +42,7 @@ pub struct InstallationManager {
     notifiable_packages: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: Box<dyn IOInterface>,
-    event_dispatcher: Option<EventDispatcher>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     output_progress: bool,
 }
 
@@ -50,7 +50,7 @@ impl InstallationManager {
     pub fn new(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: Box<dyn IOInterface>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> Self {
         Self {
             installers: vec![],
@@ -85,7 +85,7 @@ impl InstallationManager {
         let _ = installer;
         let key: Option<usize> = None;
         if let Some(k) = key {
-            array_splice(&mut self.installers, k as i64, Some(1), None);
+            array_splice(&mut self.installers, k as i64, Some(1), vec![]);
             self.cache = IndexMap::new();
         }
     }
@@ -109,18 +109,18 @@ impl InstallationManager {
     /// @param string $type package type
     ///
     /// @throws \InvalidArgumentException if installer for provided type is not registered
-    pub fn get_installer(&mut self, r#type: &str) -> Result<&dyn InstallerInterface> {
+    pub fn get_installer(&mut self, r#type: &str) -> Result<&mut dyn InstallerInterface> {
         let r#type = strtolower(r#type);
 
         if self.cache.contains_key(&r#type) {
-            return Ok(self.cache.get(&r#type).unwrap().as_ref());
+            return Ok(self.cache.get_mut(&r#type).unwrap().as_mut());
         }
 
         for installer in &self.installers {
             if installer.supports(&r#type) {
                 // TODO(phase-b): cache by cloning Box<dyn InstallerInterface> is non-trivial
                 self.cache.insert(r#type.clone(), installer.clone_box());
-                return Ok(self.cache.get(&r#type).unwrap().as_ref());
+                return Ok(self.cache.get_mut(&r#type).unwrap().as_mut());
             }
         }
 
@@ -187,9 +187,9 @@ impl InstallationManager {
 
         let signal_handler = SignalHandler::create(
             vec![
-                SignalHandler::SIGINT,
-                SignalHandler::SIGTERM,
-                SignalHandler::SIGHUP,
+                SignalHandler::SIGINT.to_string(),
+                SignalHandler::SIGTERM.to_string(),
+                SignalHandler::SIGHUP.to_string(),
             ],
             // TODO(phase-b): closure captures &mut self via &mut cleanup_promises
             Box::new(move |signal: String, handler: &SignalHandler| {
@@ -331,7 +331,7 @@ impl InstallationManager {
             if op_type != "uninstall" {
                 let installer = self.get_installer(package.get_type())?;
                 let promise = installer.download(package, initial_package);
-                if let Some(p) = promise {
+                if let Ok(Some(p)) = promise {
                     promises.push(p);
                 }
             }
@@ -447,8 +447,6 @@ impl InstallationManager {
                 initial_package = None;
             }
 
-            let installer = self.get_installer(package.get_type())?;
-
             let event_name = match op_type.as_str() {
                 "install" => PackageEvents::PRE_PACKAGE_INSTALL,
                 "update" => PackageEvents::PRE_PACKAGE_UPDATE,
@@ -457,25 +455,26 @@ impl InstallationManager {
             };
 
             if run_scripts && self.event_dispatcher.is_some() {
-                self.event_dispatcher
-                    .as_mut()
-                    .unwrap()
-                    .dispatch_package_event(
-                        event_name,
-                        dev_mode,
-                        repo,
-                        all_operations,
-                        operation.as_ref(),
-                    );
+                // TODO(phase-b): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
+                // but we hold &mut dyn here. Needs structural rework (likely shared Rc on repo and ops).
+                let _ = (
+                    event_name,
+                    dev_mode,
+                    &repo,
+                    &all_operations,
+                    operation.as_ref(),
+                );
             }
 
             let _dispatcher = self.event_dispatcher.as_ref();
             let _io = self.io.as_ref();
 
+            let installer = self.get_installer(package.get_type())?;
             let promise = installer.prepare(&op_type, package, initial_package);
             let promise = match promise {
-                Some(p) => p,
-                None => promise::resolve(None),
+                Ok(Some(p)) => p,
+                Ok(None) => promise::resolve(None),
+                Err(e) => return Err(e),
             };
 
             // TODO(phase-b): chain `.then(cb1).then(cb2)` with cleanup_promises[index], repo.write, etc.
@@ -527,7 +526,8 @@ impl InstallationManager {
             // TODO(phase-b): progress = self.io.get_progress_bar();
             progress = Some(());
         }
-        let _ = self.loop_.borrow_mut().wait(promises, progress);
+        // TODO(phase-b): pass actual ProgressBar when self.io.get_progress_bar() is implemented
+        let _ = self.loop_.borrow_mut().wait(promises, None);
         if progress.is_some() {
             // progress.clear();
             // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
@@ -545,7 +545,7 @@ impl InstallationManager {
         package: &dyn PackageInterface,
     ) -> Option<Box<dyn PromiseInterface>> {
         let installer = self.get_installer(package.get_type()).ok()?;
-        let promise = installer.cleanup("install", package, None);
+        let promise = installer.cleanup("install", package, None).ok()?;
 
         promise
     }
@@ -560,7 +560,7 @@ impl InstallationManager {
     ) -> Option<Box<dyn PromiseInterface>> {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
-        let promise = installer.install(repo, package);
+        let promise = installer.install(repo, package).ok()?;
         self.mark_for_notification(package);
 
         promise
@@ -582,14 +582,15 @@ impl InstallationManager {
 
         let promise = if initial_type == target_type {
             let installer = self.get_installer(initial_type).ok()?;
-            let promise = installer.update(repo, initial, target);
+            let promise = installer.update(repo, initial, target).ok()?;
             self.mark_for_notification(target);
             promise
         } else {
             let promise = self
                 .get_installer(initial_type)
                 .ok()?
-                .uninstall(repo, initial);
+                .uninstall(repo, initial)
+                .ok()?;
             let promise = match promise {
                 Some(p) => p,
                 None => promise::resolve(None),
@@ -615,7 +616,7 @@ impl InstallationManager {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
 
-        installer.uninstall(repo, package)
+        installer.uninstall(repo, package).ok()?
     }
 
     /// Executes markAliasInstalled operation.
@@ -684,9 +685,13 @@ impl InstallationManager {
                                 "Content-type: application/x-www-form-urlencoded".to_string(),
                             ))]),
                         );
+                        let params_vec: Vec<(&str, &str)> = params
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.as_str()))
+                            .collect();
                         http.insert(
                             "content".to_string(),
-                            PhpMixed::String(http_build_query(&params, "", Some("&"))),
+                            PhpMixed::String(http_build_query(&params_vec, "", "&")),
                         );
                         http.insert("timeout".to_string(), PhpMixed::Int(3));
                         opts.insert(
@@ -696,12 +701,13 @@ impl InstallationManager {
                             ),
                         );
 
-                        promises.push(self.loop_.borrow().get_http_downloader().borrow_mut().add(
-                            &url,
-                            &PhpMixed::Array(
-                                opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                            ),
-                        )?);
+                        promises.push(
+                            self.loop_
+                                .borrow()
+                                .get_http_downloader()
+                                .borrow_mut()
+                                .add(&url, opts)?,
+                        );
                     }
 
                     continue;
@@ -767,10 +773,13 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 );
 
-                promises.push(self.loop_.borrow().get_http_downloader().borrow_mut().add(
-                    repo_url,
-                    &PhpMixed::Array(opts.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                )?);
+                promises.push(
+                    self.loop_
+                        .borrow()
+                        .get_http_downloader()
+                        .borrow_mut()
+                        .add(repo_url, opts)?,
+                );
             }
 
             let _ = self.loop_.borrow_mut().wait(promises, None);

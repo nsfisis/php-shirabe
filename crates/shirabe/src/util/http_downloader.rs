@@ -55,7 +55,6 @@ pub struct HttpDownloader {
     allow_async: bool,
 }
 
-#[derive(Debug)]
 struct Job {
     id: i64,
     status: i64,
@@ -67,6 +66,21 @@ struct Job {
     curl_id: Option<i64>,
     response: Option<Response>,
     exception: Option<anyhow::Error>,
+}
+
+impl std::fmt::Debug for Job {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Job")
+            .field("id", &self.id)
+            .field("status", &self.status)
+            .field("request", &self.request)
+            .field("sync", &self.sync)
+            .field("origin", &self.origin)
+            .field("curl_id", &self.curl_id)
+            .field("response", &self.response)
+            .field("exception", &self.exception)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -99,28 +113,12 @@ impl HttpDownloader {
         // The cafile option can be set via config.json
         let mut self_options: IndexMap<String, PhpMixed> = IndexMap::new();
         if disable_tls == false {
-            self_options = StreamContextFactory::get_tls_defaults(&options, Some(&*io));
+            self_options =
+                StreamContextFactory::get_tls_defaults(&options, Some(&*io)).unwrap_or_default();
         }
 
         // handle the other externally set options normally.
-        self_options = array_replace_recursive(
-            PhpMixed::Array(
-                self_options
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            PhpMixed::Array(
-                options
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-        )
-        .as_array()
-        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-        .unwrap_or_default();
+        self_options = array_replace_recursive(self_options, options.clone());
 
         let curl = if Self::is_curl_enabled() {
             Some(CurlDownloader::new(
@@ -138,11 +136,16 @@ impl HttpDownloader {
             std::rc::Rc::clone(&config),
             options.clone(),
             disable_tls,
+            None,
         ));
 
         let mut max_jobs: i64 = 12;
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_HTTP");
-        if is_numeric(&max_jobs_env) {
+        let max_jobs_env_mixed = match &max_jobs_env {
+            Some(s) => PhpMixed::String(s.clone()),
+            None => PhpMixed::Bool(false),
+        };
+        if is_numeric(&max_jobs_env_mixed) {
             max_jobs = max(
                 1,
                 min(
@@ -283,19 +286,7 @@ impl HttpDownloader {
 
     /// Merges new options
     pub fn set_options(&mut self, options: IndexMap<String, PhpMixed>) {
-        self.options = array_replace_recursive(
-            PhpMixed::Array(
-                self.options
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            PhpMixed::Array(options.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-        )
-        .as_array()
-        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-        .unwrap_or_default();
+        self.options = array_replace_recursive(self.options.clone(), options);
     }
 
     /// @phpstan-param Request $request
@@ -305,25 +296,7 @@ impl HttpDownloader {
         mut request: Request,
         sync: bool,
     ) -> Result<(JobHandle, Box<dyn PromiseInterface>)> {
-        request.options = array_replace_recursive(
-            PhpMixed::Array(
-                self.options
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-            PhpMixed::Array(
-                request
-                    .options
-                    .into_iter()
-                    .map(|(k, v)| (k, Box::new(v)))
-                    .collect(),
-            ),
-        )
-        .as_array()
-        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-        .unwrap_or_default();
+        request.options = array_replace_recursive(self.options.clone(), request.options);
 
         let id = self.id_gen;
         self.id_gen += 1;
@@ -381,20 +354,21 @@ impl HttpDownloader {
         // TODO(phase-b): build resolver/canceler closures bound to &mut self.jobs; needs Rc<RefCell> wiring
         let _ = (&self.rfs, &self.curl);
 
-        let resolver: Box<dyn Fn(_, _)> = Box::new(|_resolve, _reject| {
-            // TODO(phase-b)
-        });
+        let resolver: Box<dyn Fn(Box<dyn Fn(PhpMixed)>, Box<dyn Fn(PhpMixed)>)> =
+            Box::new(|_resolve, _reject| {
+                // TODO(phase-b)
+            });
         let canceler: Box<dyn Fn()> = Box::new(|| {
             // PHP canceler logic — TODO(phase-b)
             let _ = IrrecoverableDownloadException(shirabe_php_shim::RuntimeException {
                 message: "Download canceled".to_string(),
                 code: 0,
             });
-            let _ = Url::sanitize("");
+            let _ = Url::sanitize(String::new());
         });
         let _ = (resolver, canceler);
 
-        let promise = Promise::new(Box::new(|_resolve, _reject| {}), Box::new(|| {}));
+        let promise = Promise::new(Box::new(|_resolve, _reject| {}));
         // TODO(phase-b): wire promise.then() side-effects: mark job done & store response/exception
         let promise: Box<dyn PromiseInterface> = Box::new(promise);
 
@@ -464,17 +438,17 @@ impl HttpDownloader {
             if has_if_modified_since {
                 let mut req_map: IndexMap<String, PhpMixed> = IndexMap::new();
                 req_map.insert("url".to_string(), PhpMixed::String(url.clone()));
-                let _ = Response::new(req_map, 304, IndexMap::new(), String::new());
+                let _ = Response::new(req_map, Some(304), Vec::new(), Some(String::new()));
                 // job.resolve(response) — TODO(phase-b)
             } else {
                 let mut e = TransportException::new(
                     format!(
                         "Network disabled, request canceled: {}",
-                        Url::sanitize(&url)
+                        Url::sanitize(url.clone())
                     ),
                     499,
                 );
-                e.set_status_code(499);
+                e.set_status_code(Some(499));
                 // job.reject(e) — TODO(phase-b)
                 let _ = e;
             }
@@ -597,12 +571,12 @@ impl HttpDownloader {
         url: &str,
         data: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {
-        let clean_message = |msg: &str| -> String {
+        let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
                 return Preg::replace(&format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"), "", msg);
             }
 
-            msg.to_string()
+            Ok(msg.to_string())
         };
 
         // legacy warning/info keys
@@ -633,8 +607,8 @@ impl HttpDownloader {
                 "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                 tp = r#type,
                 capitalized = ucfirst(r#type),
-                url = Url::sanitize(url),
-                msg = clean_message(entry.unwrap().as_string().unwrap_or(""))
+                url = Url::sanitize(url.to_string()),
+                msg = clean_message(entry.unwrap().as_string().unwrap_or(""))?
             ));
         }
 
@@ -669,13 +643,13 @@ impl HttpDownloader {
                             "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                             tp = r#type,
                             capitalized = ucfirst(&r#type),
-                            url = Url::sanitize(url),
+                            url = Url::sanitize(url.to_string()),
                             msg = clean_message(
                                 spec_map
                                     .get("message")
                                     .and_then(|v| v.as_string())
                                     .unwrap_or("")
-                            )
+                            )?
                         ));
                     }
                 }
@@ -711,11 +685,9 @@ impl HttpDownloader {
             );
             http_map.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
             ctx_options.insert("http".to_string(), PhpMixed::Array(http_map));
-            let test_connectivity = file_get_contents(
-                "https://8.8.8.8",
-                false,
-                Some(stream_context_create(ctx_options)),
-            );
+            // TODO(phase-b): file_get_contents only takes a path; stream context arg dropped.
+            let _ = stream_context_create(&ctx_options, None);
+            let test_connectivity = file_get_contents("https://8.8.8.8");
             Silencer::restore();
             if test_connectivity.is_some() {
                 return Some(vec![

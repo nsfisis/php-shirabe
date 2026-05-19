@@ -34,7 +34,7 @@ pub struct VersionGuesser {
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 
     /// @var SemverVersionParser
-    version_parser: SemverVersionParser,
+    version_parser: VersionParser,
 
     /// @var IOInterface|null
     io: Option<Box<dyn IOInterface>>,
@@ -54,7 +54,7 @@ impl VersionGuesser {
     pub fn new(
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        version_parser: SemverVersionParser,
+        version_parser: VersionParser,
         io: Option<Box<dyn IOInterface>>,
     ) -> Self {
         Self {
@@ -132,11 +132,14 @@ impl VersionGuesser {
             && Preg::is_match(r"{\.9{7}}", version_data.version.as_deref().unwrap_or(""))
                 .unwrap_or(false)
         {
-            version_data.pretty_version = Some(Preg::replace(
-                r"{(\.9{7})+}",
-                ".x",
-                version_data.version.as_deref().unwrap_or(""),
-            ));
+            version_data.pretty_version = Some(
+                Preg::replace(
+                    r"{(\.9{7})+}",
+                    ".x",
+                    version_data.version.as_deref().unwrap_or(""),
+                )
+                .unwrap_or_default(),
+            );
         }
 
         let feature_non_empty = version_data
@@ -157,11 +160,14 @@ impl VersionGuesser {
             )
             .unwrap_or(false)
         {
-            version_data.feature_pretty_version = Some(Preg::replace(
-                r"{(\.9{7})+}",
-                ".x",
-                version_data.feature_version.as_deref().unwrap_or(""),
-            ));
+            version_data.feature_pretty_version = Some(
+                Preg::replace(
+                    r"{(\.9{7})+}",
+                    ".x",
+                    version_data.feature_version.as_deref().unwrap_or(""),
+                )
+                .unwrap_or_default(),
+            );
         }
 
         version_data
@@ -228,7 +234,7 @@ impl VersionGuesser {
                             is_feature_branch = true;
                             is_detached = true;
                         } else {
-                            version = Some(self.version_parser.normalize_branch(&g1));
+                            version = Some(self.version_parser.normalize_branch(&g1)?);
                             pretty_version = Some(format!("dev-{}", g1));
                             is_feature_branch = self.is_feature_branch(package_config, Some(&g1));
                         }
@@ -300,7 +306,12 @@ impl VersionGuesser {
                         Box::new(PhpMixed::String("-n1".to_string())),
                         Box::new(PhpMixed::String("HEAD".to_string())),
                     ]),
-                    GitUtil::get_no_show_signature_flags(&self.process),
+                    PhpMixed::List(
+                        GitUtil::get_no_show_signature_flags(&self.process)
+                            .into_iter()
+                            .map(|s| Box::new(PhpMixed::String(s)))
+                            .collect(),
+                    ),
                 )
                 .as_list()
                 .map(|l| {
@@ -377,7 +388,7 @@ impl VersionGuesser {
             Some(path.to_string()),
         ) {
             let branch = trim(&output, None);
-            let version = self.version_parser.normalize_branch(&branch);
+            let version = self.version_parser.normalize_branch(&branch)?;
             let is_feature_branch = strpos(&version, "dev-") == Some(0);
 
             if VersionParser::DEFAULT_BRANCH_ALIAS == version {
@@ -401,20 +412,15 @@ impl VersionGuesser {
             }
 
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
-            let io = NullIO::new();
+            let _io = NullIO::new();
             let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
             repo_config.insert("url".to_string(), PhpMixed::String(path.to_string()));
-            let mut driver = HgDriver::new(
-                repo_config,
-                // TODO(phase-b): NullIO -> Box<dyn IOInterface>
-                Box::new(io),
-                self.config.clone(),
-                // TODO(phase-b): HttpDownloader::new signature
-                todo!("HttpDownloader::new(io, config)"),
-                std::rc::Rc::clone(&self.process),
+            // TODO(phase-b): HgDriver lacks a `new` constructor and HttpDownloader::new signature is unknown
+            let mut driver: HgDriver = todo!(
+                "HgDriver::new(repo_config, Box::new(io), self.config.clone(), HttpDownloader::new(io, config), Rc::clone(&self.process))"
             );
             let branches: Vec<String> =
-                array_map(|k: &String| k.clone(), &array_keys(driver.get_branches()));
+                array_map(|k: &String| k.clone(), &array_keys(&driver.get_branches()?));
 
             // try to find the best (nearest) version branch to assume this feature's version
             let mut result = self.guess_feature_version(
@@ -486,7 +492,8 @@ impl VersionGuesser {
         )
         .is_some();
         if !has_branch_alias || has_self_version {
-            let branch = Preg::replace(r"{^dev-}", "", version.as_deref().unwrap_or(""));
+            let branch =
+                Preg::replace(r"{^dev-}", "", version.as_deref().unwrap_or("")).unwrap_or_default();
             let mut length: i64 = PHP_INT_MAX;
 
             // return directly, if branch is configured to be non-feature branch
@@ -518,7 +525,8 @@ impl VersionGuesser {
             let result: Result<()> = (|| -> Result<()> {
                 let mut last_index: i64 = -1;
                 for (index, candidate) in branches.iter().enumerate() {
-                    let candidate_version = Preg::replace(r"{^remotes/\S+/}", "", candidate);
+                    let candidate_version =
+                        Preg::replace(r"{^remotes/\S+/}", "", candidate).unwrap_or_default();
 
                     // do not compare against itself or other feature branches
                     if candidate == &branch
@@ -537,23 +545,19 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let async_promise = self.process.borrow_mut().execute_async(&cmd_line, path);
-                    promises.push(async_promise.then(Box::new(
-                        move |process: Process| -> Result<()> {
-                            if !process.is_successful() {
-                                return Ok(());
-                            }
-
-                            let output = process.get_output();
-                            // overwrite existing if we have a shorter diff, or we have an equal diff and an index that comes later in the array (i.e. older version)
-                            // as newer versions typically have more commits, if the feature branch is based on a newer branch it should have a longer diff to the old version
-                            // but if it doesn't and they have equal diffs, then it probably is based on the old version
-                            // TODO(phase-b): closure captures need shared mutable state (last_index, length, version, pretty_version, promises)
-                            todo!(
-                                "mutate last_index/length/version/pretty_version and possibly cancel promises"
-                            );
-                        },
-                    )));
+                    let async_promise = self.process.borrow_mut().execute_async(&cmd_line, path)?;
+                    // TODO(phase-b): closure receives Process in PHP but PromiseInterface::then expects fn(Option<PhpMixed>) -> Option<PhpMixed>;
+                    // closure captures need shared mutable state (last_index, length, version, pretty_version, promises)
+                    promises.push(async_promise.then(
+                        Some(Box::new(
+                            move |_value: Option<PhpMixed>| -> Option<PhpMixed> {
+                                todo!(
+                                    "mutate last_index/length/version/pretty_version and possibly cancel promises"
+                                )
+                            },
+                        )),
+                        None,
+                    ));
                 }
 
                 self.process.borrow_mut().wait();
@@ -589,10 +593,13 @@ impl VersionGuesser {
             non_feature_branches = implode("|", &names);
         }
 
-        !Preg::is_match(&format!(
-            r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
-            non_feature_branches,
-        ), branch_name.unwrap_or("")).unwrap_or(false)
+        !Preg::is_match(
+            &format!(
+                r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
+                non_feature_branches,
+            ),
+            branch_name.unwrap_or(""),
+        )
         .unwrap_or(false)
     }
 
@@ -613,7 +620,7 @@ impl VersionGuesser {
             Some(path.to_string()),
         ) {
             let branch = trim(&output, None);
-            version = Some(self.version_parser.normalize_branch(&branch));
+            version = Some(self.version_parser.normalize_branch(&branch)?);
             pretty_version = Some(format!("dev-{}", branch));
         }
 
@@ -691,7 +698,9 @@ impl VersionGuesser {
                         || tags_path == *m2.as_ref().unwrap())
                 {
                     // we are in a branches path
-                    let version = self.version_parser.normalize_branch(m3.as_deref().unwrap());
+                    let version = self
+                        .version_parser
+                        .normalize_branch(m3.as_deref().unwrap())?;
                     let pretty_version = format!("dev-{}", m3.as_ref().unwrap());
 
                     return Ok(Some(VersionData {

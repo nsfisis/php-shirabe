@@ -89,4 +89,16 @@ impl Application {
     pub fn is_single_command(&self) -> bool {
         todo!()
     }
+
+    pub fn render_throwable(&self, _exception: &anyhow::Error, _output: &mut dyn OutputInterface) {
+        todo!()
+    }
+
+    pub fn set_catch_errors(&mut self, _catch_errors: bool) {
+        todo!()
+    }
+
+    pub fn has(&self, _name: &str) -> bool {
+        todo!()
+    }
 }

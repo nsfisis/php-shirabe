@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
@@ -25,7 +26,10 @@ pub struct RunScriptCommand {
 impl RunScriptCommand {
     pub fn new() -> Self {
         Self {
-            inner: BaseCommand::new(),
+            base_command_data: BaseCommandData {
+                composer: None,
+                io: None,
+            },
             script_events: vec![
                 ScriptEvents::PRE_INSTALL_CMD,
                 ScriptEvents::POST_INSTALL_CMD,
@@ -110,7 +114,7 @@ impl RunScriptCommand {
     }
 
     pub fn interact(
-        &self,
+        &mut self,
         input: &mut dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<()> {
@@ -141,13 +145,18 @@ impl RunScriptCommand {
         );
 
         if let Some(selected) = script.as_string() {
-            input.set_argument("script", selected);
+            // TODO(phase-b): input is &dyn InputInterface but set_argument needs &mut.
+            let _ = selected;
         }
 
         Ok(())
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         if input.get_option("list").as_bool().unwrap_or(false) {
             return self.list_scripts(output);
         }
@@ -217,10 +226,11 @@ impl RunScriptCommand {
 
         Ok(composer
             .get_event_dispatcher()
-            .dispatch_script(&script, dev_mode, args)?)
+            .borrow_mut()
+            .dispatch_script(&script, dev_mode, args, IndexMap::new())?)
     }
 
-    fn list_scripts(&self, output: &dyn OutputInterface) -> Result<i64> {
+    fn list_scripts(&mut self, output: &dyn OutputInterface) -> Result<i64> {
         let scripts = self.get_scripts()?;
         if scripts.is_empty() {
             return Ok(0);
@@ -228,9 +238,14 @@ impl RunScriptCommand {
 
         let io = self.get_io();
         io.write_error("<info>scripts:</info>");
-        let table: Vec<Vec<String>> = scripts
+        let table: Vec<PhpMixed> = scripts
             .iter()
-            .map(|(name, desc)| vec![format!("  {}", name), desc.clone()])
+            .map(|(name, desc)| {
+                PhpMixed::List(vec![
+                    Box::new(PhpMixed::String(format!("  {}", name))),
+                    Box::new(PhpMixed::String(desc.clone())),
+                ])
+            })
             .collect();
 
         self.render_table(table, output);
@@ -238,7 +253,7 @@ impl RunScriptCommand {
         Ok(0)
     }
 
-    fn get_scripts(&self) -> Result<Vec<(String, String)>> {
+    fn get_scripts(&mut self) -> Result<Vec<(String, String)>> {
         let scripts = self
             .require_composer(None, None)?
             .get_package()
@@ -249,11 +264,9 @@ impl RunScriptCommand {
 
         let mut result: Vec<(String, String)> = vec![];
         for (name, _script) in scripts {
-            let description = self
-                .get_application()
-                .find(&name)
-                .map(|cmd| cmd.get_description().unwrap_or("").to_string())
-                .unwrap_or_default();
+            // TODO(phase-b): Application::find returns PhpMixed; placeholder description.
+            let _ = self.get_application()?.find(&name);
+            let description = String::new();
             result.push((name, description));
         }
 

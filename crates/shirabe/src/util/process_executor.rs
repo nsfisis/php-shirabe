@@ -49,7 +49,6 @@ pub struct ProcessExecutor {
     allow_async: bool,
 }
 
-#[derive(Debug)]
 struct Job {
     id: i64,
     status: i64,
@@ -58,6 +57,18 @@ struct Job {
     process: Option<Process>,
     resolve: Option<Box<dyn Fn(PhpMixed) + Send + Sync>>,
     reject: Option<Box<dyn Fn(PhpMixed) + Send + Sync>>,
+}
+
+impl std::fmt::Debug for Job {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Job")
+            .field("id", &self.id)
+            .field("status", &self.status)
+            .field("command", &self.command)
+            .field("cwd", &self.cwd)
+            .field("process", &self.process)
+            .finish()
+    }
 }
 
 impl ProcessExecutor {
@@ -79,11 +90,11 @@ impl ProcessExecutor {
     const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
         &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
 
-    pub fn new(io: Option<Box<dyn IOInterface>>) -> Self {
+    pub fn new<I: IntoProcessExecutorIo>(io: I) -> Self {
         let mut this = Self {
             capture_output: false,
             error_output: String::new(),
-            io,
+            io: io.into_process_executor_io(),
             jobs: IndexMap::new(),
             running_jobs: 0,
             max_jobs: 10,
@@ -101,30 +112,42 @@ impl ProcessExecutor {
     ///                          if a callable is passed it will be used as output handler
     /// @param  null|string $cwd     the working directory
     /// @return int     statuscode
-    pub fn execute(
-        &mut self,
-        command: PhpMixed,
-        output: Option<&mut PhpMixed>,
-        cwd: Option<&str>,
-    ) -> Result<i64> {
+    pub fn execute<'o, C, O, W>(&mut self, command: C, output: O, cwd: W) -> Result<i64>
+    where
+        C: IntoExecCommand,
+        O: IntoExecOutput<'o>,
+        W: IntoExecCwd,
+    {
+        let command = command.into_exec_command();
+        let mut output = output.into_exec_output();
+        let cwd_storage;
+        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
+            Some(s) => {
+                cwd_storage = s;
+                Some(cwd_storage.as_str())
+            }
+            None => None,
+        };
         // PHP: func_num_args() > 1
-        let has_output_arg = output.is_some();
-        if has_output_arg {
-            return self.do_execute(command, cwd, false, output);
-        }
-
-        self.do_execute(command, cwd, false, None)
+        let has_output_arg = output.has_output();
+        let rc = if has_output_arg {
+            let mut buf = PhpMixed::Null;
+            let result = self.do_execute(command, cwd_ref, false, Some(&mut buf))?;
+            output.write_back(buf);
+            result
+        } else {
+            self.do_execute(command, cwd_ref, false, None)?
+        };
+        Ok(rc)
     }
 
     /// Convenience wrapper used by phase-A code that calls
     /// `process.execute(&[String], &mut String, Option<&str>) == 0`.
     /// Forwards to `execute`, returning the status code (0 on Err for compatibility).
-    pub fn execute_args<C: AsRef<str>>(
-        &mut self,
-        command: &[String],
-        output: &mut String,
-        cwd: Option<C>,
-    ) -> i64 {
+    pub fn execute_args<W>(&mut self, command: &[String], output: &mut String, cwd: W) -> i64
+    where
+        W: IntoExecCwd,
+    {
         let cmd = PhpMixed::List(
             command
                 .iter()
@@ -132,19 +155,39 @@ impl ProcessExecutor {
                 .collect(),
         );
         let mut buf = PhpMixed::String(String::new());
-        let cwd_str: Option<&str> = cwd.as_ref().map(|s| s.as_ref());
-        let rc = self.execute(cmd, Some(&mut buf), cwd_str).unwrap_or(1);
+        let cwd_storage;
+        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
+            Some(s) => {
+                cwd_storage = s;
+                Some(cwd_storage.as_str())
+            }
+            None => None,
+        };
+        let rc = self.execute(cmd, Some(&mut buf), cwd_ref).unwrap_or(1);
         *output = buf.as_string().unwrap_or("").to_string();
         rc
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty(&mut self, command: PhpMixed, cwd: Option<&str>) -> Result<i64> {
+    pub fn execute_tty<C, W>(&mut self, command: C, cwd: W) -> Result<i64>
+    where
+        C: IntoExecCommand,
+        W: IntoExecCwd,
+    {
+        let command = command.into_exec_command();
+        let cwd_storage;
+        let cwd_ref: Option<&str> = match cwd.into_exec_cwd() {
+            Some(s) => {
+                cwd_storage = s;
+                Some(cwd_storage.as_str())
+            }
+            None => None,
+        };
         if Platform::is_tty(None) {
-            return self.do_execute(command, cwd, true, None);
+            return self.do_execute(command, cwd_ref, true, None);
         }
 
-        self.do_execute(command, cwd, false, None)
+        self.do_execute(command, cwd_ref, false, None)
     }
 
     /// @param  string|non-empty-list<string> $command
@@ -171,7 +214,7 @@ impl ProcessExecutor {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(
                         &command_str,
-                        &Self::escape(PhpMixed::String(Self::get_executable(&m1))),
+                        &Self::escape(&Self::get_executable(&m1)),
                         0,
                         strlen(&m1) as usize,
                     );
@@ -183,7 +226,7 @@ impl ProcessExecutor {
                 cwd,
                 env.clone(),
                 None,
-                Self::get_timeout(),
+                Some(Self::get_timeout() as f64),
             );
         } else if let PhpMixed::List(ref list) = command {
             let mut cmd_vec: Vec<String> = list
@@ -195,7 +238,13 @@ impl ProcessExecutor {
                 cmd_vec[0] = Self::get_executable(&cmd_vec[0]);
             }
 
-            process = Process::new(cmd_vec, cwd, env, None, Self::get_timeout());
+            process = Process::new(
+                cmd_vec,
+                cwd.map(String::from),
+                env,
+                None,
+                Some(Self::get_timeout() as f64),
+            );
         } else {
             return Err(LogicException {
                 message: "Invalid command type".to_string(),
@@ -214,7 +263,8 @@ impl ProcessExecutor {
             }
         }
 
-        let _callback: Box<dyn Fn(&str, &str)> = if is_callable(output.as_deref().cloned()) {
+        let output_is_callable = output.as_deref().map(|o| is_callable(o)).unwrap_or(false);
+        let _callback: Box<dyn Fn(&str, &str)> = if output_is_callable {
             // TODO(phase-b): adapt output PhpMixed callable to closure
             Box::new(|_t: &str, _b: &str| {})
         } else {
@@ -226,9 +276,9 @@ impl ProcessExecutor {
         let io_for_signal = self.io.as_ref().map(|b| &**b as *const dyn IOInterface);
         let signal_handler = SignalHandler::create(
             vec![
-                SignalHandler::SIGINT,
-                SignalHandler::SIGTERM,
-                SignalHandler::SIGHUP,
+                SignalHandler::SIGINT.to_string(),
+                SignalHandler::SIGTERM.to_string(),
+                SignalHandler::SIGHUP.to_string(),
             ],
             Box::new(move |signal: String, _h: &SignalHandler| {
                 if let Some(io_ptr) = io_for_signal {
@@ -242,9 +292,11 @@ impl ProcessExecutor {
         );
 
         let result: Result<()> = (|| -> Result<()> {
-            process.run(/* callback */ Box::new(|_t: &str, _b: &str| {}))?;
+            let _ = process.run(/* callback */ Some(Box::new(|_t: &str, _b: &str| {})));
 
-            if self.capture_output && !is_callable(output.as_deref().cloned()) {
+            let output_is_callable_inner =
+                output.as_deref().map(|o| is_callable(o)).unwrap_or(false);
+            if self.capture_output && !output_is_callable_inner {
                 if let Some(out) = output.as_mut() {
                     **out = PhpMixed::String(process.get_output());
                 }
@@ -323,11 +375,13 @@ impl ProcessExecutor {
     }
 
     /// starts a process on the commandline in async mode
-    pub fn execute_async(
-        &mut self,
-        command: PhpMixed,
-        cwd: Option<&str>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    pub fn execute_async<C, W>(&mut self, command: C, cwd: W) -> Result<Box<dyn PromiseInterface>>
+    where
+        C: IntoExecCommand,
+        W: IntoExecCwd,
+    {
+        let command = command.into_exec_command();
+        let cwd_opt = cwd.into_exec_cwd();
         if !self.allow_async {
             return Err(LogicException {
                 message: "You must use the ProcessExecutor instance which is part of a Composer\\Loop instance to be able to run async processes".to_string(),
@@ -342,14 +396,15 @@ impl ProcessExecutor {
             id,
             status: Self::STATUS_QUEUED,
             command,
-            cwd: cwd.map(String::from),
+            cwd: cwd_opt,
             process: None,
             resolve: None,
             reject: None,
         };
 
         // TODO(phase-b): build resolver/canceler closures bound to &mut self.jobs
-        let resolver: Box<dyn Fn(_, _)> = Box::new(|_resolve, _reject| {});
+        let resolver: Box<dyn Fn(Option<PhpMixed>, Option<PhpMixed>)> =
+            Box::new(|_resolve, _reject| {});
         let canceler: Box<dyn Fn()> = Box::new(|| {
             if defined("SIGINT") {
                 // job.process.signal(SIGINT)
@@ -358,7 +413,7 @@ impl ProcessExecutor {
         });
         let _ = (resolver, canceler);
 
-        let promise = Promise::new(Box::new(|_resolve, _reject| {}), Box::new(|| {}));
+        let promise = Promise::new(Box::new(|_resolve, _reject| {}));
         // TODO(phase-b): wire promise.then() side-effects: mark job done & update status
         let promise: Box<dyn PromiseInterface> = Box::new(promise);
 
@@ -421,17 +476,17 @@ impl ProcessExecutor {
                     cwd.as_deref(),
                     None,
                     None,
-                    Self::get_timeout(),
+                    Some(Self::get_timeout() as f64),
                 ))
             } else if let PhpMixed::List(ref list) = command {
                 Ok(Process::new(
                     list.iter()
                         .map(|v| v.as_string().unwrap_or("").to_string())
                         .collect(),
-                    cwd.as_deref(),
+                    cwd.clone(),
                     None,
                     None,
-                    Self::get_timeout(),
+                    Some(Self::get_timeout() as f64),
                 ))
             } else {
                 Err(LogicException {
@@ -441,7 +496,7 @@ impl ProcessExecutor {
                 .into())
             }
         })();
-        let mut process = match process_result {
+        let process = match process_result {
             Ok(p) => p,
             Err(_e) => {
                 // job.reject(e) — TODO(phase-b)
@@ -450,12 +505,14 @@ impl ProcessExecutor {
         };
 
         if let Some(job) = self.jobs.get_mut(&id) {
-            job.process = Some(process.clone());
+            job.process = Some(process);
         }
 
-        if let Err(_e) = process.start() {
-            // job.reject(e) — TODO(phase-b)
-            return;
+        // PHP: $process->start($callback); — we operate on the stored job.process directly
+        if let Some(job) = self.jobs.get_mut(&id) {
+            if let Some(p) = job.process.as_mut() {
+                p.start(None);
+            }
         }
     }
 
@@ -465,7 +522,11 @@ impl ProcessExecutor {
 
     pub fn reset_max_jobs(&mut self) {
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_PROCESSES");
-        if is_numeric(&max_jobs_env) {
+        let max_jobs_env_mixed = match &max_jobs_env {
+            Some(s) => PhpMixed::String(s.clone()),
+            None => PhpMixed::Null,
+        };
+        if is_numeric(&max_jobs_env_mixed) {
             self.max_jobs = max(
                 1,
                 min(
@@ -568,13 +629,13 @@ impl ProcessExecutor {
     }
 
     /// @return string[]
-    pub fn split_lines(&self, output: Option<&str>) -> Vec<String> {
-        let output = trim(output.unwrap_or(""), None);
+    pub fn split_lines(&self, output: &str) -> Vec<String> {
+        let output = trim(output, None);
 
         if output.is_empty() {
             vec![]
         } else {
-            Preg::split(r"{\r?\n}", &output)
+            Preg::split(r"{\r?\n}", &output).unwrap_or_default()
         }
     }
 
@@ -589,12 +650,12 @@ impl ProcessExecutor {
     }
 
     /// @param  int  $timeout the timeout in seconds
-    pub fn set_timeout(timeout: i64) {
-        *TIMEOUT.lock().unwrap() = timeout;
+    pub fn set_timeout<T: ToTimeoutSeconds>(timeout: T) {
+        *TIMEOUT.lock().unwrap() = timeout.to_timeout_seconds();
     }
 
     /// Escapes a string to be used as a shell argument.
-    pub fn escape(argument: PhpMixed) -> String {
+    pub fn escape(argument: &str) -> String {
         Self::escape_argument(argument)
     }
 
@@ -608,7 +669,7 @@ impl ProcessExecutor {
             command.as_string().unwrap_or("").to_string()
         } else if let PhpMixed::List(list) = command {
             let parts: Vec<String> = array_map(
-                |v| Self::escape(v.clone()),
+                |v| Self::escape(v.as_string().unwrap_or("")),
                 &list.iter().map(|b| (**b).clone()).collect::<Vec<_>>(),
             );
             implode(" ", &parts)
@@ -617,11 +678,12 @@ impl ProcessExecutor {
         };
         let safe_command = Preg::replace_callback(
             r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i",
-            |m: &IndexMap<String, String>| -> String {
+            |m: &IndexMap<CaptureKey, String>| -> String {
+                let user_key = CaptureKey::ByName("user".to_string());
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 if Preg::is_match(
                     GitHub::GITHUB_TOKEN_REGEX,
-                    m.get("user").cloned().unwrap_or_default().as_str(),
+                    m.get(&user_key).cloned().unwrap_or_default().as_str(),
                 )
                 .unwrap_or(false)
                 {
@@ -629,22 +691,24 @@ impl ProcessExecutor {
                 }
                 if Preg::is_match(
                     r"{^[a-f0-9]{12,}$}",
-                    m.get("user").cloned().unwrap_or_default().as_str(),
+                    m.get(&user_key).cloned().unwrap_or_default().as_str(),
                 )
                 .unwrap_or(false)
                 {
                     return "://***:***@".to_string();
                 }
 
-                format!("://{}:***@", m.get("user").cloned().unwrap_or_default())
+                format!("://{}:***@", m.get(&user_key).cloned().unwrap_or_default())
             },
             &command_string,
-        );
+        )
+        .unwrap_or_default();
         let safe_command = Preg::replace(
             r"{--password (.*[^\\]') }",
             "--password '***' ",
             &safe_command,
-        );
+        )
+        .unwrap_or_default();
         self.io.as_ref().unwrap().write_error(&format!(
             "Executing{} command ({}): {}",
             if r#async { " async" } else { "" },
@@ -654,8 +718,8 @@ impl ProcessExecutor {
     }
 
     /// Escapes a string to be used as a shell argument for Symfony Process.
-    fn escape_argument(argument: PhpMixed) -> String {
-        let mut argument = argument.as_string().unwrap_or("").to_string();
+    fn escape_argument(argument: &str) -> String {
+        let mut argument = argument.to_string();
         if "" == argument {
             return escapeshellarg(&argument);
         }
@@ -690,10 +754,10 @@ impl ProcessExecutor {
 
         // In addition to whitespace, commas need quoting to preserve paths
         let mut quote = strpbrk(&argument, " \t,").is_some();
-        let mut dquotes: i64 = 0;
+        let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument =
-            Preg::replace_with_count(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes);
+        argument = Preg::replace5(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes)
+            .unwrap_or_default();
         let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument).unwrap_or(false);
 
         if !meta && !quote {
@@ -701,12 +765,15 @@ impl ProcessExecutor {
         }
 
         if quote {
-            argument = format!("\"{}\"", Preg::replace(r"/(\\*)$/", "$1$1", &argument));
+            argument = format!(
+                "\"{}\"",
+                Preg::replace(r"/(\\*)$/", "$1$1", &argument).unwrap_or_default()
+            );
         }
 
         if meta {
-            argument = Preg::replace(r#"/(["^&|<>()%])/"#, "^$1", &argument);
-            argument = Preg::replace(r"/(!)/", "^^$1", &argument);
+            argument = Preg::replace(r#"/(["^&|<>()%])/"#, "^$1", &argument).unwrap_or_default();
+            argument = Preg::replace(r"/(!)/", "^^$1", &argument).unwrap_or_default();
         }
 
         argument
@@ -761,7 +828,7 @@ impl ProcessExecutor {
 
         let mut executables = EXECUTABLES.lock().unwrap();
         if !executables.contains_key(name) {
-            let path = ExecutableFinder::new().find(name, Some(name));
+            let path = ExecutableFinder::new().find(name, Some(name), &[]);
             if let Some(p) = path {
                 executables.insert(name.to_string(), p);
             }
@@ -791,9 +858,266 @@ impl Clone for ProcessExecutor {
     }
 }
 
+/// Phase B helper trait: convert various command argument forms into `PhpMixed`.
+pub trait IntoExecCommand {
+    fn into_exec_command(self) -> PhpMixed;
+}
+
+impl IntoExecCommand for PhpMixed {
+    fn into_exec_command(self) -> PhpMixed {
+        self
+    }
+}
+
+impl IntoExecCommand for &PhpMixed {
+    fn into_exec_command(self) -> PhpMixed {
+        self.clone()
+    }
+}
+
+impl IntoExecCommand for &str {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::String(self.to_string())
+    }
+}
+
+impl IntoExecCommand for String {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::String(self)
+    }
+}
+
+impl IntoExecCommand for &String {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::String(self.clone())
+    }
+}
+
+impl IntoExecCommand for Vec<String> {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::List(
+            self.into_iter()
+                .map(|s| Box::new(PhpMixed::String(s)))
+                .collect(),
+        )
+    }
+}
+
+impl IntoExecCommand for &Vec<String> {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::List(
+            self.iter()
+                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .collect(),
+        )
+    }
+}
+
+impl<const N: usize> IntoExecCommand for &[&str; N] {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::List(
+            self.iter()
+                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .collect(),
+        )
+    }
+}
+
+impl IntoExecCommand for &[&str] {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::List(
+            self.iter()
+                .map(|s| Box::new(PhpMixed::String(s.to_string())))
+                .collect(),
+        )
+    }
+}
+
+impl IntoExecCommand for &[String] {
+    fn into_exec_command(self) -> PhpMixed {
+        PhpMixed::List(
+            self.iter()
+                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .collect(),
+        )
+    }
+}
+
+/// Phase B helper trait: write captured output back to the caller's buffer.
+pub trait IntoExecOutput<'a> {
+    type Sink: ExecOutputSink + 'a;
+    fn into_exec_output(self) -> Self::Sink;
+}
+
+pub trait ExecOutputSink {
+    fn has_output(&self) -> bool;
+    fn write_back(&mut self, value: PhpMixed);
+}
+
+pub struct NoOutput;
+impl ExecOutputSink for NoOutput {
+    fn has_output(&self) -> bool {
+        false
+    }
+    fn write_back(&mut self, _value: PhpMixed) {}
+}
+
+pub struct PhpMixedOutput<'a>(Option<&'a mut PhpMixed>);
+impl<'a> ExecOutputSink for PhpMixedOutput<'a> {
+    fn has_output(&self) -> bool {
+        self.0.is_some()
+    }
+    fn write_back(&mut self, value: PhpMixed) {
+        if let Some(out) = self.0.as_deref_mut() {
+            *out = value;
+        }
+    }
+}
+
+pub struct StringOutput<'a>(&'a mut String);
+impl<'a> ExecOutputSink for StringOutput<'a> {
+    fn has_output(&self) -> bool {
+        true
+    }
+    fn write_back(&mut self, value: PhpMixed) {
+        *self.0 = value.as_string().unwrap_or("").to_string();
+    }
+}
+
+impl<'a> IntoExecOutput<'a> for () {
+    type Sink = NoOutput;
+    fn into_exec_output(self) -> NoOutput {
+        NoOutput
+    }
+}
+
+impl<'a> IntoExecOutput<'a> for Option<&'a mut PhpMixed> {
+    type Sink = PhpMixedOutput<'a>;
+    fn into_exec_output(self) -> PhpMixedOutput<'a> {
+        PhpMixedOutput(self)
+    }
+}
+
+impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
+    type Sink = PhpMixedOutput<'a>;
+    fn into_exec_output(self) -> PhpMixedOutput<'a> {
+        PhpMixedOutput(Some(self))
+    }
+}
+
+impl<'a> IntoExecOutput<'a> for &'a mut String {
+    type Sink = StringOutput<'a>;
+    fn into_exec_output(self) -> StringOutput<'a> {
+        StringOutput(self)
+    }
+}
+
+/// Phase B helper trait: convert various cwd argument forms into `Option<String>`.
+pub trait IntoExecCwd {
+    fn into_exec_cwd(self) -> Option<String>;
+}
+
+impl IntoExecCwd for () {
+    fn into_exec_cwd(self) -> Option<String> {
+        None
+    }
+}
+
+impl IntoExecCwd for Option<&str> {
+    fn into_exec_cwd(self) -> Option<String> {
+        self.map(|s| s.to_string())
+    }
+}
+
+impl IntoExecCwd for Option<String> {
+    fn into_exec_cwd(self) -> Option<String> {
+        self
+    }
+}
+
+impl IntoExecCwd for Option<&String> {
+    fn into_exec_cwd(self) -> Option<String> {
+        self.cloned()
+    }
+}
+
+impl IntoExecCwd for &str {
+    fn into_exec_cwd(self) -> Option<String> {
+        Some(self.to_string())
+    }
+}
+
+impl IntoExecCwd for String {
+    fn into_exec_cwd(self) -> Option<String> {
+        Some(self)
+    }
+}
+
+impl IntoExecCwd for &String {
+    fn into_exec_cwd(self) -> Option<String> {
+        Some(self.clone())
+    }
+}
+
+/// Phase B helper: accept either `i64` or `PhpMixed` for `set_timeout`.
+pub trait ToTimeoutSeconds {
+    fn to_timeout_seconds(self) -> i64;
+}
+
+impl ToTimeoutSeconds for i64 {
+    fn to_timeout_seconds(self) -> i64 {
+        self
+    }
+}
+
+impl ToTimeoutSeconds for PhpMixed {
+    fn to_timeout_seconds(self) -> i64 {
+        self.as_int().unwrap_or(0)
+    }
+}
+
+/// Phase B helper: accept various IO forms for `ProcessExecutor::new`.
+/// Note: clones the IO via `clone_box` for borrow forms; this is incidental
+/// to Phase B — PHP class semantics should use Rc, but that requires broader
+/// refactor. TODO(phase-b): switch to shared ownership when call sites are
+/// stabilized.
+pub trait IntoProcessExecutorIo {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>>;
+}
+
+impl IntoProcessExecutorIo for Option<Box<dyn IOInterface>> {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
+        self
+    }
+}
+
+impl IntoProcessExecutorIo for Box<dyn IOInterface> {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
+        Some(self)
+    }
+}
+
+impl IntoProcessExecutorIo for () {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
+        None
+    }
+}
+
+impl IntoProcessExecutorIo for &dyn IOInterface {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
+        Some(self.clone_box())
+    }
+}
+
+impl IntoProcessExecutorIo for &mut dyn IOInterface {
+    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
+        Some(self.clone_box())
+    }
+}
+
 // Suppress unused-import warnings.
 #[allow(dead_code)]
 const _USE_PARITY: () = {
-    let _ = call_user_func;
+    let _ = call_user_func::<PhpMixed>;
     let _ = sprintf;
 };

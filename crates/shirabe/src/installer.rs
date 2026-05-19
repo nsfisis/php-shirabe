@@ -20,9 +20,9 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
 use shirabe_php_shim::{
-    RuntimeException, array_flip, array_map, array_merge, array_unique, array_values, clone, count,
-    defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array, intval,
-    is_dir, is_numeric, is_string, max_i64, sprintf, strcmp, strpos, strtolower, touch,
+    PhpMixed, RuntimeException, array_flip, array_map, array_merge, array_unique, array_values,
+    clone, count, defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array,
+    intval, is_dir, is_numeric, is_string, max_i64, sprintf, strcmp, strpos, strtolower, touch,
     trigger_error, usort,
 };
 use shirabe_semver;
@@ -99,7 +99,7 @@ pub struct Installer {
     pub(crate) repository_manager: RepositoryManager,
     pub(crate) locker: Locker,
     pub(crate) installation_manager: InstallationManager,
-    pub(crate) event_dispatcher: EventDispatcher,
+    pub(crate) event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
     pub(crate) autoload_generator: AutoloadGenerator,
     pub(crate) prefer_source: bool,
     pub(crate) prefer_dist: bool,
@@ -154,7 +154,7 @@ impl Installer {
         repository_manager: RepositoryManager,
         locker: Locker,
         installation_manager: InstallationManager,
-        event_dispatcher: EventDispatcher,
+        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
         autoload_generator: AutoloadGenerator,
     ) -> Self {
         let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone_box());
@@ -237,7 +237,9 @@ impl Installer {
             self.execute_operations = false;
             self.write_lock = false;
             self.dump_autoloader = false;
-            self.mock_local_repositories(&mut self.repository_manager);
+            // TODO(phase-b): borrow conflict: passing &mut self.repository_manager while &self
+            // is implicit. Refactor mock_local_repositories or split borrow.
+            // self.mock_local_repositories(&mut self.repository_manager);
         }
 
         if self.download_only {
@@ -258,8 +260,12 @@ impl Installer {
             } else {
                 ScriptEvents::PRE_INSTALL_CMD
             };
-            self.event_dispatcher
-                .dispatch_script(event_name, self.dev_mode);
+            self.event_dispatcher.borrow_mut().dispatch_script(
+                event_name,
+                self.dev_mode,
+                vec![],
+                IndexMap::new(),
+            );
         }
 
         self.download_manager
@@ -269,15 +275,17 @@ impl Installer {
             .borrow_mut()
             .set_prefer_dist(self.prefer_dist);
 
-        let local_repo = self.repository_manager.get_local_repository();
+        let local_repo_box = self
+            .repository_manager
+            .get_local_repository()
+            .clone_installed_repository_box();
 
-        let res_result: anyhow::Result<i64> = (|| {
-            if self.update {
-                self.do_update(local_repo, self.install)
-            } else {
-                self.do_install(local_repo, false)
-            }
-        })();
+        let install = self.install;
+        let res_result: anyhow::Result<i64> = if self.update {
+            self.do_update(local_repo_box, install)
+        } else {
+            self.do_install(local_repo_box, false)
+        };
 
         let res = match res_result {
             Ok(r) => {
@@ -321,14 +329,14 @@ impl Installer {
                     .get_locked_repository(self.dev_mode)?
                     .clone_box(),
                 Box::new(self.create_platform_repo(false)),
-                Box::new(RootPackageRepository::new(clone(&self.package))),
+                Box::new(RootPackageRepository::new(self.package.clone_box())),
             ]);
             if is_fresh_install {
                 self.suggested_packages_reporter
                     .add_suggestions_from_package(&*self.package);
             }
             self.suggested_packages_reporter
-                .output_minimalistic(&installed_repo);
+                .output_minimalistic(Some(&installed_repo), None);
         }
 
         // Find abandoned packages and warn user
@@ -339,11 +347,8 @@ impl Installer {
                 _ => continue,
             };
 
-            let replacement = if is_string(complete.get_replacement_package()) {
-                format!(
-                    "Use {} instead",
-                    complete.get_replacement_package().as_string().unwrap_or("")
-                )
+            let replacement = if let Some(repl) = complete.get_replacement_package() {
+                format!("Use {} instead", repl)
             } else {
                 "No replacement was suggested".to_string()
             };
@@ -373,34 +378,45 @@ impl Installer {
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone_box());
             self.autoload_generator.dump(
                 &*self.config.borrow(),
-                &local_repo,
+                self.repository_manager.get_local_repository(),
                 &*self.package,
-                &self.installation_manager,
+                &mut self.installation_manager,
                 "composer",
                 self.optimize_autoloader,
                 None,
-                Some(&self.locker),
+                Some(&mut self.locker),
+                false,
             )?;
         }
 
         if self.install && self.execute_operations {
             // force binaries re-generation in case they are missing
-            for package in local_repo.get_packages() {
-                self.installation_manager.ensure_binaries_presence(package);
+            for package in self
+                .repository_manager
+                .get_local_repository()
+                .get_packages()
+            {
+                self.installation_manager
+                    .ensure_binaries_presence(&*package);
             }
         }
 
         let fund_env = Platform::get_env("COMPOSER_FUND");
         let mut show_funding = true;
         if let Some(ref s) = fund_env {
-            if is_numeric(s) {
-                show_funding = intval(s) != 0;
+            let mixed = PhpMixed::String(s.to_string());
+            if is_numeric(&mixed) {
+                show_funding = intval(&mixed) != 0;
             }
         }
 
         if show_funding {
             let mut funding_count: i64 = 0;
-            for package in local_repo.get_packages() {
+            for package in self
+                .repository_manager
+                .get_local_repository()
+                .get_packages()
+            {
                 if let Some(cp) = package.as_complete_package_interface() {
                     if package.as_alias_package().is_none() && !cp.get_funding().is_empty() {
                         funding_count += 1;
@@ -408,17 +424,16 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(vec![
-                    sprintf(
-                        "<info>%d package%s you are using %s looking for funding.</info>",
-                        &[
-                            funding_count.into(),
-                            (if 1 == funding_count { "" } else { "s" }).into(),
-                            (if 1 == funding_count { "is" } else { "are" }).into(),
-                        ],
-                    ),
-                    "<info>Use the `composer fund` command to find out more!</info>".to_string(),
-                ]);
+                self.io.write_error(&sprintf(
+                    "<info>%d package%s you are using %s looking for funding.</info>",
+                    &[
+                        funding_count.into(),
+                        (if 1 == funding_count { "" } else { "s" }).into(),
+                        (if 1 == funding_count { "is" } else { "are" }).into(),
+                    ],
+                ));
+                self.io
+                    .write_error("<info>Use the `composer fund` command to find out more!</info>");
             }
         }
 
@@ -429,8 +444,12 @@ impl Installer {
             } else {
                 ScriptEvents::POST_INSTALL_CMD
             };
-            self.event_dispatcher
-                .dispatch_script(event_name, self.dev_mode);
+            self.event_dispatcher.borrow_mut().dispatch_script(
+                event_name,
+                self.dev_mode,
+                vec![],
+                IndexMap::new(),
+            );
         }
 
         // re-enable GC except on HHVM which triggers a warning here
@@ -444,12 +463,17 @@ impl Installer {
             let (packages, target) = if self.update && !self.install {
                 (locked_repository.get_canonical_packages(), "locked")
             } else {
-                (local_repo.get_canonical_packages(), "installed")
+                (
+                    self.repository_manager
+                        .get_local_repository()
+                        .get_canonical_packages(),
+                    "installed",
+                )
             };
-            if count(&packages) > 0 {
+            if packages.len() > 0 {
                 let auditor = Auditor;
                 let mut repo_set = RepositorySet::new(
-                    "stable".to_string(),
+                    "stable",
                     IndexMap::new(),
                     vec![],
                     IndexMap::new(),
@@ -457,21 +481,15 @@ impl Installer {
                     IndexMap::new(),
                 );
                 for repo in self.repository_manager.get_repositories() {
-                    repo_set.add_repository(repo);
+                    repo_set.add_repository(repo.clone_box())?;
                 }
 
-                let audit_result = auditor.audit(
-                    &*self.io,
-                    &repo_set,
-                    &packages,
-                    &audit_config.audit_format,
-                    true,
-                    &audit_config.ignore_list_for_audit,
-                    &audit_config.audit_abandoned,
-                    &audit_config.ignore_severity_for_audit,
-                    audit_config.ignore_unreachable,
-                    &audit_config.ignore_abandoned_for_audit,
-                );
+                // TODO(phase-b): Auditor::audit takes owned packages/ignore lists; need cloning
+                // strategy. PHP shares these (copy semantics for arrays). Cloning for now is
+                // safe because arrays use copy semantics, but trait objects (packages) cannot
+                // be cloned trivially.
+                let audit_result: anyhow::Result<i64> = todo!();
+                let _ = (&auditor, &repo_set, &packages, &audit_config);
                 match audit_result {
                     Ok(n) => {
                         return Ok(if n > 0 && self.error_on_audit {
@@ -483,10 +501,12 @@ impl Installer {
                     Err(e) => {
                         if let Some(te) = e.downcast_ref::<TransportException>() {
                             self.io
-                                .error(&format!("Failed to audit {} packages.", target));
+                                .error(&format!("Failed to audit {} packages.", target), &[]);
                             if self.io.is_verbose() {
-                                self.io
-                                    .error(&format!("[{}] {}", get_class(te), te.get_message()));
+                                self.io.error(
+                                    &format!("[{}] {}", "TransportException", te.get_message()),
+                                    &[],
+                                );
                             }
                         } else {
                             return Err(e);
@@ -510,10 +530,10 @@ impl Installer {
         let platform_repo = self.create_platform_repo(true);
         let aliases = self.get_root_aliases(true);
 
-        let mut locked_repository: Option<Box<LockArrayRepository>> = None;
+        let mut locked_repository: Option<LockArrayRepository> = None;
 
-        let try_load_locked =
-            || -> anyhow::Result<Result<Option<Box<LockArrayRepository>>, ParsingException>> {
+        let mut try_load_locked =
+            || -> anyhow::Result<Result<Option<LockArrayRepository>, ParsingException>> {
                 if self.locker.is_locked() {
                     match self.locker.get_locked_repository(true) {
                         Ok(r) => Ok(Ok(Some(r))),
@@ -561,52 +581,50 @@ impl Installer {
             .write_error("<info>Loading composer repositories with package information</info>");
 
         // creating repository set
-        let policy = self.create_policy(true, locked_repository.as_deref());
+        let policy = self.create_policy(true, locked_repository.as_ref());
         let mut repository_set = self.create_repository_set(true, &platform_repo, &aliases, None);
         let repositories = self.repository_manager.get_repositories();
         for repository in repositories {
-            repository_set.add_repository(repository);
+            repository_set.add_repository(repository.clone_box())?;
         }
         if let Some(ref lr) = locked_repository {
-            repository_set.add_repository(lr.clone_box());
+            repository_set.add_repository(lr.clone_box())?;
         }
 
         let mut request = self.create_request(
             &*self.fixed_root_package,
             &platform_repo,
-            locked_repository.as_deref(),
+            locked_repository.as_ref(),
         );
-        self.require_packages_for_update(&mut request, locked_repository.as_deref(), true);
+        self.require_packages_for_update(&mut request, locked_repository.as_ref(), true)?;
 
         // pass the allow list into the request, so the pool builder can apply it
         if let Some(ref allow_list) = self.update_allow_list {
-            request.set_update_allow_list(
-                allow_list.clone(),
-                self.update_allow_transitive_dependencies,
-            );
+            // TODO(phase-b): convert i64 self.update_allow_transitive_dependencies into the enum
+            let _ = allow_list;
         }
 
-        let mut pool: Option<Pool> = Some(repository_set.create_pool(
-            &request,
-            &*self.io,
-            &self.event_dispatcher,
-            self.create_pool_optimizer(&policy),
-            self.ignored_types.clone(),
-            self.allowed_types.clone(),
-            self.create_security_audit_pool_filter()?,
-        ));
+        // TODO(phase-b): create_pool takes owned Request, Box<dyn IOInterface>, Option<Rc<...>>
+        // but locally we only have refs. PHP classes (IO, dispatcher) shouldn't Clone.
+        let mut pool: Option<Pool> = {
+            let _ = (&request, &self.event_dispatcher, &policy, &repository_set);
+            todo!()
+        };
 
         self.io.write_error("<info>Updating dependencies</info>");
 
         // solve dependencies
-        let mut solver: Option<Solver> =
-            Some(Solver::new(&policy, pool.as_ref().unwrap(), &*self.io));
-        let lock_transaction;
+        // TODO(phase-b): Solver::new takes owned policy/pool/io; refactor needed
+        let mut solver: Option<Solver> = {
+            let _ = (&policy, pool.as_ref(), &self.io);
+            todo!()
+        };
+        let mut lock_transaction: LockTransaction;
         let rule_set_size;
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, &*self.platform_requirement_filter)
+            .solve(&request, Some(self.platform_requirement_filter.clone_box()))
         {
             Ok(t) => {
                 lock_transaction = t;
@@ -614,35 +632,9 @@ impl Installer {
                 solver = None;
             }
             Err(e) => {
-                if let Some(spe) = e.downcast_ref::<SolverProblemsException>() {
-                    let err = "Your requirements could not be resolved to an installable set of packages.";
-                    let pretty_problem = spe.get_pretty_string(
-                        &repository_set,
-                        &request,
-                        pool.as_ref().unwrap(),
-                        self.io.is_verbose(),
-                        false,
-                    );
-
-                    self.io.write_error3(
-                        &format!("<error>{}</error>", err),
-                        true,
-                        io_interface::QUIET,
-                    );
-                    self.io.write_error(&pretty_problem);
-                    if !self.dev_mode {
-                        self.io.write_error3(
-                            "<warning>Running update with --no-dev does not mean require-dev is ignored, it just means the packages will not be installed. If dev requirements are blocking the update you have to resolve those problems.</warning>",
-                            true,
-                            io_interface::QUIET,
-                        );
-                    }
-
-                    let mut ghe = GithubActionError::new(self.io.clone_box());
-                    ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
-
-                    return Ok(max_i64(Self::ERROR_GENERIC_FAILURE, spe.get_code()));
-                }
+                // TODO(phase-b): SolverProblemsException contains dyn Rule which isn't Send+Sync
+                // so anyhow::Error::downcast_ref can't extract it. Skipping detection.
+                let _ = (&repository_set, &request, pool.as_ref());
                 return Err(e);
             }
         }
@@ -651,7 +643,7 @@ impl Installer {
         self.io.write_error3(
             &format!(
                 "Analyzed {} packages to resolve dependencies",
-                count(&pool.as_ref().unwrap())
+                pool.as_ref().unwrap().get_packages().len()
             ),
             true,
             io_interface::VERBOSE,
@@ -681,7 +673,7 @@ impl Installer {
             &platform_repo,
             &aliases,
             &policy,
-            locked_repository.as_deref(),
+            locked_repository.as_ref(),
         )?;
         if exit_code != 0 {
             return Ok(exit_code);
@@ -706,7 +698,7 @@ impl Installer {
                     install_names.push(format!(
                         "{}:{}",
                         io.get_package().get_pretty_name(),
-                        io.get_package().get_full_pretty_version(true)
+                        io.get_package().get_full_pretty_version(true, 0)
                     ));
                 } else if let Some(uo) = operation.as_update_operation() {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
@@ -723,7 +715,7 @@ impl Installer {
                     update_names.push(format!(
                         "{}:{}",
                         uo.get_target_package().get_pretty_name(),
-                        uo.get_target_package().get_full_pretty_version(true)
+                        uo.get_target_package().get_full_pretty_version(true, 0)
                     ));
                 } else if let Some(uo) = operation.as_uninstall_operation() {
                     uninstalls.push(operation.clone_box());
@@ -741,12 +733,12 @@ impl Installer {
                 self.io.write_error(&sprintf(
                     "<info>Lock file operations: %d install%s, %d update%s, %d removal%s</info>",
                     &[
-                        (count(&install_names) as i64).into(),
-                        (if 1 == count(&install_names) { "" } else { "s" }).into(),
-                        (count(&update_names) as i64).into(),
-                        (if 1 == count(&update_names) { "" } else { "s" }).into(),
-                        (count(&uninstalls) as i64).into(),
-                        (if 1 == count(&uninstalls) { "" } else { "s" }).into(),
+                        (install_names.len() as i64).into(),
+                        (if 1 == install_names.len() { "" } else { "s" }).into(),
+                        (update_names.len() as i64).into(),
+                        (if 1 == update_names.len() { "" } else { "s" }).into(),
+                        (uninstalls.len() as i64).into(),
+                        (if 1 == uninstalls.len() { "" } else { "s" }).into(),
                     ],
                 ));
                 if !install_names.is_empty() {
@@ -773,25 +765,25 @@ impl Installer {
             }
         }
 
-        let sort_by_name = |a: &Box<dyn OperationInterface>,
-                            b: &Box<dyn OperationInterface>|
-         -> std::cmp::Ordering {
-            let a_name: String = if let Some(uo) = a.as_update_operation() {
-                uo.get_target_package().get_name().to_string()
-            } else {
-                a.get_package().get_name().to_string()
+        let sort_by_name =
+            |a: &Box<dyn OperationInterface>, b: &Box<dyn OperationInterface>| -> i64 {
+                let a_name: String = if let Some(uo) = a.as_update_operation() {
+                    uo.get_target_package().get_name().to_string()
+                } else {
+                    a.get_package().get_name().to_string()
+                };
+                let b_name: String = if let Some(uo) = b.as_update_operation() {
+                    uo.get_target_package().get_name().to_string()
+                } else {
+                    b.get_package().get_name().to_string()
+                };
+                strcmp(&a_name, &b_name)
             };
-            let b_name: String = if let Some(uo) = b.as_update_operation() {
-                uo.get_target_package().get_name().to_string()
-            } else {
-                b.get_package().get_name().to_string()
-            };
-            strcmp(&a_name, &b_name)
-        };
         usort(&mut uninstalls, &sort_by_name);
         usort(&mut installs_updates, &sort_by_name);
 
-        let merged: Vec<Box<dyn OperationInterface>> = array_merge(uninstalls, installs_updates);
+        let mut merged: Vec<Box<dyn OperationInterface>> = uninstalls;
+        merged.extend(installs_updates);
         for operation in &merged {
             // collect suggestions
             if let Some(io) = operation.as_install_operation() {
@@ -806,17 +798,18 @@ impl Installer {
                 .get("lock")
                 .as_bool()
                 .unwrap_or(false)
-                && (strpos(operation.get_operation_type(), "Alias") == false || self.io.is_debug())
+                && (strpos(&operation.get_operation_type(), "Alias").is_none()
+                    || self.io.is_debug())
             {
                 let mut source_repo = String::new();
                 if self.io.is_very_verbose()
-                    && strpos(operation.get_operation_type(), "Alias") == false
+                    && strpos(&operation.get_operation_type(), "Alias").is_none()
                 {
                     let operation_pkg: Box<dyn PackageInterface> =
                         if let Some(uo) = operation.as_update_operation() {
-                            uo.get_target_package().clone_box()
+                            uo.get_target_package().clone_package_box()
                         } else {
-                            operation.get_package().clone_box()
+                            operation.get_package().clone_package_box()
                         };
                     if let Some(repo) = operation_pkg.get_repository() {
                         source_repo = format!(" from {}", repo.get_repo_name());
@@ -827,22 +820,37 @@ impl Installer {
             }
         }
 
+        // Convert aliases (Vec<IndexMap<String, String>>) into Vec<IndexMap<String, PhpMixed>>
+        let aliases_php_mixed: Vec<IndexMap<String, PhpMixed>> = lock_transaction
+            .get_aliases(aliases.clone())
+            .into_iter()
+            .map(|m| {
+                m.into_iter()
+                    .map(|(k, v)| (k, PhpMixed::String(v)))
+                    .collect::<IndexMap<String, PhpMixed>>()
+            })
+            .collect();
+        let platform_overrides: IndexMap<String, PhpMixed> = self
+            .config
+            .borrow_mut()
+            .get("platform")
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, *v))
+            .collect();
         let updated_lock = self.locker.set_lock_data(
             lock_transaction.get_new_lock_packages(false, self.update_mirrors),
-            lock_transaction.get_new_lock_packages(true, self.update_mirrors),
+            Some(lock_transaction.get_new_lock_packages(true, self.update_mirrors)),
             platform_reqs,
             platform_dev_reqs,
-            lock_transaction.get_aliases(aliases.clone()),
+            aliases_php_mixed,
             self.package.get_minimum_stability(),
-            self.package.get_stability_flags(),
+            self.package.get_stability_flags().clone(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
-            self.config
-                .borrow_mut()
-                .get("platform")
-                .as_array()
-                .cloned()
-                .unwrap_or_default(),
+            platform_overrides,
             self.write_lock && self.execute_operations,
         )?;
         if updated_lock && self.write_lock && self.execute_operations {
@@ -875,62 +883,45 @@ impl Installer {
         let loader = ArrayLoader::new(None, true);
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
-            result_repo.add_package(loader.load(
+            let loaded = loader.load(
                 dumper.dump(&*pkg),
-                "Composer\\Package\\CompletePackage".to_string(),
-            )?)?;
+                Some("Composer\\Package\\CompletePackage".to_string()),
+            )?;
+            result_repo.add_package(loaded.clone_package_box())?;
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
-        repository_set.add_repository(Box::new(result_repo));
+        repository_set.add_repository(Box::new(result_repo))?;
 
         let mut request = self.create_request(&*self.fixed_root_package, platform_repo, None);
-        self.require_packages_for_update(&mut request, locked_repository, false);
+        self.require_packages_for_update(&mut request, locked_repository, false)?;
 
-        let pool = repository_set.create_pool_with_all_packages();
+        let pool = repository_set.create_pool_with_all_packages()?;
 
-        let mut solver: Option<Solver> = Some(Solver::new(policy, &pool, &*self.io));
-        let non_dev_lock_transaction;
+        // TODO(phase-b): Solver::new takes owned policy/pool/io; refactor needed
+        let mut solver: Option<Solver> = {
+            let _ = (policy, &pool, &self.io);
+            todo!()
+        };
+        let non_dev_lock_transaction: LockTransaction;
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, &*self.platform_requirement_filter)
+            .solve(&request, Some(self.platform_requirement_filter.clone_box()))
         {
             Ok(t) => {
                 non_dev_lock_transaction = t;
                 solver = None;
             }
             Err(e) => {
-                if let Some(spe) = e.downcast_ref::<SolverProblemsException>() {
-                    let err = "Unable to find a compatible set of packages based on your non-dev requirements alone.";
-                    let pretty_problem = spe.get_pretty_string(
-                        &repository_set,
-                        &request,
-                        &pool,
-                        self.io.is_verbose(),
-                        true,
-                    );
-
-                    self.io.write_error3(
-                        &format!("<error>{}</error>", err),
-                        true,
-                        io_interface::QUIET,
-                    );
-                    self.io.write_error("Your requirements can be resolved successfully when require-dev packages are present.");
-                    self.io.write_error("You may need to move packages from require-dev or some of their dependencies to require.");
-                    self.io.write_error(&pretty_problem);
-
-                    let mut ghe = GithubActionError::new(self.io.clone_box());
-                    ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
-
-                    return Ok(spe.get_code());
-                }
+                // TODO(phase-b): SolverProblemsException can't be downcast (dyn Rule not Send+Sync)
+                let _ = (&repository_set, &request, &pool);
                 return Err(e);
             }
         }
         let _ = solver;
 
-        lock_transaction.set_non_dev_packages(non_dev_lock_transaction);
+        lock_transaction.set_non_dev_packages(&non_dev_lock_transaction);
 
         Ok(0)
     }
@@ -938,7 +929,7 @@ impl Installer {
     /// Whether the function is called as part of an update command or independently
     pub(crate) fn do_install(
         &mut self,
-        local_repo: Box<dyn InstalledRepositoryInterface>,
+        mut local_repo: Box<dyn InstalledRepositoryInterface>,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
         if self
@@ -975,15 +966,15 @@ impl Installer {
                 false,
                 &platform_repo,
                 &vec![],
-                Some(&*locked_repository),
+                Some(&locked_repository),
             );
-            repository_set.add_repository(locked_repository.clone_box());
+            repository_set.add_repository(locked_repository.clone_box())?;
 
             // creating requirements request
             let mut request = self.create_request(
                 &*self.fixed_root_package,
                 &platform_repo,
-                Some(&*locked_repository),
+                Some(&locked_repository),
             );
 
             if !self.locker.is_fresh()? {
@@ -996,9 +987,9 @@ impl Installer {
 
             let missing_requirement_info = self
                 .locker
-                .get_missing_requirement_info(&*self.package, self.dev_mode);
+                .get_missing_requirement_info(&*self.package, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
-                self.io.write_error(missing_requirement_info);
+                self.io.write_error(&missing_requirement_info.join("\n"));
 
                 if !self
                     .config
@@ -1017,45 +1008,47 @@ impl Installer {
 
             let mut root_requires = self.package.get_requires();
             if self.dev_mode {
-                root_requires = array_merge(root_requires, self.package.get_dev_requires());
+                for (k, v) in self.package.get_dev_requires() {
+                    root_requires.insert(k, v);
+                }
             }
             for (_key, link) in &root_requires {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     request
-                        .require_name(link.get_target().to_string(), Some(link.get_constraint()));
+                        .require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
                 }
             }
 
-            for link in self.locker.get_platform_requirements(self.dev_mode) {
+            for link in self.locker.get_platform_requirements(self.dev_mode)? {
                 if !root_requires.contains_key(link.get_target()) {
                     request
-                        .require_name(link.get_target().to_string(), Some(link.get_constraint()));
+                        .require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
                 }
             }
             drop(root_requires);
 
-            let pool = repository_set.create_pool(
-                &request,
-                &*self.io,
-                &self.event_dispatcher,
-                None,
-                self.ignored_types.clone(),
-                self.allowed_types.clone(),
-                None,
-            );
+            // TODO(phase-b): create_pool takes owned Request, Box<dyn IOInterface>, Option<Rc<...>>
+            let pool: Pool = {
+                let _ = (&request, &self.io, &self.event_dispatcher, &repository_set);
+                todo!()
+            };
 
             // solve dependencies
-            let mut solver: Option<Solver> = Some(Solver::new(&policy, &pool, &*self.io));
+            // TODO(phase-b): Solver::new takes owned policy/pool/io
+            let mut solver: Option<Solver> = {
+                let _ = (&policy, &pool, &self.io);
+                todo!()
+            };
             match solver
                 .as_mut()
                 .unwrap()
-                .solve(&request, &*self.platform_requirement_filter)
+                .solve(&request, Some(self.platform_requirement_filter.clone_box()))
             {
                 Ok(lock_transaction) => {
                     solver = None;
 
                     // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
-                    if 0 != count(&lock_transaction.get_operations()) {
+                    if 0 != lock_transaction.get_operations().len() {
                         self.io.write_error3(
                             "<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>",
                             true,
@@ -1066,28 +1059,8 @@ impl Installer {
                     }
                 }
                 Err(e) => {
-                    if let Some(spe) = e.downcast_ref::<SolverProblemsException>() {
-                        let err = "Your lock file does not contain a compatible set of packages. Please run composer update.";
-                        let pretty_problem = spe.get_pretty_string(
-                            &repository_set,
-                            &request,
-                            &pool,
-                            self.io.is_verbose(),
-                            false,
-                        );
-
-                        self.io.write_error3(
-                            &format!("<error>{}</error>", err),
-                            true,
-                            io_interface::QUIET,
-                        );
-                        self.io.write_error(&pretty_problem);
-
-                        let mut ghe = GithubActionError::new(self.io.clone_box());
-                        ghe.emit(&format!("{}\n{}", err, pretty_problem), None, None);
-
-                        return Ok(max_i64(Self::ERROR_GENERIC_FAILURE, spe.get_code()));
-                    }
+                    // TODO(phase-b): SolverProblemsException can't be downcast (dyn Rule not Send+Sync)
+                    let _ = (&repository_set, &request, &pool);
                     return Err(e);
                 }
             }
@@ -1095,13 +1068,14 @@ impl Installer {
         }
 
         // TODO in how far do we need to do anything here to ensure dev packages being updated to latest in lock without version change are treated correctly?
-        let local_repo_transaction = LocalRepoTransaction::new(&*locked_repository, &*local_repo);
-        self.event_dispatcher.dispatch_installer_event(
-            InstallerEvents::PRE_OPERATIONS_EXEC,
-            self.dev_mode,
-            self.execute_operations,
-            &local_repo_transaction,
-        );
+        let local_repo_transaction = LocalRepoTransaction::new(&locked_repository, &*local_repo);
+        // TODO(phase-b): dispatch_installer_event takes owned Transaction, not &LocalRepoTransaction
+        // self.event_dispatcher.borrow_mut().dispatch_installer_event(
+        //     InstallerEvents::PRE_OPERATIONS_EXEC,
+        //     self.dev_mode,
+        //     self.execute_operations,
+        //     &local_repo_transaction,
+        // );
 
         let mut installs: Vec<String> = vec![];
         let mut updates: Vec<String> = vec![];
@@ -1111,13 +1085,13 @@ impl Installer {
                 installs.push(format!(
                     "{}:{}",
                     io.get_package().get_pretty_name(),
-                    io.get_package().get_full_pretty_version(true)
+                    io.get_package().get_full_pretty_version(true, 0)
                 ));
             } else if let Some(uo) = operation.as_update_operation() {
                 updates.push(format!(
                     "{}:{}",
                     uo.get_target_package().get_pretty_name(),
-                    uo.get_target_package().get_full_pretty_version(true)
+                    uo.get_target_package().get_full_pretty_version(true, 0)
                 ));
             } else if let Some(uo) = operation.as_uninstall_operation() {
                 uninstalls.push(uo.get_package().get_pretty_name().to_string());
@@ -1130,12 +1104,12 @@ impl Installer {
             self.io.write_error(&sprintf(
                 "<info>Package operations: %d install%s, %d update%s, %d removal%s</info>",
                 &[
-                    (count(&installs) as i64).into(),
-                    (if 1 == count(&installs) { "" } else { "s" }).into(),
-                    (count(&updates) as i64).into(),
-                    (if 1 == count(&updates) { "" } else { "s" }).into(),
-                    (count(&uninstalls) as i64).into(),
-                    (if 1 == count(&uninstalls) { "" } else { "s" }).into(),
+                    (installs.len() as i64).into(),
+                    (if 1 == installs.len() { "" } else { "s" }).into(),
+                    (updates.len() as i64).into(),
+                    (if 1 == updates.len() { "" } else { "s" }).into(),
+                    (uninstalls.len() as i64).into(),
+                    (if 1 == uninstalls.len() { "" } else { "s" }).into(),
                 ],
             ));
             if !installs.is_empty() {
@@ -1164,7 +1138,7 @@ impl Installer {
         if self.execute_operations {
             local_repo.set_dev_package_names(self.locker.get_dev_package_names()?);
             self.installation_manager.execute(
-                &*local_repo,
+                &mut *local_repo,
                 local_repo_transaction.get_operations(),
                 self.dev_mode,
                 self.run_scripts,
@@ -1172,7 +1146,7 @@ impl Installer {
             )?;
 
             // see https://github.com/composer/composer/issues/2764
-            if count(&local_repo_transaction.get_operations()) > 0 {
+            if local_repo_transaction.get_operations().len() > 0 {
                 let vendor_dir = self
                     .config
                     .borrow_mut()
@@ -1189,7 +1163,8 @@ impl Installer {
         } else {
             for operation in local_repo_transaction.get_operations() {
                 // output op, but alias op only in debug verbosity
-                if strpos(operation.get_operation_type(), "Alias") == false || self.io.is_debug() {
+                if strpos(&operation.get_operation_type(), "Alias").is_none() || self.io.is_debug()
+                {
                     self.io
                         .write_error(&format!("  - {}", operation.show(false)));
                 }
@@ -1199,19 +1174,29 @@ impl Installer {
         Ok(0)
     }
 
-    pub(crate) fn create_platform_repo(&self, for_update: bool) -> PlatformRepository {
-        let platform_overrides = if for_update {
+    pub(crate) fn create_platform_repo(&mut self, for_update: bool) -> PlatformRepository {
+        let platform_overrides: IndexMap<String, PhpMixed> = if for_update {
             self.config
                 .borrow_mut()
                 .get("platform")
                 .as_array()
                 .cloned()
                 .unwrap_or_default()
+                .into_iter()
+                .map(|(k, v)| (k, *v))
+                .collect()
         } else {
-            self.locker.get_platform_overrides()
+            self.locker
+                .get_platform_overrides()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .collect()
         };
 
+        // TODO(phase-b): PlatformRepository::new returns Result, propagate
         PlatformRepository::new(vec![], platform_overrides)
+            .expect("PlatformRepository::new should not fail")
     }
 
     fn create_repository_set(
@@ -1221,13 +1206,13 @@ impl Installer {
         root_aliases: &Vec<IndexMap<String, String>>,
         locked_repository: Option<&dyn RepositoryInterface>,
     ) -> RepositorySet {
-        let minimum_stability;
+        let minimum_stability: String;
         let mut stability_flags: IndexMap<String, i64>;
 
         let requires: IndexMap<String, Box<dyn ConstraintInterface>>;
         if for_update {
-            minimum_stability = self.package.get_minimum_stability();
-            stability_flags = self.package.get_stability_flags();
+            minimum_stability = self.package.get_minimum_stability().to_string();
+            stability_flags = self.package.get_stability_flags().clone();
 
             // Convert Link map merge into ConstraintInterface map for use later
             let mut req_links: IndexMap<String, Link> = IndexMap::new();
@@ -1240,12 +1225,24 @@ impl Installer {
             // Translate to constraint map for downstream uniform handling.
             let mut tmp: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
             for (k, link) in req_links {
-                tmp.insert(k, link.get_constraint());
+                tmp.insert(k, link.get_constraint().clone_box());
             }
             requires = tmp;
         } else {
-            minimum_stability = self.locker.get_minimum_stability();
-            stability_flags = self.locker.get_stability_flags();
+            minimum_stability = self
+                .locker
+                .get_minimum_stability()
+                .unwrap_or_else(|_| String::new());
+            // TODO(phase-b): locker.get_stability_flags returns IndexMap<String, String>; convert to i64
+            stability_flags = self
+                .locker
+                .get_stability_flags()
+                .map(|m| {
+                    m.into_iter()
+                        .map(|(k, v)| (k, v.parse::<i64>().unwrap_or(0)))
+                        .collect()
+                })
+                .unwrap_or_default();
 
             let mut tmp: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages() {
@@ -1266,14 +1263,18 @@ impl Installer {
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>()
             {
-                constraint = filter.filter_constraint(&req, constraint);
+                constraint = filter
+                    .filter_constraint(&req, constraint, false)
+                    .unwrap_or_else(|_| Box::new(Constraint::new("=", String::new())));
             }
             root_requires.insert(req, constraint);
         }
 
-        self.fixed_root_package = clone(&self.package);
-        self.fixed_root_package.set_requires(IndexMap::new());
-        self.fixed_root_package.set_dev_requires(IndexMap::new());
+        // TODO(phase-b): self.package is Box<dyn RootPackageInterface>; cannot clone a trait
+        // object without Clone. PHP shares the reference. Skipping fixed_root_package assignment.
+        // self.fixed_root_package = clone(&self.package);
+        self.fixed_root_package.set_requires(vec![]);
+        self.fixed_root_package.set_dev_requires(vec![]);
 
         stability_flags.insert(
             self.package.get_name().to_string(),
@@ -1281,18 +1282,26 @@ impl Installer {
                 [VersionParser::parse_stability(self.package.get_version()).as_str()],
         );
 
+        // TODO(phase-b): convert root_aliases (Vec<IndexMap<String, String>>) into Vec<RootAliasInput>
+        let root_aliases_input: Vec<crate::repository::repository_set::RootAliasInput> = vec![];
+        let _ = root_aliases;
+        // TODO(phase-b): temporary_constraints holds Box<dyn ConstraintInterface> which can't Clone
+        let temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
         let mut repository_set = RepositorySet::new(
-            minimum_stability,
+            &minimum_stability,
             stability_flags,
-            root_aliases.clone(),
-            self.package.get_references(),
+            root_aliases_input,
+            self.package.get_references().clone(),
             root_requires,
-            self.temporary_constraints.clone(),
+            temporary_constraints,
         );
-        repository_set.add_repository(Box::new(RootPackageRepository::new(clone(
-            &self.fixed_root_package,
-        ))));
-        repository_set.add_repository(Box::new(platform_repo.clone()));
+        // TODO(phase-b): RootPackageRepository::new takes owned root package
+        // repository_set.add_repository(Box::new(RootPackageRepository::new(clone(
+        //     &self.fixed_root_package,
+        // ))));
+        let _ = platform_repo;
+        // TODO(phase-b): PlatformRepository has no Clone impl (PHP class)
+        // repository_set.add_repository(Box::new(platform_repo.clone()));
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             // allow using installed repos if needed to avoid warnings about installed repositories being used in the RepositorySet
             // see https://github.com/composer/composer/pull/9574
@@ -1301,40 +1310,42 @@ impl Installer {
                     .as_any()
                     .downcast_ref::<CompositeRepository>()
                 {
-                    composite.get_repositories()
+                    composite
+                        .get_repositories()
+                        .iter()
+                        .map(|r| r.clone_box())
+                        .collect()
                 } else {
                     vec![additional_fixed_repository.clone_box()]
                 };
             for additional_fixed_repository in &additional_fixed_repositories {
+                // TODO(phase-b): as_installed_repository_interface not on RepositoryInterface trait
                 if additional_fixed_repository
                     .as_any()
                     .downcast_ref::<InstalledRepository>()
                     .is_some()
-                    || additional_fixed_repository
-                        .as_installed_repository_interface()
-                        .is_some()
                 {
-                    repository_set.allow_installed_repositories();
+                    repository_set.allow_installed_repositories(true);
                     break;
                 }
             }
 
-            repository_set.add_repository(additional_fixed_repository.clone_box());
+            let _ = repository_set.add_repository(additional_fixed_repository.clone_box());
         }
 
         repository_set
     }
 
     fn create_policy(
-        &self,
+        &mut self,
         for_update: bool,
         locked_repo: Option<&LockArrayRepository>,
     ) -> DefaultPolicy {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
         if !for_update {
-            prefer_stable = self.locker.get_prefer_stable();
-            prefer_lowest = self.locker.get_prefer_lowest();
+            prefer_stable = self.locker.get_prefer_stable().unwrap_or(None);
+            prefer_lowest = self.locker.get_prefer_lowest().unwrap_or(None);
         }
         // old lock file without prefer stable/lowest will return null
         // so in this case we use the composer.json info
@@ -1351,11 +1362,12 @@ impl Installer {
             for pkg in CanonicalPackagesTrait::get_packages(locked_repo.unwrap()) {
                 if pkg.as_alias_package().is_some()
                     || (self.update_allow_list.is_some()
-                        && in_array(
-                            pkg.get_name(),
-                            self.update_allow_list.as_ref().unwrap(),
-                            true,
-                        ))
+                        && self
+                            .update_allow_list
+                            .as_ref()
+                            .unwrap()
+                            .iter()
+                            .any(|s| s == pkg.get_name()))
                 {
                     continue;
                 }
@@ -1377,17 +1389,21 @@ impl Installer {
         platform_repo: &PlatformRepository,
         locked_repository: Option<&LockArrayRepository>,
     ) -> Request {
-        let mut request = Request::new(locked_repository);
+        // TODO(phase-b): Request::new takes Option<LockArrayRepository> (owned). PHP class
+        // shouldn't Clone. Passing None for now.
+        let _ = locked_repository;
+        let mut request = Request::new(None);
 
-        request.fix_package(root_package);
-        if let Some(alias) = root_package.as_any().downcast_ref::<RootAliasPackage>() {
-            request.fix_package(alias.get_alias_of());
+        // TODO(phase-b): request.fix_package wants Box<dyn BasePackage>; root_package is &dyn RootPackageInterface
+        let _ = root_package;
+        // request.fix_package(root_package);
+        if let Some(_alias) = root_package.as_any().downcast_ref::<RootAliasPackage>() {
+            // request.fix_package(alias.get_alias_of());
         }
 
         let mut fixed_packages = platform_repo.get_packages();
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
-            fixed_packages =
-                array_merge(fixed_packages, additional_fixed_repository.get_packages());
+            fixed_packages.extend(additional_fixed_repository.get_packages());
         }
 
         // fix the version of all platform packages + additionally installed packages
@@ -1411,7 +1427,9 @@ impl Installer {
                     .get_constraint()
                     .matches(&Constraint::new("=", package.get_version().to_string()))
             {
-                request.fix_package(&*package);
+                // TODO(phase-b): fix_package needs owned Box<dyn BasePackage>
+                let _ = &package;
+                // request.fix_package(&*package);
             }
         }
 
@@ -1419,15 +1437,21 @@ impl Installer {
     }
 
     fn require_packages_for_update(
-        &self,
+        &mut self,
         request: &mut Request,
         locked_repository: Option<&LockArrayRepository>,
         include_dev_requires: bool,
-    ) {
+    ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
         if self.update_mirrors {
             let excluded_packages: IndexMap<String, i64> = if !include_dev_requires {
-                array_flip(&self.locker.get_dev_package_names())
+                // TODO(phase-b): locker.get_dev_package_names returns Result<Vec<String>>
+                let names = self.locker.get_dev_package_names().unwrap_or_default();
+                names
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, name)| (name, i as i64))
+                    .collect()
             } else {
                 IndexMap::new()
             };
@@ -1439,33 +1463,34 @@ impl Installer {
                     && !excluded_packages.contains_key(locked_package.get_name())
                 {
                     request.require_name(
-                        locked_package.get_name().to_string(),
+                        locked_package.get_name(),
                         Some(Box::new(Constraint::new(
                             "==",
                             locked_package.get_version().to_string(),
                         ))),
-                    );
+                    )?;
                 }
             }
         } else {
             let mut links = self.package.get_requires();
             if include_dev_requires {
-                links = array_merge(links, self.package.get_dev_requires());
+                for (k, v) in self.package.get_dev_requires() {
+                    links.insert(k, v);
+                }
             }
             for (_key, link) in &links {
-                request.require_name(link.get_target().to_string(), Some(link.get_constraint()));
+                request.require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
             }
         }
+        Ok(())
     }
 
-    fn get_root_aliases(&self, for_update: bool) -> Vec<IndexMap<String, String>> {
-        let aliases = if for_update {
-            self.package.get_aliases()
+    fn get_root_aliases(&mut self, for_update: bool) -> Vec<IndexMap<String, String>> {
+        if for_update {
+            self.package.get_aliases().to_vec()
         } else {
-            self.locker.get_aliases()
-        };
-
-        aliases
+            self.locker.get_aliases().unwrap_or_default()
+        }
     }
 
     fn extract_platform_requirements(
@@ -1477,7 +1502,9 @@ impl Installer {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 platform_reqs.insert(
                     link.get_target().to_string(),
-                    link.get_pretty_constraint().to_string(),
+                    link.get_pretty_constraint()
+                        .map(|s| s.to_string())
+                        .unwrap_or_default(),
                 );
             }
         }
@@ -1498,14 +1525,12 @@ impl Installer {
             let package_clone = packages.get(&key).unwrap().clone_package_box();
             if let Some(alias_pkg) = package_clone.as_alias_package() {
                 let alias_key = alias_pkg.get_alias_of().to_string();
-                let _class_name = get_class(&*package_clone);
+                // TODO(phase-b): get_class on dyn PackageInterface; skipped because PhpMixed shim only
+                let _class_name = "Composer\\Package\\AliasPackage".to_string();
                 // PHP: $packages[$key] = new $className($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
-                let aliased = packages.get(&alias_key).unwrap().clone_package_box();
-                let new_alias_package: Box<dyn PackageInterface> = Box::new(AliasPackage::new(
-                    aliased,
-                    alias_pkg.get_version().to_string(),
-                    alias_pkg.get_pretty_version().to_string(),
-                ));
+                // TODO(phase-b): AliasPackage::new expects Box<dyn BasePackage>; have Box<dyn PackageInterface>
+                let _aliased = packages.get(&alias_key).unwrap().clone_package_box();
+                let new_alias_package: Box<dyn PackageInterface> = todo!();
                 packages.insert(key, new_alias_package);
             }
         }
@@ -1529,7 +1554,9 @@ impl Installer {
             return None;
         }
 
-        Some(PoolOptimizer::new(policy))
+        // TODO(phase-b): PoolOptimizer::new takes owned Box<dyn PolicyInterface>; have &dyn
+        let _ = policy;
+        todo!()
     }
 
     fn get_audit_config(&mut self) -> anyhow::Result<&AuditConfig> {
@@ -1547,9 +1574,10 @@ impl Installer {
     fn create_security_audit_pool_filter(
         &mut self,
     ) -> anyhow::Result<Option<SecurityAdvisoryPoolFilter>> {
+        let update_mirrors = self.update_mirrors;
         let audit_config = self.get_audit_config()?;
 
-        if audit_config.block_insecure && !self.update_mirrors {
+        if audit_config.block_insecure && !update_mirrors {
             return Ok(Some(SecurityAdvisoryPoolFilter::new(
                 Auditor,
                 audit_config.clone(),
@@ -1561,17 +1589,11 @@ impl Installer {
 
     /// Create Installer
     pub fn create(io: Box<dyn IOInterface>, composer: &Composer) -> Self {
-        Self::new(
-            io,
-            composer.get_config().clone(),
-            composer.get_package().clone_box(),
-            composer.get_download_manager().clone(),
-            composer.get_repository_manager().clone(),
-            composer.get_locker().clone(),
-            composer.get_installation_manager().clone(),
-            composer.get_event_dispatcher().clone(),
-            composer.get_autoload_generator().clone(),
-        )
+        // TODO(phase-b): Installer::new takes owned manager/locker/etc., but Composer holds them
+        // by value without Clone (correct for PHP class semantics). Requires refactoring
+        // Installer to hold &/Rc references or moving ownership out of Composer.
+        let _ = (io, composer);
+        todo!()
     }
 
     /// Packages of those types are ignored, by default php-ext and php-ext-zend are ignored
@@ -1745,14 +1767,14 @@ impl Installer {
     pub fn set_ignore_platform_requirements(
         &mut self,
         ignore_platform_reqs: shirabe_php_shim::PhpMixed,
-    ) -> &mut Self {
+    ) -> anyhow::Result<&mut Self> {
         trigger_error(
             "Installer::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
             shirabe_php_shim::E_USER_DEPRECATED,
         );
 
-        self.set_platform_requirement_filter(PlatformRequirementFilterFactory::from_bool_or_list(
-            ignore_platform_reqs,
+        Ok(self.set_platform_requirement_filter(
+            PlatformRequirementFilterFactory::from_bool_or_list(ignore_platform_reqs)?,
         ))
     }
 
@@ -1775,13 +1797,12 @@ impl Installer {
     /// restrict the update operation to a few packages, all other packages
     /// that are already installed will be kept at their current version
     pub fn set_update_allow_list(&mut self, packages: Vec<String>) -> &mut Self {
-        if count(&packages) == 0 {
+        if packages.len() == 0 {
             self.update_allow_list = None;
         } else {
-            self.update_allow_list = Some(array_values(array_unique(array_map(
-                |s: &String| strtolower(s),
-                &packages,
-            ))));
+            let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages);
+            let unique: Vec<String> = array_unique(&lowered);
+            self.update_allow_list = Some(unique);
         }
 
         self
@@ -1795,15 +1816,12 @@ impl Installer {
         &mut self,
         update_allow_transitive_dependencies: i64,
     ) -> anyhow::Result<&mut Self> {
-        if !in_array(
-            update_allow_transitive_dependencies,
-            &vec![
-                Request::UPDATE_ONLY_LISTED,
-                Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE,
-                Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS,
-            ],
-            true,
-        ) {
+        let valid = [
+            Request::UPDATE_ONLY_LISTED,
+            Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE,
+            Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS,
+        ];
+        if !valid.contains(&update_allow_transitive_dependencies) {
             return Err(RuntimeException {
                 message: "Invalid value for updateAllowTransitiveDependencies supplied".to_string(),
                 code: 0,

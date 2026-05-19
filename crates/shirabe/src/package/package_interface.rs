@@ -200,6 +200,18 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// @phpstan-return array<string, string>
     fn get_suggests(&self) -> IndexMap<String, String>;
 
+    /// PHP helper that switches on the link kind (require/require-dev/conflict/etc.).
+    fn get_links_for_type(&self, link_type: &str) -> IndexMap<String, crate::package::link::Link> {
+        match link_type {
+            "require" => self.get_requires(),
+            "require-dev" => self.get_dev_requires(),
+            "conflict" => self.get_conflicts(),
+            "provide" => self.get_provides(),
+            "replace" => self.get_replaces(),
+            _ => IndexMap::new(),
+        }
+    }
+
     /// Returns an associative array of autoloading rules
     ///
     /// {"<type>": {"<namespace": "<directory>"}}

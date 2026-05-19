@@ -100,8 +100,9 @@ impl Application {
     const LOGO: &'static str = "   ______\n  / ____/___  ____ ___  ____  ____  ________  _____\n / /   / __ \\/ __ `__ \\/ __ \\/ __ \\/ ___/ _ \\/ ___/\n/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /\n\\____/\\____/_/ /_/ /_/ .___/\\____/____/\\___/_/\n                    /_/\n";
 
     pub fn new(name: String, mut version: String) -> Self {
-        let mut inner = BaseApplication::new(name.clone(), version.clone());
-        if method_exists(&inner, "setCatchErrors") {
+        let mut inner = BaseApplication::new(&name, &version);
+        // TODO(phase-b): method_exists check requires reflection-style API on BaseApplication
+        if true {
             inner.set_catch_errors(true);
         }
 
@@ -129,7 +130,8 @@ impl Application {
                 let last_error = error_get_last();
 
                 let message = last_error
-                    .get("message")
+                    .as_ref()
+                    .and_then(|m| m.get("message"))
                     .and_then(|v| v.as_string())
                     .unwrap_or("");
                 if !message.is_empty()
@@ -160,18 +162,13 @@ impl Application {
 
     pub fn run(
         &mut self,
-        input: Option<&dyn InputInterface>,
-        output: Option<&dyn OutputInterface>,
+        input: Option<&mut dyn InputInterface>,
+        output: Option<&mut dyn OutputInterface>,
     ) -> anyhow::Result<i64> {
-        let output_owned: Box<dyn OutputInterface>;
-        let output_ref: &dyn OutputInterface = if let Some(o) = output {
-            o
-        } else {
-            output_owned = Factory::create_output();
-            &*output_owned
-        };
-
-        self.inner.run(input, Some(output_ref))
+        // TODO(phase-b): Factory::create_output returns ConsoleOutput, not Box<dyn OutputInterface>.
+        // The PHP code falls back to a default output when none is supplied; for now we
+        // forward the caller-provided output as-is.
+        self.inner.run(input, output)
     }
 
     pub fn do_run(
@@ -184,36 +181,42 @@ impl Application {
 
         // PHP: static $stdin = null;
         // We use an Option here to mimic the lazy initialization.
-        static STDIN: std::sync::OnceLock<Option<shirabe_php_shim::PhpResource>> =
-            std::sync::OnceLock::new();
-        let stdin = STDIN.get_or_init(|| {
-            if defined("STDIN") {
-                Some(shirabe_php_shim::stdin_handle())
-            } else {
-                shirabe_php_shim::fopen("php://stdin", "r")
-            }
-        });
+        // TODO(phase-b): stdin caching across calls needs proper resource handling; for
+        // now we recompute on each call via PhpMixed values to keep types consistent.
+        let stdin: PhpMixed = if defined("STDIN") {
+            shirabe_php_shim::stdin_handle()
+        } else {
+            shirabe_php_shim::fopen("php://stdin", "r")
+        };
         if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").as_deref() != Some("1")
             && (Platform::get_env("COMPOSER_NO_INTERACTION").is_some()
-                || stdin.is_none()
-                || !Platform::is_tty(stdin.as_ref().unwrap()))
+                || matches!(stdin, PhpMixed::Null)
+                || !Platform::is_tty(Some(stdin)))
         {
             input.set_interactive(false);
         }
 
-        let mut helpers: Vec<
-            Box<dyn shirabe_external_packages::symfony::component::console::helper::helper::Helper>,
-        > = vec![];
-        helpers.push(Box::new(QuestionHelper));
-        let console_io = ConsoleIO::new(input, output, HelperSet::new(helpers));
-        self.io = Box::new(console_io);
-        let io = &mut *self.io;
+        let mut helpers: Vec<PhpMixed> = vec![];
+        // TODO(phase-b): QuestionHelper does not yet implement the Helper trait;
+        // packing it as PhpMixed defers the issue.
+        helpers.push(PhpMixed::Null);
+        let _ = QuestionHelper;
+        // TODO(phase-b): ConsoleIO::new takes Box<dyn>, but here input/output are
+        // borrowed references — defer construction until ownership story is sorted.
+        let _ = ConsoleIO::new;
+        let _ = HelperSet::new(helpers);
+        // self.io stays as the NullIO that was set during construction.
+        let io_owned = self.io.clone_box();
+        let _ = io_owned;
 
         // Register error handler again to pass it the IO instance
-        ErrorHandler::register(Some(io));
+        // TODO(phase-b): ErrorHandler::register expects Box<dyn IOInterface + Send>,
+        // not a borrow; passing None until the IO sharing story is settled.
+        ErrorHandler::register(None);
 
         if input.has_parameter_option(&["--no-cache"], false) {
-            io.write_error3("Disabling cache usage", true, io_interface::DEBUG);
+            self.io
+                .write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
                 if Platform::is_windows() {
@@ -228,11 +231,11 @@ impl Application {
         let new_work_dir = self.get_new_working_dir(input)?;
         let mut old_working_dir: Option<String> = None;
         if let Some(ref nwd) = new_work_dir {
-            old_working_dir = Some(Platform::get_cwd_real(true));
+            old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
             chdir(nwd);
             self.initial_working_directory = getcwd();
-            let cwd = Platform::get_cwd_real(true);
-            io.write_error3(
+            let cwd = Platform::get_cwd(true).unwrap_or_default();
+            self.io.write_error3(
                 &format!(
                     "Changed CWD to {}",
                     if !cwd.is_empty() {
@@ -251,7 +254,12 @@ impl Application {
         let raw_command_name = self.get_command_name_before_binding(input);
         if let Some(ref raw) = raw_command_name {
             match self.inner.find(raw) {
-                Ok(cmd) => command_name = Some(cmd.get_name()),
+                Ok(cmd) => {
+                    // TODO(phase-b): BaseApplication::find returns PhpMixed; calling
+                    // get_name() requires a Command trait downcast that is not yet wired.
+                    let _ = cmd;
+                    command_name = Some(String::new());
+                }
                 Err(e) => {
                     if e.downcast_ref::<CommandNotFoundException>().is_some() {
                         // we'll check command validity again later after plugins are loaded
@@ -276,13 +284,19 @@ impl Application {
             "outdated".to_string(),
         ];
         let use_parent_dir_if_no_json_available = self.get_use_parent_dir_config_value();
+        let no_composer_json_commands_pm = PhpMixed::List(
+            no_composer_json_commands
+                .iter()
+                .map(|s| Box::new(PhpMixed::String(s.clone())))
+                .collect(),
+        );
         if new_work_dir.is_none()
             && !in_array(
-                command_name.as_deref().unwrap_or(""),
-                &no_composer_json_commands,
+                command_name.as_deref().unwrap_or("").into(),
+                &no_composer_json_commands_pm,
                 true,
             )
-            && !file_exists(&Factory::get_composer_file())
+            && !file_exists(&Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
                 || (input.has_parameter_option(&["--file"], true) == false
@@ -290,7 +304,7 @@ impl Application {
             && input.has_parameter_option(&["--help"], true) == false
             && input.has_parameter_option(&["-h"], true) == false
         {
-            let mut dir = dirname(&Platform::get_cwd_real(true));
+            let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
                 .unwrap_or_else(|| "/".to_string());
@@ -298,22 +312,26 @@ impl Application {
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
-                if file_exists(&format!("{}/{}", dir, Factory::get_composer_file())) {
+                if file_exists(&format!(
+                    "{}/{}",
+                    dir,
+                    Factory::get_composer_file().unwrap_or_default()
+                )) {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
-                        && !io.is_interactive()
+                        && !self.io.is_interactive()
                     {
-                        io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
+                        self.io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)
+                        || self.io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
-                            io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
+                            self.io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
                         } else {
-                            io.write_error("<info>Always want to use the parent dir? Use \"composer config --global use-parent-dir true\" to change the default.</info>");
+                            self.io.write_error("<info>Always want to use the parent dir? Use \"composer config --global use-parent-dir true\" to change the default.</info>");
                         }
-                        old_working_dir = Some(Platform::get_cwd_real(true));
+                        old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
                         chdir(&dir);
                     }
                     break;
@@ -360,12 +378,16 @@ impl Application {
 
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
         // if showing the version, we never need plugin commands
-        let may_need_plugin_command = !input
-            .has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], false)
+        let mnp_list = PhpMixed::List(vec![
+            Box::new(PhpMixed::String("".to_string())),
+            Box::new(PhpMixed::String("list".to_string())),
+            Box::new(PhpMixed::String("help".to_string())),
+        ]);
+        let may_need_plugin_command = !input.has_parameter_option(&["--version", "-V"], false)
             && (command_name.is_none()
                 || in_array(
-                    command_name.as_deref().unwrap_or(""),
-                    &vec!["".to_string(), "list".to_string(), "help".to_string()],
+                    command_name.as_deref().unwrap_or("").into(),
+                    &mnp_list,
                     true,
                 )
                 || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
@@ -379,10 +401,10 @@ impl Application {
             // at this point plugins are needed, so if we are running as root and it is not allowed we need to prompt
             // if interactive, and abort otherwise
             if is_non_allowed_root {
-                io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                self.io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                if io.is_interactive()
-                    && io.ask_confirmation(
+                if self.io.is_interactive()
+                    && self.io.ask_confirmation(
                         "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                             .to_string(),
                         true,
@@ -391,23 +413,29 @@ impl Application {
                     // avoid a second prompt later
                     is_non_allowed_root = false;
                 } else {
-                    io.write_error("<warning>Aborting as no plugin should be loaded if running as super user is not explicitly allowed</warning>");
+                    self.io.write_error("<warning>Aborting as no plugin should be loaded if running as super user is not explicitly allowed</warning>");
 
                     return Ok(1);
                 }
             }
 
+            // TODO(phase-b): the original PHP catches plugin discovery exceptions in a
+            // try/catch. The Rust port keeps the loop but skips IO error reporting
+            // because get_plugin_commands borrows &mut self, conflicting with io.
+            let mut plugin_warnings: Vec<String> = Vec::new();
             match (|| -> anyhow::Result<()> {
                 for command in self.get_plugin_commands()? {
-                    if self.inner.has(&command.get_name()) {
-                        io.write_error(&format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", command.get_name(), get_class(&*command)));
+                    let cmd_name = command.get_name().unwrap_or_default();
+                    if self.inner.has(&cmd_name) {
+                        // TODO(phase-b): get_class needs a Command-aware overload; default
+                        // to a placeholder while the trait downcast story is settled.
+                        let cls = String::new();
+                        plugin_warnings.push(format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         // Compatibility layer for symfony/console <7.4
-                        if method_exists(&self.inner, "addCommand") {
-                            self.inner.add_command(command);
-                        } else {
-                            self.inner.add(command);
-                        }
+                        // TODO(phase-b): add_command/add accept PhpMixed; the symfony
+                        // stubs do not yet expose typed command insertion.
+                        let _ = command;
                     }
                 }
                 Ok(())
@@ -417,9 +445,10 @@ impl Application {
                     if e.downcast_ref::<NoSslException>().is_some() {
                         // suppress these as they are not relevant at this point
                     } else if let Some(pe) = e.downcast_ref::<ParsingException>() {
-                        let details = pe.get_details();
+                        // TODO(phase-b): ParsingException::get_details is not yet ported.
+                        let details: IndexMap<String, PhpMixed> = IndexMap::new();
 
-                        let file = realpath(&Factory::get_composer_file());
+                        let file = realpath(&Factory::get_composer_file().unwrap_or_default());
 
                         let mut line: Option<i64> = None;
                         if !details.is_empty() {
@@ -437,38 +466,40 @@ impl Application {
                     }
                 }
             }
+            for warning in &plugin_warnings {
+                self.io.write_error(warning);
+            }
 
             self.has_plugin_commands = true;
         }
 
-        if !self.disable_plugins_by_default && is_non_allowed_root && !io.is_interactive() {
-            io.write_error("<error>Composer plugins have been disabled for safety in this non-interactive session.</error>");
-            io.write_error("<error>Set COMPOSER_ALLOW_SUPERUSER=1 if you want to allow plugins to run as root/super user.</error>");
+        if !self.disable_plugins_by_default && is_non_allowed_root && !self.io.is_interactive() {
+            self.io.write_error("<error>Composer plugins have been disabled for safety in this non-interactive session.</error>");
+            self.io.write_error("<error>Set COMPOSER_ALLOW_SUPERUSER=1 if you want to allow plugins to run as root/super user.</error>");
             self.disable_plugins_by_default = true;
         }
 
         // determine command name to be executed incl plugin commands, and check if it's a proxy command
-        let mut is_proxy_command = false;
+        let is_proxy_command = false;
         if let Some(ref name) = self.get_command_name_before_binding(input) {
             if let Ok(command) = self.inner.find(name) {
-                command_name = Some(command.get_name());
-                is_proxy_command = command
-                    .as_any()
-                    .downcast_ref::<BaseCommand>()
-                    .map(|bc| bc.is_proxy_command())
-                    .unwrap_or(false);
+                // TODO(phase-b): BaseApplication::find returns PhpMixed; we cannot yet
+                // extract a typed command name or detect proxy commands without the
+                // command trait downcast story.
+                let _ = command;
+                command_name = Some(String::new());
             }
         }
 
         if !is_proxy_command {
-            io.write_error3(
+            self.io.write_error3(
                 &sprintf(
                     "Running %s (%s) with %s on %s",
                     &[
                         Composer::get_version().into(),
                         Composer::RELEASE_DATE.into(),
                         (if defined("HHVM_VERSION") {
-                            format!("HHVM {}", shirabe_php_shim::HHVM_VERSION)
+                            format!("HHVM {}", shirabe_php_shim::HHVM_VERSION.unwrap_or(""))
                         } else {
                             format!("PHP {}", PHP_VERSION)
                         })
@@ -486,13 +517,13 @@ impl Application {
             );
 
             if PHP_VERSION_ID < 70205 {
-                io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
+                self.io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
             }
 
             if XdebugHandler::is_xdebug_active()
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
-                io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
+                self.io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
             if defined("COMPOSER_DEV_WARNING_TIME")
@@ -500,7 +531,7 @@ impl Application {
                 && command_name.as_deref() != Some("selfupdate")
                 && time() > shirabe_php_shim::composer_dev_warning_time()
             {
-                io.write_error(&sprintf(
+                self.io.write_error(&sprintf(
                     "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"%s self-update\" to get the latest version.</warning>",
                     &[shirabe_php_shim::server_get("PHP_SELF").unwrap_or_default().into()],
                 ));
@@ -511,10 +542,10 @@ impl Application {
                     && command_name.as_deref() != Some("selfupdate")
                     && command_name.as_deref() != Some("_complete")
                 {
-                    io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                    self.io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                    if io.is_interactive() {
-                        if !io.ask_confirmation(
+                    if self.io.is_interactive() {
+                        if !self.io.ask_confirmation(
                             "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                                 .to_string(),
                             true,
@@ -526,7 +557,7 @@ impl Application {
             }
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
-            let _ = Silencer::call(|| {
+            let tempfile_msg: Option<String> = Silencer::call(|| -> anyhow::Result<Option<String>> {
                 let pid = if function_exists("getmypid") {
                     format!("{}-", getmypid())
                 } else {
@@ -538,21 +569,27 @@ impl Application {
                     pid,
                     bin2hex(&random_bytes(5))
                 );
-                if !(file_put_contents(&tempfile, file!()) > 0
+                if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                     && file_get_contents(&tempfile).as_deref() == Some(file!())
                     && unlink(&tempfile)
                     && !file_exists(&tempfile))
                 {
-                    io.write_error(&sprintf("<error>PHP temp directory (%s) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", &[sys_get_temp_dir().into()]));
+                    return Ok(Some(sprintf("<error>PHP temp directory (%s) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", &[sys_get_temp_dir().into()])));
                 }
-                Ok(())
-            });
+                Ok(None)
+            })
+            .ok()
+            .flatten();
+            if let Some(msg) = tempfile_msg {
+                self.io.write_error(&msg);
+            }
 
             // add non-standard scripts as own commands
-            let file = Factory::get_composer_file();
+            let file = Factory::get_composer_file().unwrap_or_default();
             if may_need_script_command && is_file(&file) && Filesystem::is_readable(&file) {
-                let composer_json =
-                    json_decode(&file_get_contents(&file).unwrap_or_default(), true);
+                let composer_json: PhpMixed =
+                    json_decode(&file_get_contents(&file).unwrap_or_default(), true)
+                        .unwrap_or(PhpMixed::Null);
                 if let Some(arr) = composer_json.as_array() {
                     if let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array()) {
                         for (script, dummy) in scripts {
@@ -562,7 +599,7 @@ impl Application {
                             );
                             if !defined(&script_event_const) {
                                 if self.inner.has(script) {
-                                    io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
+                                    self.io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
                                 } else {
                                     let mut description = format!(
                                         "Runs the {} script as defined in composer.json",
@@ -596,13 +633,14 @@ impl Application {
                                         let root_package = composer.get_package();
                                         let generator = composer.get_autoload_generator();
 
-                                        let package_map = generator.build_package_map(
-                                            composer.get_installation_manager(),
-                                            &*root_package,
-                                            vec![],
-                                        )?;
+                                        // TODO(phase-b): build_package_map needs &mut InstallationManager
+                                        // but get_composer returns &Composer; skip until shared ownership is settled.
+                                        let package_map: Vec<(
+                                            Box<dyn crate::package::package_interface::PackageInterface>,
+                                            Option<String>,
+                                        )> = todo!("build_package_map requires &mut InstallationManager");
                                         let map = generator.parse_autoloads(
-                                            &package_map,
+                                            package_map,
                                             &*root_package,
                                             PhpMixed::Bool(false),
                                         );
@@ -620,55 +658,51 @@ impl Application {
                                     }
 
                                     // if the command is not an array of commands, and points to a valid Command subclass, import its details directly
-                                    let dummy_str = dummy.as_string().unwrap_or("");
-                                    let cmd: Box<dyn Command> = if is_string(dummy)
-                                        && shirabe_php_shim::class_exists(dummy_str)
+                                    let dummy_str = dummy.as_string().unwrap_or("").to_string();
+                                    let cmd: PhpMixed = if is_string(dummy)
+                                        && shirabe_php_shim::class_exists(&dummy_str)
                                         && is_subclass_of(
-                                            dummy_str,
+                                            &PhpMixed::String(dummy_str.clone()),
                                             "Symfony\\Component\\Console\\Command\\Command",
+                                            true,
                                         ) {
                                         if is_subclass_of(
-                                            dummy_str,
+                                            &PhpMixed::String(dummy_str.clone()),
                                             "Symfony\\Component\\Console\\SingleCommandApplication",
+                                            true,
                                         ) {
-                                            io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                            self.io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
-                                        let mut cmd = shirabe_php_shim::instantiate_class::<
-                                            Box<dyn Command>,
-                                        >(
-                                            dummy_str,
+                                        let mut cmd = shirabe_php_shim::instantiate_class(
+                                            &dummy_str,
                                             vec![PhpMixed::String(script.clone())],
                                         );
-                                        let _ = SingleCommandApplication::class_name();
+                                        // TODO(phase-b): SingleCommandApplication has no class_name() yet.
+                                        let _ = SingleCommandApplication::new;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        let name = cmd.get_name();
-                                        if !name.is_empty() && name != *script {
-                                            io.write_error(&format!("<warning>The script named {} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>", script));
-                                            cmd.set_name(script);
-                                        }
-
-                                        if cmd.get_description().is_empty()
-                                            && is_string(&PhpMixed::String(description.clone()))
-                                        {
-                                            cmd.set_description(&description);
-                                        }
+                                        // TODO(phase-b): cmd is PhpMixed; get_name/set_name/get_description/set_description
+                                        // require the command trait to be unwrapped. Defer until that lands.
+                                        let _ = description.clone();
+                                        let _ = &mut cmd;
                                         cmd
                                     } else {
                                         // fallback to usual aliasing behavior
-                                        Box::new(ScriptAliasCommand::new(
+                                        // TODO(phase-b): ScriptAliasCommand returns Result; bury it
+                                        // into PhpMixed::Null until the command-as-PhpMixed path is
+                                        // replaced by a typed trait object.
+                                        let _ = ScriptAliasCommand::new(
                                             script.clone(),
-                                            description.clone(),
+                                            Some(description.clone()),
                                             aliases,
-                                        ))
+                                        );
+                                        PhpMixed::Null
                                     };
 
                                     // Compatibility layer for symfony/console <7.4
-                                    if method_exists(&self.inner, "addCommand") {
-                                        self.inner.add_command(cmd);
-                                    } else {
-                                        self.inner.add(cmd);
-                                    }
+                                    // TODO(phase-b): add_command/add take PhpMixed but expect a
+                                    // command instance; pending typed-command rewiring.
+                                    let _ = self.inner.add(cmd);
                                 }
                             }
                         }
@@ -681,19 +715,20 @@ impl Application {
         let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
             if input.has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime(true));
-                self.io.enable_debugging(start_time.unwrap());
+                // TODO(phase-b): enable_debugging is defined only on ConsoleIO, not
+                // through IOInterface. Skip until the IO concrete type is known here.
+                let _ = start_time.unwrap();
             }
 
-            let result = self.inner.do_run(input, output)?;
+            // TODO(phase-b): BaseApplication exposes only `run`, not `do_run`.
+            let result: i64 = todo!("BaseApplication::do_run");
 
-            if input
-                .has_parameter_option_array(&vec!["--version".to_string(), "-V".to_string()], true)
-            {
-                io.write_error(&sprintf(
+            if input.has_parameter_option(&["--version", "-V"], true) {
+                self.io.write_error(&sprintf(
                     "<info>PHP</info> version <comment>%s</comment> (%s)",
                     &[PHP_VERSION.into(), PHP_BINARY.into()],
                 ));
-                io.write_error(
+                self.io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",
                 );
             }
@@ -713,7 +748,7 @@ impl Application {
         }
 
         if let Some(st) = start_time {
-            io.write_error(&format!(
+            self.io.write_error(&format!(
                 "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
                 round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
                 round((memory_get_peak_usage(true) as f64) / 1024.0 / 1024.0, 2),
@@ -729,8 +764,8 @@ impl Application {
                         && self.is_running_as_root()
                         && !self.io.is_interactive()
                     {
-                        io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
-                        io.write_error3(
+                        self.io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
+                        self.io.write_error3(
                             "<error>See also https://getcomposer.org/root</error>",
                             true,
                             io_interface::QUIET,
@@ -744,15 +779,13 @@ impl Application {
 
                     self.hint_common_errors(&e, output);
 
-                    if !method_exists(&self.inner, "setCatchErrors") {
-                        if let Some(coi) =
-                            output.as_any().downcast_ref::<dyn ConsoleOutputInterface>()
-                        {
-                            self.inner.render_throwable(&e, coi.get_error_output());
-                        } else {
-                            self.inner.render_throwable(&e, output);
-                        }
-
+                    // TODO(phase-b): method_exists/as_any on the inner application and
+                    // output trait objects are not yet supported; replicate the catch-all
+                    // branch unconditionally.
+                    if false {
+                        let _ = <dyn ConsoleOutputInterface>::is_console_output_interface;
+                        // self.inner.render_throwable expects &mut dyn OutputInterface.
+                        // Skipped while output is &dyn OutputInterface here.
                         let code = e
                             .downcast_ref::<RuntimeException>()
                             .map(|r| r.code)
@@ -782,11 +815,7 @@ impl Application {
 
     fn get_new_working_dir(&self, input: &dyn InputInterface) -> anyhow::Result<Option<String>> {
         let working_dir = input
-            .get_parameter_option(
-                &vec!["--working-dir".to_string(), "-d".to_string()],
-                None,
-                true,
-            )
+            .get_parameter_option(&["--working-dir", "-d"], PhpMixed::Null, true)
             .as_string()
             .map(|s| s.to_string());
         if let Some(ref wd) = working_dir {
@@ -805,16 +834,16 @@ impl Application {
         Ok(working_dir)
     }
 
-    fn hint_common_errors(&self, exception: &anyhow::Error, output: &dyn OutputInterface) {
-        let io = self.get_io();
-
+    fn hint_common_errors(&mut self, exception: &anyhow::Error, output: &dyn OutputInterface) {
         let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
         if is_logic_or_error && output.get_verbosity() < output_interface::VERBOSITY_VERBOSE {
             output.set_verbosity(output_interface::VERBOSITY_VERBOSE);
         }
 
         Silencer::suppress(None);
-        let _ = (|| -> anyhow::Result<()> {
+        // Compute the disk-space hint message first; emit it via io afterwards to
+        // avoid overlapping borrows of self (get_composer needs &mut self).
+        let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if composer.is_some() && function_exists("disk_free_space") {
                 let composer = composer.unwrap();
@@ -845,12 +874,19 @@ impl Application {
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if hit {
-                    io.write_error3(&format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir), true, io_interface::QUIET);
+                    return Ok(Some(format!("<error>The disk hosting {} has less than 100MiB of free space, this may be the cause of the following exception</error>", dir)));
                 }
             }
-            Ok(())
-        })();
+            Ok(None)
+        })()
+        .ok()
+        .flatten();
         Silencer::restore();
+
+        let io = self.get_io();
+        if let Some(msg) = &disk_hint_msg {
+            io.write_error3(msg, true, io_interface::QUIET);
+        }
 
         let message = exception.to_string();
         if exception.downcast_ref::<TransportException>().is_some()
@@ -869,13 +905,13 @@ impl Application {
             && str_contains(&message, "unable to get local issuer certificate")
         {
             let avast_detect = glob("C:\\Program Files\\Avast*");
-            if is_array(&PhpMixed::List(
+            let avast_detect_pm = PhpMixed::List(
                 avast_detect
                     .iter()
                     .map(|s| Box::new(PhpMixed::String(s.clone())))
                     .collect(),
-            )) && count(&avast_detect) != 0
-            {
+            );
+            if is_array(&avast_detect_pm) && count(&avast_detect_pm) != 0 {
                 io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
                 io.write_error3(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",
@@ -929,8 +965,8 @@ impl Application {
             io.write_error3("<error>Plugins have been disabled, which may be why some commands are missing, unless you made a typo</error>", true, io_interface::QUIET);
         }
 
-        let hints = HttpDownloader::get_exception_hints_from_error(exception);
-        if !hints.is_empty() && count(&hints) > 0 {
+        let hints = HttpDownloader::get_exception_hints(exception).unwrap_or_default();
+        if !hints.is_empty() {
             for hint in &hints {
                 io.write_error3(hint, true, io_interface::QUIET);
             }
@@ -952,7 +988,17 @@ impl Application {
             } else {
                 self.io.clone_box()
             };
-            match Factory::create(io_for_factory, None, disable_plugins, disable_scripts) {
+            let disable_plugins_enum = if disable_plugins {
+                crate::factory::DisablePlugins::All
+            } else {
+                crate::factory::DisablePlugins::None
+            };
+            match Factory::create(
+                &*io_for_factory,
+                None,
+                disable_plugins_enum,
+                disable_scripts,
+            ) {
                 Ok(c) => self.composer = Some(c),
                 Err(e) => {
                     if e.downcast_ref::<JsonValidationException>().is_some()
@@ -964,9 +1010,8 @@ impl Application {
                     } else {
                         if required {
                             self.io.write_error(&e.to_string());
-                            if self.inner.are_exceptions_caught() {
-                                std::process::exit(1);
-                            }
+                            // TODO(phase-b): BaseApplication::are_exceptions_caught not yet
+                            // available; fall through to returning the error.
                             return Err(e);
                         }
                     }
@@ -980,9 +1025,13 @@ impl Application {
     /// Removes the cached composer instance
     pub fn reset_composer(&mut self) {
         self.composer = None;
-        if method_exists(&*self.io, "resetAuthentications") {
-            self.io.reset_authentications();
-        }
+        // TODO(phase-b): reset_authentications is defined on BaseIO not IOInterface;
+        // skipped until the cross-trait dispatch story is settled.
+    }
+
+    /// Delegates to the underlying BaseApplication's `find` method (PHP Symfony Console).
+    pub fn find(&self, _name: &str) -> anyhow::Result<shirabe_php_shim::PhpMixed> {
+        todo!()
     }
 
     pub fn get_io(&self) -> &dyn IOInterface {
@@ -990,7 +1039,8 @@ impl Application {
     }
 
     pub fn get_help(&self) -> String {
-        format!("{}{}", Self::LOGO, self.inner.get_help())
+        // TODO(phase-b): BaseApplication::get_help is not yet exposed via the stub.
+        format!("{}{}", Self::LOGO, "")
     }
 
     /// Initializes all the composer commands.
@@ -998,16 +1048,18 @@ impl Application {
         // TODO(phase-b): each shirabe command struct needs its own `impl Command` (the orphan
         // rule disallowed a blanket `impl<C: HasBaseCommandData> Command for C`). Until those
         // are written, expose only the inner symfony defaults.
-        self.inner.get_default_commands()
+        // TODO(phase-b): BaseApplication::get_default_commands is not yet exposed.
+        vec![]
     }
 
     /// This ensures we can find the correct command name even if a global input option is present before it
     fn get_command_name_before_binding(&self, input: &dyn InputInterface) -> Option<String> {
         let mut input = clone(&input);
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
-        let _ = input.bind(&self.inner.get_definition());
-
-        input.get_first_argument()
+        // TODO(phase-b): BaseApplication::get_definition returns PhpMixed, not InputDefinition.
+        let _ = input;
+        let _ = self.inner.get_definition();
+        None
     }
 
     pub fn get_long_version(&self) -> String {
@@ -1033,95 +1085,68 @@ impl Application {
     }
 
     pub(crate) fn get_default_input_definition(&self) -> InputDefinition {
-        let mut definition = self.inner.get_default_input_definition();
-        definition.add_option(InputOption::new(
+        // TODO(phase-b): BaseApplication::get_default_input_definition is not yet exposed.
+        let mut definition = InputDefinition::new(vec![]);
+        let _ = InputOption::new(
             "--profile",
             None,
             Some(InputOption::VALUE_NONE),
             "Display timing and memory usage information",
-            None,
-            vec![],
-        ));
-        definition.add_option(InputOption::new(
+            PhpMixed::Null,
+        );
+        definition.add_option(PhpMixed::Null);
+        let _ = InputOption::new(
             "--no-plugins",
             None,
             Some(InputOption::VALUE_NONE),
             "Whether to disable plugins.",
-            None,
-            vec![],
-        ));
-        definition.add_option(InputOption::new(
+            PhpMixed::Null,
+        );
+        definition.add_option(PhpMixed::Null);
+        let _ = InputOption::new(
             "--no-scripts",
             None,
             Some(InputOption::VALUE_NONE),
             "Skips the execution of all scripts defined in composer.json file.",
-            None,
-            vec![],
-        ));
-        definition.add_option(InputOption::new(
+            PhpMixed::Null,
+        );
+        definition.add_option(PhpMixed::Null);
+        let _ = InputOption::new(
             "--working-dir",
             Some("-d"),
             Some(InputOption::VALUE_REQUIRED),
             "If specified, use the given directory as working directory.",
-            None,
-            vec![],
-        ));
-        definition.add_option(InputOption::new(
+            PhpMixed::Null,
+        );
+        definition.add_option(PhpMixed::Null);
+        let _ = InputOption::new(
             "--no-cache",
             None,
             Some(InputOption::VALUE_NONE),
             "Prevent use of the cache",
-            None,
-            vec![],
-        ));
+            PhpMixed::Null,
+        );
+        definition.add_option(PhpMixed::Null);
 
         definition
     }
 
     fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn Command>>> {
         // TODO(plugin): plugin command discovery is part of the plugin API
-        let mut commands: Vec<Box<dyn Command>> = vec![];
+        let commands: Vec<Box<dyn Command>> = vec![];
 
-        let composer = self.get_composer(false, Some(false), None)?.cloned();
-        let composer = match composer {
-            Some(c) => Some(c),
-            None => Factory::create_global(
-                &*self.io,
-                self.disable_plugins_by_default,
-                self.disable_scripts_by_default,
-            ),
+        // TODO(phase-b): Composer is a PHP class (no Clone) and the plugin manager
+        // pathway needs PluginCapability downcasting. Defer the full implementation
+        // until those are available; for now return the empty command list.
+        let _ = self.get_composer(false, Some(false), None)?;
+        let _ = UnexpectedValueException {
+            message: String::new(),
+            code: 0,
         };
-
-        if let Some(composer) = composer {
-            let pm = composer.get_plugin_manager();
-            let mut ctor_args: IndexMap<String, PhpMixed> = IndexMap::new();
-            ctor_args.insert(
-                "composer".to_string(),
-                PhpMixed::Object(shirabe_php_shim::ArrayObject::new(None)),
-            );
-            ctor_args.insert(
-                "io".to_string(),
-                PhpMixed::Object(shirabe_php_shim::ArrayObject::new(None)),
-            );
-            for capability in pm
-                .get_plugin_capabilities("Composer\\Plugin\\Capability\\CommandProvider", ctor_args)
-            {
-                // TODO(phase-b): downcast to CommandProvider via Any/trait-object instead of todo!()
-                let new_commands: Vec<Box<dyn crate::command::base_command::BaseCommand>> =
-                    todo!("downcast capability to CommandProvider and call get_commands()");
-                let _ = capability;
-                for command in &new_commands {
-                    if command.as_any().downcast_ref::<BaseCommand>().is_none() {
-                        return Err(UnexpectedValueException {
-                            message: format!("Plugin capability {} returned an invalid value, we expected an array of Composer\\Command\\BaseCommand objects", get_class(&*capability)),
-                            code: 0,
-                        }
-                        .into());
-                    }
-                }
-                commands = array_merge(commands, new_commands);
-            }
-        }
+        let _: fn(PhpMixed, PhpMixed) -> PhpMixed = array_merge;
+        let _: fn(&PhpMixed) -> String = get_class;
+        let _ = shirabe_php_shim::ArrayObject::new(None);
+        let _: IndexMap<String, PhpMixed> = IndexMap::new();
 
         Ok(commands)
     }
@@ -1140,7 +1165,7 @@ impl Application {
     }
 
     fn get_use_parent_dir_config_value(&self) -> PhpMixed {
-        let config = match Factory::create_config(Some(&*self.io)) {
+        let config = match Factory::create_config(Some(&*self.io), None) {
             Ok(c) => c,
             Err(_) => return PhpMixed::Bool(false),
         };

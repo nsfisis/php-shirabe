@@ -463,9 +463,9 @@ impl Package {
                 url,
                 &self.name,
                 &self.version,
-                r#ref.unwrap_or(""),
-                r#type.unwrap_or(""),
-                &self.pretty_version,
+                r#ref,
+                r#type,
+                Some(self.pretty_version.as_str()),
             )
         } else {
             url.to_string()
@@ -479,9 +479,9 @@ impl Package {
                         &mirror.url,
                         &self.name,
                         &self.version,
-                        r#ref.unwrap_or(""),
-                        r#type.unwrap_or(""),
-                        &self.pretty_version,
+                        r#ref,
+                        r#type,
+                        Some(self.pretty_version.as_str()),
                     )
                 } else if url_type == "source" && r#type == Some("git") {
                     ComposerMirror::process_git_url(
@@ -560,7 +560,7 @@ impl BasePackage for Package {
     }
 
     fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository.as_ref()
+        self.repository.as_deref()
     }
 
     fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {

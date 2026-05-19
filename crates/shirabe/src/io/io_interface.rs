@@ -82,22 +82,22 @@ pub trait IOInterface: LoggerInterface + std::fmt::Debug {
     }
     fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn ask(&mut self, question: String, default: PhpMixed) -> PhpMixed;
+    fn ask(&self, question: String, default: PhpMixed) -> PhpMixed;
 
-    fn ask_confirmation(&mut self, question: String, default: bool) -> bool;
+    fn ask_confirmation(&self, question: String, default: bool) -> bool;
 
     fn ask_and_validate(
-        &mut self,
+        &self,
         question: String,
         validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> PhpMixed;
 
-    fn ask_and_hide_answer(&mut self, question: String) -> Option<String>;
+    fn ask_and_hide_answer(&self, question: String) -> Option<String>;
 
     fn select(
-        &mut self,
+        &self,
         question: String,
         choices: Vec<String>,
         default: PhpMixed,

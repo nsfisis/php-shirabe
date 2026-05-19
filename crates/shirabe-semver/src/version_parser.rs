@@ -20,7 +20,7 @@ const MODIFIER_REGEX: &str =
 
 const STABILITIES_REGEX: &str = "stable|RC|beta|alpha|dev";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VersionParser;
 
 impl VersionParser {

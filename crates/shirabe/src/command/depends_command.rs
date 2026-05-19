@@ -23,7 +23,7 @@ impl DependsCommand {
             .set_description("Shows which packages cause the given package to be installed")
             .set_definition(&[
                 InputArgument::new(
-                    <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
+                    crate::command::base_dependency_command::ARGUMENT_PACKAGE,
                     Some(InputArgument::REQUIRED),
                     "Package to inspect",
                     None,
@@ -31,7 +31,7 @@ impl DependsCommand {
                 .unwrap()
                 .into(),
                 InputOption::new(
-                    <Self as BaseDependencyCommand>::OPTION_RECURSIVE,
+                    crate::command::base_dependency_command::OPTION_RECURSIVE,
                     Some(shirabe_php_shim::PhpMixed::String("r".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Recursively resolves up to the root package",
@@ -40,7 +40,7 @@ impl DependsCommand {
                 .unwrap()
                 .into(),
                 InputOption::new(
-                    <Self as BaseDependencyCommand>::OPTION_TREE,
+                    crate::command::base_dependency_command::OPTION_TREE,
                     Some(shirabe_php_shim::PhpMixed::String("t".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Prints the results as a nested tree",
@@ -65,7 +65,7 @@ impl DependsCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
+    pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
         // TODO(phase-b): wire `do_execute` from BaseDependencyCommand trait without conflicting with
         // BaseCommand blanket impl
         let _ = (input, output);

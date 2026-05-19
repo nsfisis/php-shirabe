@@ -113,10 +113,11 @@ impl CreateProjectCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
-        let io = self.get_io();
+        // TODO(phase-b): get_io returns &mut Self-borrow; clone_box for an owned Box to dodge.
+        let io: Box<dyn IOInterface> = self.get_io().clone_box();
 
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config, input, true)?;
+            self.get_preferred_install_options(&config.borrow(), input, true)?;
 
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
@@ -160,8 +161,9 @@ impl CreateProjectCommand {
             Some(repository_url_opt)
         };
 
+        let mut io = io;
         self.install_project(
-            io,
+            &mut *io,
             config,
             input,
             input
@@ -206,7 +208,7 @@ impl CreateProjectCommand {
     #[allow(clippy::too_many_arguments)]
     pub fn install_project(
         &mut self,
-        io: &dyn IOInterface,
+        io: &mut dyn IOInterface,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: &dyn InputInterface,
         package_name: Option<String>,
@@ -248,7 +250,7 @@ impl CreateProjectCommand {
         // we need to manually load the configuration to pass the auth credentials to the io interface!
         io.load_configuration(&mut *config.borrow_mut())?;
 
-        self.suggested_packages_reporter = Some(SuggestedPackagesReporter::new(io));
+        self.suggested_packages_reporter = Some(SuggestedPackagesReporter::new(io.clone_box()));
 
         let installed_from_vcs = if let Some(package_name) = package_name.as_ref() {
             self.install_root_package(
@@ -292,16 +294,22 @@ impl CreateProjectCommand {
                     )?;
                     let composer_json_repositories_config =
                         composer.get_config().borrow().get_repositories();
+                    // TODO(phase-b): generate_repository_name expects existing repos as
+                    // IndexMap<String, Box<dyn RepositoryInterface>>; pass empty placeholder.
+                    let _ = &composer_json_repositories_config;
+                    let placeholder_existing: IndexMap<
+                        String,
+                        Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+                    > = IndexMap::new();
                     let name = RepositoryFactory::generate_repository_name(
-                        PhpMixed::Int(index as i64),
+                        &PhpMixed::Int(index as i64),
                         &repo_config,
-                        &composer_json_repositories_config,
+                        &placeholder_existing,
                     );
-                    let config_source = JsonConfigSource::new(JsonFile::new(
-                        "composer.json".to_string(),
-                        None,
-                        None,
-                    )?);
+                    let mut config_source = JsonConfigSource::new(
+                        JsonFile::new("composer.json".to_string(), None, None)?,
+                        false,
+                    );
 
                     let is_packagist_disabled = (repo_config.contains_key("packagist")
                         && repo_config.len() == 1
@@ -336,13 +344,18 @@ impl CreateProjectCommand {
             .borrow()
             .get_process_executor()
             .map(std::rc::Rc::clone);
-        let fs = Filesystem::new(process);
+        let mut fs = Filesystem::new(process);
 
         // dispatch event
-        composer.get_event_dispatcher().dispatch_script(
-            ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
-            install_dev_packages,
-        );
+        composer
+            .get_event_dispatcher()
+            .borrow_mut()
+            .dispatch_script(
+                ScriptEvents::POST_ROOT_PACKAGE_INSTALL,
+                install_dev_packages,
+                vec![],
+                IndexMap::new(),
+            );
 
         // use the new config including the newly installed project
         let config = std::rc::Rc::clone(composer.get_config());
@@ -353,18 +366,18 @@ impl CreateProjectCommand {
         // install dependencies of the created project
         if no_install == false {
             composer
-                .get_installation_manager()
+                .get_installation_manager_mut()
                 .set_output_progress(!no_progress);
 
-            let mut installer = Installer::create(io, &composer);
+            let mut installer = Installer::create(io.clone_box(), &composer);
+            // TODO(phase-b): set_suggested_packages_reporter takes by value but PHP class
+            // means shared ownership; needs Rc<SuggestedPackagesReporter> for proper sharing.
             installer
                 .set_prefer_source(prefer_source)
                 .set_prefer_dist(prefer_dist)
                 .set_dev_mode(install_dev_packages)
                 .set_platform_requirement_filter(platform_requirement_filter.clone_box())
-                .set_suggested_packages_reporter(
-                    self.suggested_packages_reporter.as_ref().unwrap().clone(),
-                )
+                .set_suggested_packages_reporter(SuggestedPackagesReporter::new(io.clone_box()))
                 .set_optimize_autoloader(
                     config
                         .borrow_mut()
@@ -389,7 +402,7 @@ impl CreateProjectCommand {
                 )
                 .set_audit_config(self.create_audit_config(&mut *config.borrow_mut(), input)?);
 
-            if !composer.get_locker().is_locked() {
+            if !composer.get_locker_mut().is_locked() {
                 installer.set_update(true);
             }
 
@@ -453,7 +466,7 @@ impl CreateProjectCommand {
             }
 
             // PHP: try { $dirs = iterator_to_array($finder); ... } catch (\Exception $e) { ... }
-            let dirs: Vec<String> = finder.iter().collect();
+            let dirs: Vec<String> = finder.iter().map(|f| f.get_pathname()).collect();
             drop(finder);
             let mut had_error: Option<anyhow::Error> = None;
             for dir in &dirs {
@@ -481,15 +494,17 @@ impl CreateProjectCommand {
         // rewriting self.version dependencies with explicit version numbers if the package's vcs metadata is gone
         if !has_vcs {
             let package = composer.get_package();
-            let config_source =
-                JsonConfigSource::new(JsonFile::new("composer.json".to_string(), None, None)?);
+            let mut config_source = JsonConfigSource::new(
+                JsonFile::new("composer.json".to_string(), None, None)?,
+                false,
+            );
             for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
                 // PHP: $package->{'get'.$meta['method']}() — dynamic getter dispatch
                 // TODO(phase-b): dynamic getter dispatch by name
                 let _method = format!("get{}", meta.method);
                 let links: Vec<crate::package::link::Link> = vec![];
                 for link in links {
-                    if link.get_pretty_constraint().as_deref() == Some("self.version") {
+                    if link.get_pretty_constraint().as_deref().ok() == Some("self.version") {
                         config_source.add_link(
                             r#type,
                             link.get_target(),
@@ -501,12 +516,15 @@ impl CreateProjectCommand {
         }
 
         // dispatch event
-        composer.get_event_dispatcher().dispatch_script(
-            ScriptEvents::POST_CREATE_PROJECT_CMD,
-            install_dev_packages,
-            vec![],
-            indexmap::IndexMap::new(),
-        );
+        composer
+            .get_event_dispatcher()
+            .borrow_mut()
+            .dispatch_script(
+                ScriptEvents::POST_CREATE_PROJECT_CMD,
+                install_dev_packages,
+                vec![],
+                indexmap::IndexMap::new(),
+            );
 
         chdir(&old_cwd);
 
@@ -564,10 +582,10 @@ impl CreateProjectCommand {
         directory = rtrim(&directory, Some("/\\"));
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-            Box::new(io),
+            io.clone_box(),
         ))));
-        let fs = Filesystem::new(Some(process));
-        if !fs.is_absolute_path(&directory) {
+        let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
+        if !fs.borrow().is_absolute_path(&directory) {
             directory = format!(
                 "{}{}{}",
                 Platform::get_cwd(false)?,
@@ -599,7 +617,8 @@ impl CreateProjectCommand {
         io.write_error(&format!(
             "<info>Creating a \"{}\" project at \"{}\"</info>",
             package_name,
-            fs.find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)
+            fs.borrow()
+                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)
         ));
 
         if file_exists(&directory) {
@@ -613,7 +632,7 @@ impl CreateProjectCommand {
                 }
                 .into());
             }
-            if !fs.is_dir_empty(&directory) {
+            if !fs.borrow().is_dir_empty(&directory) {
                 return Err(InvalidArgumentException {
                     message: format!("Project directory \"{}\" is not empty.", directory),
                     code: 0,
@@ -660,7 +679,8 @@ impl CreateProjectCommand {
             }
         }
 
-        let stability = VersionParser::normalize_stability(stability.as_deref().unwrap_or(""));
+        let stability = VersionParser::normalize_stability(stability.as_deref().unwrap_or(""))
+            .unwrap_or_default();
 
         if !STABILITIES.contains_key(stability.as_str()) {
             return Err(InvalidArgumentException {
@@ -692,14 +712,26 @@ impl CreateProjectCommand {
         config.borrow_mut().set_base_dir(Some(directory.clone()));
         let rm = composer.get_repository_manager();
 
-        let mut repository_set = RepositorySet::new(&stability);
+        let mut repository_set = RepositorySet::new(
+            &stability,
+            indexmap::IndexMap::new(),
+            vec![],
+            indexmap::IndexMap::new(),
+            indexmap::IndexMap::new(),
+            indexmap::IndexMap::new(),
+        );
         if repositories.is_none() {
+            // TODO(phase-b): default_repos needs &mut RepositoryManager but we hold &RepositoryManager.
+            let _ = rm;
             repository_set.add_repository(Box::new(CompositeRepository::new(
                 RepositoryFactory::default_repos(
                     Some(io),
                     Some(std::rc::Rc::clone(&config)),
-                    Some(rm),
-                )?,
+                    None,
+                )?
+                .into_iter()
+                .map(|(_, v)| v)
+                .collect(),
             )));
         } else {
             for repo in repositories.unwrap() {
@@ -739,7 +771,7 @@ impl CreateProjectCommand {
                     io,
                     &config,
                     repo_config.clone(),
-                    Some(rm),
+                    None,
                 )?);
             }
         }
@@ -750,21 +782,30 @@ impl CreateProjectCommand {
             match platform_overrides {
                 PhpMixed::Array(m) => m
                     .iter()
-                    .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                    .map(|(k, v)| {
+                        (
+                            k.clone(),
+                            PhpMixed::String(v.as_string().unwrap_or("").to_string()),
+                        )
+                    })
                     .collect(),
                 _ => indexmap::IndexMap::new(),
             },
-        );
+        )?;
 
         // find the latest version if there are multiple
-        let version_selector = VersionSelector::new(repository_set, Some(platform_repo));
+        let mut version_selector = VersionSelector::new(repository_set, Some(&platform_repo))?;
+        // TODO(phase-b): platform_requirement_filter is &dyn here but VersionSelector expects
+        // Option<Box<dyn ...>>; pass None as placeholder.
+        let _ = platform_requirement_filter;
         let package = version_selector.find_best_candidate(
             &name,
             package_version.as_deref(),
             &stability,
-            platform_requirement_filter,
+            None,
             0,
             Some(io),
+            PhpMixed::Bool(true),
         )?;
 
         if package.is_none() {
@@ -785,9 +826,10 @@ impl CreateProjectCommand {
                         &name,
                         package_version.as_deref(),
                         &stability,
-                        &*PlatformRequirementFilterFactory::ignore_all(),
+                        Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
+                        PhpMixed::Bool(true),
                     )?
                     .is_some()
             {
@@ -816,14 +858,14 @@ impl CreateProjectCommand {
             let real_dir_clone = real_dir.clone();
             signal_handler = Some(SignalHandler::create(
                 vec![
-                    SignalHandler::SIGINT,
-                    SignalHandler::SIGTERM,
-                    SignalHandler::SIGHUP,
+                    SignalHandler::SIGINT.to_string(),
+                    SignalHandler::SIGTERM.to_string(),
+                    SignalHandler::SIGHUP.to_string(),
                 ],
                 Box::new(move |signal: String, handler: &SignalHandler| {
                     // TODO(phase-b): self.get_io().write_error(...) inside the closure
                     let _ = &signal;
-                    let fs = Filesystem::new(None);
+                    let mut fs = Filesystem::new(None);
                     fs.remove_directory(&real_dir_clone).ok();
                     handler.exit_with_last_signal();
                 }),
@@ -831,12 +873,14 @@ impl CreateProjectCommand {
         }
 
         // avoid displaying 9999999-dev as version if default-branch was selected
-        // TODO(phase-b): `$package instanceof AliasPackage` downcast
+        // TODO(phase-b): `$package instanceof AliasPackage` downcast and reassigning
+        // `package` to its alias-of requires Rc<dyn PackageInterface> sharing. Skipped.
         let package_as_alias: Option<&AliasPackage> = None;
         if package_as_alias.is_some()
             && package.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS
         {
-            package = package_as_alias.unwrap().get_alias_of();
+            // package = package_as_alias.unwrap().get_alias_of();
+            todo!("phase-b: reassigning package to alias_of needs Rc-shared ownership");
         }
 
         io.write_error(&format!(
@@ -852,10 +896,12 @@ impl CreateProjectCommand {
             io.write_error("<info>Plugins have been disabled.</info>");
         }
 
-        // TODO(phase-b): `$package instanceof AliasPackage` downcast
+        // TODO(phase-b): `$package instanceof AliasPackage` downcast and reassigning
+        // `package` to its alias-of requires Rc<dyn PackageInterface> sharing. Skipped.
         let package_as_alias: Option<&AliasPackage> = None;
-        if let Some(alias) = package_as_alias {
-            package = alias.get_alias_of();
+        if let Some(_alias) = package_as_alias {
+            // package = alias.get_alias_of();
+            todo!("phase-b: reassigning package to alias_of needs Rc-shared ownership");
         }
 
         let dm = composer.get_download_manager();
@@ -863,13 +909,17 @@ impl CreateProjectCommand {
             .set_prefer_source(prefer_source)
             .set_prefer_dist(prefer_dist);
 
-        let project_installer = ProjectInstaller::new(&directory, dm.clone(), &fs);
+        let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs.clone());
         let im = composer.get_installation_manager();
         im.set_output_progress(!no_progress);
         im.add_installer(Box::new(project_installer));
+        let mut installed_repo = InstalledArrayRepository::new()?;
         im.execute(
-            Box::new(InstalledArrayRepository::new()?),
-            vec![Box::new(InstallOperation::new(package.clone()))],
+            &mut installed_repo,
+            vec![Box::new(InstallOperation::new(package.clone_package_box()))],
+            true,
+            true,
+            false,
         )?;
         im.notify_installs(io);
 
@@ -886,7 +936,7 @@ impl CreateProjectCommand {
         // as it is probably not meant to be used here, so we do not use it if a composer.json can be found
         // in the project
         if file_exists(&format!("{}/composer.json", directory))
-            && Platform::get_env("COMPOSER") != PhpMixed::Bool(false)
+            && Platform::get_env("COMPOSER").is_some()
         {
             Platform::clear_env("COMPOSER");
         }

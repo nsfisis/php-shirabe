@@ -26,11 +26,13 @@ pub struct LoadPackagesResult {
     pub packages: Vec<Box<dyn BasePackage>>,
 }
 
+#[derive(Debug, Clone)]
 pub enum AbandonedInfo {
     Replacement(String),
     Abandoned,
 }
 
+#[derive(Debug, Clone)]
 pub struct SearchResult {
     pub name: String,
     pub description: Option<String>,
@@ -38,6 +40,7 @@ pub struct SearchResult {
     pub url: Option<String>,
 }
 
+#[derive(Debug, Clone)]
 pub struct ProviderInfo {
     pub name: String,
     pub description: Option<String>,
@@ -80,6 +83,13 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
     fn get_repo_name(&self) -> String;
 
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
+        None
+    }
+
+    fn as_installed_repository_interface(
+        &self,
+    ) -> Option<&dyn crate::repository::installed_repository_interface::InstalledRepositoryInterface>
+    {
         None
     }
 

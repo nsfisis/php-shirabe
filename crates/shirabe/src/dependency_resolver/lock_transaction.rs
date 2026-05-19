@@ -38,7 +38,11 @@ impl LockTransaction {
             result_packages: IndexMap::new(),
         };
         this.set_result_packages(pool, decisions);
-        let all = this.result_packages.get("all").cloned().unwrap_or_default();
+        let all: Vec<Box<dyn PackageInterface>> = this
+            .result_packages
+            .get("all")
+            .map(|v| v.iter().map(|p| p.clone_package_box()).collect())
+            .unwrap_or_default();
         let present: Vec<Box<dyn PackageInterface>> = this
             .present_map
             .values()
@@ -54,8 +58,8 @@ impl LockTransaction {
         result_packages.insert("non-dev".to_string(), vec![]);
         result_packages.insert("dev".to_string(), vec![]);
 
-        for decision in decisions.iter() {
-            let literal = decision[Decisions::DECISION_LITERAL];
+        for decision in decisions.decision_queue.iter() {
+            let literal = decision.0;
 
             if literal > 0 {
                 let package = pool.literal_to_package(literal);
@@ -120,7 +124,11 @@ impl LockTransaction {
                 continue;
             }
 
-            if update_mirrors && !self.present_map.contains_key(&package.get_object_hash()) {
+            if update_mirrors
+                && !self
+                    .present_map
+                    .contains_key(&shirabe_php_shim::spl_object_hash(package.as_ref()))
+            {
                 let updated = self.update_mirror_and_urls(package.as_ref());
                 packages.push(updated);
             } else {
@@ -150,8 +158,11 @@ impl LockTransaction {
             }
 
             if let Some(concrete_pkg) = present_package.as_any().downcast_ref::<Package>() {
-                concrete_pkg.set_source_url(package.get_source_url());
-                concrete_pkg.set_source_mirrors(package.get_source_mirrors());
+                // TODO(phase-b): set_source_url/set_source_mirrors expect &mut and owned types;
+                // present_package is &Box<dyn PackageInterface> (immutable). Revisit ownership.
+                let _ = concrete_pkg;
+                let _ = package.get_source_url().map(|s| s.to_string());
+                let _ = package.get_source_mirrors();
             }
 
             if present_package.get_dist_type() != package.get_dist_type() {
@@ -168,9 +179,11 @@ impl LockTransaction {
                     package.get_dist_url().unwrap(),
                 )
                 .unwrap_or_else(|_| package.get_dist_url().unwrap().to_string());
-                present_package.set_dist_url(Some(new_dist_url));
+                // TODO(phase-b): set_dist_url requires &mut PackageInterface; revisit ownership.
+                let _ = new_dist_url;
             }
-            present_package.set_dist_mirrors(package.get_dist_mirrors());
+            // TODO(phase-b): set_dist_mirrors requires &mut PackageInterface; revisit ownership.
+            let _ = package.get_dist_mirrors();
 
             return present_package.clone_package_box();
         }

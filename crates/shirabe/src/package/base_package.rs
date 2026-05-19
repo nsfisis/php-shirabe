@@ -83,6 +83,12 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>);
     fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>>;
 
+    /// PHP `setRepository($this)` from the containing repository — Rust port marker until
+    /// the borrow story for repository-package back-references is finalized in phase B.
+    fn set_repository_self(&mut self) {
+        // TODO(phase-b): wire up a back-reference to the containing repository when needed.
+    }
+
     fn clone_box(&self) -> Box<dyn BasePackage>;
 
     // as_alias_package / as_complete_package_interface inherited from PackageInterface.

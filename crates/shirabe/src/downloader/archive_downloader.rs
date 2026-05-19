@@ -9,6 +9,7 @@ use shirabe_php_shim::{
 };
 
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::platform::Platform;
@@ -69,7 +70,14 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = self.inner().config.borrow_mut().get("vendor-dir");
+        let vendor_dir = self
+            .inner()
+            .config
+            .borrow_mut()
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
@@ -90,21 +98,20 @@ pub trait ArchiveDownloader {
             self.inner_mut()
                 .filesystem
                 .borrow_mut()
-                .empty_directory(path);
+                .empty_directory(path, true);
         }
 
-        let temporary_dir;
-        loop {
-            temporary_dir = format!("{}/composer/{}", vendor_dir, bin2hex(&random_bytes(4)));
-            if !is_dir(&temporary_dir) {
-                break;
+        let temporary_dir = loop {
+            let candidate = format!("{}/composer/{}", vendor_dir, bin2hex(&random_bytes(4)));
+            if !is_dir(&candidate) {
+                break candidate;
             }
-        }
+        };
 
         self.inner_mut().add_cleanup_path(package, &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
-        if !is_dir(path) || realpath(path) != Platform::get_cwd(false).unwrap_or_default() {
+        if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
             self.inner_mut().add_cleanup_path(package, path);
         }
 
@@ -114,136 +121,21 @@ pub trait ArchiveDownloader {
             .ensure_directory_exists(&temporary_dir);
         let file_name = self.inner().get_file_name(package, path);
 
-        let filesystem = &self.inner().filesystem;
+        let _ = file_name;
 
-        let cleanup = move || {
-            // remove cache if the file was corrupted
-            self.inner_mut().clear_last_cache_write(package);
+        let promise = self.extract(package, "", &temporary_dir)?;
 
-            // clean up
-            filesystem.borrow_mut().remove_directory(&temporary_dir);
-            if is_dir(path) && realpath(path) != Platform::get_cwd(false).unwrap_or_default() {
-                filesystem.borrow_mut().remove_directory(path);
-            }
-            self.inner_mut()
-                .remove_cleanup_path(package, &temporary_dir);
-            let realpath_result = realpath(path);
-            if let Some(realpath_val) = realpath_result {
-                self.inner_mut().remove_cleanup_path(package, &realpath_val);
-            }
-        };
-
-        let promise = match self.extract(package, &file_name, &temporary_dir) {
-            Ok(p) => p,
-            Err(e) => {
-                cleanup();
-                return Err(e);
-            }
-        };
-
-        Ok(promise.then(
-            Box::new(move || -> Result<Box<dyn PromiseInterface>> {
-                if file_exists(&file_name) {
-                    filesystem.borrow_mut().unlink(&file_name);
-                }
-
-                let get_folder_content = |dir: &str| -> Vec<std::path::PathBuf> {
-                    let finder = Finder::create()
-                        .ignore_vcs(false)
-                        .ignore_dot_files(false)
-                        .not_name(".DS_Store")
-                        .depth(0)
-                        .in_(dir);
-
-                    finder.into_iter().collect()
-                };
-
-                let mut rename_recursively: Option<Box<dyn Fn(&str, &str) -> Result<()>>> = None;
-                // Renames (and recursively merges if needed) a folder into another one
-                //
-                // For custom installers, where packages may share paths, and given Composer 2's parallelism, we need to make sure
-                // that the source directory gets merged into the target one if the target exists. Otherwise rename() by default would
-                // put the source into the target e.g. src/ => target/src/ (assuming target exists) instead of src/ => target/
-                rename_recursively = Some(Box::new(move |from: &str, to: &str| -> Result<()> {
-                    let content_dir = get_folder_content(from);
-
-                    // move files back out of the temp dir
-                    for file in &content_dir {
-                        let file = file.to_string_lossy().to_string();
-                        let file_basename = shirabe_php_shim::basename(&file);
-                        if is_dir(&format!("{}/{}", to, file_basename)) {
-                            if !is_dir(&file) {
-                                return Err(RuntimeException {
-                                    message: format!("Installing {} would lead to overwriting the {}/{} directory with a file from the package, invalid operation.", package, to, file_basename),
-                                    code: 0,
-                                }.into());
-                            }
-                            rename_recursively.as_ref().unwrap()(
-                                &file,
-                                &format!("{}/{}", to, file_basename),
-                            )?;
-                        } else {
-                            filesystem.borrow_mut().rename(&file, &format!("{}/{}", to, file_basename));
-                        }
-                    }
-
-                    Ok(())
-                }));
-
-                let mut rename_as_one = false;
-                if !file_exists(path) {
-                    rename_as_one = true;
-                } else if filesystem.borrow().is_dir_empty(path) {
-                    match filesystem.borrow_mut().remove_directory_php(path) {
-                        Ok(true) => {
-                            rename_as_one = true;
-                        }
-                        _ => {
-                            // ignore error, and simply do not renameAsOne
-                        }
-                    }
-                }
-
-                let content_dir = get_folder_content(&temporary_dir);
-                let single_dir_at_top_level =
-                    content_dir.len() == 1
-                        && is_dir(&content_dir[0].to_string_lossy().to_string());
-
-                if rename_as_one {
-                    // if the target $path is clear, we can rename the whole package in one go instead of looping over the contents
-                    let extracted_dir = if single_dir_at_top_level {
-                        content_dir[0].to_string_lossy().to_string()
-                    } else {
-                        temporary_dir.clone()
-                    };
-                    filesystem.borrow_mut().rename(&extracted_dir, path);
-                } else {
-                    // only one dir in the archive, extract its contents out of it
-                    let from = if single_dir_at_top_level {
-                        content_dir[0].to_string_lossy().to_string()
-                    } else {
-                        temporary_dir.clone()
-                    };
-
-                    rename_recursively.as_ref().unwrap()(&from, path)?;
-                }
-
-                let promise = filesystem.borrow_mut().remove_directory_async(&temporary_dir);
-
-                Ok(promise.then(
-                    Box::new(move || -> Result<()> {
-                        self.inner_mut().remove_cleanup_path(package, &temporary_dir);
-                        self.inner_mut().remove_cleanup_path(package, path);
-                        Ok(())
-                    }),
-                    None,
-                ))
-            }),
-            Box::new(move |e: anyhow::Error| -> Result<()> {
-                cleanup();
-                Err(e)
-            }),
-        ))
+        // TODO(phase-b): the original PHP chains React promise `.then(onFulfilled, onRejected)`
+        // callbacks that capture `$this`, `$filesystem`, `$package`, `$path`, `$temporaryDir`,
+        // `$fileName`, and a recursive `$renameRecursively` closure. PromiseInterface::then in
+        // Rust expects `FnOnce(Option<PhpMixed>) -> Option<PhpMixed>` and the callbacks here
+        // need both `&mut self` access and to return another promise. This needs a structural
+        // rework (likely splitting the trait or adding a `then_boxed_result` adapter), plus a
+        // way to share `&mut self` with the closure (probably `Rc<RefCell<...>>`).
+        let _ = (&promise, &temporary_dir, package, path);
+        todo!(
+            "ArchiveDownloader::install: rewire .then(onFulfilled, onRejected) chain to match PromiseInterface signature"
+        )
     }
 
     /// @inheritDoc

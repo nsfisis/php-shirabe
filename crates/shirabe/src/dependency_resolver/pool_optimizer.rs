@@ -120,7 +120,7 @@ impl PoolOptimizer {
                 );
             }
             // Extract package conflicts
-            for link in package.get_conflicts() {
+            for link in package.get_conflicts().values() {
                 self.extract_conflict_constraints_per_package(
                     link.get_target(),
                     // TODO(phase-b): clone constraint
@@ -167,7 +167,7 @@ impl PoolOptimizer {
             if CompilingMatcher::r#match(
                 constraint.as_ref(),
                 Constraint::OP_EQ,
-                package.get_version(),
+                package.get_version().to_string(),
             ) {
                 self.mark_package_irremovable(package.as_ref());
             }
@@ -216,7 +216,8 @@ impl PoolOptimizer {
             todo!("pool.get_unacceptable_fixed_or_locked_packages().clone()"),
             removed_versions,
             self.removed_versions_by_package.clone(),
-            pool.get_all_security_removed_package_versions().clone(),
+            // TODO(phase-b): PartialSecurityAdvisory is a PHP class (no Clone). Need shared ownership rework.
+            todo!("pool.get_all_security_removed_package_versions().clone()"),
             pool.get_all_abandoned_removed_package_versions().clone(),
         )
     }
@@ -254,31 +255,35 @@ impl PoolOptimizer {
                     continue;
                 }
 
-                let require_constraints = self
-                    .require_constraints_per_package
-                    .get(&package_name)
-                    .cloned()
-                    .unwrap_or_default();
+                let require_constraints = self.require_constraints_per_package.get(&package_name);
+                let empty_constraints = IndexMap::new();
+                let require_constraints = require_constraints.unwrap_or(&empty_constraints);
                 for (_, require_constraint) in require_constraints.iter() {
                     let mut group_hash_parts: Vec<String> = vec![];
 
                     if CompilingMatcher::r#match(
                         require_constraint.as_ref(),
                         Constraint::OP_EQ,
-                        package.get_version(),
+                        package.get_version().to_string(),
                     ) {
-                        group_hash_parts.push(format!("require:{}", require_constraint));
+                        group_hash_parts.push(format!(
+                            "require:{}",
+                            require_constraint.get_pretty_string()
+                        ));
                     }
 
                     if package.get_replaces().len() > 0 {
-                        for link in package.get_replaces() {
+                        for (_, link) in package.get_replaces() {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
                                 Constraint::OP_EQ,
-                                package.get_version(),
+                                package.get_version().to_string(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
-                                group_hash_parts.push(format!("require:{}", link.get_constraint()));
+                                group_hash_parts.push(format!(
+                                    "require:{}",
+                                    link.get_constraint().get_pretty_string()
+                                ));
                             }
                         }
                     }
@@ -290,9 +295,12 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 conflict_constraint.as_ref(),
                                 Constraint::OP_EQ,
-                                package.get_version(),
+                                package.get_version().to_string(),
                             ) {
-                                group_hash_parts.push(format!("conflict:{}", conflict_constraint));
+                                group_hash_parts.push(format!(
+                                    "conflict:{}",
+                                    conflict_constraint.get_pretty_string()
+                                ));
                             }
                         }
                     }
@@ -325,14 +333,18 @@ impl PoolOptimizer {
         }
 
         // PHP: foreach ($identicalDefinitionsPerPackage as $constraintGroups)
-        let identical_clone = identical_definitions_per_package.clone();
+        // TODO(phase-b): Box<dyn BasePackage> is not Clone; need restructuring to avoid borrow conflict.
+        let identical_clone: IndexMap<
+            String,
+            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
+        > = todo!("identical_definitions_per_package.clone()");
         for (_, constraint_groups) in identical_clone.iter() {
             for (_, constraint_group) in constraint_groups.iter() {
                 for (_, packages) in constraint_group.iter() {
                     // Only one package in this constraint group has the same requirements, we're not allowed to remove that package
                     if 1 == packages.len() {
                         self.keep_package(
-                            &packages[0],
+                            packages[0].as_ref(),
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -352,7 +364,7 @@ impl PoolOptimizer {
                             .select_preferred_packages(pool, literals.clone(), None)
                     {
                         self.keep_package(
-                            &pool.literal_to_package(preferred_literal),
+                            pool.literal_to_package(preferred_literal),
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -372,9 +384,18 @@ impl PoolOptimizer {
                 "requires",
                 package.get_requires().values().cloned().collect(),
             ),
-            ("conflicts", package.get_conflicts()),
-            ("replaces", package.get_replaces()),
-            ("provides", package.get_provides()),
+            (
+                "conflicts",
+                package.get_conflicts().values().cloned().collect(),
+            ),
+            (
+                "replaces",
+                package.get_replaces().values().cloned().collect(),
+            ),
+            (
+                "provides",
+                package.get_provides().values().cloned().collect(),
+            ),
         ];
 
         for (key, links) in hash_relevant_links {
@@ -394,7 +415,7 @@ impl PoolOptimizer {
                 // performance more than the additional few packages that could be filtered out would benefit the process.
                 subhash.insert(
                     link.get_target().to_string(),
-                    link.get_constraint().to_string(),
+                    link.get_constraint().__to_string(),
                 );
             }
 
@@ -618,7 +639,7 @@ impl PoolOptimizer {
                             == CompilingMatcher::r#match(
                                 link_constraint,
                                 Constraint::OP_EQ,
-                                &version_str,
+                                version_str,
                             )
                         {
                             // TODO(phase-b): mark_package_for_removal returns Result; ignoring here
@@ -647,7 +668,7 @@ impl PoolOptimizer {
             self.require_constraints_per_package
                 .entry(package.to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(expanded.to_string(), expanded);
+                .insert(expanded.__to_string(), expanded);
         }
     }
 
@@ -665,7 +686,7 @@ impl PoolOptimizer {
             self.conflict_constraints_per_package
                 .entry(package.to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(expanded.to_string(), expanded);
+                .insert(expanded.__to_string(), expanded);
         }
     }
 
@@ -680,7 +701,11 @@ impl PoolOptimizer {
             if multi.is_disjunctive() {
                 // No need to call ourselves recursively here because Intervals::compactConstraint() ensures that there
                 // are no nested disjunctive MultiConstraint instances possible
-                return multi.get_constraints();
+                return multi
+                    .get_constraints()
+                    .iter()
+                    .map(|c| c.clone_box())
+                    .collect();
             }
         }
 

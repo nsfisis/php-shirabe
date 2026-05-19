@@ -164,33 +164,21 @@ impl RepositoryCommand {
                     }
                     let reference_name = before.as_deref().or(after.as_deref()).unwrap();
                     let offset: i64 = if after.is_some() { 1 } else { 0 };
-                    let repo_config_opt: Option<IndexMap<String, PhpMixed>> = match &repo_config {
-                        PhpMixed::Array(m) => {
-                            Some(m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect())
-                        }
-                        _ => None,
-                    };
                     self.config_source.as_mut().unwrap().insert_repository(
                         name.as_deref().unwrap(),
-                        repo_config_opt,
+                        repo_config.clone(),
                         reference_name,
                         offset,
-                    );
+                    )?;
                     return Ok(0);
                 }
 
                 let append = input.get_option("append").as_bool().unwrap_or(false);
-                let repo_config_opt: Option<IndexMap<String, PhpMixed>> = match &repo_config {
-                    PhpMixed::Array(m) => {
-                        Some(m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect())
-                    }
-                    _ => None,
-                };
                 self.config_source.as_mut().unwrap().add_repository(
                     name.as_deref().unwrap(),
-                    repo_config_opt,
+                    repo_config.clone(),
                     append,
-                );
+                )?;
                 Ok(0)
             }
             "remove" | "rm" | "delete" => {
@@ -204,13 +192,13 @@ impl RepositoryCommand {
                 self.config_source
                     .as_mut()
                     .unwrap()
-                    .remove_repository(name_str);
+                    .remove_repository(name_str)?;
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     self.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
-                        None,
+                        PhpMixed::Null,
                         false,
-                    );
+                    )?;
                 }
                 Ok(0)
             }
@@ -326,7 +314,7 @@ impl RepositoryCommand {
         }
     }
 
-    fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) {
+    fn list_repositories(&mut self, mut repos: IndexMap<String, PhpMixed>) {
         let io = self.get_io();
 
         let mut packagist_present = false;

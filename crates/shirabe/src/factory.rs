@@ -116,7 +116,7 @@ impl Factory {
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(format!(
                 "{}/Composer",
-                trim(&strtr(&appdata, "\\", "/"), "/")
+                trim(&strtr(&appdata, "\\", "/"), Some("/"))
             ));
         }
 
@@ -168,7 +168,7 @@ impl Factory {
                 cache_dir = format!("{}/cache", home);
             }
 
-            return Ok(trim(&strtr(&cache_dir, "\\", "/"), "/"));
+            return Ok(trim(&strtr(&cache_dir, "\\", "/"), Some("/")));
         }
 
         let user_dir = Self::get_user_dir()?;
@@ -233,11 +233,12 @@ impl Factory {
         io: Option<&dyn IOInterface>,
         cwd: Option<&str>,
     ) -> anyhow::Result<Config> {
-        let cwd = cwd
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| Platform::get_cwd(true));
+        let cwd = match cwd {
+            Some(s) => s.to_string(),
+            None => Platform::get_cwd(true)?,
+        };
 
-        let mut config = Config::new(true, cwd);
+        let mut config = Config::new(true, Some(cwd));
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
@@ -256,10 +257,11 @@ impl Factory {
             "config".to_string(),
             PhpMixed::Array(inner.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
         );
-        config.merge(defaults, Config::SOURCE_DEFAULT);
+        config.merge(&defaults, Config::SOURCE_DEFAULT);
 
         // load global config
-        let file = JsonFile::new(format!("{}/config.json", config.get_str("home")?), None, io)?;
+        let global_config_path = format!("{}/config.json", config.get_str("home")?);
+        let mut file = JsonFile::new(global_config_path.clone(), None, io.map(|i| i.clone_box()))?;
         if file.exists() {
             if let Some(io_ref) = io {
                 io_ref.write_error3(
@@ -268,15 +270,29 @@ impl Factory {
                     crate::io::io_interface::DEBUG,
                 );
             }
+            // TODO(phase-b): validate_json_schema takes ownership of JsonFile; recreate it
             Self::validate_json_schema(
                 io,
-                ValidateJsonInput::File(file.clone()),
+                ValidateJsonInput::File(JsonFile::new(
+                    global_config_path.clone(),
+                    None,
+                    io.map(|i| i.clone_box()),
+                )?),
                 JsonFile::LAX_SCHEMA,
                 None,
             )?;
-            config.merge(file.read()?, file.get_path().to_string());
+            let read_data = match file.read()? {
+                PhpMixed::Array(map) => map
+                    .into_iter()
+                    .map(|(k, v)| (k, *v))
+                    .collect::<IndexMap<_, _>>(),
+                _ => IndexMap::new(),
+            };
+            let file_path_owned = file.get_path().to_string();
+            config.merge(&read_data, &file_path_owned);
         }
-        config.set_config_source(JsonConfigSource::new(file.clone(), false));
+        // TODO(phase-b): set_config_source takes Box<dyn ConfigSourceInterface>
+        config.set_config_source(Box::new(JsonConfigSource::new(file, false)));
 
         let htaccess_protect = config.get("htaccess-protect").as_bool().unwrap_or(false);
         if htaccess_protect {
@@ -305,7 +321,8 @@ impl Factory {
         }
 
         // load global auth file
-        let auth_file = JsonFile::new(format!("{}/auth.json", config.get_str("home")?), None, io)?;
+        let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
+        let mut auth_file = JsonFile::new(auth_file_path.clone(), None, io.map(|i| i.clone_box()))?;
         if auth_file.exists() {
             if let Some(io_ref) = io {
                 io_ref.write_error3(
@@ -314,26 +331,36 @@ impl Factory {
                     crate::io::io_interface::DEBUG,
                 );
             }
+            // TODO(phase-b): validate_json_schema takes ownership; recreate JsonFile
             Self::validate_json_schema(
                 io,
-                ValidateJsonInput::File(auth_file.clone()),
+                ValidateJsonInput::File(JsonFile::new(
+                    auth_file_path.clone(),
+                    None,
+                    io.map(|i| i.clone_box()),
+                )?),
                 JsonFile::AUTH_SCHEMA,
                 None,
             )?;
+            let read_data: IndexMap<String, PhpMixed> = match auth_file.read()? {
+                PhpMixed::Array(map) => map.into_iter().map(|(k, v)| (k, *v)).collect(),
+                _ => IndexMap::new(),
+            };
             let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
             wrapped.insert(
                 "config".to_string(),
                 PhpMixed::Array(
-                    auth_file
-                        .read()?
+                    read_data
                         .into_iter()
                         .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
                 ),
             );
-            config.merge(wrapped, auth_file.get_path().to_string());
+            let auth_path_owned = auth_file.get_path().to_string();
+            config.merge(&wrapped, &auth_path_owned);
         }
-        config.set_auth_config_source(JsonConfigSource::new(auth_file, true));
+        // TODO(phase-b): set_auth_config_source takes Box<dyn ConfigSourceInterface>
+        config.set_auth_config_source(Box::new(JsonConfigSource::new(auth_file, true)));
 
         Self::load_composer_auth_env(&mut config, io)?;
 
@@ -343,7 +370,7 @@ impl Factory {
     pub fn get_composer_file() -> anyhow::Result<String> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
-            let env_trimmed = trim(&env_str, " \t\n\r\0\u{0B}");
+            let env_trimmed = trim(&env_str, Some(" \t\n\r\0\u{0B}"));
             if env_trimmed != "" {
                 if is_dir(&env_trimmed) {
                     return Err(anyhow::anyhow!(RuntimeException {
@@ -385,24 +412,21 @@ impl Factory {
         let mut styles: IndexMap<String, OutputFormatterStyle> = IndexMap::new();
         styles.insert(
             "highlight".to_string(),
-            OutputFormatterStyle::new(Some("red".to_string()), None, Vec::new()),
+            OutputFormatterStyle::new(Some("red"), None, Some(vec![])),
         );
         styles.insert(
             "warning".to_string(),
-            OutputFormatterStyle::new(
-                Some("black".to_string()),
-                Some("yellow".to_string()),
-                Vec::new(),
-            ),
+            OutputFormatterStyle::new(Some("black"), Some("yellow"), Some(vec![])),
         );
         styles
     }
 
     pub fn create_output() -> ConsoleOutput {
-        let styles = Self::create_additional_styles();
-        let formatter = OutputFormatter::new(false, styles);
-
-        ConsoleOutput::new_with_formatter(ConsoleOutput::VERBOSITY_NORMAL, None, formatter)
+        let _styles = Self::create_additional_styles();
+        // TODO(phase-b): OutputFormatter::new signature and ConsoleOutput::new_with_formatter missing
+        todo!(
+            "create_output: wire OutputFormatter into ConsoleOutput once the symfony console stubs are completed"
+        )
     }
 
     /// Creates a Composer instance
@@ -424,7 +448,10 @@ impl Factory {
             }
         }
 
-        let cwd = cwd.unwrap_or_else(|| Platform::get_cwd(true));
+        let cwd = match cwd {
+            Some(s) => s,
+            None => Platform::get_cwd(true)?,
+        };
 
         // load Composer configuration
         if local_config.is_none() {
@@ -437,7 +464,7 @@ impl Factory {
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
 
-            let file = JsonFile::new(path.clone(), None, Some(io))?;
+            let mut file = JsonFile::new(path.clone(), None, Some(io.clone_box()))?;
 
             if !file.exists() {
                 let message = if path == "./composer.json" || path == "composer.json" {
@@ -473,7 +500,11 @@ impl Factory {
                 }
             }
 
-            local_config_data = file.read()?.as_array().cloned().unwrap_or_default();
+            local_config_data = file
+                .read()?
+                .as_array()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .unwrap_or_default();
             local_config_source = file.get_path().to_string();
         } else if let Some(LocalConfigInput::Data(data)) = local_config {
             local_config_data = data;
@@ -504,7 +535,7 @@ impl Factory {
                 false,
             )));
 
-            let local_auth_file = JsonFile::new(
+            let mut local_auth_file = JsonFile::new(
                 format!(
                     "{}/auth.json",
                     dirname(&realpath(composer_file_path).unwrap_or_default())
@@ -554,7 +585,8 @@ impl Factory {
 
         if full_load {
             // load auth configs into the IO instance
-            io.load_configuration(&mut *config.borrow_mut())?;
+            // TODO(phase-b): load_configuration requires &mut IOInterface; create_composer takes &dyn IOInterface
+            // io.load_configuration(&mut *config.borrow_mut())?;
 
             // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
             // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
@@ -578,7 +610,9 @@ impl Factory {
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
             Self::create_http_downloader(io, &config, IndexMap::new())?,
         ));
-        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io)));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+            io.clone_box(),
+        ))));
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
             std::rc::Rc::clone(&http_downloader),
             Some(std::rc::Rc::clone(&process)),
@@ -586,23 +620,25 @@ impl Factory {
         composer.set_loop(r#loop.clone());
 
         // initialize event dispatcher
-        let mut dispatcher = EventDispatcher::new(
-            composer.as_partial(),
-            io.clone_box(),
-            Some(std::rc::Rc::clone(&process)),
-        );
-        dispatcher.set_run_scripts(!disable_scripts);
-        composer.set_event_dispatcher(dispatcher.clone());
+        let dispatcher = {
+            let mut d = EventDispatcher::new(
+                composer.as_partial(),
+                io.clone_box(),
+                Some(std::rc::Rc::clone(&process)),
+            );
+            d.set_run_scripts(!disable_scripts);
+            std::rc::Rc::new(std::cell::RefCell::new(d))
+        };
+        composer.set_event_dispatcher(std::rc::Rc::clone(&dispatcher));
 
         // initialize repository manager
-        let rm = RepositoryFactory::manager(
+        let mut rm = RepositoryFactory::manager(
             io,
             &config,
             Some(std::rc::Rc::clone(&http_downloader)),
-            Some(dispatcher.clone()),
+            Some(std::rc::Rc::clone(&dispatcher)),
             Some(std::rc::Rc::clone(&process)),
         )?;
-        composer.set_repository_manager(rm.clone());
 
         // force-set the version of the global package if not defined as
         // guessing it adds no value and only takes time
@@ -616,9 +652,12 @@ impl Factory {
             std::rc::Rc::clone(&config),
             std::rc::Rc::clone(&process),
             parser.clone(),
+            Some(io.clone_box()),
         );
+        // TODO(phase-b): RepositoryManager is a PHP class — both composer.set_repository_manager()
+        // and self.load_root_package() want ownership. Use a placeholder rm for the loader.
         let mut loader = self.load_root_package(
-            rm.clone(),
+            todo!("share RepositoryManager via Rc<RefCell<>>"),
             std::rc::Rc::clone(&config),
             parser,
             guesser,
@@ -632,24 +671,28 @@ impl Factory {
             "Composer\\Package\\RootPackage",
             Some(&cwd),
         )?;
-        composer.set_package(package);
+        // TODO(phase-b): set_package expects RootPackageInterface; loader returns BasePackage
+        // composer.set_package(package);
+        let _ = package;
 
         // load local repository
         self.add_local_repository(
             io,
-            rm.clone(),
+            &mut rm,
             &vendor_dir,
             composer.get_package(),
             Some(&process),
         );
+        composer.set_repository_manager(rm);
 
         // initialize installation manager
         let im = self.create_installation_manager(
             r#loop.clone(),
             io.clone_box(),
-            Some(dispatcher.clone()),
+            Some(std::rc::Rc::clone(&dispatcher)),
         );
-        composer.set_installation_manager(im.clone());
+        // TODO(phase-b): set_installation_manager takes ownership; im needs sharing for create_default_installers
+        composer.set_installation_manager(im);
 
         if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
             // initialize download manager
@@ -663,7 +706,8 @@ impl Factory {
             composer_full.set_download_manager(dm.clone());
 
             // initialize autoload generator
-            let generator = AutoloadGenerator::new(&dispatcher, io.clone_box());
+            let generator =
+                AutoloadGenerator::new(std::rc::Rc::clone(&dispatcher), Some(io.clone_box()));
             composer_full.set_autoload_generator(generator);
 
             // initialize archive manager
@@ -694,6 +738,7 @@ impl Factory {
                     );
                 }
 
+                // TODO(phase-b): InstallationManager is a PHP class — needs Rc<RefCell<>> sharing
                 let locker = Locker::new(
                     io.clone_box(),
                     JsonFile::new(
@@ -703,27 +748,29 @@ impl Factory {
                             Platform::get_dev_null()
                         },
                         None,
-                        Some(io),
+                        Some(io.clone_box()),
                     )?,
-                    im.clone(),
-                    file_get_contents(composer_file_path).unwrap_or_default(),
+                    todo!("InstallationManager clone"),
+                    &file_get_contents(composer_file_path).unwrap_or_default(),
                     std::rc::Rc::clone(&process),
                 );
                 composer_full.set_locker(locker);
             } else {
+                let lock_contents = JsonFile::encode(
+                    &PhpMixed::Array(
+                        local_config_data
+                            .iter()
+                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                            .collect(),
+                    ),
+                    448,
+                );
+                // TODO(phase-b): InstallationManager is a PHP class — needs Rc<RefCell<>> sharing
                 let locker = Locker::new(
                     io.clone_box(),
-                    JsonFile::new(Platform::get_dev_null(), None, Some(io))?,
-                    im.clone(),
-                    JsonFile::encode(
-                        &PhpMixed::Array(
-                            local_config_data
-                                .iter()
-                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                .collect(),
-                        ),
-                        448,
-                    ),
+                    JsonFile::new(Platform::get_dev_null(), None, Some(io.clone_box()))?,
+                    todo!("InstallationManager clone"),
+                    &lock_contents,
                     std::rc::Rc::clone(&process),
                 );
                 composer_full.set_locker(locker);
@@ -748,24 +795,25 @@ impl Factory {
                 global_composer.as_ref(),
                 disable_plugins,
             );
-            composer_full.set_plugin_manager(pm.clone());
-
+            // TODO(phase-b): PluginManager is a PHP class; sharing pm before transferring requires Rc<RefCell<>>
             if composer_full.is_global() {
                 pm.set_running_in_global_dir(true);
             }
-
             pm.load_installed_plugins();
+            composer_full.set_plugin_manager(pm);
         }
 
         if full_load {
             let init_event = Event::from_name(PluginEvents::INIT.to_string());
             composer
-                .get_event_dispatcher_mut()
+                .get_event_dispatcher()
+                .borrow_mut()
                 .dispatch(Some(init_event.get_name()), Some(init_event))?;
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
-            self.purge_packages(rm.get_local_repository(), &im);
+            // TODO(phase-b): rm and im are owned by composer at this point; need to access via composer
+            // self.purge_packages(rm.get_local_repository(), &mut im)?;
         }
 
         Ok(composer)
@@ -789,7 +837,7 @@ impl Factory {
     fn add_local_repository(
         &self,
         io: &dyn IOInterface,
-        mut rm: RepositoryManager,
+        rm: &mut RepositoryManager,
         vendor_dir: &str,
         root_package: &dyn RootPackageInterface,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
@@ -865,9 +913,12 @@ impl Factory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        event_dispatcher: Option<&EventDispatcher>,
+        event_dispatcher: Option<&std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
-        let mut cache: Option<Cache> = None;
+        // TODO(phase-b): cache is shared across all downloaders; PHP class semantics requires
+        // either Rc<RefCell<Cache>> (with corresponding signature changes everywhere) or
+        // making Cache cloneable. For now we don't construct a cache and pass None below.
+        let _cache: Option<Cache> = None;
         if config
             .borrow_mut()
             .get("cache-files-ttl")
@@ -875,19 +926,13 @@ impl Factory {
             .unwrap_or(0)
             > 0
         {
-            let mut c = Cache::new(
-                io,
+            let _ = Cache::new(
+                io.clone_box(),
                 &config.borrow_mut().get_str("cache-files-dir")?,
-                "a-z0-9_./",
+                Some("a-z0-9_./"),
+                None,
+                false,
             );
-            c.set_read_only(
-                config
-                    .borrow_mut()
-                    .get("cache-read-only")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false),
-            );
-            cache = Some(c);
         }
 
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
@@ -895,8 +940,8 @@ impl Factory {
         ))));
 
         let mut dm = DownloadManager::new(io.clone_box(), false, Some(std::rc::Rc::clone(&fs)));
-        let preferred = config.borrow_mut().get("preferred-install").cloned();
-        match preferred.as_ref().and_then(|v| v.as_string()) {
+        let preferred = config.borrow_mut().get("preferred-install");
+        match preferred.as_string() {
             Some("dist") => {
                 dm.set_prefer_dist(true);
             }
@@ -908,7 +953,7 @@ impl Factory {
             }
         }
 
-        if let Some(PhpMixed::Array(prefs)) = preferred {
+        if let PhpMixed::Array(prefs) = preferred {
             dm.set_preferences(
                 prefs
                     .into_iter()
@@ -977,7 +1022,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -989,7 +1034,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1001,7 +1046,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1013,7 +1058,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1025,7 +1070,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1037,7 +1082,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1049,7 +1094,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 Some(std::rc::Rc::clone(&fs)),
                 Some(std::rc::Rc::clone(&process)),
             )),
@@ -1061,7 +1106,7 @@ impl Factory {
                 std::rc::Rc::clone(&config),
                 std::rc::Rc::clone(http_downloader),
                 event_dispatcher.cloned(),
-                cache.clone(),
+                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
                 std::rc::Rc::clone(&fs),
                 std::rc::Rc::clone(&process),
             )),
@@ -1094,19 +1139,17 @@ impl Factory {
         global_composer: Option<&PartialComposer>,
         disable_plugins: DisablePlugins,
     ) -> PluginManager {
-        PluginManager::new(
-            io.clone_box(),
-            composer.clone(),
-            global_composer.cloned(),
-            disable_plugins,
-        )
+        // TODO(phase-b): PluginManager::new takes ownership of Composer/PartialComposer; PHP
+        // class semantics requires Rc<RefCell<>> for shared access. Stubbed for now.
+        let _ = (io, composer, global_composer, disable_plugins);
+        todo!("PluginManager::new requires shared Composer/PartialComposer")
     }
 
     pub fn create_installation_manager(
         &self,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
         io: Box<dyn IOInterface>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> InstallationManager {
         InstallationManager::new(r#loop, io, event_dispatcher)
     }
@@ -1127,7 +1170,7 @@ impl Factory {
                 .borrow_mut()
                 .get_str("bin-dir")
                 .unwrap_or_default(),
-            "/",
+            Some("/"),
         );
         let bin_compat = composer
             .get_config()
@@ -1140,31 +1183,20 @@ impl Factory {
                 .borrow_mut()
                 .get_str("vendor-dir")
                 .unwrap_or_default(),
-            "/",
+            Some("/"),
         );
-        let binary_installer = BinaryInstaller::new(
+        // TODO(phase-b): BinaryInstaller is a PHP class so it can't be cloned. Sharing requires
+        // Rc<RefCell<BinaryInstaller>>; for now construct one per installer.
+        let _binary_installer = BinaryInstaller::new(
             io.clone_box(),
-            bin_dir,
-            bin_compat,
+            bin_dir.clone(),
+            bin_compat.clone(),
             Some(std::rc::Rc::clone(&fs)),
-            vendor_dir,
+            Some(vendor_dir.clone()),
         );
 
-        let mut im = im.clone();
-        im.add_installer(Box::new(LibraryInstaller::new(
-            io.clone_box(),
-            composer.as_partial(),
-            None,
-            Some(std::rc::Rc::clone(&fs)),
-            binary_installer.clone(),
-        )));
-        im.add_installer(Box::new(PluginInstaller::new(
-            io.clone_box(),
-            composer.as_partial(),
-            Some(std::rc::Rc::clone(&fs)),
-            binary_installer.clone(),
-        )));
-        im.add_installer(Box::new(MetapackageInstaller::new(io.clone_box())));
+        // TODO(phase-b): InstallationManager not clone-able; need shared Rc<RefCell<>>
+        let _ = im;
     }
 
     fn purge_packages(
@@ -1240,7 +1272,7 @@ impl Factory {
         static mut WARNED: bool = false;
         let mut disable_tls = false;
         // allow running the config command if disable-tls is in the arg list, even if openssl is missing, to allow disabling it via the config command
-        let argv = Platform::server_argv().unwrap_or_default();
+        let argv = shirabe_php_shim::server_argv();
         if !argv.is_empty()
             && argv.contains(&"disable-tls".to_string())
             && (argv.contains(&"conf".to_string()) || argv.contains(&"config".to_string()))
@@ -1301,12 +1333,13 @@ impl Factory {
             http_downloader_options =
                 array_replace_recursive(http_downloader_options, options.clone());
         }
-        let http_downloader = match HttpDownloader::new_full(
+        let http_downloader_result: anyhow::Result<HttpDownloader> = Ok(HttpDownloader::new(
             io.clone_box(),
             std::rc::Rc::clone(config),
             http_downloader_options,
             disable_tls,
-        ) {
+        ));
+        let http_downloader = match http_downloader_result {
             Ok(h) => h,
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
@@ -1372,13 +1405,14 @@ impl Factory {
         if !matches!(auth_data_assoc, PhpMixed::Null) {
             let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
             wrapped.insert("config".to_string(), auth_data_assoc);
-            config.merge(wrapped, "COMPOSER_AUTH".to_string());
+            config.merge(&wrapped, "COMPOSER_AUTH");
         }
         Ok(())
     }
 
     fn use_xdg() -> bool {
-        for key in array_keys(&Platform::server_env()) {
+        // PHP: array_keys($_SERVER) — iterate env-style server vars
+        for (key, _) in std::env::vars() {
             if strpos(&key, "XDG_") == Some(0) {
                 return true;
             }
@@ -1398,7 +1432,7 @@ impl Factory {
             }));
         }
 
-        Ok(trim(&strtr(&home, "\\", "/"), "/"))
+        Ok(trim(&strtr(&home, "\\", "/"), Some("/")))
     }
 
     fn validate_json_schema(
@@ -1412,7 +1446,7 @@ impl Factory {
         }
 
         let result = match file_or_data {
-            ValidateJsonInput::File(file) => file.validate_schema(schema),
+            ValidateJsonInput::File(mut file) => file.validate_schema(schema, None),
             ValidateJsonInput::Data(data) => {
                 let source = source.ok_or_else(|| {
                     anyhow::anyhow!(InvalidArgumentException {
@@ -1422,7 +1456,7 @@ impl Factory {
                         code: 0,
                     })
                 })?;
-                JsonFile::validate_json_schema(source, &data, schema)
+                JsonFile::validate_json_schema(source, &data, schema, None)
             }
         };
 
@@ -1484,7 +1518,10 @@ impl PartialComposerOrComposer {
             Self::Partial(p) => p.set_loop(r#loop),
         }
     }
-    fn set_event_dispatcher(&mut self, dispatcher: EventDispatcher) {
+    fn set_event_dispatcher(
+        &mut self,
+        dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+    ) {
         match self {
             Self::Full(c) => c.set_event_dispatcher(dispatcher),
             Self::Partial(p) => p.set_event_dispatcher(dispatcher),
@@ -1520,18 +1557,16 @@ impl PartialComposerOrComposer {
             Self::Partial(p) => p.get_config(),
         }
     }
-    fn get_event_dispatcher_mut(&mut self) -> &mut EventDispatcher {
+    fn get_event_dispatcher(&self) -> &std::rc::Rc<std::cell::RefCell<EventDispatcher>> {
         match self {
-            Self::Full(c) => c.get_event_dispatcher_mut(),
-            Self::Partial(p) => p.get_event_dispatcher_mut(),
+            Self::Full(c) => c.get_event_dispatcher(),
+            Self::Partial(p) => p.get_event_dispatcher(),
         }
     }
     fn as_partial(&self) -> PartialComposer {
-        // TODO(phase-b): exact clone semantics differ across Composer/PartialComposer.
-        match self {
-            Self::Full(_) => PartialComposer::default(),
-            Self::Partial(p) => p.clone(),
-        }
+        // TODO(phase-b): PHP class semantics requires sharing PartialComposer by reference;
+        // currently returning a fresh default since PartialComposer is not Clone.
+        PartialComposer::default()
     }
     fn into_partial(self) -> PartialComposer {
         match self {

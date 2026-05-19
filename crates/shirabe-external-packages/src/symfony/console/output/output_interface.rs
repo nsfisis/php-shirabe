@@ -13,6 +13,16 @@ pub trait OutputInterface {
     fn is_decorated(&self) -> bool;
     fn set_formatter(&mut self, formatter: OutputFormatter);
     fn get_formatter(&mut self) -> &mut OutputFormatter;
+
+    /// PHP: `$output instanceof ConsoleOutputInterface`. Default false; ConsoleOutput overrides.
+    fn is_console_output_interface(&self) -> bool {
+        false
+    }
+
+    /// PHP: only StreamOutput exposes `getStream()`. Default panics for outputs without one.
+    fn get_stream(&self) -> shirabe_php_shim::PhpResource {
+        todo!("get_stream not available on this OutputInterface implementation")
+    }
 }
 
 pub const VERBOSITY_QUIET: i64 = 16;

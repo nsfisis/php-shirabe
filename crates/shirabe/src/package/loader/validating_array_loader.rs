@@ -12,6 +12,7 @@ use shirabe_php_shim::{
     strtolower, strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
 use shirabe_semver::constraint::match_none_constraint::MatchNoneConstraint;
 use shirabe_semver::intervals::Intervals;
 
@@ -215,7 +216,7 @@ impl ValidatingArrayLoader {
                         let license_to_validate = str_replace("proprietary", "MIT", &license_str);
                         if !license_validator.validate(&license_to_validate) {
                             if license_validator
-                                .validate(&trim(&license_to_validate, " \t\n\r\0\u{0B}"))
+                                .validate(&trim(&license_to_validate, Some(" \t\n\r\0\u{0B}")))
                             {
                                 self.warnings.push(sprintf(
                                     "License %s must not contain extra spaces, make sure to trim it.",
@@ -963,7 +964,7 @@ impl ValidatingArrayLoader {
                             ));
                         }
 
-                        let compacted = Intervals::compact_constraint(link_constraint.as_ref());
+                        let compacted = Intervals::compact_constraint(link_constraint.as_ref())?;
                         if compacted.as_any().is::<MatchNoneConstraint>() {
                             self.warnings.push(format!(
                                 "{}.{} : this version constraint cannot possibly match anything ({})",
@@ -985,7 +986,16 @@ impl ValidatingArrayLoader {
                             .and_then(|v| v.as_array())
                             .cloned()
                             .unwrap_or_default();
-                        let keys = array_intersect_key(&replace_map, &conflict_map);
+                        // TODO(phase-b): convert Box<PhpMixed> maps for the shim signature.
+                        let replace_map_flat: IndexMap<String, PhpMixed> = replace_map
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect();
+                        let conflict_map_flat: IndexMap<String, PhpMixed> = conflict_map
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect();
+                        let keys = array_intersect_key(&replace_map_flat, &conflict_map_flat);
                         if !keys.is_empty() {
                             self.errors.push(format!(
                                 "{}.{} : you cannot conflict with a package that is also replaced, as replace already creates an implicit conflict rule",
@@ -1238,7 +1248,7 @@ impl ValidatingArrayLoader {
                         0,
                         Some((target_branch_str.len() as i64) - 4),
                     );
-                    let validated_target_branch = self.version_parser.normalize_branch(&trimmed);
+                    let validated_target_branch = self.version_parser.normalize_branch(&trimmed)?;
                     if substr(&validated_target_branch, -4, None) != "-dev" {
                         self.warnings.push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must be a parseable number like 2.0-dev",
@@ -1418,7 +1428,7 @@ impl ValidatingArrayLoader {
         let is_empty = !self.config.contains_key(property)
             || trim(
                 self.config[property].as_string().unwrap_or(""),
-                " \t\n\r\0\u{0B}",
+                Some(" \t\n\r\0\u{0B}"),
             ) == "";
         if is_empty {
             if mandatory {

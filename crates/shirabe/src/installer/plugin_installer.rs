@@ -57,19 +57,8 @@ impl PluginInstaller {
     }
 
     fn get_plugin_manager(&self) -> &PluginManager {
-        // TODO(plugin): assert self.inner.composer is fully loaded Composer instance
-        assert!(
-            self.inner.composer.is_full_composer(),
-            "{}",
-            LogicException {
-                message:
-                    "PluginInstaller should be initialized with a fully loaded Composer instance."
-                        .to_string(),
-                code: 0,
-            }
-        );
-        // TODO(plugin): return plugin manager from composer
-        self.inner.composer.get_plugin_manager()
+        // TODO(plugin): PartialComposer does not expose PluginManager; revisit when wiring plugin support
+        todo!("PartialComposer.get_plugin_manager")
     }
 
     fn get_plugin_manager_mut(&mut self) -> &mut PluginManager {
@@ -106,8 +95,8 @@ impl InstallerInterface for PluginInstaller {
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             // TODO(plugin): check if plugin is allowed
-            self.get_plugin_manager()
-                .is_plugin_allowed(package.get_name(), false, plugin_optional);
+            // TODO(phase-b): is_plugin_allowed needs &mut PluginManager but prepare is &self.
+            let _ = plugin_optional;
         }
 
         self.inner.prepare(r#type, package, prev_package)
@@ -145,12 +134,15 @@ impl InstallerInterface for PluginInstaller {
         };
 
         // TODO(plugin): register package in plugin manager after install, rollback on failure
-        Ok(Some(promise.then(Box::new(move || -> Result<()> {
-            Platform::workaround_filesystem_issues();
-            // self.get_plugin_manager().register_package(package, true)?;
-            // On error: self.rollback_install(e, repo, package)?;
-            Ok(())
-        }))))
+        Ok(Some(promise.then(
+            Some(Box::new(move |_v| -> Option<PhpMixed> {
+                Platform::workaround_filesystem_issues();
+                // self.get_plugin_manager().register_package(package, true)?;
+                // On error: self.rollback_install(e, repo, package)?;
+                None
+            })),
+            None,
+        )))
     }
 
     fn update(
@@ -166,13 +158,16 @@ impl InstallerInterface for PluginInstaller {
         };
 
         // TODO(plugin): deactivate initial and register target in plugin manager after update, rollback on failure
-        Ok(Some(promise.then(Box::new(move || -> Result<()> {
-            Platform::workaround_filesystem_issues();
-            // self.get_plugin_manager().deactivate_package(initial);
-            // self.get_plugin_manager().register_package(target, true)?;
-            // On error: self.rollback_install(e, repo, target)?;
-            Ok(())
-        }))))
+        Ok(Some(promise.then(
+            Some(Box::new(move |_v| -> Option<PhpMixed> {
+                Platform::workaround_filesystem_issues();
+                // self.get_plugin_manager().deactivate_package(initial);
+                // self.get_plugin_manager().register_package(target, true)?;
+                // On error: self.rollback_install(e, repo, target)?;
+                None
+            })),
+            None,
+        )))
     }
 
     fn uninstall(

@@ -42,28 +42,36 @@ impl DumpAutoloadCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
+        let mut composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch CommandEvent
         let command_event =
             CommandEvent::new(PluginEvents::COMMAND, "dump-autoload", input, output);
         composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let installation_manager = composer.get_installation_manager();
-        let local_repo = composer.get_repository_manager().get_local_repository();
-        let package = composer.get_package();
-        let config = composer.get_config();
+        // Clone the Rc<RefCell<Config>> so we can take mutable borrows of composer later
+        let config = std::rc::Rc::clone(composer.get_config());
 
         let mut missing_dependencies = false;
-        for local_pkg in local_repo.get_canonical_packages() {
-            let install_path = installation_manager.get_install_path(&*local_pkg);
-            if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
-                missing_dependencies = true;
-                self.get_io().write("<warning>Not all dependencies are installed. Make sure to run a \"composer install\" to install missing dependencies</warning>");
-                break;
+        {
+            let local_repo = composer.get_repository_manager().get_local_repository();
+            for local_pkg in local_repo.get_canonical_packages() {
+                // TODO(phase-b): get_install_path takes &mut self on installation_manager which conflicts with the &local_repo borrow held by this loop; needs shared-ownership refactor
+                let install_path: Option<String> =
+                    todo!("InstallationManager::get_install_path requires &mut self");
+                if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
+                    missing_dependencies = true;
+                    self.get_io().write("<warning>Not all dependencies are installed. Make sure to run a \"composer install\" to install missing dependencies</warning>");
+                    break;
+                }
             }
         }
 
@@ -127,12 +135,12 @@ impl DumpAutoloadCommand {
                 .write("<info>Generating autoload files</info>");
         }
 
-        let generator = composer.get_autoload_generator();
+        let platform_requirement_filter = self.get_platform_requirement_filter(input)?;
         if input.get_option("dry-run").as_bool().unwrap_or(false) {
-            generator.set_dry_run(true);
+            composer.get_autoload_generator_mut().set_dry_run(true);
         }
         if input.get_option("no-dev").as_bool().unwrap_or(false) {
-            generator.set_dev_mode(false);
+            composer.get_autoload_generator_mut().set_dev_mode(false);
         }
         if input.get_option("dev").as_bool().unwrap_or(false) {
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
@@ -144,27 +152,22 @@ impl DumpAutoloadCommand {
                 }
                 .into());
             }
-            generator.set_dev_mode(true);
+            composer.get_autoload_generator_mut().set_dev_mode(true);
         }
-        generator.set_class_map_authoritative(authoritative);
-        generator.set_run_scripts(true);
-        generator.set_apcu(apcu, apcu_prefix.as_deref());
-        generator.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
-        let class_map = generator.dump(
-            &*config.borrow(),
-            &local_repo,
-            package,
-            installation_manager,
-            "composer",
-            optimize,
-            None,
-            composer.get_locker(),
-            input
-                .get_option("strict-ambiguous")
-                .as_bool()
-                .unwrap_or(false),
-        )?;
-        let number_of_classes = class_map.len();
+        composer
+            .get_autoload_generator_mut()
+            .set_class_map_authoritative(authoritative);
+        composer.get_autoload_generator_mut().set_run_scripts(true);
+        composer
+            .get_autoload_generator_mut()
+            .set_apcu(apcu, apcu_prefix);
+        composer
+            .get_autoload_generator_mut()
+            .set_platform_requirement_filter(platform_requirement_filter);
+        // TODO(phase-b): dump requires multiple borrows of composer simultaneously (autoload generator mut, repository, package, installation manager, locker); needs shared-ownership refactor
+        let class_map: shirabe_class_map_generator::class_map::ClassMap =
+            todo!("AutoloadGenerator::dump requires concurrent borrows of Composer subsystems");
+        let number_of_classes = class_map.map.len();
 
         if authoritative {
             self.get_io().write(&format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
@@ -188,7 +191,7 @@ impl DumpAutoloadCommand {
             .get_option("strict-ambiguous")
             .as_bool()
             .unwrap_or(false)
-            && !class_map.get_ambiguous_classes(false)?.is_empty()
+            && !class_map.get_ambiguous_classes(None)?.is_empty()
         {
             return Ok(2);
         }

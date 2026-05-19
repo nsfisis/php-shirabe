@@ -5,10 +5,10 @@ use shirabe_external_packages::composer::metadata_minifier::metadata_minifier::M
 use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, LogicException,
-    PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash,
-    http_build_query, in_array, json_decode, parse_url_all, realpath, spl_object_hash, strtolower,
-    strtr, urlencode, var_export,
+    Countable, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
+    LogicException, PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException,
+    extension_loaded, hash, http_build_query, in_array, json_decode, parse_url_all, realpath,
+    spl_object_hash, strtolower, strtr, urlencode, var_export,
 };
 
 use shirabe_semver::compiling_matcher::CompilingMatcher;
@@ -100,7 +100,7 @@ pub struct ComposerRepository {
     pub(crate) provider_listing: Option<IndexMap<String, ProviderListingEntry>>,
     pub(crate) loader: ArrayLoader,
     allow_ssl_downgrade: bool,
-    event_dispatcher: Option<EventDispatcher>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     source_mirrors: Option<IndexMap<String, Vec<SourceMirror>>>,
     dist_mirrors: Option<Vec<DistMirror>>,
     degraded_mode: bool,
@@ -149,10 +149,10 @@ impl ComposerRepository {
         io: Box<dyn IOInterface>,
         config: &Config,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> anyhow::Result<Self> {
         // parent::__construct();
-        let inner = ArrayRepository::new();
+        let inner = ArrayRepository::new(Vec::new());
 
         let url_str = repo_config
             .get("url")
@@ -263,16 +263,12 @@ impl ComposerRepository {
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
-        let cache = Cache::new(
-            &*io,
-            format!(
-                "{}/{}",
-                config.get("cache-repo-dir").as_string().unwrap_or(""),
-                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone()))?,
-            ),
-        );
+        // TODO(phase-b): Cache::new expects Box<dyn IOInterface> but io is also stored in self.io;
+        // need shared ownership (Rc) for IOInterface. Using todo!() placeholder.
+        let cache: Cache =
+            todo!("Cache::new requires Box<dyn IOInterface> but io is also moved into self.io");
         let version_parser = VersionParser::new();
-        let loader = ArrayLoader::new_with_parser(version_parser.clone());
+        let loader = ArrayLoader::new(Some(version_parser.clone()), true);
 
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
             std::rc::Rc::clone(&http_downloader),
@@ -280,7 +276,7 @@ impl ComposerRepository {
         )));
 
         let mut this = Self {
-            inner,
+            inner: inner?,
             repo_config,
             options,
             url,
@@ -674,7 +670,7 @@ impl ComposerRepository {
                 let result = self
                     .http_downloader
                     .borrow_mut()
-                    .get(&url, &self.options)?
+                    .get(&url, self.options.clone())?
                     .decode_json()?;
                 let package_names: Vec<String> = result
                     .as_array()
@@ -706,7 +702,7 @@ impl ComposerRepository {
         let result = self
             .http_downloader
             .borrow_mut()
-            .get(&url, &self.options)?
+            .get(&url, self.options.clone())?
             .decode_json()?;
         let package_names: Vec<String> = result
             .as_array()
@@ -736,12 +732,19 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         if !has_providers && !self.has_partial_packages()? && self.lazy_providers_url.is_none() {
-            return self.inner.load_packages(
+            let inner_result = self.inner.load_packages(
                 package_name_map,
                 acceptable_stabilities,
                 stability_flags,
                 already_loaded,
             );
+            // TODO(phase-b): repository_interface::LoadPackagesResult uses Vec<Box<dyn BasePackage>>
+            // for `packages`; this fn returns IndexMap. Reconciliation needs structural changes.
+            let _ = inner_result;
+            return Ok(LoadPackagesResult {
+                names_found: Vec::new(),
+                packages: IndexMap::new(),
+            });
         }
 
         let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
@@ -763,13 +766,16 @@ impl ComposerRepository {
                     continue;
                 }
 
+                // TODO(phase-b): Box<dyn PackageInterface> is not Clone; share via Rc
                 let candidates = self.what_provides(
                     &name,
                     Some(&acceptable_stabilities),
                     Some(&stability_flags),
-                    already_loaded.clone(),
+                    todo!("clone of already_loaded requires sharing Box<dyn PackageInterface>"),
                 )?;
-                let constraint = package_name_map.get(&name).cloned().flatten();
+                let constraint = package_name_map
+                    .get(&name)
+                    .and_then(|c| c.as_ref().map(|c| c.clone_box()));
                 for (_uid, candidate) in candidates.iter() {
                     if candidate.get_name() != name {
                         return Err(LogicException {
@@ -865,7 +871,8 @@ impl ComposerRepository {
 
                 let search = self
                     .http_downloader
-                    .get(&url, &self.options)?
+                    .borrow_mut()
+                    .get(&url, self.options.clone())?
                     .decode_json()?;
 
                 let results_arr = search
@@ -887,7 +894,7 @@ impl ComposerRepository {
                     // do not show virtual packages in results as they are not directly useful from a composer perspective
                     if let Some(v) = arr.get("virtual") {
                         // PHP's `empty()` is false when the value is truthy
-                        let is_empty = match v {
+                        let is_empty = match &**v {
                             PhpMixed::Null => true,
                             PhpMixed::Bool(false) => true,
                             PhpMixed::Int(0) => true,
@@ -919,7 +926,8 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
-            for name in Preg::grep(&regex, &vendor_names)? {
+            let vendor_names_refs: Vec<&str> = vendor_names.iter().map(|s| s.as_str()).collect();
+            for name in Preg::grep(&regex, &vendor_names_refs)? {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -955,7 +963,7 @@ impl ComposerRepository {
                 let result = self
                     .http_downloader
                     .borrow_mut()
-                    .get(&url, &self.options)?
+                    .get(&url, self.options.clone())?
                     .decode_json()?;
 
                 let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
@@ -983,7 +991,8 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;
-            for name in Preg::grep(&regex, &package_names)? {
+            let package_names_refs: Vec<&str> = package_names.iter().map(|s| s.as_str()).collect();
+            for name in Preg::grep(&regex, &package_names_refs)? {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -993,7 +1002,23 @@ impl ComposerRepository {
             return Ok(results);
         }
 
-        Ok(self.inner.search(query, mode, None))
+        // TODO(phase-b): inner.search returns Vec<SearchResult>; convert to PHP-shaped map
+        let inner_results = self.inner.search(query, mode, None);
+        let converted: Vec<IndexMap<String, PhpMixed>> = inner_results
+            .into_iter()
+            .map(|sr| {
+                let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                m.insert("name".to_string(), PhpMixed::String(sr.name));
+                if let Some(d) = sr.description {
+                    m.insert("description".to_string(), PhpMixed::String(d));
+                }
+                if let Some(u) = sr.url {
+                    m.insert("url".to_string(), PhpMixed::String(u));
+                }
+                m
+            })
+            .collect();
+        Ok(converted)
     }
 
     pub fn has_security_advisories(&mut self) -> anyhow::Result<bool> {
@@ -1096,61 +1121,85 @@ impl ComposerRepository {
                     continue;
                 }
 
+                // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
+                // not anyhow::Result<()>; needs structural reshape of closure type
                 let promise = self
                     .start_cached_async_download(&name, Some(&name))?
-                    .then_boxed(Box::new({
-                        let advisories_ptr = &mut advisories as *mut _;
-                        let names_found_ptr = &mut names_found as *mut _;
-                        let package_constraint_map_ptr = &mut package_constraint_map as *mut _;
-                        let name = name.clone();
-                        let create = &create;
-                        move |spec: PhpMixed| -> anyhow::Result<()> {
-                            // [$response] = $spec;
-                            let response = spec
-                                .as_list()
-                                .and_then(|l| l.first())
-                                .map(|b| (**b).clone())
-                                .unwrap_or(PhpMixed::Null);
-                            let response_arr = match response.as_array() {
-                                Some(a) => a.clone(),
-                                None => return Ok(()),
-                            };
-                            let sec_advs = match response_arr.get("security-advisories") {
-                                Some(v) => v.clone(),
-                                None => return Ok(()),
-                            };
-                            let sec_advs_arr = match sec_advs.as_array() {
-                                Some(a) => a.clone(),
-                                None => return Ok(()),
-                            };
-                            unsafe {
-                                (*names_found_ptr).insert(name.clone(), true);
-                            }
-                            if !sec_advs_arr.is_empty() {
-                                let mut entries: Vec<PartialOrSecurityAdvisory> = Vec::new();
-                                for (_k, data_mixed) in sec_advs_arr.iter() {
-                                    if let Some(data) = data_mixed.as_array() {
-                                        let data_map: IndexMap<String, PhpMixed> = data
-                                            .iter()
-                                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                                            .collect();
-                                        let pcm: &IndexMap<String, Box<dyn ConstraintInterface>> =
-                                            unsafe { &*package_constraint_map_ptr };
-                                        if let Some(adv) = create(&data_map, &name, pcm)? {
-                                            entries.push(adv);
+                    .then_boxed(
+                        Some(Box::new({
+                            let advisories_ptr: *mut IndexMap<
+                                String,
+                                Vec<PartialOrSecurityAdvisory>,
+                            > = &mut advisories as *mut _;
+                            let names_found_ptr: *mut IndexMap<String, bool> =
+                                &mut names_found as *mut _;
+                            let package_constraint_map_ptr: *mut IndexMap<
+                                String,
+                                Box<dyn ConstraintInterface>,
+                            > = &mut package_constraint_map as *mut _;
+                            let name = name.clone();
+                            // TODO(phase-b): create closure captures local references (semver_parser, repo_name,
+                            // allow_partial_advisories) but is consumed by a 'static Box; needs restructuring
+                            move |spec: PhpMixed| -> Box<dyn PromiseInterface> {
+                                let _result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
+                                    // [$response] = $spec;
+                                    let response = spec
+                                        .as_list()
+                                        .and_then(|l| l.first())
+                                        .map(|b| (**b).clone())
+                                        .unwrap_or(PhpMixed::Null);
+                                    let response_arr = match response.as_array() {
+                                        Some(a) => a.clone(),
+                                        None => return Ok(()),
+                                    };
+                                    let sec_advs = match response_arr.get("security-advisories") {
+                                        Some(v) => v.clone(),
+                                        None => return Ok(()),
+                                    };
+                                    let sec_advs_arr = match sec_advs.as_array() {
+                                        Some(a) => a.clone(),
+                                        None => return Ok(()),
+                                    };
+                                    unsafe {
+                                        (*names_found_ptr).insert(name.clone(), true);
+                                    }
+                                    if !sec_advs_arr.is_empty() {
+                                        let mut entries: Vec<PartialOrSecurityAdvisory> =
+                                            Vec::new();
+                                        for (_k, data_mixed) in sec_advs_arr.iter() {
+                                            if let Some(data) = data_mixed.as_array() {
+                                                let data_map: IndexMap<String, PhpMixed> = data
+                                                    .iter()
+                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                                                    .collect();
+                                                let _pcm: &IndexMap<
+                                                    String,
+                                                    Box<dyn ConstraintInterface>,
+                                                > = unsafe { &*package_constraint_map_ptr };
+                                                let _ = &data_map;
+                                                // TODO(phase-b): call create() closure; it captures references
+                                                if let Some(adv) = None::<PartialOrSecurityAdvisory>
+                                                {
+                                                    entries.push(adv);
+                                                }
+                                            }
+                                        }
+                                        unsafe {
+                                            (*advisories_ptr).insert(name.clone(), entries);
                                         }
                                     }
-                                }
-                                unsafe {
-                                    (*advisories_ptr).insert(name.clone(), entries);
-                                }
+                                    unsafe {
+                                        (*package_constraint_map_ptr).shift_remove(&name);
+                                    }
+                                    Ok(())
+                                })(
+                                );
+                                // TODO(phase-b): return a real PromiseInterface; closure body retains side-effects
+                                todo!("return real PromiseInterface")
                             }
-                            unsafe {
-                                (*package_constraint_map_ptr).shift_remove(&name);
-                            }
-                            Ok(())
-                        }
-                    }));
+                        })),
+                        None,
+                    );
                 promises.push(promise);
             }
 
@@ -1163,7 +1212,7 @@ impl ComposerRepository {
                 let http_entry = options
                     .entry("http".to_string())
                     .or_insert(PhpMixed::Array(IndexMap::new()));
-                if let PhpMixed::Array(ref mut http_map) = http_entry {
+                if let PhpMixed::Array(http_map) = http_entry {
                     http_map.insert(
                         "method".to_string(),
                         Box::new(PhpMixed::String("POST".to_string())),
@@ -1203,7 +1252,7 @@ impl ComposerRepository {
                     http_map.insert("content".to_string(), Box::new(PhpMixed::String(body)));
                 }
 
-                let response = self.http_downloader.borrow_mut().get(&api_url, &options)?;
+                let response = self.http_downloader.borrow_mut().get(&api_url, options)?;
                 let mut warned = false;
                 let decoded = response.decode_json()?;
                 let advisories_response = decoded
@@ -1271,12 +1320,12 @@ impl ComposerRepository {
         if let Some(providers_api_url) = self.providers_api_url.clone() {
             let api_result = match self.http_downloader.borrow_mut().get(
                 &providers_api_url.replace("%package%", package_name),
-                &self.options,
+                self.options.clone(),
             ) {
                 Ok(resp) => resp.decode_json()?,
                 Err(e) => {
                     if let Some(te) = e.downcast_ref::<TransportException>() {
-                        if te.get_status_code() == 404 {
+                        if te.get_status_code() == Some(404) {
                             return Ok(result);
                         }
                     }
@@ -1350,9 +1399,16 @@ impl ComposerRepository {
             }
         }
 
-        if !self.inner.is_packages_empty() {
-            for (k, v) in self.inner.get_providers(package_name) {
-                result.insert(k, v);
+        if Countable::count(&self.inner) > 0 {
+            for (k, v) in self.inner.get_providers(package_name.to_string()) {
+                // TODO(phase-b): ProviderInfo -> IndexMap<String, PhpMixed> conversion needed
+                let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
+                entry.insert("name".to_string(), PhpMixed::String(v.name));
+                if let Some(d) = v.description {
+                    entry.insert("description".to_string(), PhpMixed::String(d));
+                }
+                entry.insert("type".to_string(), PhpMixed::String(v.r#type));
+                result.insert(k, entry);
             }
         }
 
@@ -1561,7 +1617,10 @@ impl ComposerRepository {
                             let status_code = te.get_status_code();
                             if self.lazy_providers_url.is_some()
                                 && in_array(
-                                    PhpMixed::Int(status_code),
+                                    match status_code {
+                                        Some(c) => PhpMixed::Int(c),
+                                        None => PhpMixed::Null,
+                                    },
                                     &PhpMixed::List(vec![
                                         Box::new(PhpMixed::Int(404)),
                                         Box::new(PhpMixed::Int(499)),
@@ -1576,9 +1635,11 @@ impl ComposerRepository {
                                     "not-found file ({})",
                                     Url::sanitize(url.clone())
                                 ));
-                                if status_code == 499 {
-                                    self.io
-                                        .error(&format!("<warning>{}</warning>", te.get_message()));
+                                if status_code == Some(499) {
+                                    self.io.error(
+                                        &format!("<warning>{}</warning>", te.get_message()),
+                                        &[],
+                                    );
                                 }
                             } else {
                                 return Err(e);
@@ -1762,7 +1823,7 @@ impl ComposerRepository {
 
     /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        self.inner.initialize()?;
+        self.inner.initialize();
 
         let repo_data = self.load_data_from_server()?;
 
@@ -1810,7 +1871,9 @@ impl ComposerRepository {
         // load ~dev versions of the packages as well if needed
         let names_snapshot: Vec<String> = package_names.keys().cloned().collect();
         for name in names_snapshot {
-            let constraint = package_names.get(&name).cloned().flatten();
+            let constraint = package_names
+                .get(&name)
+                .and_then(|c| c.as_ref().map(|c| c.clone_box()));
             if acceptable_stabilities.is_none()
                 || stability_flags.is_none()
                 || StabilityFilter::is_package_acceptable(
@@ -1847,164 +1910,179 @@ impl ComposerRepository {
                 continue;
             }
 
-            let already_loaded_clone = already_loaded.clone();
+            // TODO(phase-b): Box<dyn PackageInterface> is not Clone; share via Rc
+            let already_loaded_clone: IndexMap<
+                String,
+                IndexMap<String, Box<dyn PackageInterface>>,
+            > = todo!("clone of already_loaded requires sharing Box<dyn PackageInterface>");
             let acceptable_stabilities_clone = acceptable_stabilities.cloned();
             let stability_flags_clone = stability_flags.cloned();
             let version_parser = self.version_parser.clone();
+            // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
+            // not anyhow::Result<()>; needs structural reshape
             let promise = self
                 .start_cached_async_download(&name, Some(&real_name))?
-                .then_boxed(Box::new({
-                    let packages_ptr = &mut packages as *mut _;
-                    let names_found_ptr = &mut names_found as *mut _;
-                    let real_name = real_name.clone();
-                    let constraint = constraint;
-                    move |spec: PhpMixed| -> anyhow::Result<()> {
-                        let spec_list = spec.as_list().cloned().unwrap_or_default();
-                        let response = spec_list
-                            .first()
-                            .map(|b| (**b).clone())
-                            .unwrap_or(PhpMixed::Null);
-                        let packages_source_val = spec_list
-                            .get(1)
-                            .map(|b| (**b).clone())
-                            .unwrap_or(PhpMixed::Null);
-                        let packages_source: Option<String> =
-                            packages_source_val.as_string().map(|s| s.to_string());
-                        if response.is_null() {
-                            return Ok(());
-                        }
-                        let response_arr = match response.as_array() {
-                            Some(a) => a.clone(),
-                            None => return Ok(()),
-                        };
-                        let inner_packages = response_arr.get("packages");
-                        let versions_mixed = match inner_packages
-                            .and_then(|v| v.as_array())
-                            .and_then(|a| a.get(&real_name))
-                            .cloned()
-                        {
-                            Some(b) => *b,
-                            None => return Ok(()),
-                        };
+                .then_boxed(
+                    Some(Box::new({
+                        let packages_ptr: *mut IndexMap<String, Box<dyn BasePackage>> = &mut packages as *mut _;
+                        let names_found_ptr: *mut IndexMap<String, bool> = &mut names_found as *mut _;
+                        let real_name = real_name.clone();
+                        let constraint = constraint;
+                        move |spec: PhpMixed| -> Box<dyn PromiseInterface> {
+                            let _result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
+                            let spec_list = spec.as_list().cloned().unwrap_or_default();
+                            let response = spec_list
+                                .first()
+                                .map(|b| (**b).clone())
+                                .unwrap_or(PhpMixed::Null);
+                            let packages_source_val = spec_list
+                                .get(1)
+                                .map(|b| (**b).clone())
+                                .unwrap_or(PhpMixed::Null);
+                            let packages_source: Option<String> =
+                                packages_source_val.as_string().map(|s| s.to_string());
+                            if response.is_null() {
+                                return Ok(());
+                            }
+                            let response_arr = match response.as_array() {
+                                Some(a) => a.clone(),
+                                None => return Ok(()),
+                            };
+                            let inner_packages = response_arr.get("packages");
+                            let versions_mixed = match inner_packages
+                                .and_then(|v| v.as_array())
+                                .and_then(|a| a.get(&real_name))
+                                .cloned()
+                            {
+                                Some(b) => *b,
+                                None => return Ok(()),
+                            };
 
-                        let mut versions: Vec<IndexMap<String, PhpMixed>> = match &versions_mixed {
-                            PhpMixed::List(l) => l
-                                .iter()
-                                .filter_map(|v| {
-                                    v.as_array().map(|a| {
-                                        a.iter()
-                                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                                            .collect::<IndexMap<String, PhpMixed>>()
-                                    })
-                                })
-                                .collect(),
-                            PhpMixed::Array(a) => a
-                                .values()
-                                .filter_map(|v| {
-                                    v.as_array().map(|a| {
-                                        a.iter()
-                                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                                            .collect::<IndexMap<String, PhpMixed>>()
-                                    })
-                                })
-                                .collect(),
-                            _ => return Ok(()),
-                        };
+                            let mut versions: Vec<IndexMap<String, PhpMixed>> =
+                                match &versions_mixed {
+                                    PhpMixed::List(l) => l
+                                        .iter()
+                                        .filter_map(|v| {
+                                            v.as_array().map(|a| {
+                                                a.iter()
+                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                                                    .collect::<IndexMap<String, PhpMixed>>()
+                                            })
+                                        })
+                                        .collect(),
+                                    PhpMixed::Array(a) => a
+                                        .values()
+                                        .filter_map(|v| {
+                                            v.as_array().map(|a| {
+                                                a.iter()
+                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                                                    .collect::<IndexMap<String, PhpMixed>>()
+                                            })
+                                        })
+                                        .collect(),
+                                    _ => return Ok(()),
+                                };
 
-                        let minified = response_arr
-                            .get("minified")
-                            .and_then(|v| v.as_string())
-                            .map_or(false, |s| s == "composer/2.0");
-                        if minified {
-                            versions = MetadataMinifier::expand(versions);
-                        }
+                            let minified = response_arr
+                                .get("minified")
+                                .and_then(|v| v.as_string())
+                                .map_or(false, |s| s == "composer/2.0");
+                            if minified {
+                                // TODO(phase-b): MetadataMinifier::expand expects/returns IndexMap but versions is Vec
+                                versions = todo!("MetadataMinifier::expand signature mismatch with Vec<IndexMap>");
+                            }
 
-                        unsafe {
-                            (*names_found_ptr).insert(real_name.clone(), true);
-                        }
-                        let mut versions_to_load: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                        for version in versions.into_iter() {
-                            let mut version = version;
-                            let has_vn = version.contains_key("version_normalized");
-                            if !has_vn {
-                                let v = version
-                                    .get("version")
+                            unsafe {
+                                (*names_found_ptr).insert(real_name.clone(), true);
+                            }
+                            let mut versions_to_load: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                            for version in versions.into_iter() {
+                                let mut version = version;
+                                let has_vn = version.contains_key("version_normalized");
+                                if !has_vn {
+                                    let v = version
+                                        .get("version")
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let normalized = version_parser.normalize(&v, None)?;
+                                    version.insert(
+                                        "version_normalized".to_string(),
+                                        PhpMixed::String(normalized),
+                                    );
+                                } else if version
+                                    .get("version_normalized")
+                                    .and_then(|v| v.as_string())
+                                    .map_or(false, |s| s == VersionParser::DEFAULT_BRANCH_ALIAS)
+                                {
+                                    // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
+                                    let v = version
+                                        .get("version")
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let normalized = version_parser.normalize(&v, None)?;
+                                    version.insert(
+                                        "version_normalized".to_string(),
+                                        PhpMixed::String(normalized),
+                                    );
+                                }
+
+                                let version_normalized = version
+                                    .get("version_normalized")
                                     .and_then(|v| v.as_string())
                                     .unwrap_or("")
                                     .to_string();
-                                let normalized = version_parser.normalize(&v, None)?;
-                                version.insert(
-                                    "version_normalized".to_string(),
-                                    PhpMixed::String(normalized),
-                                );
-                            } else if version
-                                .get("version_normalized")
-                                .and_then(|v| v.as_string())
-                                .map_or(false, |s| s == VersionParser::DEFAULT_BRANCH_ALIAS)
-                            {
-                                // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
-                                let v = version
-                                    .get("version")
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let normalized = version_parser.normalize(&v, None)?;
-                                version.insert(
-                                    "version_normalized".to_string(),
-                                    PhpMixed::String(normalized),
-                                );
-                            }
+                                // avoid loading packages which have already been loaded
+                                if already_loaded_clone
+                                    .get(&real_name)
+                                    .map_or(false, |m| m.contains_key(&version_normalized))
+                                {
+                                    continue;
+                                }
 
-                            let version_normalized = version
-                                .get("version_normalized")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or("")
-                                .to_string();
-                            // avoid loading packages which have already been loaded
-                            if already_loaded_clone
-                                .get(&real_name)
-                                .map_or(false, |m| m.contains_key(&version_normalized))
-                            {
-                                continue;
-                            }
-
-                            let acceptable = ComposerRepository::is_version_acceptable_static(
-                                constraint.as_deref(),
-                                &real_name,
-                                &version,
-                                acceptable_stabilities_clone.as_ref(),
-                                stability_flags_clone.as_ref(),
-                            )?;
-                            if acceptable {
-                                versions_to_load.push(version);
-                            }
-                        }
-
-                        let loaded_packages: Vec<Box<dyn BasePackage>> =
-                            ComposerRepository::create_packages_static(
-                                versions_to_load,
-                                packages_source,
-                            )?;
-                        for mut package in loaded_packages.into_iter() {
-                            package.set_repository_self();
-                            let hash_c = spl_object_hash(&*package);
-                            if let Some(alias) = package.as_alias_package_mut() {
-                                let aliased_hash = spl_object_hash(alias.get_alias_of());
-                                if !unsafe { (*packages_ptr).contains_key(&aliased_hash) } {
-                                    alias.get_alias_of_mut().set_repository_self();
-                                    let aliased_clone = dyn_clone_box(alias.get_alias_of());
-                                    unsafe {
-                                        (*packages_ptr).insert(aliased_hash, aliased_clone);
-                                    }
+                                let acceptable = ComposerRepository::is_version_acceptable_static(
+                                    constraint.as_deref(),
+                                    &real_name,
+                                    &version,
+                                    acceptable_stabilities_clone.as_ref(),
+                                    stability_flags_clone.as_ref(),
+                                )?;
+                                if acceptable {
+                                    versions_to_load.push(version);
                                 }
                             }
-                            unsafe {
-                                (*packages_ptr).insert(hash_c, package);
+
+                            let loaded_packages: Vec<Box<dyn BasePackage>> =
+                                ComposerRepository::create_packages_static(
+                                    versions_to_load,
+                                    packages_source,
+                                )?;
+                            for mut package in loaded_packages.into_iter() {
+                                package.set_repository_self();
+                                let hash_c = spl_object_hash(&*package);
+                                if let Some(alias) = package.as_alias_package_mut() {
+                                    let aliased_hash = spl_object_hash(alias.get_alias_of());
+                                    if !unsafe { (*packages_ptr).contains_key(&aliased_hash) } {
+                                        alias.get_alias_of_mut().set_repository_self();
+                                        let aliased_clone = dyn_clone_box(alias.get_alias_of());
+                                        unsafe {
+                                            (*packages_ptr).insert(aliased_hash, aliased_clone);
+                                        }
+                                    }
+                                }
+                                unsafe {
+                                    (*packages_ptr).insert(hash_c, package);
+                                }
                             }
+                            Ok(())
+                            })();
+                            // TODO(phase-b): return a real PromiseInterface
+                            todo!("return real PromiseInterface")
                         }
-                        Ok(())
-                    }
-                }));
+                    })),
+                    None,
+                );
             promises.push(promise);
         }
 
@@ -2065,47 +2143,58 @@ impl ComposerRepository {
         let url_owned = url.clone();
         let cache_key_owned = cache_key.clone();
         let contents = contents_opt;
-        Ok(promise.then_boxed(Box::new(
-            move |response: PhpMixed| -> anyhow::Result<PhpMixed> {
-                let mut packages_source =
-                    format!("downloaded file ({})", Url::sanitize(url_owned.clone()));
+        // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
+        // not anyhow::Result<PhpMixed>; needs structural reshape
+        Ok(promise.then_boxed(
+            Some(Box::new(
+                move |response: PhpMixed| -> Box<dyn PromiseInterface> {
+                    let _result: anyhow::Result<PhpMixed> = (|| -> anyhow::Result<PhpMixed> {
+                        let mut packages_source =
+                            format!("downloaded file ({})", Url::sanitize(url_owned.clone()));
 
-                let response_data = if response.as_bool() == Some(true) {
-                    packages_source = format!(
-                        "cached file ({} originating from {})",
-                        cache_key_owned,
-                        Url::sanitize(url_owned.clone())
-                    );
-                    contents
-                        .clone()
-                        .map(|m| {
-                            PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect())
-                        })
-                        .unwrap_or(PhpMixed::Null)
-                } else {
-                    response
-                };
+                        let response_data = if response.as_bool() == Some(true) {
+                            packages_source = format!(
+                                "cached file ({} originating from {})",
+                                cache_key_owned,
+                                Url::sanitize(url_owned.clone())
+                            );
+                            contents
+                                .clone()
+                                .map(|m| {
+                                    PhpMixed::Array(
+                                        m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                                    )
+                                })
+                                .unwrap_or(PhpMixed::Null)
+                        } else {
+                            response
+                        };
 
-                let response_arr = response_data.as_array();
-                let has_pkg = response_arr
-                    .and_then(|a| a.get("packages"))
-                    .and_then(|v| v.as_array())
-                    .map_or(false, |a| a.contains_key(&package_name));
-                let has_advisories =
-                    response_arr.map_or(false, |a| a.contains_key("security-advisories"));
-                if !has_pkg && !has_advisories {
-                    return Ok(PhpMixed::List(vec![
-                        Box::new(PhpMixed::Null),
-                        Box::new(PhpMixed::String(packages_source)),
-                    ]));
-                }
+                        let response_arr = response_data.as_array();
+                        let has_pkg = response_arr
+                            .and_then(|a| a.get("packages"))
+                            .and_then(|v| v.as_array())
+                            .map_or(false, |a| a.contains_key(&package_name));
+                        let has_advisories =
+                            response_arr.map_or(false, |a| a.contains_key("security-advisories"));
+                        if !has_pkg && !has_advisories {
+                            return Ok(PhpMixed::List(vec![
+                                Box::new(PhpMixed::Null),
+                                Box::new(PhpMixed::String(packages_source)),
+                            ]));
+                        }
 
-                Ok(PhpMixed::List(vec![
-                    Box::new(response_data),
-                    Box::new(PhpMixed::String(packages_source)),
-                ]))
-            },
-        )))
+                        Ok(PhpMixed::List(vec![
+                            Box::new(response_data),
+                            Box::new(PhpMixed::String(packages_source)),
+                        ]))
+                    })();
+                    // TODO(phase-b): return a real PromiseInterface
+                    todo!("return real PromiseInterface")
+                },
+            )),
+            None,
+        ))
     }
 
     /// @param name package name (must be lowercased already)
@@ -2135,7 +2224,7 @@ impl ComposerRepository {
         stability_flags: Option<&IndexMap<String, i64>>,
     ) -> anyhow::Result<bool> {
         Self::is_version_acceptable_with_loader(
-            &ArrayLoader::new_with_parser(VersionParser::new()),
+            &ArrayLoader::new(Some(VersionParser::new()), true),
             constraint,
             name,
             version_data,
@@ -2160,7 +2249,7 @@ impl ComposerRepository {
                 .to_string(),
         ];
 
-        if let Some(alias) = loader.get_branch_alias(version_data) {
+        if let Some(alias) = loader.get_branch_alias(version_data)? {
             versions.push(alias);
         }
 
@@ -2178,7 +2267,7 @@ impl ComposerRepository {
             }
 
             if let Some(c) = constraint {
-                if !CompilingMatcher::match_(c, Constraint::OP_EQ, version) {
+                if !CompilingMatcher::r#match(c, Constraint::OP_EQ, version.clone()) {
                     continue;
                 }
             }
@@ -2189,7 +2278,7 @@ impl ComposerRepository {
         Ok(false)
     }
 
-    fn get_packages_json_url(&self) -> String {
+    pub fn get_packages_json_url(&self) -> String {
         let json_url_parts = parse_url_all(&strtr(&self.url, "\\", "/"));
 
         let has_json = json_url_parts
@@ -2339,12 +2428,10 @@ impl ComposerRepository {
                         .get("preferred")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
+                    let url = self.canonicalize_url(&dist_url)?;
                     self.dist_mirrors
                         .get_or_insert_with(Vec::new)
-                        .push(DistMirror {
-                            url: self.canonicalize_url(&dist_url)?,
-                            preferred,
-                        });
+                        .push(DistMirror { url, preferred });
                 }
             }
         }
@@ -2766,11 +2853,29 @@ impl ComposerRepository {
                     if let Some(mirrors) =
                         self.source_mirrors.as_ref().and_then(|m| m.get(src_type))
                     {
-                        package.set_source_mirrors(mirrors);
+                        let converted: Vec<IndexMap<String, PhpMixed>> = mirrors
+                            .iter()
+                            .map(|m| {
+                                let mut im: IndexMap<String, PhpMixed> = IndexMap::new();
+                                im.insert("url".to_string(), PhpMixed::String(m.url.clone()));
+                                im.insert("preferred".to_string(), PhpMixed::Bool(m.preferred));
+                                im
+                            })
+                            .collect();
+                        package.set_source_mirrors(Some(converted));
                     }
                 }
                 if let Some(dist_mirrors) = self.dist_mirrors.as_ref() {
-                    package.set_dist_mirrors(dist_mirrors);
+                    let converted: Vec<IndexMap<String, PhpMixed>> = dist_mirrors
+                        .iter()
+                        .map(|m| {
+                            let mut im: IndexMap<String, PhpMixed> = IndexMap::new();
+                            im.insert("url".to_string(), PhpMixed::String(m.url.clone()));
+                            im.insert("preferred".to_string(), PhpMixed::Bool(m.preferred));
+                            im
+                        })
+                        .collect();
+                    package.set_dist_mirrors(Some(converted));
                 }
                 self.configure_package_transport_options(&mut *package);
                 results.push(package);
@@ -2803,7 +2908,7 @@ impl ComposerRepository {
         if packages.is_empty() {
             return Ok(vec![]);
         }
-        let loader = ArrayLoader::new_with_parser(VersionParser::new());
+        let loader = ArrayLoader::new(Some(VersionParser::new()), true);
         Ok(loader.load_packages(packages)?)
     }
 
@@ -2847,7 +2952,8 @@ impl ComposerRepository {
         } {
             let attempt: anyhow::Result<()> = (|| -> anyhow::Result<()> {
                 let mut options = self.options.clone();
-                if let Some(dispatcher) = self.event_dispatcher.as_mut() {
+                if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+                    let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
                         PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
                         std::rc::Rc::clone(&self.http_downloader),
@@ -2857,20 +2963,33 @@ impl ComposerRepository {
                             let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                             // TODO(plugin): pass repository self-reference
                             m.insert("repository".to_string(), PhpMixed::Null);
-                            m
+                            m.into()
                         },
                     );
-                    pre_file_download_event.set_transport_options(self.options.clone());
-                    dispatcher.dispatch(
-                        &pre_file_download_event.get_name(),
-                        &mut pre_file_download_event,
+                    pre_file_download_event.set_transport_options(
+                        self.options
+                            .clone()
+                            .into_iter()
+                            .map(|(k, v)| (k, Box::new(v)))
+                            .collect(),
                     );
-                    filename = pre_file_download_event.get_processed_url();
-                    options = pre_file_download_event.get_transport_options();
+                    // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types;
+                    // need a way to pass PreFileDownloadEvent through EventDispatcher's API.
+                    let _ = &mut pre_file_download_event;
+                    dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+                    filename = pre_file_download_event.get_processed_url().to_string();
+                    options = pre_file_download_event
+                        .get_transport_options()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), (**v).clone()))
+                        .collect();
                 }
 
-                let response = self.http_downloader.borrow_mut().get(&filename, &options)?;
-                let mut json = response.get_body().to_string();
+                let mut response = self
+                    .http_downloader
+                    .borrow_mut()
+                    .get(&filename, options.clone())?;
+                let mut json = response.get_body().unwrap_or("").to_string();
                 if let Some(sha256_val) = sha256 {
                     if sha256_val != hash("sha256", &json) {
                         // undo downgrade before trying again if http seems to be hijacked or modifying content somehow
@@ -2896,7 +3015,8 @@ impl ComposerRepository {
                     }
                 }
 
-                if let Some(dispatcher) = self.event_dispatcher.as_mut() {
+                if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+                    let mut dispatcher = dispatcher.borrow_mut();
                     let mut post_file_download_event = PostFileDownloadEvent::new(
                         PluginEvents::POST_FILE_DOWNLOAD.to_string(),
                         None,
@@ -2908,13 +3028,12 @@ impl ComposerRepository {
                             // TODO(plugin): pass response and repository self-reference
                             m.insert("response".to_string(), PhpMixed::Null);
                             m.insert("repository".to_string(), PhpMixed::Null);
-                            m
+                            m.into()
                         },
                     );
-                    dispatcher.dispatch(
-                        &post_file_download_event.get_name(),
-                        &mut post_file_download_event,
-                    );
+                    // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
+                    let _ = &mut post_file_download_event;
+                    dispatcher.dispatch(Some(post_file_download_event.get_name()), None)?;
                 }
 
                 let decoded = response.decode_json()?;
@@ -2961,7 +3080,7 @@ impl ComposerRepository {
                         return Err(e);
                     }
                     if let Some(te) = e.downcast_ref::<TransportException>() {
-                        if te.get_status_code() == 404 {
+                        if te.get_status_code() == Some(404) {
                             return Err(e);
                         }
                     }
@@ -2981,7 +3100,7 @@ impl ComposerRepository {
                                 }
                                 self.degraded_mode = true;
                                 let parsed = JsonFile::parse_json(
-                                    &contents,
+                                    Some(&contents),
                                     Some(&format!("{}{}", self.cache.get_root(), ck)),
                                 )?;
                                 let map: IndexMap<String, PhpMixed> = parsed
@@ -3028,7 +3147,8 @@ impl ComposerRepository {
         let mut filename = filename.to_string();
         let result: anyhow::Result<FetchFileIfLastModifiedResult> = (|| {
             let mut options = self.options.clone();
-            if let Some(dispatcher) = self.event_dispatcher.as_mut() {
+            if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+                let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
                     PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
                     std::rc::Rc::clone(&self.http_downloader),
@@ -3037,23 +3157,32 @@ impl ComposerRepository {
                     {
                         let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                         m.insert("repository".to_string(), PhpMixed::Null);
-                        m
+                        m.into()
                     },
                 );
-                pre_file_download_event.set_transport_options(self.options.clone());
-                dispatcher.dispatch(
-                    &pre_file_download_event.get_name(),
-                    &mut pre_file_download_event,
+                pre_file_download_event.set_transport_options(
+                    self.options
+                        .clone()
+                        .into_iter()
+                        .map(|(k, v)| (k, Box::new(v)))
+                        .collect(),
                 );
-                filename = pre_file_download_event.get_processed_url();
-                options = pre_file_download_event.get_transport_options();
+                // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
+                let _ = &mut pre_file_download_event;
+                dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+                filename = pre_file_download_event.get_processed_url().to_string();
+                options = pre_file_download_event
+                    .get_transport_options()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .collect();
             }
 
             // cast http.header to array, then append
             let http_entry = options
                 .entry("http".to_string())
                 .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(ref mut http_map) = http_entry {
+            if let PhpMixed::Array(http_map) = http_entry {
                 if let Some(existing) = http_map.get("header") {
                     let arr = match &**existing {
                         PhpMixed::List(l) => l.clone(),
@@ -3075,13 +3204,17 @@ impl ComposerRepository {
                 http_map.insert("header".to_string(), Box::new(PhpMixed::List(headers)));
             }
 
-            let response = self.http_downloader.borrow_mut().get(&filename, &options)?;
-            let mut json = response.get_body().to_string();
+            let mut response = self
+                .http_downloader
+                .borrow_mut()
+                .get(&filename, options.clone())?;
+            let mut json = response.get_body().unwrap_or("").to_string();
             if json.is_empty() && response.get_status_code() == 304 {
                 return Ok(FetchFileIfLastModifiedResult::NotModified);
             }
 
-            if let Some(dispatcher) = self.event_dispatcher.as_mut() {
+            if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+                let mut dispatcher = dispatcher.borrow_mut();
                 let mut post_file_download_event = PostFileDownloadEvent::new(
                     PluginEvents::POST_FILE_DOWNLOAD.to_string(),
                     None,
@@ -3092,13 +3225,12 @@ impl ComposerRepository {
                         let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                         m.insert("response".to_string(), PhpMixed::Null);
                         m.insert("repository".to_string(), PhpMixed::Null);
-                        m
+                        m.into()
                     },
                 );
-                dispatcher.dispatch(
-                    &post_file_download_event.get_name(),
-                    &mut post_file_download_event,
-                );
+                // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
+                let _ = &mut post_file_download_event;
+                dispatcher.dispatch(Some(post_file_download_event.get_name()), None)?;
             }
 
             let decoded = response.decode_json()?;
@@ -3133,7 +3265,7 @@ impl ComposerRepository {
                     return Err(e);
                 }
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_status_code() == 404 {
+                    if te.get_status_code() == Some(404) {
                         return Err(e);
                     }
                 }
@@ -3183,7 +3315,8 @@ impl ComposerRepository {
 
         let mut filename = filename.to_string();
         let mut options = self.options.clone();
-        if let Some(dispatcher) = self.event_dispatcher.as_mut() {
+        if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+            let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
                 PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
                 std::rc::Rc::clone(&self.http_downloader),
@@ -3192,23 +3325,32 @@ impl ComposerRepository {
                 {
                     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                     m.insert("repository".to_string(), PhpMixed::Null);
-                    m
+                    m.into()
                 },
             );
-            pre_file_download_event.set_transport_options(self.options.clone());
-            dispatcher.dispatch(
-                &pre_file_download_event.get_name(),
-                &mut pre_file_download_event,
+            pre_file_download_event.set_transport_options(
+                self.options
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| (k, Box::new(v)))
+                    .collect(),
             );
-            filename = pre_file_download_event.get_processed_url();
-            options = pre_file_download_event.get_transport_options();
+            // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
+            let _ = &mut pre_file_download_event;
+            dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+            filename = pre_file_download_event.get_processed_url().to_string();
+            options = pre_file_download_event
+                .get_transport_options()
+                .iter()
+                .map(|(k, v)| (k.clone(), (**v).clone()))
+                .collect();
         }
 
         if let Some(last_modified_time) = last_modified_time {
             let http_entry = options
                 .entry("http".to_string())
                 .or_insert(PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(ref mut http_map) = http_entry {
+            if let PhpMixed::Array(http_map) = http_entry {
                 if let Some(existing) = http_map.get("header") {
                     let arr = match &**existing {
                         PhpMixed::List(l) => l.clone(),
@@ -3236,10 +3378,11 @@ impl ComposerRepository {
         let url_owned = self.url.clone();
         let last_modified_time_owned = last_modified_time.map(|s| s.to_string());
 
-        let packages_not_found_ptr = &mut self.packagesNotFoundCache as *mut _;
-        let fresh_metadata_ptr = &mut self.freshMetadataUrls as *mut _;
-        let degraded_ptr = &mut self.degraded_mode as *mut _;
-        let cache_ptr = &mut self.cache as *mut _;
+        let packages_not_found_ptr: *mut IndexMap<String, bool> =
+            &mut self.packagesNotFoundCache as *mut _;
+        let fresh_metadata_ptr: *mut IndexMap<String, bool> = &mut self.freshMetadataUrls as *mut _;
+        let degraded_ptr: *mut bool = &mut self.degraded_mode as *mut _;
+        let cache_ptr: *mut Cache = &mut self.cache as *mut _;
         let io_ptr = self.io.as_ref() as *const dyn IOInterface;
 
         let accept = {
@@ -3248,7 +3391,7 @@ impl ComposerRepository {
             let url_owned = url_owned.clone();
             move |response_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                 // emulate: $response is a Response object; status code/body/header accessed via methods
-                let response = Response::from_php_mixed(response_mixed)?;
+                let mut response = Response::from_php_mixed(response_mixed);
                 // package not found is acceptable for a v2 protocol repository
                 if response.get_status_code() == 404 {
                     unsafe {
@@ -3262,7 +3405,7 @@ impl ComposerRepository {
                     ));
                 }
 
-                let mut json = response.get_body().to_string();
+                let mut json = response.get_body().unwrap_or("").to_string();
                 if json.is_empty() && response.get_status_code() == 304 {
                     unsafe {
                         (*fresh_metadata_ptr).insert(filename.clone(), true);
@@ -3318,7 +3461,7 @@ impl ComposerRepository {
             let accept_clone = accept.clone();
             move |e: anyhow::Error| -> anyhow::Result<PhpMixed> {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_status_code() == 404 {
+                    if te.get_status_code() == Some(404) {
                         unsafe {
                             (*packages_not_found_ptr).insert(filename.clone(), true);
                         }
@@ -3348,7 +3491,7 @@ impl ComposerRepository {
 
                 // special error code returned when network is being artificially disabled
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_status_code() == 499 {
+                    if te.get_status_code() == Some(499) {
                         let resp =
                             Response::new_fake(&url_owned, 404, IndexMap::new(), String::new());
                         return accept_clone(resp.to_php_mixed());
@@ -3359,7 +3502,10 @@ impl ComposerRepository {
             }
         };
 
-        let initial = self.http_downloader.borrow_mut().add(&filename, &options)?;
+        let initial = self
+            .http_downloader
+            .borrow_mut()
+            .add(&filename, options.clone())?;
         Ok(initial.then_with_reject_boxed(Box::new(accept), Box::new(reject)))
     }
 

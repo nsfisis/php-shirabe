@@ -44,6 +44,10 @@ impl SecurityAdvisory {
         }
     }
 
+    pub fn advisory_id(&self) -> &str {
+        &self.inner.advisory_id
+    }
+
     pub fn affected_versions(&self) -> &dyn ConstraintInterface {
         &*self.inner.affected_versions
     }

@@ -38,11 +38,12 @@ impl ScriptAliasCommand {
             }
         }
 
-        let mut inner = BaseCommand::new();
-        inner.ignore_validation_errors();
-
+        // TODO(phase-b): BaseCommand::new() / ignore_validation_errors() not yet ported
         Ok(Self {
-            inner,
+            base_command_data: BaseCommandData {
+                composer: None,
+                io: None,
+            },
             script,
             description,
             aliases,
@@ -50,9 +51,12 @@ impl ScriptAliasCommand {
     }
 
     pub fn configure(&mut self) {
-        self.set_name(&self.script)
-            .set_description(&self.description)
-            .set_aliases(self.aliases.clone())
+        let script = self.script.clone();
+        let description = self.description.clone();
+        let aliases = self.aliases.clone();
+        self.set_name(&script)
+            .set_description(&description)
+            .set_aliases(&aliases)
             .set_definition(&[
                 InputOption::new(
                     "dev",
@@ -97,13 +101,11 @@ impl ScriptAliasCommand {
 
         let args = input.get_arguments();
 
+        // TODO(phase-b): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
-        if !input.has_to_string() {
+        if false {
             return Err(LogicException {
-                message: format!(
-                    "Expected an Input instance that is stringable, got {}",
-                    input.get_class_name()
-                ),
+                message: "Expected an Input instance that is stringable".to_string(),
                 code: 0,
             }
             .into());
@@ -114,21 +116,30 @@ impl ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input.to_string(), 1)?;
+        // TODO(phase-b): InputInterface lacks to_string; use a placeholder
+        let input_as_string = String::new();
+        let _ = input;
+        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input_as_string, 1)?;
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),
             PhpMixed::String(script_alias_input),
         );
 
-        let args_value = args.get("args").cloned().unwrap_or(PhpMixed::Null);
+        let args_value: Vec<String> = args
+            .get("args")
+            .and_then(|v| v.as_list())
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
 
-        Ok(composer.get_event_dispatcher().dispatch_script(
-            &self.script,
-            dev_mode,
-            args_value,
-            flags,
-        )?)
+        Ok(composer
+            .get_event_dispatcher()
+            .borrow_mut()
+            .dispatch_script(&self.script, dev_mode, args_value, flags)?)
     }
 }
 

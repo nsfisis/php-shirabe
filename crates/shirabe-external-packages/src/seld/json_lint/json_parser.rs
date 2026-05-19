@@ -19,4 +19,12 @@ impl JsonParser {
     pub fn parse(&self, _json: &str, _flags: u32) -> anyhow::Result<PhpMixed> {
         todo!()
     }
+
+    /// PHP: JsonParser::lint() — returns null on success, ParsingException on failure.
+    pub fn lint(
+        &mut self,
+        _json: &str,
+    ) -> Option<crate::seld::json_lint::parsing_exception::ParsingException> {
+        todo!()
+    }
 }

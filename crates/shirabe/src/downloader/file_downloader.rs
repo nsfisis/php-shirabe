@@ -67,7 +67,7 @@ pub struct FileDownloader {
     /// @var ?Cache
     pub(crate) cache: Option<Cache>,
     /// @var ?EventDispatcher
-    pub(crate) event_dispatcher: Option<EventDispatcher>,
+    pub(crate) event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     /// @var ProcessExecutor
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var array<string, string> Map of package name to cache key
@@ -77,19 +77,29 @@ pub struct FileDownloader {
 }
 
 impl FileDownloader {
+    /// TODO(phase-b): `$downloadMetadata` is a static property in PHP; not yet mapped to Rust.
+    pub fn reset_download_metadata() {
+        todo!("FileDownloader::reset_download_metadata")
+    }
+
+    /// TODO(phase-b): `$downloadMetadata` is a static property in PHP; not yet mapped to Rust.
+    pub fn download_metadata() -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+        todo!("FileDownloader::download_metadata")
+    }
+
     /// Constructor.
     pub fn new(
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         cache: Option<Cache>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                Box::new(&*io),
+                io.clone_box(),
             ))))
         });
         let filesystem = filesystem.unwrap_or_else(|| {
@@ -185,7 +195,7 @@ impl DownloaderInterface for FileDownloader {
 
         let file_name = self.get_file_name(package, path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
-        let dir_of_file = shirabe_php_shim::dirname(&file_name, 1);
+        let dir_of_file = shirabe_php_shim::dirname(&file_name);
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&dir_of_file)?;
@@ -209,7 +219,7 @@ impl DownloaderInterface for FileDownloader {
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Box<dyn PromiseInterface>> {
-        Ok(react_promise_resolve(PhpMixed::Null))
+        Ok(react_promise_resolve(Some(PhpMixed::Null)))
     }
 
     /// @inheritDoc
@@ -257,14 +267,14 @@ impl DownloaderInterface for FileDownloader {
 
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
-                && self.filesystem.borrow_mut().is_dir_empty(dir)?
+                && self.filesystem.borrow_mut().is_dir_empty(dir)
                 && realpath(dir).as_deref() != Some(&Platform::get_cwd(false).unwrap_or_default())
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }
         }
 
-        Ok(react_promise_resolve(PhpMixed::Null))
+        Ok(react_promise_resolve(Some(PhpMixed::Null)))
     }
 
     /// @inheritDoc
@@ -379,8 +389,11 @@ impl ChangeReportInterface for FileDownloader {
 
         let mut null_io = NullIO::new();
         null_io.load_configuration(&mut *self.config.borrow_mut())?;
-        let mut e: Option<anyhow::Error> = None;
-        let mut output: String = String::new();
+        // TODO(phase-b): `e` is captured by both the inner closure (assignment in error handler)
+        // and the outer block (read after the closure). PHP closures capture by reference (`use (&$e)`);
+        // emulate via Rc<RefCell> or restructure when proper async/promise types land.
+        let e: std::cell::RefCell<Option<anyhow::Error>> = std::cell::RefCell::new(None);
+        let output_cell: std::cell::RefCell<String> = std::cell::RefCell::new(String::new());
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         let result: Result<()> = (|| -> Result<()> {
@@ -400,8 +413,8 @@ impl ChangeReportInterface for FileDownloader {
                 })),
             );
             self.http_downloader.borrow_mut().wait()?;
-            if e.is_some() {
-                return Err(e.unwrap());
+            if e.borrow().is_some() {
+                return Err(e.borrow_mut().take().unwrap());
             }
             let promise = self.install(package, &format!("{}_compare", target_dir), false)?;
             promise.then_with(
@@ -412,23 +425,25 @@ impl ChangeReportInterface for FileDownloader {
                 })),
             );
             self.process.borrow_mut().wait()?;
-            if e.is_some() {
-                return Err(e.unwrap());
+            if e.borrow().is_some() {
+                return Err(e.borrow_mut().take().unwrap());
             }
 
             let mut comparer = Comparer::new();
             comparer.set_source(format!("{}_compare", target_dir));
             comparer.set_update(target_dir.clone());
             comparer.do_compare();
-            output = comparer.get_changed_as_string(true, false);
+            *output_cell.borrow_mut() = comparer.get_changed_as_string(true, false);
             self.filesystem
                 .borrow_mut()
                 .remove_directory(&format!("{}_compare", target_dir))?;
             Ok(())
         })();
         if let Err(err) = result {
-            e = Some(err);
+            *e.borrow_mut() = Some(err);
         }
+        let e = e.into_inner();
+        let output = output_cell.into_inner();
 
         // TODO(phase-b): restore self.io = prev_io
 
@@ -474,24 +489,26 @@ impl FileDownloader {
         .to_string()
     }
 
-    fn clear_last_cache_write(&mut self, package: &dyn PackageInterface) {
+    pub(crate) fn clear_last_cache_write(&mut self, package: &dyn PackageInterface) {
         if self.cache.is_some() && self.last_cache_writes.contains_key(package.get_name()) {
-            self.cache
-                .as_ref()
+            let key = self
+                .last_cache_writes
+                .get(package.get_name())
                 .unwrap()
-                .remove(self.last_cache_writes.get(package.get_name()).unwrap());
+                .clone();
+            self.cache.as_mut().unwrap().remove(&key);
             self.last_cache_writes.shift_remove(package.get_name());
         }
     }
 
-    fn add_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
+    pub(crate) fn add_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
         self.additional_cleanup_paths
             .entry(package.get_name().to_string())
             .or_insert_with(Vec::new)
             .push(path.to_string());
     }
 
-    fn remove_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
+    pub(crate) fn remove_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
         if let Some(paths) = self.additional_cleanup_paths.get_mut(package.get_name()) {
             // PHP: array_search($path, ..., true)
             let idx = paths.iter().position(|p| p == path);
@@ -503,7 +520,7 @@ impl FileDownloader {
     }
 
     /// Gets file name for specific package
-    fn get_file_name(&self, package: &dyn PackageInterface, _path: &str) -> String {
+    pub(crate) fn get_file_name(&self, package: &dyn PackageInterface, _path: &str) -> String {
         let extension = self.get_dist_path(package, PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or("").to_string()
@@ -539,7 +556,7 @@ impl FileDownloader {
     }
 
     /// Process the download url
-    fn process_url(&self, package: &dyn PackageInterface, url: &str) -> Result<String> {
+    pub(crate) fn process_url(&self, package: &dyn PackageInterface, url: &str) -> Result<String> {
         if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
             return Err(RuntimeException {
                 message: "You must enable the openssl extension to download files via https"
@@ -553,7 +570,7 @@ impl FileDownloader {
         if package.get_dist_reference().is_some() {
             url = UrlUtil::update_dist_reference(
                 &*self.config.borrow(),
-                &url,
+                url,
                 package.get_dist_reference().unwrap(),
             );
         }
@@ -571,7 +588,7 @@ struct UrlEntry {
 
 // Suppress unused-import warnings for items kept for parity with the PHP source.
 #[allow(dead_code)]
-const _USE_PARITY: () = {
+fn _use_parity() {
     let _ = filesize;
     let _ = hash_file;
     let _ = in_array;
@@ -581,4 +598,4 @@ const _USE_PARITY: () = {
         message: String::new(),
         code: 0,
     };
-};
+}

@@ -57,7 +57,7 @@ impl RuleSet {
             .into());
         }
 
-        let hash = rule.get_hash();
+        let hash = rule.get_hash().to_string();
 
         if let Some(potential_duplicates) = self.rules_by_hash.get(&hash) {
             for potential_duplicate in potential_duplicates {
@@ -67,12 +67,16 @@ impl RuleSet {
             }
         }
 
+        // TODO(phase-b): Rule is a PHP class with shared ownership; should be Rc<dyn Rule>
+        // so the same instance can be inserted in rules, rule_by_id, and rules_by_hash.
+        // Box<dyn Rule> cannot be cloned; storing placeholders for now.
         self.rules
             .entry(r#type)
             .or_insert_with(Vec::new)
-            .push(rule.clone());
+            .push(todo!("share rule via Rc"));
         rule.set_type(r#type);
-        self.rule_by_id.insert(self.next_rule_id, rule.clone());
+        self.rule_by_id
+            .insert(self.next_rule_id, todo!("share rule via Rc"));
 
         self.next_rule_id += 1;
 
@@ -93,7 +97,7 @@ impl RuleSet {
     }
 
     pub fn rule_by_id_mut(&mut self, id: i64) -> &mut dyn Rule {
-        &mut *self.rule_by_id.get_mut(&id).unwrap()
+        self.rule_by_id.get_mut(&id).unwrap().as_mut()
     }
 
     pub fn get_rules(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
@@ -136,12 +140,9 @@ impl RuleSet {
             string.push_str(&format!("{:<8}: ", type_name));
             for rule in rules {
                 if repository_set.is_some() && request.is_some() && pool.is_some() {
-                    string.push_str(&rule.get_pretty_string(
-                        repository_set.unwrap(),
-                        request.unwrap(),
-                        pool.unwrap(),
-                        is_verbose,
-                    ));
+                    // TODO(phase-b): get_pretty_string needs &mut Pool plus installed_map and learned_pool.
+                    let _ = (repository_set, request, pool, is_verbose, rule);
+                    string.push_str(&rule.to_string());
                 } else {
                     string.push_str(&rule.to_string());
                 }

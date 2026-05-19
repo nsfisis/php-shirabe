@@ -36,9 +36,10 @@ pub trait BaseConfigCommand: BaseCommand {
             return Err(anyhow::anyhow!("--file and --global can not be combined"));
         }
 
-        let io = self.get_io();
+        // TODO(phase-b): clone_box to release the &mut self borrow held by get_io.
+        let io = self.get_io().clone_box();
         *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_config(Some(&*io), None)?,
+            Factory::create_config(Some(io.as_ref()), None)?,
         )));
         let config_rc = std::rc::Rc::clone(self.config().unwrap());
 

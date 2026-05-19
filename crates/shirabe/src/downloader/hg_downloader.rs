@@ -1,8 +1,13 @@
 //! ref: composer/src/Composer/Downloader/HgDownloader.php
 
+use crate::config::Config;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::vcs_downloader::VcsDownloaderBase;
+use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
+use crate::util::filesystem::Filesystem;
 use crate::util::hg::Hg as HgUtils;
+use crate::util::process_executor::ProcessExecutor;
 use anyhow::Result;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::RuntimeException;
@@ -13,6 +18,17 @@ pub struct HgDownloader {
 }
 
 impl HgDownloader {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    ) -> Self {
+        Self {
+            inner: VcsDownloaderBase::new(io, config, Some(process), Some(fs)),
+        }
+    }
+
     pub(crate) fn do_download(
         &self,
         package: &dyn PackageInterface,
@@ -59,7 +75,10 @@ impl HgDownloader {
             "hg".to_string(),
             "up".to_string(),
             "--".to_string(),
-            package.get_source_reference().unwrap_or_default(),
+            package
+                .get_source_reference()
+                .unwrap_or_default()
+                .to_string(),
         ];
         let mut ignored_output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -95,7 +114,10 @@ impl HgDownloader {
             &self.inner.process,
         );
 
-        let ref_ = target.get_source_reference().unwrap_or_default();
+        let ref_ = target
+            .get_source_reference()
+            .unwrap_or_default()
+            .to_string();
         self.inner.io.write_error(&format!(
             " Updating to {}",
             target.get_source_reference().unwrap_or_default()
@@ -193,5 +215,71 @@ impl HgDownloader {
 
     pub(crate) fn has_metadata_repository(&self, path: String) -> bool {
         std::path::Path::new(&format!("{}/.hg", path)).is_dir()
+    }
+}
+
+// TODO(phase-b): wire up VcsDownloader trait properly. HgDownloader extends VcsDownloader which
+// implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
+// VcsDownloaderBase exposes the matching impl surface.
+impl DownloaderInterface for HgDownloader {
+    fn get_installation_source(&self) -> String {
+        todo!()
+    }
+
+    fn download(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn prepare(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn install(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn update(
+        &self,
+        _initial: &dyn PackageInterface,
+        _target: &dyn PackageInterface,
+        _path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn remove(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        todo!()
     }
 }

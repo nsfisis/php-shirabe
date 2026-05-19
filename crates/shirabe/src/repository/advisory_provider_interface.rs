@@ -11,6 +11,15 @@ pub enum PartialOrSecurityAdvisory {
     Full(SecurityAdvisory),
 }
 
+impl PartialOrSecurityAdvisory {
+    pub fn advisory_id(&self) -> &str {
+        match self {
+            PartialOrSecurityAdvisory::Partial(p) => &p.advisory_id,
+            PartialOrSecurityAdvisory::Full(s) => s.advisory_id(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SecurityAdvisoryResult {
     pub names_found: Vec<String>,

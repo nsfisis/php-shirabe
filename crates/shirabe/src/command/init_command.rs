@@ -11,10 +11,10 @@ use shirabe_external_packages::symfony::component::console::input::input_interfa
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL, InvalidArgumentException, PHP_EOL, PhpMixed,
-    array_filter, array_flip, array_intersect_key, array_keys, array_map, basename, empty, explode,
-    file, file_exists, file_get_contents, file_put_contents, function_exists, get_current_user,
-    implode, is_dir, is_string, preg_quote, realpath, server_get, sprintf, str_replace, strpos,
-    strtolower, trim, ucwords,
+    array_filter, array_flip, array_flip_strings, array_intersect_key, array_keys, array_map,
+    basename, empty, explode, file, file_exists, file_get_contents, file_put_contents,
+    function_exists, get_current_user, implode, is_dir, is_string, preg_quote, realpath,
+    server_get, sprintf, str_replace, strpos, strtolower, trim, ucwords,
 };
 
 use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -115,7 +115,7 @@ impl InitCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let io = self.get_io();
+        let io = PackageDiscoveryTrait::get_io(self);
 
         let allowlist: Vec<String> = vec![
             "name".to_string(),
@@ -129,12 +129,15 @@ impl InitCommand {
             "license".to_string(),
             "autoload".to_string(),
         ];
-        let mut options = array_filter(
-            &array_intersect_key(&input.get_options(), &array_flip(&allowlist)),
-            |val: &PhpMixed| {
-                !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
-            },
-        );
+        // TODO(phase-b): adapt PhpMixed<->Box<PhpMixed> for array_filter_map
+        let filtered_input: IndexMap<String, Box<PhpMixed>> =
+            array_intersect_key(&input.get_options(), &array_flip_strings(&allowlist))
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v)))
+                .collect();
+        let mut options = shirabe_php_shim::array_filter_map(&filtered_input, |val: &PhpMixed| {
+            !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
+        });
 
         if options.contains_key("name")
             && !Preg::is_match(
@@ -287,24 +290,16 @@ impl InitCommand {
             options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
         }
 
-        let file_obj = JsonFile::new(Factory::get_composer_file(), None, None)?;
+        let file_obj = JsonFile::new(Factory::get_composer_file()?, None, None)?;
         let options_for_encode: IndexMap<String, Box<PhpMixed>> = options
             .clone()
             .into_iter()
             .map(|(k, v)| (k, Box::new(v)))
             .collect();
-        let json = JsonFile::encode(&options_for_encode, 448);
+        let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()), 448);
 
         if input.is_interactive() {
-            io.write_error3(
-                PhpMixed::List(vec![
-                    Box::new(PhpMixed::String(String::new())),
-                    Box::new(PhpMixed::String(json)),
-                    Box::new(PhpMixed::String(String::new())),
-                ]),
-                true,
-                io_interface::NORMAL,
-            );
+            io.write_error3(&format!("\n{}\n", json), true, io_interface::NORMAL);
             if !io.ask_confirmation(
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
                 true,
@@ -321,7 +316,7 @@ impl InitCommand {
             );
         }
 
-        file_obj.write(&PhpMixed::Array(options_for_encode.clone()))?;
+        file_obj.write(PhpMixed::Array(options_for_encode.clone()))?;
         let validate_result = file_obj.validate_schema(JsonFile::LAX_SCHEMA, None);
         if let Err(e) = validate_result {
             // try to downcast to JsonValidationException
@@ -336,7 +331,7 @@ impl InitCommand {
                     implode(&format!("{} - ", PHP_EOL), &json_err.get_errors())
                 );
                 io.write_error3(
-                    &format!("{}:{}{}", json_err.message, PHP_EOL, errors),
+                    &format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
                     true,
                     io_interface::NORMAL,
                 );
@@ -353,7 +348,7 @@ impl InitCommand {
 
         // --autoload - Create src folder
         if let Some(ref ap) = autoload_path {
-            let filesystem = Filesystem::new(None);
+            let mut filesystem = Filesystem::new(None);
             filesystem.ensure_directory_exists(ap);
 
             // dump-autoload only for projects without added dependencies.
@@ -416,16 +411,11 @@ impl InitCommand {
 
         if !input.is_interactive() {
             if input.get_option("name").is_null() {
-                input.set_option("name", PhpMixed::String(self.get_default_package_name()));
+                // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
             }
 
             if input.get_option("author").is_null() {
-                input.set_option(
-                    "author",
-                    self.get_default_author()
-                        .map(PhpMixed::String)
-                        .unwrap_or(PhpMixed::Null),
-                );
+                // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
             }
         }
     }
@@ -437,7 +427,10 @@ impl InitCommand {
     ) -> Result<()> {
         let io = self.get_io();
         // @var FormatterHelper $formatter
-        let formatter: &FormatterHelper = self.get_helper_set().get("formatter");
+        // TODO(phase-b): get_helper_set returns PhpMixed; the helper set needs proper typing.
+        let formatter: FormatterHelper = todo!();
+        let _ = &formatter;
+        let _ = self.get_helper_set();
 
         // initialize repos if configured
         let repositories: Vec<String> = input
@@ -480,7 +473,7 @@ impl InitCommand {
                 repos.push(RepositoryFactory::create_repo(
                     io,
                     &config,
-                    &repo_config,
+                    repo_config,
                     Some(&mut repo_manager),
                 )?);
             }
@@ -495,7 +488,7 @@ impl InitCommand {
                 repos.push(RepositoryFactory::create_repo(
                     io,
                     &config,
-                    &default_config,
+                    default_config,
                     Some(&mut repo_manager),
                 )?);
             }
@@ -505,29 +498,21 @@ impl InitCommand {
         }
 
         io.write_error3(
-            PhpMixed::List(vec![
-                Box::new(PhpMixed::String(String::new())),
-                Box::new(PhpMixed::String(formatter.format_block(
-                    "Welcome to the Composer config generator",
+            &format!(
+                "\n{}\n",
+                formatter.format_block(
+                    &["Welcome to the Composer config generator"],
                     "bg=blue;fg=white",
                     true,
-                ))),
-                Box::new(PhpMixed::String(String::new())),
-            ]),
+                )
+            ),
             true,
             io_interface::NORMAL,
         );
 
         // namespace
         io.write_error3(
-            PhpMixed::List(vec![
-                Box::new(PhpMixed::String(String::new())),
-                Box::new(PhpMixed::String(
-                    "This command will guide you through creating your composer.json config."
-                        .to_string(),
-                )),
-                Box::new(PhpMixed::String(String::new())),
-            ]),
+            "\nThis command will guide you through creating your composer.json config.\n",
             true,
             io_interface::NORMAL,
         );
@@ -730,15 +715,7 @@ impl InitCommand {
         }
         input.set_option("license", license);
 
-        io.write_error3(
-            PhpMixed::List(vec![
-                Box::new(PhpMixed::String(String::new())),
-                Box::new(PhpMixed::String("Define your dependencies.".to_string())),
-                Box::new(PhpMixed::String(String::new())),
-            ]),
-            true,
-            io_interface::NORMAL,
-        );
+        io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
         // prepare to resolve dependencies
         let repos = self.get_repos();
@@ -768,7 +745,7 @@ impl InitCommand {
                 input,
                 _output,
                 require,
-                _platform_repo.unwrap_or(&PlatformRepository::new(vec![], PhpMixed::Null)),
+                _platform_repo,
                 &preferred_stability,
                 false,
                 false,
@@ -802,7 +779,7 @@ impl InitCommand {
                     input,
                     _output,
                     require_dev,
-                    _platform_repo.unwrap_or(&PlatformRepository::new(vec![], PhpMixed::Null)),
+                    _platform_repo,
                     &preferred_stability,
                     false,
                     false,
@@ -950,7 +927,7 @@ impl InitCommand {
 
         let namespace: Vec<String> = array_map(
             |part: &String| {
-                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part);
+                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part).unwrap_or_default();
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -966,13 +943,13 @@ impl InitCommand {
             return self.git_config.clone().unwrap_or_default();
         }
 
-        let mut process = ProcessExecutor::new(self.get_io());
+        let mut process = ProcessExecutor::new(Some(self.get_io().clone_box()));
 
         let mut output = String::new();
         if process.execute_args(
             &vec!["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
-            None,
+            (),
         ) == 0
         {
             self.git_config = Some(IndexMap::new());
@@ -1037,7 +1014,7 @@ impl InitCommand {
             }
         }
 
-        file_put_contents(ignore_file, &format!("{}{}\n", contents, vendor));
+        file_put_contents(ignore_file, format!("{}{}\n", contents, vendor).as_bytes());
     }
 
     pub(crate) fn is_valid_email(&self, email: &str) -> bool {
@@ -1051,10 +1028,12 @@ impl InitCommand {
 
     fn update_dependencies(&self, output: &dyn OutputInterface) {
         // PHP try/catch: catch \Exception
-        let result = self.get_application().and_then(|app| {
-            let update_command = app.find("update")?;
-            app.reset_composer()?;
-            update_command.run(ArrayInput::new(IndexMap::new()), output)?;
+        let result = self.get_application().and_then(|mut app| {
+            let _update_command = app.find("update")?;
+            app.reset_composer();
+            // TODO(phase-b): invoke update_command.run; currently update_command is a PhpMixed.
+            let _ = ArrayInput::new(IndexMap::new(), None);
+            let _ = output;
             Ok(())
         });
         if let Err(_e) = result {
@@ -1067,10 +1046,12 @@ impl InitCommand {
     }
 
     fn run_dump_autoload_command(&self, output: &dyn OutputInterface) {
-        let result = self.get_application().and_then(|app| {
-            let command = app.find("dump-autoload")?;
-            app.reset_composer()?;
-            command.run(ArrayInput::new(IndexMap::new()), output)?;
+        let result = self.get_application().and_then(|mut app| {
+            let _command = app.find("dump-autoload")?;
+            app.reset_composer();
+            // TODO(phase-b): invoke command.run; currently command is a PhpMixed.
+            let _ = ArrayInput::new(IndexMap::new(), None);
+            let _ = output;
             Ok(())
         });
         if let Err(_e) = result {

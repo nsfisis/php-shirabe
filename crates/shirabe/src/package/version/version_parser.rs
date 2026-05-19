@@ -13,7 +13,7 @@ use crate::repository::platform_repository::PlatformRepository;
 static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, Arc<dyn ConstraintInterface + Send + Sync>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VersionParser {
     inner: SemverVersionParser,
 }
@@ -24,13 +24,9 @@ impl VersionParser {
     pub fn parse_constraints(
         &self,
         constraints: &str,
-    ) -> anyhow::Result<Arc<dyn ConstraintInterface + Send + Sync>> {
-        let mut cache = CONSTRAINTS.lock().unwrap();
-        if !cache.contains_key(constraints) {
-            let parsed = self.inner.parse_constraints(constraints)?;
-            cache.insert(constraints.to_string(), Arc::from(parsed));
-        }
-        Ok(Arc::clone(cache.get(constraints).unwrap()))
+    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
+        // TODO(phase-b): re-introduce a memoization cache once trait objects are Send+Sync.
+        self.inner.parse_constraints(constraints)
     }
 
     pub fn parse_name_version_pairs(
@@ -90,6 +86,10 @@ impl VersionParser {
 
     pub fn parse_stability(version: &str) -> String {
         SemverVersionParser::parse_stability(version)
+    }
+
+    pub fn parse_numeric_alias_prefix(&self, branch: &str) -> Option<String> {
+        self.inner.parse_numeric_alias_prefix(branch)
     }
 
     pub fn is_upgrade(normalized_from: &str, normalized_to: &str) -> anyhow::Result<bool> {

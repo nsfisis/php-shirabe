@@ -252,7 +252,7 @@ impl BinaryInstaller {
         let bin_path = self
             .filesystem
             .borrow_mut()
-            .find_shortest_path(link, bin, false);
+            .find_shortest_path(link, bin, false, false);
         let caller = Self::determine_binary_caller(bin);
 
         // if the target is a php file, we run the unixy proxy file
@@ -288,7 +288,7 @@ impl BinaryInstaller {
         let bin_path = self
             .filesystem
             .borrow_mut()
-            .find_shortest_path(link, bin, false);
+            .find_shortest_path(link, bin, false, false);
 
         let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
         let bin_file = basename(&bin_path);
@@ -312,7 +312,7 @@ impl BinaryInstaller {
             let bin_path_exported = self
                 .filesystem
                 .borrow()
-                .find_shortest_path_code(link, bin, false, true);
+                .find_shortest_path_code(link, bin, false, true, false);
             let mut stream_proxy_code = String::new();
             let mut stream_hint = String::new();
             let mut globals_code = format!("$GLOBALS['_composer_bin_dir'] = __DIR__;\n",);
@@ -329,6 +329,7 @@ impl BinaryInstaller {
                         &format!("{}/autoload.php", vendor_dir_real),
                         false,
                         true,
+                        false,
                     ),
                 ));
             }

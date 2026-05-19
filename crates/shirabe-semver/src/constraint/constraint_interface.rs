@@ -22,6 +22,21 @@ pub trait ConstraintInterface: std::fmt::Debug {
         false
     }
 
+    /// Rust-specific helper: PHP `$c instanceof Constraint` check.
+    fn is_constraint(&self) -> bool {
+        false
+    }
+
+    /// Rust-specific helper: PHP `$c->getOperator()`. Only meaningful when `is_constraint()` is true.
+    fn get_operator(&self) -> &'static str {
+        ""
+    }
+
+    /// Rust-specific helper: PHP `$c->getVersion()`. Only meaningful when `is_constraint()` is true.
+    fn get_version(&self) -> &str {
+        ""
+    }
+
     fn clone_box(&self) -> Box<dyn ConstraintInterface>;
 
     fn as_any(&self) -> &dyn std::any::Any;

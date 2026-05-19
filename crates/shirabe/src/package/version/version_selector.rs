@@ -23,6 +23,7 @@ use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::version::version_parser::VersionParser;
 use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::repository_set::RepositorySet;
 
 #[derive(Debug)]
@@ -40,7 +41,8 @@ impl VersionSelector {
         let mut platform_constraints: IndexMap<String, Vec<Box<dyn ConstraintInterface>>> =
             IndexMap::new();
         if let Some(platform_repo) = platform_repo {
-            for package in platform_repo.get_packages() {
+            for package in <PlatformRepository as RepositoryInterface>::get_packages(platform_repo)
+            {
                 let constraint = Constraint::new("==", package.get_version());
                 platform_constraints
                     .entry(package.get_name().to_string())
@@ -88,9 +90,9 @@ impl VersionSelector {
         };
         let mut candidates = self.repository_set.find_packages(
             &strtolower(package_name),
-            constraint.as_deref(),
+            constraint.as_ref().map(|c| c.clone_box()),
             repo_set_flags,
-        )?;
+        );
 
         let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {
@@ -190,7 +192,7 @@ impl VersionSelector {
                                     pkg.get_pretty_version(),
                                     link.get_description(),
                                     link.get_target(),
-                                    link.get_pretty_constraint(),
+                                    link.get_pretty_constraint().unwrap_or_default(),
                                     reason
                                 ),
                                 true,
@@ -216,7 +218,7 @@ impl VersionSelector {
             package = found_package;
         } else {
             package = if !candidates.is_empty() {
-                Some(candidates.remove(0))
+                Some(candidates.remove(0).clone_package_box())
             } else {
                 None
             };
@@ -230,7 +232,7 @@ impl VersionSelector {
         let package = if let Some(alias) = package.as_ref().as_any().downcast_ref::<AliasPackage>()
         {
             if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                alias.get_alias_of()
+                alias.get_alias_of().clone_package_box()
             } else {
                 package
             }
@@ -266,9 +268,9 @@ impl VersionSelector {
             );
         }
 
-        let loader = ArrayLoader::new(self.get_parser());
+        let loader = ArrayLoader::new(Some(self.get_parser().clone()), false);
         let dumper = ArrayDumper::new();
-        let extra = loader.get_branch_alias(&dumper.dump(package)?)?;
+        let extra = loader.get_branch_alias(&dumper.dump(package))?;
         if let Some(extra) = extra {
             if extra != VersionParser::DEFAULT_BRANCH_ALIAS {
                 let new_extra =

@@ -73,7 +73,7 @@ impl GitLab {
                 "gitlab.accesstoken".to_string(),
             ],
             &mut output,
-            None,
+            (),
         ) == 0
         {
             self.io.set_authentication(
@@ -94,7 +94,7 @@ impl GitLab {
                 "gitlab.deploytoken.user".to_string(),
             ],
             &mut token_user,
-            None,
+            (),
         ) == 0
             && self.process.borrow_mut().execute_args(
                 &[
@@ -103,7 +103,7 @@ impl GitLab {
                     "gitlab.deploytoken.token".to_string(),
                 ],
                 &mut token_password,
-                None,
+                (),
             ) == 0
         {
             self.io.set_authentication(
@@ -177,7 +177,12 @@ impl GitLab {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let local_auth_config = self.config.borrow().get_local_auth_config_source();
+        let local_auth_config_name: Option<String> = self
+            .config
+            .borrow()
+            .get_local_auth_config_source()
+            .map(|c| c.get_name());
+        let has_local_auth_config = local_auth_config_name.is_some();
         let personal_access_token_link = format!(
             "{}://{}/-/user_settings/personal_access_tokens",
             scheme, origin_url
@@ -186,9 +191,9 @@ impl GitLab {
         self.io.write_error3(
             &format!(
                 "A token will be created and stored in \"{}\", your password will never be stored",
-                local_auth_config
+                local_auth_config_name
                     .as_ref()
-                    .map(|c| format!("{} OR ", c.get_name()))
+                    .map(|name| format!("{} OR ", name))
                     .unwrap_or_default()
                     + &self.config.borrow().get_auth_config_source().get_name()
             ),
@@ -223,7 +228,7 @@ impl GitLab {
             .write_error3("for more details.", true, io_interface::NORMAL);
 
         let mut store_in_local_auth_config = false;
-        if local_auth_config.is_some() {
+        if has_local_auth_config {
             store_in_local_auth_config = self.io.ask_confirmation(
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
@@ -313,14 +318,15 @@ impl GitLab {
             );
 
             // store value in user config in auth file
-            let use_local = store_in_local_auth_config && local_auth_config.is_some();
+            let use_local = store_in_local_auth_config && has_local_auth_config;
             let has_expires_in = response
                 .as_array()
                 .map(|arr| arr.contains_key("expires_in"))
                 .unwrap_or(false);
 
             if use_local {
-                let mut auth_config_source = local_auth_config.clone().unwrap();
+                let mut config = self.config.borrow_mut();
+                let auth_config_source = config.get_local_auth_config_source_mut().unwrap();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
                         &format!("gitlab-oauth.{}", origin_url),
@@ -333,7 +339,8 @@ impl GitLab {
                     )?;
                 }
             } else {
-                let mut auth_config_source = self.config.borrow().get_auth_config_source();
+                let mut config = self.config.borrow_mut();
+                let auth_config_source = config.get_auth_config_source_mut();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
                         &format!("gitlab-oauth.{}", origin_url),
@@ -392,8 +399,8 @@ impl GitLab {
 
         // store value in user config in auth file
         self.config
-            .borrow()
-            .get_auth_config_source()
+            .borrow_mut()
+            .get_auth_config_source_mut()
             .add_config_setting(
                 &format!("gitlab-oauth.{}", origin_url),
                 Self::build_oauth_config(&response, &access_token),
@@ -451,7 +458,7 @@ impl GitLab {
             .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, api_url),
-                &PhpMixed::Array(options),
+                options.into_iter().map(|(k, v)| (k, *v)).collect(),
             )?
             .decode_json()?;
 
@@ -538,7 +545,7 @@ impl GitLab {
             .borrow_mut()
             .get(
                 &format!("{}://{}/oauth/token", scheme, origin_url),
-                &PhpMixed::Array(options),
+                options.into_iter().map(|(k, v)| (k, *v)).collect(),
             )?
             .decode_json()?;
 

@@ -29,6 +29,7 @@ use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::lock_array_repository::LockArrayRepository;
 use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::repository_interface::FindPackageConstraint;
 use crate::repository::root_package_repository::RootPackageRepository;
 use crate::util::git::Git as GitUtil;
 use crate::util::process_executor::ProcessExecutor;
@@ -51,7 +52,7 @@ pub struct Locker {
     /// @var ProcessExecutor
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var mixed[]|null
-    lock_data_cache: Option<IndexMap<String, PhpMixed>>,
+    lock_data_cache: std::cell::RefCell<Option<IndexMap<String, PhpMixed>>>,
     /// @var bool
     virtual_file_written: bool,
 }
@@ -73,7 +74,7 @@ impl Locker {
             loader: ArrayLoader::new(None, true),
             dumper: ArrayDumper::new(),
             process,
-            lock_data_cache: None,
+            lock_data_cache: std::cell::RefCell::new(None),
             virtual_file_written: false,
         }
     }
@@ -85,7 +86,12 @@ impl Locker {
 
     /// Returns the md5 hash of the sorted content of the composer file.
     pub fn get_content_hash(composer_file_contents: &str) -> Result<String> {
-        let content = JsonFile::parse_json(composer_file_contents, Some("composer.json"))?;
+        let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
+        // TODO(phase-b): parse_json returns PhpMixed; downstream expects map-like access
+        let content_map: IndexMap<String, PhpMixed> = match &content {
+            PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+            _ => IndexMap::new(),
+        };
 
         let relevant_keys: Vec<&str> = vec![
             "name",
@@ -103,16 +109,16 @@ impl Locker {
 
         let mut relevant_content: IndexMap<String, PhpMixed> = IndexMap::new();
 
-        let content_keys: Vec<String> = array_keys(&content);
+        let content_keys: Vec<String> = array_keys(&content_map);
         let relevant_keys_strings: Vec<String> =
             relevant_keys.iter().map(|s| s.to_string()).collect();
         let intersected = array_intersect(&relevant_keys_strings, &content_keys);
         for key in intersected {
-            if let Some(value) = content.get(&key) {
+            if let Some(value) = content_map.get(&key) {
                 relevant_content.insert(key, value.clone());
             }
         }
-        let platform_value = content.get("config").and_then(|v| match v {
+        let platform_value = content_map.get("config").and_then(|v| match v {
             PhpMixed::Array(m) => m.get("platform").cloned(),
             _ => None,
         });
@@ -152,17 +158,21 @@ impl Locker {
     }
 
     /// Checks whether the lock file is still up to date with the current hash
-    pub fn is_fresh(&self) -> Result<bool> {
+    pub fn is_fresh(&mut self) -> Result<bool> {
         let lock = self.lock_file.read()?;
+        let lock_map: IndexMap<String, PhpMixed> = match lock {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
 
-        let content_hash = lock.get("content-hash");
+        let content_hash = lock_map.get("content-hash");
         if content_hash.is_some() && !shirabe_php_shim::empty(content_hash.unwrap()) {
             // There is a content hash key, use that instead of the file hash
             return Ok(self.content_hash == content_hash.unwrap().as_string().unwrap_or(""));
         }
 
         // BC support for old lock files without content-hash
-        let lock_hash = lock.get("hash");
+        let lock_hash = lock_map.get("hash");
         if lock_hash.is_some() && !shirabe_php_shim::empty(lock_hash.unwrap()) {
             return Ok(self.hash == lock_hash.unwrap().as_string().unwrap_or(""));
         }
@@ -174,7 +184,8 @@ impl Locker {
     /// Searches and returns an array of locked packages, retrieved from registered repositories.
     pub fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepository> {
         let lock_data = self.get_lock_data()?;
-        let mut packages = LockArrayRepository::new(vec![])?;
+        // TODO(phase-b): LockArrayRepository has no `new` constructor yet
+        let mut packages: LockArrayRepository = todo!("LockArrayRepository::new(vec![])");
 
         let mut locked_packages = lock_data
             .get("packages")
@@ -215,17 +226,12 @@ impl Locker {
                         let info_map: IndexMap<String, PhpMixed> =
                             m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
                         let package = self.loader.load(info_map, None)?;
-                        packages.add_package(package.clone())?;
-                        package_by_name.insert(package.get_name().to_string(), package.clone());
-
-                        // TODO(phase-b): `$package instanceof AliasPackage` downcast
-                        let package_as_alias: Option<&AliasPackage> = None;
-                        if let Some(alias) = package_as_alias {
-                            package_by_name.insert(
-                                alias.get_alias_of().get_name().to_string(),
-                                alias.get_alias_of(),
-                            );
-                        }
+                        // TODO(phase-b): PHP shares the package between repository and map (Rc<dyn BasePackage>)
+                        let _name = package.get_name().to_string();
+                        let _ = (&mut packages, &mut package_by_name, package);
+                        todo!(
+                            "packages.add_package(package); package_by_name.insert(name, package); + AliasPackage downcast"
+                        );
                     }
                 }
             }
@@ -239,7 +245,8 @@ impl Locker {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string();
-                            if let Some(base_pkg) = package_by_name.get(&alias_pkg_name).cloned() {
+                            // TODO(phase-b): Box<dyn BasePackage> is not Clone; PHP semantics need Rc<dyn BasePackage>
+                            if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
                                 let mut alias_pkg = CompleteAliasPackage::new(
                                     todo!("phase-b: downcast Box<BasePackage> to CompletePackage"),
                                     m.get("alias_normalized")
@@ -251,7 +258,7 @@ impl Locker {
                                         .unwrap_or("")
                                         .to_string(),
                                 );
-                                alias_pkg.set_root_package_alias(true);
+                                // TODO(phase-b): set_root_package_alias missing on CompleteAliasPackage
                                 let _ = base_pkg;
                                 // TODO(phase-b): packages.add_package(Box::new(alias_pkg))
                                 let _ = alias_pkg;
@@ -432,7 +439,7 @@ impl Locker {
 
     /// @return array<string, mixed>
     pub fn get_lock_data(&mut self) -> Result<IndexMap<String, PhpMixed>> {
-        if let Some(cache) = self.lock_data_cache.clone() {
+        if let Some(cache) = self.lock_data_cache.borrow().clone() {
             return Ok(cache);
         }
 
@@ -444,8 +451,12 @@ impl Locker {
             .into());
         }
 
-        let data = self.lock_file.read()?;
-        self.lock_data_cache = Some(data.clone());
+        let data_php = self.lock_file.read()?;
+        let data: IndexMap<String, PhpMixed> = match data_php {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
+        *self.lock_data_cache.borrow_mut() = Some(data.clone());
         Ok(data)
     }
 
@@ -604,16 +615,21 @@ impl Locker {
         } else {
             None
         };
-        if !is_locked || Some(&lock) != current_data.as_ref() {
+        // TODO(phase-b): PhpMixed lacks PartialEq; PHP compares lock array with current data
+        let differs = current_data
+            .as_ref()
+            .map(|c| !std::ptr::eq(c as *const _, &lock as *const _))
+            .unwrap_or(true);
+        if !is_locked || differs {
             if write {
                 self.lock_file.write(PhpMixed::Array(
                     lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
                 ))?;
-                self.lock_data_cache = None;
+                *self.lock_data_cache.borrow_mut() = None;
                 self.virtual_file_written = false;
             } else {
                 self.virtual_file_written = true;
-                self.lock_data_cache = Some(JsonFile::parse_json(
+                let parsed = JsonFile::parse_json(
                     Some(&JsonFile::encode_with_indent(
                         &PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                         shirabe_php_shim::JSON_UNESCAPED_SLASHES
@@ -622,7 +638,12 @@ impl Locker {
                         JsonFile::INDENT_DEFAULT,
                     )),
                     None,
-                )?);
+                )?;
+                let parsed_map: IndexMap<String, PhpMixed> = match parsed {
+                    PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    _ => IndexMap::new(),
+                };
+                *self.lock_data_cache.borrow_mut() = Some(parsed_map);
             }
 
             return Ok(true);
@@ -644,7 +665,7 @@ impl Locker {
     where
         F: FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>,
     {
-        let contents = file_get_contents(&composer_json.get_path(), false, None);
+        let contents = file_get_contents(&composer_json.get_path());
         let contents = match contents {
             Some(s) => s,
             None => {
@@ -660,7 +681,11 @@ impl Locker {
         };
 
         let lock_mtime = filemtime(&self.lock_file.get_path());
-        let mut lock_data = self.lock_file.read()?;
+        let lock_data_php = self.lock_file.read()?;
+        let mut lock_data: IndexMap<String, PhpMixed> = match lock_data_php {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
         lock_data.insert(
             "content-hash".to_string(),
             PhpMixed::String(Self::get_content_hash(&contents)?),
@@ -675,11 +700,13 @@ impl Locker {
                 .map(|(k, v)| (k, Box::new(v)))
                 .collect(),
         ))?;
-        self.lock_data_cache = None;
+        *self.lock_data_cache.borrow_mut() = None;
         self.virtual_file_written = false;
         if let Some(mtime) = lock_mtime {
             if is_int(&PhpMixed::Int(mtime)) {
-                let _ = touch(&self.lock_file.get_path(), Some(mtime));
+                // TODO(phase-b): touch() in php-shim doesn't accept mtime; need touch2
+                let _ = mtime;
+                let _ = touch(&self.lock_file.get_path());
             }
         }
         Ok(())
@@ -835,7 +862,12 @@ impl Locker {
                     let command = GitUtil::build_rev_list_command(&self.process, args);
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
-                        PhpMixed::String(command),
+                        PhpMixed::List(
+                            command
+                                .into_iter()
+                                .map(|s| Box::new(PhpMixed::String(s)))
+                                .collect(),
+                        ),
                         Some(&mut output),
                         path.as_deref(),
                     )? {
@@ -916,7 +948,7 @@ impl Locker {
         let root_repo = RootPackageRepository::new(todo!("phase-b: clone root package"));
 
         for set in &sets {
-            let installed_repo = InstalledRepository::new(vec![/* set.repo, root_repo */])?;
+            let installed_repo = InstalledRepository::new(vec![/* set.repo, root_repo */]);
 
             // PHP: call_user_func([$package, $set['method']])
             // TODO(phase-b): dynamic method dispatch by name
@@ -925,13 +957,15 @@ impl Locker {
                 if PlatformRepository::is_platform_package(&link.get_target()) {
                     continue;
                 }
-                if link.get_pretty_constraint().as_deref() == Some("self.version") {
+                if link.get_pretty_constraint().ok() == Some("self.version") {
                     continue;
                 }
                 if installed_repo
                     .find_packages_with_replacers_and_providers(
                         &link.get_target(),
-                        Some(link.get_constraint()),
+                        Some(FindPackageConstraint::Constraint(
+                            link.get_constraint().clone_box(),
+                        )),
                     )
                     .is_empty()
                 {
@@ -939,7 +973,10 @@ impl Locker {
                         .find_packages_with_replacers_and_providers(&link.get_target(), None);
 
                     if !results.is_empty() {
-                        let provider = reset_first(&results).unwrap();
+                        // TODO(phase-b): reset_first requires Clone on dyn BasePackage; PHP returns shared reference
+                        let provider: &Box<dyn BasePackage> =
+                            todo!("reset_first(&results) shared ref");
+                        let _ = &results;
                         let mut description = provider.get_pretty_version().to_string();
                         if provider.get_name() != link.get_target() {
                             'outer: for (method, text) in [
@@ -959,7 +996,8 @@ impl Locker {
                                                 PhpMixed::String(
                                                     provider_link
                                                         .get_pretty_constraint()
-                                                        .unwrap_or_default(),
+                                                        .unwrap_or_default()
+                                                        .to_string(),
                                                 ),
                                                 PhpMixed::String(format!(
                                                     "{} {}",
@@ -1012,7 +1050,7 @@ struct SetEntry {
 
 // Suppress unused-import warnings for items kept for parity with the PHP source.
 #[allow(dead_code)]
-const _USE_PARITY: () = {
+fn _use_parity() {
     let _ = is_array;
-    let _ = call_user_func;
-};
+    let _: PhpMixed = call_user_func("", &[]);
+}

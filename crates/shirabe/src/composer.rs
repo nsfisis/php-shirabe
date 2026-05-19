@@ -59,6 +59,10 @@ impl Composer {
         self.locker.as_ref().unwrap()
     }
 
+    pub fn get_locker_mut(&mut self) -> &mut Locker {
+        self.locker.as_mut().unwrap()
+    }
+
     pub fn set_download_manager(
         &mut self,
         manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
@@ -88,12 +92,21 @@ impl Composer {
         self.plugin_manager.as_ref().unwrap()
     }
 
+    // TODO(plugin): get_plugin_manager_mut is part of the plugin API
+    pub fn get_plugin_manager_mut(&mut self) -> &mut PluginManager {
+        self.plugin_manager.as_mut().unwrap()
+    }
+
     pub fn set_autoload_generator(&mut self, autoload_generator: AutoloadGenerator) {
         self.autoload_generator = Some(autoload_generator);
     }
 
     pub fn get_autoload_generator(&self) -> &AutoloadGenerator {
         self.autoload_generator.as_ref().unwrap()
+    }
+
+    pub fn get_autoload_generator_mut(&mut self) -> &mut AutoloadGenerator {
+        self.autoload_generator.as_mut().unwrap()
     }
 
     pub fn get_package(&self) -> &dyn crate::package::root_package_interface::RootPackageInterface {
@@ -116,9 +129,19 @@ impl Composer {
         self.inner.get_repository_manager()
     }
 
+    pub fn set_event_dispatcher(
+        &mut self,
+        dispatcher: std::rc::Rc<
+            std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>,
+        >,
+    ) {
+        self.inner.set_event_dispatcher(dispatcher);
+    }
+
     pub fn get_event_dispatcher(
         &self,
-    ) -> &crate::event_dispatcher::event_dispatcher::EventDispatcher {
+    ) -> &std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>>
+    {
         self.inner.get_event_dispatcher()
     }
 
@@ -128,11 +151,54 @@ impl Composer {
         self.inner.get_installation_manager()
     }
 
+    pub fn get_installation_manager_mut(
+        &mut self,
+    ) -> &mut crate::installer::installation_manager::InstallationManager {
+        self.inner.get_installation_manager_mut()
+    }
+
     pub fn get_loop(&self) -> &std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>> {
         self.inner.get_loop()
     }
 
+    pub fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>) {
+        self.inner.set_loop(r#loop);
+    }
+
+    pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>) {
+        self.inner.set_config(config);
+    }
+
+    pub fn set_global(&mut self) {
+        self.inner.set_global();
+    }
+
+    pub fn set_repository_manager(
+        &mut self,
+        manager: crate::repository::repository_manager::RepositoryManager,
+    ) {
+        self.inner.set_repository_manager(manager);
+    }
+
+    pub fn set_installation_manager(
+        &mut self,
+        manager: crate::installer::installation_manager::InstallationManager,
+    ) {
+        self.inner.set_installation_manager(manager);
+    }
+
     pub fn is_global(&self) -> bool {
         self.inner.is_global()
+    }
+
+    pub fn as_partial(&self) -> &crate::partial_composer::PartialComposer {
+        &self.inner
+    }
+
+    pub fn set_package(
+        &mut self,
+        package: Box<dyn crate::package::root_package_interface::RootPackageInterface>,
+    ) {
+        self.inner.set_package(package);
     }
 }

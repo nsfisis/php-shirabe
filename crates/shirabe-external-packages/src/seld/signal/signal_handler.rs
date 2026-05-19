@@ -13,4 +13,12 @@ impl SignalHandler {
     pub fn unregister(&self) {
         todo!()
     }
+
+    pub fn exit_with_last_signal(&self) {
+        todo!()
+    }
+
+    pub fn is_triggered(&self) -> bool {
+        todo!()
+    }
 }

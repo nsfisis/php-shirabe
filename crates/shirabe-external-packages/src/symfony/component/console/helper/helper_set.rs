@@ -8,7 +8,7 @@ impl HelperSet {
         todo!()
     }
 
-    pub fn get(&self, _name: &str) -> Option<PhpMixed> {
+    pub fn get(&self, _name: &str) -> PhpMixed {
         todo!()
     }
 

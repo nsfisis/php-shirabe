@@ -31,7 +31,7 @@ impl GzipDownloader {
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         cache: Option<Cache>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -88,7 +88,7 @@ impl GzipDownloader {
                         .collect(),
                 ),
                 Some(&mut process_output),
-                None,
+                (),
             )? == 0
             {
                 return Ok(shirabe_external_packages::react::promise::resolve(None));
@@ -127,5 +127,68 @@ impl GzipDownloader {
         }
         gzclose(archive_file);
         fclose(target_file);
+    }
+}
+
+impl crate::downloader::downloader_interface::DownloaderInterface for GzipDownloader {
+    fn get_installation_source(&self) -> String {
+        self.inner.get_installation_source()
+    }
+
+    fn download(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.download(package, path, prev_package, output)
+    }
+
+    fn prepare(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.prepare(r#type, package, path, prev_package)
+    }
+
+    fn install(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.install(package, path, output)
+    }
+
+    fn update(
+        &self,
+        initial: &dyn PackageInterface,
+        target: &dyn PackageInterface,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.update(initial, target, path)
+    }
+
+    fn remove(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.remove(package, path, output)
+    }
+
+    fn cleanup(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

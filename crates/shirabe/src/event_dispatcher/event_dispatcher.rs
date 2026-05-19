@@ -88,11 +88,11 @@ impl EventDispatcher {
             Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_else(|| "".to_string());
         let skip_scripts: Vec<String> = skip_scripts_env
             .split(',')
-            .map(|v| trim(v, " \t\n\r\0\u{0B}"))
+            .map(|v| trim(v, Some(" \t\n\r\0\u{0B}")))
             .filter(|val| val != "")
             .collect();
         Self {
-            composer,
+            composer: Box::new(composer),
             io,
             loader: None,
             process,
@@ -251,8 +251,12 @@ impl EventDispatcher {
 
             // other newly appeared prepended autoloaders should be appended instead to ensure Composer loads its classes first
             // TODO(plugin): ClassLoader detection via instanceof — currently treat all callbacks uniformly
-            spl_autoload_unregister(cb.clone());
-            spl_autoload_register(cb);
+            // TODO(phase-b): `cb` is a PhpMixed; spl_autoload_*/register expect a typed
+            // Box<dyn Fn(&str) -> PhpMixed + Send + Sync> callback. Bridging requires
+            // exposing the underlying callable from PhpMixed.
+            let _ = &cb;
+            let _ = spl_autoload_unregister;
+            let _ = spl_autoload_register;
         }
 
         result
@@ -358,7 +362,12 @@ impl EventDispatcher {
 
                         let args: Vec<String>;
                         if let Some(index) = array_search_in_vec("@additional_args", &script) {
-                            let _ = array_splice::<String>(&mut script, index, 0, &additional_args);
+                            let _ = array_splice::<String>(
+                                &mut script,
+                                index as i64,
+                                Some(0),
+                                additional_args.clone(),
+                            );
                             args = script.clone();
                         } else {
                             let mut merged = script.clone();
@@ -558,7 +567,7 @@ impl EventDispatcher {
                             continue;
                         }
 
-                        let mut app = Application::new();
+                        let mut app = Application::new("", "");
                         app.set_catch_exceptions(false);
                         if method_exists(
                             &PhpMixed::String("Application".to_string()),
@@ -579,15 +588,18 @@ impl EventDispatcher {
                                 .join(" ");
                             // reusing the output from $this->io is mostly needed for tests, but generally speaking
                             // it does not hurt to keep the same stream as the current Application
-                            let output = if let Some(_console_io) =
-                                self.io.as_any().downcast_ref::<ConsoleIO>()
-                            {
+                            // TODO(phase-b): IOInterface needs an `as_any` shim before
+                            // `instanceof ConsoleIO` can be expressed; treat io as a
+                            // generic IOInterface for now.
+                            let _io_ref: &dyn IOInterface = &*self.io;
+                            let downcast: Option<&ConsoleIO> = None;
+                            let output: ConsoleOutput = if let Some(_console_io) = downcast {
                                 // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
                                 // is required by the original PHP — needs user-decided porting strategy.
                                 let _refl_php_version_gate = PHP_VERSION_ID < 80100;
                                 todo!("\\ReflectionProperty on ConsoleIO::$output")
                             } else {
-                                ConsoleOutput::new()
+                                ConsoleOutput::new(0, None, None)
                             };
                             let input_str = event
                                 .get_flags()
@@ -595,7 +607,9 @@ impl EventDispatcher {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or(&args)
                                 .to_string();
-                            Ok(app.run(StringInput::new(input_str), output))
+                            let mut input = StringInput::new(&input_str);
+                            let mut output = output;
+                            Ok(app.run(Some(&mut input), Some(&mut output))?)
                         })();
                         match result {
                             Ok(v) => r#return = v,
@@ -690,12 +704,8 @@ impl EventDispatcher {
                             if strpos(&exec, "=").is_none() {
                                 Platform::clear_env(&substr(&exec, 8, None));
                             } else {
-                                let parts: Vec<&str> = substr(&exec, 8, None)
-                                    .splitn(2, '=')
-                                    .collect::<Vec<_>>()
-                                    .iter()
-                                    .map(|s| *s)
-                                    .collect();
+                                let after = substr(&exec, 8, None);
+                                let parts: Vec<&str> = after.splitn(2, '=').collect();
                                 let var = parts[0].to_string();
                                 let value = parts[1].to_string();
                                 Platform::put_env(&var, &value);
@@ -727,7 +737,7 @@ impl EventDispatcher {
                                     m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
                                 if !file_exists(&m0) {
                                     let finder = ExecutableFinder::new();
-                                    if let Some(path_to_exec) = finder.find(&m0) {
+                                    if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
                                             let exec_without_ext = Preg::replace(
@@ -848,10 +858,10 @@ impl EventDispatcher {
 
     fn execute_tty(&self, exec: &str) -> anyhow::Result<i64> {
         if self.io.is_interactive() {
-            return self.process.borrow_mut().execute_tty(exec);
+            return self.process.borrow_mut().execute_tty(exec, ());
         }
 
-        self.process.borrow_mut().execute(exec)
+        self.process.borrow_mut().execute(exec, (), ())
     }
 
     fn get_php_exec_command(&self) -> anyhow::Result<String> {
@@ -1045,8 +1055,10 @@ impl EventDispatcher {
         let package = self.composer.get_package();
         let scripts = package.get_scripts();
 
-        let event_scripts = match scripts.get(event.get_name()) {
-            Some(v) if !Self::is_empty_value(v) => v.clone(),
+        // TODO(phase-b): RootPackage::get_scripts() returns Vec<String> per event;
+        // mirror PHP's is_empty_value semantics on the Vec form.
+        let event_scripts: Vec<String> = match scripts.get(event.get_name()) {
+            Some(v) if !v.is_empty() => v.clone(),
             _ => return Vec::new(),
         };
 
@@ -1064,23 +1076,7 @@ impl EventDispatcher {
         }
 
         // PHP returns the array of script strings; convert each to Callable::String
-        match event_scripts {
-            PhpMixed::Array(map) => map
-                .values()
-                .filter_map(|v| match v.as_ref() {
-                    PhpMixed::String(s) => Some(Callable::String(s.clone())),
-                    _ => None,
-                })
-                .collect(),
-            PhpMixed::List(list) => list
-                .iter()
-                .filter_map(|v| match v.as_ref() {
-                    PhpMixed::String(s) => Some(Callable::String(s.clone())),
-                    _ => None,
-                })
-                .collect(),
-            _ => Vec::new(),
-        }
+        event_scripts.into_iter().map(Callable::String).collect()
     }
 
     /// Checks if string given references a class path and method
@@ -1203,10 +1199,14 @@ impl EventDispatcher {
 
     fn make_autoloader(&mut self, event: &Event, callable: &Callable) {
         // TODO(plugin): full autoloader rebuild on plugin-supplied callables — currently a stub.
-        let composer = match self.composer_as_full() {
-            Some(c) => c,
-            None => return,
-        };
+        // TODO(phase-b): composer_as_full() returns Option<&Composer> borrowed from &self,
+        // which conflicts with &mut self updates further down (previous_listeners,
+        // previous_hash, loader). Resolve when Composer ownership is shared. For now,
+        // short-circuit before any mutable use and fabricate the rest via todo!().
+        if self.composer_as_full().is_none() {
+            return;
+        }
+        let composer: &Composer = todo!("composer_as_full borrows &self; needs shared ownership");
 
         let callable_key = match callable {
             Callable::ArrayCallable(first, method) => {
@@ -1247,9 +1247,15 @@ impl EventDispatcher {
 
         self.previous_hash = Some(hash_value);
 
-        let package_map =
-            generator.build_package_map(composer.get_installation_manager(), package, &packages);
-        let map = generator.parse_autoloads(&package_map, package);
+        // TODO(phase-b): build_package_map needs &mut InstallationManager and returns Result;
+        // Composer is &Composer here so we cannot take a mut borrow. Defer until shared ownership.
+        let _ = generator;
+        let _ = packages;
+        let package_map: Vec<(Box<dyn PackageInterface>, Option<String>)> =
+            todo!("build_package_map requires &mut InstallationManager");
+        // TODO(phase-b): parse_autoloads also expects the filtered dev packages list
+        // (PhpMixed in this port).
+        let map = generator.parse_autoloads(package_map, package, shirabe_php_shim::PhpMixed::Null);
 
         if self.loader.is_some() {
             self.loader.as_mut().unwrap().unregister();
@@ -1262,7 +1268,7 @@ impl EventDispatcher {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        let mut loader = generator.create_loader(&map, &vendor_dir);
+        let mut loader = generator.create_loader(&map, Some(vendor_dir.clone()));
         loader.register(false);
         self.loader = Some(loader);
     }

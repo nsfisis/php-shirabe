@@ -2,6 +2,7 @@
 
 use crate::composer::Composer;
 use crate::io::io_interface::IOInterface;
+use crate::plugin::capable::Capable;
 
 pub const PLUGIN_API_VERSION: &'static str = "2.9.0";
 
@@ -14,5 +15,16 @@ pub trait PluginInterface: std::fmt::Debug {
 
     fn clone_box(&self) -> Box<dyn PluginInterface> {
         todo!()
+    }
+
+    // TODO(plugin): PHP-side `instanceof` checks for EventSubscriberInterface / Capable.
+    // EventSubscriberInterface is not dyn-compatible (its only method is associated, not
+    // a `&self` method), so we expose a boolean predicate instead.
+    fn is_event_subscriber_interface(&self) -> bool {
+        false
+    }
+
+    fn as_capable(&self) -> Option<&dyn Capable> {
+        None
     }
 }

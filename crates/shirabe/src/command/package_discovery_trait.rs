@@ -63,8 +63,11 @@ pub trait PackageDiscoveryTrait {
                 // TODO(phase-b): PlatformRepository::new() signature
                 Box::new(todo!("PlatformRepository::new()") as PlatformRepository),
             ];
-            let io_owned: Box<dyn IOInterface> = todo!("clone self.get_io() into a Box");
-            for repo in RepositoryFactory::default_repos_with_default_manager(io_owned) {
+            let mut io_owned: Box<dyn IOInterface> = todo!("clone self.get_io() into a Box");
+            for (_, repo) in RepositoryFactory::default_repos_with_default_manager(&mut *io_owned)
+                .unwrap()
+                .into_iter()
+            {
                 repos.push(repo);
             }
             *self.get_repos_mut() = Some(CompositeRepository::new(repos));
@@ -113,11 +116,12 @@ pub trait PackageDiscoveryTrait {
                     .as_string()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "stable".to_string()),
-            );
+            )
+            .unwrap_or_default();
         }
 
         // @phpstan-ignore-next-line as RequireCommand does not have the option above so this code is reachable there
-        let file = Factory::get_composer_file();
+        let file = Factory::get_composer_file().unwrap_or_default();
         if is_file(&file) && Filesystem::is_readable(&file) {
             let contents = file_get_contents(&file).unwrap_or_default();
             let composer = json_decode(&contents, true).unwrap_or(PhpMixed::Null);
@@ -125,7 +129,7 @@ pub trait PackageDiscoveryTrait {
                 if let Some(arr) = composer.as_array() {
                     if let Some(ms) = arr.get("minimum-stability") {
                         if let Some(s) = ms.as_string() {
-                            return VersionParser::normalize_stability(s);
+                            return VersionParser::normalize_stability(s).unwrap_or_default();
                         }
                     }
                 }
@@ -160,6 +164,7 @@ pub trait PackageDiscoveryTrait {
                         r"{^\d+(\.\d+)?$}",
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                     )
+                    .unwrap_or(false)
                 {
                     io.write_error3(
                         &format!(
@@ -174,14 +179,10 @@ pub trait PackageDiscoveryTrait {
 
                 if !requirement.contains_key("version") {
                     // determine the best version automatically
-                    let (name, version) = self.find_best_version_and_name_for_package(
-                        self.get_io(),
-                        input,
-                        requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                        platform_repo,
-                        preferred_stability,
-                        fixed,
-                    )?;
+                    // TODO(phase-b): self.get_io() borrow conflicts with self.find_best_version_and_name_for_package
+                    let (name, version): (String, String) = todo!(
+                        "borrow conflict between get_io and find_best_version_and_name_for_package"
+                    );
 
                     // replace package name from packagist.org
                     requirement.insert("name".to_string(), name);
@@ -219,7 +220,7 @@ pub trait PackageDiscoveryTrait {
         let version_parser = VersionParser::new();
 
         // Collect existing packages
-        let composer = self.try_composer(None, None);
+        let composer = self.try_composer();
         let mut installed_repo: Option<_> = None;
         if let Some(c) = &composer {
             installed_repo = Some(c.get_repository_manager().get_local_repository());
@@ -231,8 +232,8 @@ pub trait PackageDiscoveryTrait {
             }
         }
         // PHP: unset($composer, $installedRepo);
-        drop(composer);
         drop(installed_repo);
+        drop(composer);
 
         let io = self.get_io();
         loop {
@@ -241,7 +242,8 @@ pub trait PackageDiscoveryTrait {
                 Some(s) => s.to_string(),
                 None => break,
             };
-            let mut matches = self.get_repos().search(package.clone(), 0, None);
+            // TODO(phase-b): self.get_repos() (&mut self) conflicts with io borrow (&self)
+            let mut matches: Vec<SearchResult> = todo!("self.get_repos().search()");
 
             if count(&PhpMixed::List(
                 matches.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
@@ -271,7 +273,11 @@ pub trait PackageDiscoveryTrait {
 
                 // no match, prompt which to pick
                 if !exact_match {
-                    let providers = self.get_repos().get_providers(package.clone());
+                    // TODO(phase-b): self.get_repos() (&mut self) conflicts with io borrow (&self)
+                    let providers: IndexMap<
+                        String,
+                        crate::repository::repository_interface::ProviderInfo,
+                    > = todo!("self.get_repos().get_providers()");
                     if count(&PhpMixed::List(
                         providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
                     )) > 0
@@ -424,14 +430,10 @@ pub trait PackageDiscoveryTrait {
 
                     let constraint: String = match &constraint_mixed {
                         PhpMixed::Bool(false) => {
-                            let (_name, c) = self.find_best_version_and_name_for_package(
-                                self.get_io(),
-                                input,
-                                &package,
-                                platform_repo,
-                                preferred_stability,
-                                fixed,
-                            )?;
+                            // TODO(phase-b): self.get_io() borrow conflicts with self.find_best_version_and_name_for_package
+                            let (_name, c): (String, String) = todo!(
+                                "borrow conflict between get_io and find_best_version_and_name_for_package"
+                            );
 
                             io.write_error3(
                                 &sprintf(
@@ -490,16 +492,21 @@ pub trait PackageDiscoveryTrait {
 
         // find the latest version allowed in this repo set
         let repo_set = self.get_repository_set(input, None);
-        let version_selector = VersionSelector::new_with_platform_repo(repo_set, platform_repo);
+        // TODO(phase-b): VersionSelector::new takes owned RepositorySet; we have a shared reference
+        let mut version_selector: VersionSelector =
+            todo!("VersionSelector::new with owned repo_set");
         let effective_minimum_stability = self.get_minimum_stability(input);
 
         let package = version_selector.find_best_candidate(
             name,
             None,
             preferred_stability,
-            &*platform_requirement_filter,
-            // TODO(phase-b): extra optional arguments (0, $this->getIO())
-        );
+            // TODO(phase-b): Box<dyn ...> cannot be cloned; original PHP shares reference
+            Some(PlatformRequirementFilterFactory::ignore_nothing()),
+            0,
+            None,
+            shirabe_php_shim::PhpMixed::Null,
+        )?;
 
         if package.is_none() {
             // platform packages can not be found in the pool in versions other than the local platform's has
@@ -557,8 +564,11 @@ pub trait PackageDiscoveryTrait {
                     name,
                     None,
                     preferred_stability,
-                    &*PlatformRequirementFilterFactory::ignore_all(),
-                );
+                    Some(PlatformRequirementFilterFactory::ignore_all()),
+                    0,
+                    None,
+                    shirabe_php_shim::PhpMixed::Null,
+                )?;
                 if let Some(candidate) = candidate {
                     return Err(InvalidArgumentException {
                         message: sprintf(
@@ -574,22 +584,27 @@ pub trait PackageDiscoveryTrait {
                 }
             }
             // Check whether the minimum stability was the problem but the package exists
-            let package_at_unacceptable = version_selector.find_best_candidate_with_flags(
+            let package_at_unacceptable = version_selector.find_best_candidate(
                 name,
                 None,
                 preferred_stability,
-                &*platform_requirement_filter,
+                // TODO(phase-b): Box<dyn ...> cannot be cloned; reusing factory result
+                Some(PlatformRequirementFilterFactory::ignore_nothing()),
                 RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
-            );
+                None,
+                shirabe_php_shim::PhpMixed::Null,
+            )?;
             if let Some(package) = package_at_unacceptable {
                 // we must first verify if a valid package would be found in a lower priority repository
-                let all_repos_package = version_selector.find_best_candidate_with_flags(
+                let all_repos_package = version_selector.find_best_candidate(
                     name,
                     None,
                     preferred_stability,
-                    &*platform_requirement_filter,
+                    Some(PlatformRequirementFilterFactory::ignore_nothing()),
                     RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
-                );
+                    None,
+                    shirabe_php_shim::PhpMixed::Null,
+                )?;
                 if let Some(all_repos_package) = all_repos_package {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -617,21 +632,26 @@ pub trait PackageDiscoveryTrait {
             }
             // Check whether the PHP version was the problem for all versions
             if !is_ignore_all {
-                let candidate = version_selector.find_best_candidate_with_flags(
+                let candidate = version_selector.find_best_candidate(
                     name,
                     None,
                     preferred_stability,
-                    &*PlatformRequirementFilterFactory::ignore_all(),
+                    Some(PlatformRequirementFilterFactory::ignore_all()),
                     RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
-                );
+                    None,
+                    shirabe_php_shim::PhpMixed::Null,
+                )?;
                 if let Some(candidate) = candidate {
                     let mut additional = String::new();
                     let no_match = version_selector.find_best_candidate(
                         name,
                         None,
                         preferred_stability,
-                        &*PlatformRequirementFilterFactory::ignore_all(),
-                    );
+                        Some(PlatformRequirementFilterFactory::ignore_all()),
+                        0,
+                        None,
+                        shirabe_php_shim::PhpMixed::Null,
+                    )?;
                     if no_match.is_none() {
                         additional = format!(
                             "{}{}Additionally, the package was only found with a stability of \"{}\" while your minimum stability is \"{}\".",
@@ -691,12 +711,9 @@ pub trait PackageDiscoveryTrait {
                             "<error>Could not find package {}.</error>\nPick one of these or leave empty to abort:",
                             name,
                         ),
-                        similar
-                            .iter()
-                            .map(|s| (s.clone(), s.clone()))
-                            .collect(),
-                        false,
-                        1,
+                        similar.iter().map(|s| s.clone()).collect(),
+                        PhpMixed::Bool(false),
+                        PhpMixed::Int(1),
                         "No package named \"%s\" is installed.".to_string(),
                         false,
                     );
@@ -755,7 +772,7 @@ pub trait PackageDiscoveryTrait {
             if fixed {
                 package.get_pretty_version().to_string()
             } else {
-                version_selector.find_recommended_require_version(&*package)
+                version_selector.find_recommended_require_version(&*package)?
             },
         ))
     }
@@ -793,8 +810,8 @@ pub trait PackageDiscoveryTrait {
         };
         let mut similar_packages: IndexMap<String, i64> = IndexMap::new();
 
-        let installed_repo = self
-            .require_composer(None, None)
+        let composer_for_installed = self.require_composer(None, None);
+        let installed_repo = composer_for_installed
             .get_repository_manager()
             .get_local_repository();
 
@@ -802,7 +819,7 @@ pub trait PackageDiscoveryTrait {
             // TODO(phase-b): installed_repo.find_package signature mismatch with FindPackageConstraint
             if installed_repo
                 .find_package(
-                    result.name.clone(),
+                    &result.name,
                     crate::repository::repository_interface::FindPackageConstraint::String(
                         "*".to_string(),
                     ),
@@ -835,7 +852,7 @@ pub trait PackageDiscoveryTrait {
                 continue;
             }
             let platform_pkg = platform_repo.find_package(
-                link.get_target().to_string(),
+                link.get_target(),
                 crate::repository::repository_interface::FindPackageConstraint::String(
                     "*".to_string(),
                 ),
@@ -873,10 +890,7 @@ pub trait PackageDiscoveryTrait {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key("config.platform");
-                let is_complete = platform_pkg
-                    .as_any()
-                    .downcast_ref::<dyn CompletePackageInterface>()
-                    .is_some();
+                let is_complete = platform_pkg.as_complete_package_interface().is_some();
                 if has_config_platform && is_complete {
                     // TODO(phase-b): platform_pkg.get_description() via CompletePackageInterface
                     platform_pkg_version = format!(

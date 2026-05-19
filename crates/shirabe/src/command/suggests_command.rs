@@ -8,8 +8,10 @@ use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
 use crate::io::io_interface::IOInterface;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::root_package_repository::RootPackageRepository;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
 use shirabe_php_shim::{PhpMixed, empty, in_array};
@@ -43,37 +45,53 @@ impl SuggestsCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
 
-        let mut installed_repos = vec![Box::new(RootPackageRepository::new(
-            composer.get_package().clone(),
-        ))];
+        let mut installed_repos: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(
+            RootPackageRepository::new(composer.get_package().clone_box()),
+        )];
 
-        let locker = composer.get_locker();
-        if locker.is_locked() {
+        if composer.get_locker_mut().is_locked() {
+            // TODO(phase-b): get_platform_overrides returns IndexMap<String, String>; PlatformRepository::new expects IndexMap<String, PhpMixed>
+            let _platform_overrides = composer.get_locker_mut().get_platform_overrides()?;
+            let platform_overrides: IndexMap<String, PhpMixed> =
+                todo!("convert IndexMap<String, String> to IndexMap<String, PhpMixed>");
             installed_repos.push(Box::new(PlatformRepository::new(
                 vec![],
-                locker.get_platform_overrides(),
-            )));
-            installed_repos.push(Box::new(locker.get_locked_repository(
-                !input.get_option("no-dev").as_bool().unwrap_or(false),
-            )));
+                platform_overrides,
+            )?));
+            let locked_repo = composer
+                .get_locker_mut()
+                .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
+            installed_repos.push(Box::new(locked_repo));
         } else {
+            // TODO(phase-b): Config::get returns PhpMixed; need to coerce to IndexMap<String, PhpMixed>
+            let _platform_cfg = composer.get_config().borrow().get("platform");
+            let platform_overrides: IndexMap<String, PhpMixed> =
+                todo!("extract IndexMap<String, PhpMixed> from PhpMixed config value");
             installed_repos.push(Box::new(PlatformRepository::new(
                 vec![],
-                composer.get_config().borrow().get("platform"),
-            )));
-            installed_repos.push(Box::new(
-                composer.get_repository_manager().get_local_repository(),
-            ));
+                platform_overrides,
+            )?));
+            installed_repos.push(
+                composer
+                    .get_repository_manager()
+                    .get_local_repository()
+                    .clone_box(),
+            );
         }
 
         let installed_repo = InstalledRepository::new(installed_repos);
-        let mut reporter = SuggestedPackagesReporter::new(self.get_io());
+        // TODO(phase-b): SuggestedPackagesReporter::new expects Box<dyn IOInterface>; self.get_io() returns &mut dyn IOInterface
+        let io_box: Box<dyn IOInterface> = todo!("share IOInterface as Box<dyn IOInterface>");
+        let mut reporter = SuggestedPackagesReporter::new(io_box);
 
         let filter = input.get_argument("packages");
-        let mut packages = installed_repo.get_packages();
-        packages.push(composer.get_package());
+        let mut packages = RepositoryInterface::get_packages(&installed_repo);
+        // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; pushing into Vec<Box<dyn BasePackage>> requires conversion
+        let root_pkg_as_base: Box<dyn crate::package::base_package::BasePackage> =
+            todo!("convert RootPackageInterface to Box<dyn BasePackage>");
+        packages.push(root_pkg_as_base);
         for package in &packages {
             if !empty(&filter)
                 && !in_array(
@@ -84,7 +102,10 @@ impl SuggestsCommand {
             {
                 continue;
             }
-            reporter.add_suggestions_from_package(package);
+            // TODO(phase-b): add_suggestions_from_package expects &dyn PackageInterface; BasePackage is a separate trait
+            reporter.add_suggestions_from_package(todo!(
+                "convert Box<dyn BasePackage> to &dyn PackageInterface"
+            ));
         }
 
         let mut mode = SuggestedPackagesReporter::MODE_BY_PACKAGE;
@@ -99,15 +120,17 @@ impl SuggestsCommand {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
-        reporter.output(
-            mode,
-            &installed_repo,
+        let only_dependents_of: Option<&dyn crate::package::package_interface::PackageInterface> =
             if empty(&filter) && !input.get_option("all").as_bool().unwrap_or(false) {
-                Some(composer.get_package())
+                // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; need conversion to &dyn PackageInterface
+                Some(todo!(
+                    "convert RootPackageInterface to &dyn PackageInterface"
+                ))
             } else {
                 None
-            },
-        );
+            };
+
+        reporter.output(mode, Some(&installed_repo), only_dependents_of);
 
         Ok(0)
     }

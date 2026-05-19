@@ -24,11 +24,16 @@ use crate::repository::repository_interface::{FindPackageConstraint, RepositoryI
 use crate::repository::root_package_repository::RootPackageRepository;
 use crate::util::package_info::PackageInfo;
 
+pub const ARGUMENT_PACKAGE: &str = "package";
+pub const ARGUMENT_CONSTRAINT: &str = "version";
+pub const OPTION_RECURSIVE: &str = "recursive";
+pub const OPTION_TREE: &str = "tree";
+
 pub trait BaseDependencyCommand: BaseCommand {
-    const ARGUMENT_PACKAGE: &'static str = "package";
-    const ARGUMENT_CONSTRAINT: &'static str = "version";
-    const OPTION_RECURSIVE: &'static str = "recursive";
-    const OPTION_TREE: &'static str = "tree";
+    const ARGUMENT_PACKAGE: &'static str = ARGUMENT_PACKAGE;
+    const ARGUMENT_CONSTRAINT: &'static str = ARGUMENT_CONSTRAINT;
+    const OPTION_RECURSIVE: &'static str = OPTION_RECURSIVE;
+    const OPTION_TREE: &'static str = OPTION_TREE;
 
     fn colors(&self) -> &[String];
     fn colors_mut(&mut self) -> &mut Vec<String>;
@@ -42,7 +47,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         output: &dyn OutputInterface,
         inverted: bool,
     ) -> anyhow::Result<i64> {
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
@@ -51,7 +56,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         )));
 
         if input.get_option("locked").as_bool().unwrap_or(false) {
-            let locker = composer.get_locker();
+            let locker = composer.get_locker_mut();
 
             if !locker.is_locked() {
                 return Err(anyhow::anyhow!(UnexpectedValueException {
@@ -134,11 +139,16 @@ pub trait BaseDependencyCommand: BaseCommand {
             FindPackageConstraint::String(text_constraint.clone()),
         );
         if matched_package.is_none() {
-            let default_repos = CompositeRepository::new(RepositoryFactory::default_repos(
-                Some(self.get_io()),
-                Some(std::rc::Rc::clone(composer.get_config())),
-                Some(&mut composer.get_repository_manager()),
-            )?);
+            let default_repos = CompositeRepository::new(
+                RepositoryFactory::default_repos(
+                    Some(self.get_io()),
+                    Some(std::rc::Rc::clone(composer.get_config())),
+                    // TODO(phase-b): get_repository_manager returns &; default_repos needs &mut
+                    Some(todo!("share repository_manager as &mut")),
+                )?
+                .into_values()
+                .collect(),
+            );
             if let Some(r#match) = default_repos.find_package(
                 &needle,
                 FindPackageConstraint::String(text_constraint.clone()),
@@ -384,7 +394,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn print_tree(&self, results: &[DependentsEntry], prefix: &str, level: i64) {
+    fn print_tree(&mut self, results: &[DependentsEntry], prefix: &str, level: i64) {
         let count = results.len() as i64;
         let mut idx: i64 = 0;
         let colors_len = self.colors().len() as i64;
@@ -448,7 +458,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
     }
 
-    fn write_tree_line(&self, line: &str) {
+    fn write_tree_line(&mut self, line: &str) {
         let io = self.get_io();
         let line = if !io.is_decorated() {
             line.replace('└', "`-")

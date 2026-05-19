@@ -29,6 +29,24 @@ pub struct GitDriver {
 }
 
 impl GitDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<
+            std::cell::RefCell<crate::util::http_downloader::HttpDownloader>,
+        >,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            tags: None,
+            branches: None,
+            root_identifier: None,
+            repo_dir: String::new(),
+        }
+    }
+
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
@@ -65,12 +83,16 @@ impl GitDriver {
             self.repo_dir = format!(
                 "{}/{}/",
                 cache_vcs_dir,
-                Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.inner.url.clone()))?
+                Preg::replace(
+                    r"{[^a-z0-9.]}i",
+                    "-",
+                    &Url::sanitize(self.inner.url.clone())
+                )?
             );
 
             GitUtil::clean_env(&self.inner.process);
 
-            let fs = Filesystem::new(None);
+            let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&dirname(&self.repo_dir))?;
 
             if !is_writable(&dirname(&self.repo_dir)) {
@@ -96,8 +118,8 @@ impl GitDriver {
                 .into());
             }
 
-            let git_util = GitUtil::new(
-                &*self.inner.io,
+            let mut git_util = GitUtil::new(
+                self.inner.io.clone_box(),
                 std::rc::Rc::clone(&self.inner.config),
                 std::rc::Rc::clone(&self.inner.process),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
@@ -113,10 +135,10 @@ impl GitDriver {
                     }
                     .into());
                 }
-                self.inner.io.write_error3(shirabe_php_shim::PhpMixed::String(format!(
+                self.inner.io.write_error3(&format!(
                     "<error>Failed to update {}, package information from this repository may be outdated</error>",
                     self.inner.url
-                )), true, io_interface::NORMAL);
+                ), true, io_interface::NORMAL);
             }
 
             cache_url = self.inner.url.clone();
@@ -134,12 +156,15 @@ impl GitDriver {
             .unwrap_or("")
             .to_string();
         self.inner.cache = Some(Cache::new(
-            &*self.inner.io,
-            format!(
+            self.inner.io.clone_box(),
+            &format!(
                 "{}/{}",
                 cache_repo_dir,
-                Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(cache_url))?
+                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(cache_url))?
             ),
+            None,
+            None,
+            false,
         ));
         self.inner.cache.as_mut().map(|c| {
             c.set_read_only(
@@ -159,15 +184,15 @@ impl GitDriver {
         if self.root_identifier.is_none() {
             self.root_identifier = Some("master".to_string());
 
-            let git_util = GitUtil::new(
-                &*self.inner.io,
+            let mut git_util = GitUtil::new(
+                self.inner.io.clone_box(),
                 std::rc::Rc::clone(&self.inner.config),
                 std::rc::Rc::clone(&self.inner.process),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
                 let default_branch =
-                    git_util.get_mirror_default_branch(&self.inner.url, &self.repo_dir, false)?;
+                    git_util.get_mirror_default_branch(&self.inner.url, &self.repo_dir, false);
                 if let Some(branch) = default_branch {
                     self.root_identifier = Some(branch.clone());
                     return Ok(branch);
@@ -269,7 +294,7 @@ impl GitDriver {
 
         let command = GitUtil::build_rev_list_command(
             &self.inner.process,
-            &[
+            vec![
                 "-n1".to_string(),
                 "--format=%at".to_string(),
                 identifier.to_string(),
@@ -406,7 +431,11 @@ impl GitDriver {
             {
                 return Ok(true);
             }
-            GitUtil::check_for_repo_ownership_error(&process.borrow().get_error_output(), &url);
+            GitUtil::check_for_repo_ownership_error(
+                &process.borrow().get_error_output(),
+                &url,
+                Some(io),
+            )?;
         }
 
         if !deep {
@@ -421,7 +450,7 @@ impl GitDriver {
             "GitDriver::supports requires Rc<RefCell<Config>>: not yet ported"
         ));
         #[allow(unreachable_code)]
-        let git_util = GitUtil::new(
+        let mut git_util = GitUtil::new(
             io.clone_box(),
             todo!(),
             std::rc::Rc::clone(&process),
@@ -430,7 +459,7 @@ impl GitDriver {
         GitUtil::clean_env(&process);
 
         let result = git_util.run_commands(
-            &[vec![
+            vec![vec![
                 "git".to_string(),
                 "ls-remote".to_string(),
                 "--heads".to_string(),
@@ -438,7 +467,9 @@ impl GitDriver {
                 "%url%".to_string(),
             ]],
             url,
-            &sys_get_temp_dir(),
+            Some(&sys_get_temp_dir()),
+            false,
+            None,
         );
         match result {
             Ok(_) => Ok(true),

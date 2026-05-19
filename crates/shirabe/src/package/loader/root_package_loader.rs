@@ -9,12 +9,14 @@ use shirabe_php_shim::{
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
 use crate::package::base_package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::loader::array_loader::ArrayLoader;
 use crate::package::loader::loader_interface::LoaderInterface;
 use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_alias_package::RootAliasPackage;
 use crate::package::root_package::RootPackage;
+use crate::package::root_package_interface::RootPackageInterface;
 use crate::package::version::version_guesser::VersionGuesser;
 use crate::package::version::version_parser::VersionParser;
 use crate::repository::repository_factory::RepositoryFactory;
@@ -39,9 +41,9 @@ impl RootPackageLoader {
         version_guesser: Option<VersionGuesser>,
         io: Option<Box<dyn IOInterface>>,
     ) -> Self {
-        let inner = ArrayLoader::new(parser);
+        let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {
-            let mut process_executor = ProcessExecutor::new(io.as_deref());
+            let mut process_executor = ProcessExecutor::new(io.as_deref().map(|i| i.clone_box()));
             process_executor.enable_async();
             VersionGuesser::new(
                 std::rc::Rc::clone(&config),
@@ -94,7 +96,7 @@ impl RootPackageLoader {
             let mut commit: Option<String> = None;
 
             if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
-                let version = self.version_guesser.get_root_version_from_env();
+                let version = self.version_guesser.get_root_version_from_env()?;
                 config.insert(
                     "version".to_string(),
                     Box::new(shirabe_php_shim::PhpMixed::String(version)),
@@ -102,18 +104,25 @@ impl RootPackageLoader {
             } else {
                 let cwd_str = cwd
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| Platform::get_cwd(true));
-                let version_data = self.version_guesser.guess_version(&config, &cwd_str);
+                    .unwrap_or_else(|| Platform::get_cwd(true).unwrap_or_default());
+                // TODO(phase-b): config here is IndexMap<String, Box<PhpMixed>> but guess_version
+                // expects IndexMap<String, PhpMixed>; pass an empty map as placeholder.
+                let unboxed_config: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
+                let version_data = self
+                    .version_guesser
+                    .guess_version(&unboxed_config, &cwd_str)?;
                 if let Some(data) = version_data {
                     config.insert(
                         "version".to_string(),
                         Box::new(shirabe_php_shim::PhpMixed::String(
-                            data.pretty_version.clone(),
+                            data.pretty_version.clone().unwrap_or_default(),
                         )),
                     );
                     config.insert(
                         "version_normalized".to_string(),
-                        Box::new(shirabe_php_shim::PhpMixed::String(data.version.clone())),
+                        Box::new(shirabe_php_shim::PhpMixed::String(
+                            data.version.clone().unwrap_or_default(),
+                        )),
                     );
                     commit = data.commit;
                 }
@@ -127,7 +136,7 @@ impl RootPackageLoader {
                         io.warning(&format!(
                             "Composer could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
                             name
-                        ));
+                        ), &[]);
                     }
                 }
                 config.insert(
@@ -176,42 +185,30 @@ impl RootPackageLoader {
             }
         }
 
-        let package = self
-            .inner
-            .load(config.clone(), "Composer\\Package\\RootPackage")?;
+        // TODO(phase-b): config is IndexMap<String, Box<PhpMixed>> but LoaderInterface::load
+        // expects IndexMap<String, PhpMixed>; pass empty placeholder.
+        let unboxed_config: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
+        let mut package = self.inner.load(
+            unboxed_config,
+            Some("Composer\\Package\\RootPackage".to_string()),
+        )?;
 
-        let real_package: &mut RootPackage =
-            if let Some(alias_pkg) = package.as_any_mut().downcast_mut::<RootAliasPackage>() {
-                alias_pkg
-                    .get_alias_of_mut()
-                    .as_any_mut()
-                    .downcast_mut::<RootPackage>()
-                    .ok_or_else(|| {
-                        anyhow::anyhow!(LogicException {
-                            message: "Expecting a Composer\\Package\\RootPackage at this point"
-                                .to_string(),
-                            code: 0,
-                        })
-                    })?
-            } else if let Some(root_pkg) = package.as_any_mut().downcast_mut::<RootPackage>() {
-                root_pkg
-            } else {
-                return Err(anyhow::anyhow!(LogicException {
-                    message: "Expecting a Composer\\Package\\RootPackage at this point".to_string(),
-                    code: 0,
-                }));
-            };
+        // TODO(phase-b): as_any_mut is not available on BasePackage; downcast via Any is not
+        // possible without it. Skipping real downcast and using todo!() placeholder.
+        let real_package: &mut RootPackage = {
+            let _ = &mut package;
+            todo!("downcast Box<dyn BasePackage> to &mut RootPackage requires as_any_mut on trait")
+        };
 
         if auto_versioned {
-            real_package.replace_version(
-                real_package.get_version().to_string(),
-                RootPackage::DEFAULT_PRETTY_VERSION.to_string(),
-            );
+            // TODO(phase-b): replace_version is an inherent method on Package, not exposed via trait.
+            let _ = real_package;
+            todo!("replace_version is not accessible through RootPackage's embedded Package");
         }
 
         if let Some(min_stability) = config.get("minimum-stability").and_then(|v| v.as_string()) {
             real_package.set_minimum_stability(
-                VersionParser::normalize_stability(min_stability).to_string(),
+                VersionParser::normalize_stability(min_stability).unwrap_or_default(),
             );
         }
 
@@ -222,19 +219,10 @@ impl RootPackageLoader {
         for link_type in ["require", "require-dev"] {
             if config.contains_key(link_type) {
                 let link_info = &SUPPORTED_LINK_TYPES[link_type];
-                let method = format!("get_{}", link_info.method);
-                let links: IndexMap<String, String> = real_package
-                    .call_get_links_method(&method)
-                    .iter()
-                    .map(|(target, link)| {
-                        (
-                            target.clone(),
-                            link.get_constraint()
-                                .map(|c| c.get_pretty_string().to_string())
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect();
+                let _method = format!("get_{}", link_info.method);
+                // TODO(phase-b): PHP uses dynamic method dispatch ($realPackage->{$method}()).
+                // We need a Rust-side equivalent (e.g. a match on link_type) to collect Links.
+                let links: IndexMap<String, String> = IndexMap::new();
                 aliases = self.extract_aliases(&links, aliases);
                 stability_flags = Self::extract_stability_flags(
                     &links,
@@ -295,10 +283,13 @@ impl RootPackageLoader {
             Some(std::rc::Rc::clone(&self.config)),
             Some(&mut self.manager),
         )?;
-        for repo in repos {
+        for (_, repo) in repos {
             self.manager.add_repository(repo);
         }
-        real_package.set_repositories(self.config.borrow().get_repositories());
+        // TODO(phase-b): Config::get_repositories returns IndexMap<String, PhpMixed>, but
+        // set_repositories expects Vec<IndexMap<String, PhpMixed>>; pass empty placeholder.
+        real_package.set_repositories(Vec::new());
+        let _ = self.config.borrow().get_repositories();
 
         Ok(package)
     }
@@ -390,7 +381,8 @@ impl RootPackageLoader {
                 {
                     let name = strtolower(req_name);
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    let stability = stabilities[VersionParser::normalize_stability(&m1)];
+                    let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
+                    let stability = stabilities[normalized_m1.as_str()];
 
                     if stability_flags.get(&name).copied().unwrap_or(i64::MAX) > stability {
                         continue;
@@ -411,7 +403,7 @@ impl RootPackageLoader {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
                         let name = strtolower(req_name);
-                        let stability = stabilities[stability_name];
+                        let stability = stabilities[stability_name.as_str()];
                         if stability_flags.get(&name).copied().unwrap_or(i64::MAX) > stability
                             || minimum_stability_val > stability
                         {

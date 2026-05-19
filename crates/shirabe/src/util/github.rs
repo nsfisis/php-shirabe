@@ -68,7 +68,7 @@ impl GitHub {
                 "github.accesstoken".to_string(),
             ],
             &mut output,
-            None,
+            (),
         ) == 0
         {
             self.io.set_authentication(
@@ -103,7 +103,7 @@ impl GitHub {
             if self
                 .process
                 .borrow_mut()
-                .execute_args(&["hostname".to_string()], &mut output, None)
+                .execute_args(&["hostname".to_string()], &mut output, ())
                 == 0
             {
                 note += &format!(" on {}", output.trim());
@@ -111,84 +111,74 @@ impl GitHub {
         }
         note += &format!(" {}", date("Y-m-d Hi", None));
 
-        let local_auth_config = self.config.borrow().get_local_auth_config_source();
-
-        self.io.write_error3(PhpMixed::List(vec![
-            Box::new(PhpMixed::String(
-                "You need to provide a GitHub access token.".to_string(),
-            )),
-            Box::new(PhpMixed::String(format!(
-                "Tokens will be stored in plain text in \"{}\" for future use by Composer.",
-                local_auth_config
-                    .as_ref()
-                    .map(|c| format!("{} OR ", c.get_name()))
-                    .unwrap_or_default()
-                    + &self.config.borrow().get_auth_config_source().get_name()
-            ))),
-            Box::new(PhpMixed::String(
-                "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.".to_string(),
-            )),
-            Box::new(PhpMixed::String(String::new())),
-            Box::new(PhpMixed::String(
-                "Carefully consider the following options in order:".to_string(),
-            )),
-            Box::new(PhpMixed::String(String::new())),
-        ]), true, io_interface::NORMAL);
+        // PHP: writeError(array) joins with newline. TODO(phase-b): writeError accepts array natively in Symfony.
+        let (local_name, auth_name): (Option<String>, String) = {
+            let cfg = self.config.borrow();
+            (
+                cfg.get_local_auth_config_source()
+                    .map(|c| c.get_name().to_string()),
+                cfg.get_auth_config_source().get_name().to_string(),
+            )
+        };
+        let prefix = local_name
+            .as_ref()
+            .map(|n| format!("{} OR ", n))
+            .unwrap_or_default();
+        let lines = [
+            "You need to provide a GitHub access token.".to_string(),
+            format!(
+                "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
+                prefix, auth_name
+            ),
+            "Due to the security risk of tokens being exfiltrated, use tokens with short expiration times and only the minimum permissions necessary.".to_string(),
+            String::new(),
+            "Carefully consider the following options in order:".to_string(),
+            String::new(),
+        ];
+        self.io
+            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
 
         let encoded_note = shirabe_php_shim::rawurlencode(&note).replace("%20", "+");
-        self.io.write_error3(PhpMixed::List(vec![
-            Box::new(PhpMixed::String(
-                "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "Use the following URL to create such a token:".to_string(),
-            )),
-            Box::new(PhpMixed::String(format!(
+        let lines = [
+            "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files".to_string(),
+            "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.".to_string(),
+            "Use the following URL to create such a token:".to_string(),
+            format!(
                 "https://{}/settings/personal-access-tokens/new?name={}",
                 origin_url, encoded_note
-            ))),
-            Box::new(PhpMixed::String(String::new())),
-        ]), true, io_interface::NORMAL);
+            ),
+            String::new(),
+        ];
+        self.io
+            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
 
-        self.io.write_error3(PhpMixed::List(vec![
-            Box::new(PhpMixed::String(
-                "2. When all relevant _private_ GitHub repositories belong to a single user or organisation, use a fine-grained token with".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "repository \"content\" read-only permissions. You can start with the following URL, but you may need to change the resource owner".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.".to_string(),
-            )),
-            Box::new(PhpMixed::String(format!(
+        let lines = [
+            "2. When all relevant _private_ GitHub repositories belong to a single user or organisation, use a fine-grained token with".to_string(),
+            "repository \"content\" read-only permissions. You can start with the following URL, but you may need to change the resource owner".to_string(),
+            "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.".to_string(),
+            format!(
                 "https://{}/settings/personal-access-tokens/new?contents=read&name={}",
                 origin_url, encoded_note
-            ))),
-            Box::new(PhpMixed::String(String::new())),
-        ]), true, io_interface::NORMAL);
+            ),
+            String::new(),
+        ];
+        self.io
+            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
 
-        self.io.write_error3(PhpMixed::List(vec![
-            Box::new(PhpMixed::String(
-                "3. A \"classic\" token grants broad permissions on your behalf to all repositories accessible by you.".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "This may include write permissions, even though not needed by Composer. Use it only when you need to access".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "private repositories across multiple organisations at the same time and using directory-specific authentication sources".to_string(),
-            )),
-            Box::new(PhpMixed::String(
-                "is not an option. You can generate a classic token here:".to_string(),
-            )),
-            Box::new(PhpMixed::String(format!(
+        let mut lines3 = vec![
+            "3. A \"classic\" token grants broad permissions on your behalf to all repositories accessible by you.".to_string(),
+            "This may include write permissions, even though not needed by Composer. Use it only when you need to access".to_string(),
+            "private repositories across multiple organisations at the same time and using directory-specific authentication sources".to_string(),
+            "is not an option. You can generate a classic token here:".to_string(),
+            format!(
                 "https://{}/settings/tokens/new?scopes=repo&description={}",
                 origin_url, encoded_note
-            ))),
-            Box::new(PhpMixed::String(String::new())),
-        ]), true, io_interface::NORMAL);
+            ),
+            String::new(),
+        ];
+        let _ = &mut lines3;
+        self.io
+            .write_error3(&lines3.join("\n"), true, io_interface::NORMAL);
 
         self.io.write_error3(
             "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth",
@@ -197,7 +187,7 @@ impl GitHub {
         );
 
         let mut store_in_local_auth_config = false;
-        if local_auth_config.is_some() {
+        if local_name.is_some() {
             store_in_local_auth_config = self.io.ask_confirmation(
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
@@ -238,21 +228,22 @@ impl GitHub {
             format!("{}/api/v3/", origin_url)
         };
 
-        let mut http_options = indexmap::IndexMap::new();
-        http_options.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
-        let http_options = PhpMixed::Array(http_options);
+        let mut http_options: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
+        http_options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
 
         match self
             .http_downloader
             .borrow_mut()
-            .get(&format!("https://{}", api_url), &http_options)
+            .get(&format!("https://{}", api_url), http_options)
         {
             Ok(_) => {}
             Err(te) => {
-                if te.code == 403 || te.code == 401 {
+                // TODO(phase-b): downcast anyhow::Error to TransportException for status code
+                let code = te
+                    .downcast_ref::<crate::downloader::transport_exception::TransportException>()
+                    .and_then(|t| t.get_status_code())
+                    .unwrap_or(0);
+                if code == 403 || code == 401 {
                     self.io.write_error3(
                         "<error>Invalid token provided.</error>",
                         true,
@@ -269,34 +260,28 @@ impl GitHub {
             }
         }
 
+        // TODO(phase-b): Config getters return references; cross-borrow chains require
+        // Rc<RefCell<dyn ConfigSourceInterface>> shape. For now use _mut variants.
         let use_local = store_in_local_auth_config
             && self
                 .config
                 .borrow()
                 .get_local_auth_config_source()
                 .is_some();
-        let auth_config_source_name;
+        let key = format!("github-oauth.{}", origin_url);
+        {
+            let mut cfg = self.config.borrow_mut();
+            cfg.get_config_source_mut().remove_config_setting(&key)?;
+        }
         if use_local {
-            let mut auth_config_source =
-                self.config.borrow().get_local_auth_config_source().unwrap();
-            self.config
-                .borrow()
-                .get_config_source()
-                .remove_config_setting(&format!("github-oauth.{}", origin_url))?;
-            auth_config_source.add_config_setting(
-                &format!("github-oauth.{}", origin_url),
-                PhpMixed::String(token),
-            )?;
+            let mut cfg = self.config.borrow_mut();
+            if let Some(local) = cfg.get_local_auth_config_source_mut() {
+                local.add_config_setting(&key, PhpMixed::String(token))?;
+            }
         } else {
-            let mut auth_config_source = self.config.borrow().get_auth_config_source();
-            self.config
-                .borrow()
-                .get_config_source()
-                .remove_config_setting(&format!("github-oauth.{}", origin_url))?;
-            auth_config_source.add_config_setting(
-                &format!("github-oauth.{}", origin_url),
-                PhpMixed::String(token),
-            )?;
+            let mut cfg = self.config.borrow_mut();
+            cfg.get_auth_config_source_mut()
+                .add_config_setting(&key, PhpMixed::String(token))?;
         }
 
         self.io.write_error3(

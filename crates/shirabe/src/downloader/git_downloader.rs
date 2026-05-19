@@ -93,7 +93,10 @@ impl GitDownloader {
                 &format!(
                     "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
                     package.get_name(),
-                    package.get_full_pretty_version(),
+                    package.get_full_pretty_version(
+                        true,
+                        <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
+                    ),
                 ),
                 true,
                 io_interface::NORMAL,
@@ -112,7 +115,7 @@ impl GitDownloader {
                 &cache_path,
                 r#ref.unwrap_or(""),
                 Some(package.get_pretty_version()),
-            ) && is_dir(&cache_path)
+            )? && is_dir(&cache_path)
             {
                 self.cached_packages
                     .entry(package.get_id())
@@ -736,7 +739,7 @@ impl GitDownloader {
 
         let changes: Vec<String> = array_map(
             |elem: &String| format!("    {}", elem),
-            &Preg::split(r"{\s*\r?\n\s*}", &changes),
+            &Preg::split(r"{\s*\r?\n\s*}", &changes)?,
         );
         self.inner.io.write_error3(
             &format!(
@@ -747,16 +750,10 @@ impl GitDownloader {
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        self.inner.io.write_error3(
-            PhpMixed::List(
-                changes[..slice_end]
-                    .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                    .collect(),
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        // TODO(phase-b): PHP passes the list directly to writeError; joined here so write_error3 takes &str
+        self.inner
+            .io
+            .write_error3(&changes[..slice_end].join("\n"), true, io_interface::NORMAL);
         if (changes.len() as i64) > 10 {
             self.inner.io.write_error3(
                 &format!(
@@ -804,16 +801,10 @@ impl GitDownloader {
                     .into());
                 }
                 Some("v") => {
-                    self.inner.io.write_error3(
-                        PhpMixed::List(
-                            changes
-                                .iter()
-                                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                .collect(),
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    // TODO(phase-b): PHP passes list directly; joined here for &str arg
+                    self.inner
+                        .io
+                        .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
                 }
                 Some("d") => {
                     self.view_diff(&path);
@@ -826,21 +817,21 @@ impl GitDownloader {
 
             if do_help {
                 // help:
+                // TODO(phase-b): PHP passes list directly; joined here for &str arg
                 self.inner.io.write_error3(
-                    PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(format!(
+                    &[
+                        format!(
                             "    y - discard changes and apply the {}",
                             if update { "update" } else { "uninstall" }
-                        ))),
-                        Box::new(PhpMixed::String(format!(
+                        ),
+                        format!(
                             "    n - abort the {} and let you manually clean things up",
                             if update { "update" } else { "uninstall" }
-                        ))),
-                        Box::new(PhpMixed::String("    v - view modified files".to_string())),
-                        Box::new(PhpMixed::String(
-                            "    d - view local modifications (diff)".to_string(),
-                        )),
-                    ]),
+                        ),
+                        "    v - view modified files".to_string(),
+                        "    d - view local modifications (diff)".to_string(),
+                    ]
+                    .join("\n"),
                     true,
                     io_interface::NORMAL,
                 );
@@ -925,7 +916,7 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version);
+        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version)?;
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.

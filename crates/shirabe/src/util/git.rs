@@ -15,7 +15,7 @@ use shirabe_php_shim::{
 
 use crate::config::Config;
 use crate::io::io_interface::IOInterface;
-use crate::util::auth_helper::AuthHelper;
+use crate::util::auth_helper::{AuthHelper, StoreAuth};
 use crate::util::bitbucket::Bitbucket;
 use crate::util::filesystem::Filesystem;
 use crate::util::github::GitHub;
@@ -117,7 +117,7 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url),
+                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url).unwrap_or_default(),
                 );
 
                 array_map(
@@ -308,7 +308,7 @@ impl Git {
             }
 
             // failed to checkout, first check git accessibility
-            let m1 = m.get(1).cloned().unwrap_or_default();
+            let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
             if !self.io.has_authentication(&m1) && !self.io.is_interactive() {
                 self.throw_exception(
                     &format!(
@@ -519,7 +519,7 @@ impl Git {
                     // We already have an access_token from a previous request.
                     if username != "x-token-auth" {
                         let access_token =
-                            bitbucket_util.request_token(&domain, &username, &password);
+                            bitbucket_util.request_token(&domain, &username, &password)?;
                         if !access_token.is_empty() {
                             self.io.set_authentication(
                                 domain.clone(),
@@ -769,7 +769,12 @@ impl Git {
                             .set_authentication(m2.clone(), username, Some(password));
                         let mut auth_helper =
                             AuthHelper::new(self.io.clone_box(), std::rc::Rc::clone(&self.config));
-                        auth_helper.store_auth(&m2, &store_auth);
+                        let store_auth_enum = match &store_auth {
+                            PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
+                            PhpMixed::Bool(b) => StoreAuth::Bool(*b),
+                            _ => StoreAuth::Bool(false),
+                        };
+                        auth_helper.store_auth(&m2, store_auth_enum)?;
 
                         return Ok(());
                     }
@@ -946,7 +951,7 @@ impl Git {
                 && pretty_version.is_some()
             {
                 let branch =
-                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap());
+                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap())?;
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
@@ -1126,9 +1131,9 @@ impl Git {
             "fatal: could not read Username",
         ];
 
-        let error_output = self.process.borrow().get_error_output();
+        let error_output = self.process.borrow().get_error_output().to_string();
         for auth_failure in &auth_failures {
-            if strpos(error_output, auth_failure).is_some() {
+            if strpos(&error_output, auth_failure).is_some() {
                 return Some(m);
             }
         }
@@ -1304,7 +1309,7 @@ impl Git {
         if self.process.borrow_mut().execute_args(
             &vec!["git".to_string(), "--version".to_string()],
             &mut ignored_output,
-            None,
+            Option::<&str>::None,
         ) != 0
         {
             return Err(RuntimeException {

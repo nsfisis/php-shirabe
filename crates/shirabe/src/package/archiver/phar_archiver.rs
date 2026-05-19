@@ -156,4 +156,8 @@ impl ArchiverInterface for PharArchiver {
     fn supports(&self, format: String, _source_type: Option<String>) -> bool {
         formats().contains_key(format.as_str())
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

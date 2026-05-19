@@ -1,18 +1,30 @@
 use crate::symfony::component::console::formatter::output_formatter::OutputFormatter;
 
 pub trait OutputInterface {
-    fn write(&mut self, messages: &str, newline: bool, r#type: i64);
-    fn writeln(&mut self, messages: &str, r#type: i64);
-    fn set_verbosity(&mut self, level: i64);
+    // PHP class semantics: OutputInterface methods take &self with interior mutability,
+    // because output objects are shared by reference across the PHP code.
+    fn write(&self, messages: &str, newline: bool, r#type: i64);
+    fn writeln(&self, messages: &str, r#type: i64);
+    fn set_verbosity(&self, level: i64);
     fn get_verbosity(&self) -> i64;
     fn is_quiet(&self) -> bool;
     fn is_verbose(&self) -> bool;
     fn is_very_verbose(&self) -> bool;
     fn is_debug(&self) -> bool;
-    fn set_decorated(&mut self, decorated: bool);
+    fn set_decorated(&self, decorated: bool);
     fn is_decorated(&self) -> bool;
-    fn set_formatter(&mut self, formatter: OutputFormatter);
+    fn set_formatter(&self, formatter: OutputFormatter);
     fn get_formatter(&self) -> &OutputFormatter;
+
+    /// PHP: `$output instanceof ConsoleOutputInterface`. Default false; ConsoleOutput overrides.
+    fn is_console_output_interface(&self) -> bool {
+        false
+    }
+
+    /// PHP: only StreamOutput exposes `getStream()`. Default panics for outputs without one.
+    fn get_stream(&self) -> shirabe_php_shim::PhpResource {
+        todo!("get_stream not available on this OutputInterface implementation")
+    }
 }
 
 pub const VERBOSITY_QUIET: i64 = 16;

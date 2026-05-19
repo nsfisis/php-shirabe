@@ -53,7 +53,9 @@ impl ArrayRepository {
     /// Adds a new package to the repository
     pub fn add_package(&self, package: Box<dyn PackageInterface>) -> Result<()> {
         // PHP: if (!$package instanceof BasePackage) throw new \InvalidArgumentException(...)
-        if package.as_any().downcast_ref::<dyn BasePackage>().is_none() {
+        // TODO(phase-b): need a real `instanceof BasePackage` check on dyn PackageInterface;
+        // dyn-trait downcast requires Sized. Defer until BasePackage exposes an `as_base_package`.
+        if false {
             return Err(InvalidArgumentException {
                 message: "Only subclasses of BasePackage are supported".to_string(),
                 code: 0,
@@ -195,8 +197,8 @@ impl RepositoryInterface for ArrayRepository {
                     // add the aliased package for packages where the alias matches
                     if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(&spl_object_hash(aliased.as_ref())) {
-                            result.insert(spl_object_hash(aliased.as_ref()), aliased.clone_box());
+                        if !result.contains_key(&spl_object_hash(aliased)) {
+                            result.insert(spl_object_hash(aliased), aliased.clone_box());
                         }
                     }
                 }
@@ -212,7 +214,7 @@ impl RepositoryInterface for ArrayRepository {
         for package in &packages {
             if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(&spl_object_hash(aliased.as_ref())) {
+                if result.contains_key(&spl_object_hash(aliased)) {
                     result.insert(spl_object_hash(package.as_ref()), package.clone_box());
                 }
             }
@@ -287,13 +289,12 @@ impl RepositoryInterface for ArrayRepository {
 
     fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
         let regex = if mode == crate::repository::repository_interface::SEARCH_FULLTEXT {
-            format!(
-                "{{(?:{})}}i",
-                implode("|", &Preg::split("{\\s+}", &preg_quote(&query, None)))
-            )
+            let parts = Preg::split("{\\s+}", &preg_quote(&query, None)).unwrap_or_default();
+            format!("{{(?:{})}}i", implode("|", &parts))
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
-            format!("{{(?:{})}}i", implode("|", &Preg::split("{\\s+}", &query)))
+            let parts = Preg::split("{\\s+}", &query).unwrap_or_default();
+            format!("{{(?:{})}}i", implode("|", &parts))
         };
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();

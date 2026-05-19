@@ -73,7 +73,7 @@ impl ProhibitsCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
+    pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
         // TODO(phase-b): wire `do_execute` from BaseDependencyCommand trait
         let _ = (input, output);
         todo!()

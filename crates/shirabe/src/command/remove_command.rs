@@ -183,18 +183,23 @@ impl RemoveCommand {
             .unwrap_or_default();
 
         if input.get_option("unused").as_bool().unwrap_or(false) {
-            let composer = self.require_composer(None, None)?;
-            let locker = composer.get_locker();
-            if !locker.is_locked() {
-                return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message:
-                        "A valid composer.lock file is required to run this command with --unused"
-                            .to_string(),
-                    code: 0,
-                }));
+            let mut composer = self.require_composer(None, None)?;
+            {
+                let locker = composer.get_locker_mut();
+                if !locker.is_locked() {
+                    return Err(anyhow::anyhow!(UnexpectedValueException {
+                        message:
+                            "A valid composer.lock file is required to run this command with --unused"
+                                .to_string(),
+                        code: 0,
+                    }));
+                }
             }
 
-            let locked_packages = locker.get_locked_repository(true)?.get_packages();
+            let locked_packages = composer
+                .get_locker_mut()
+                .get_locked_repository(true)?
+                .get_packages();
 
             let mut required: IndexMap<String, bool> = IndexMap::new();
             for link in composer
@@ -245,12 +250,12 @@ impl RemoveCommand {
 
         let file = Factory::get_composer_file()?;
 
-        let json_file = JsonFile::new(file.clone(), None, None)?;
+        let mut json_file = JsonFile::new(file.clone(), None, None)?;
         let composer_data = json_file.read()?;
         let composer_backup = std::fs::read_to_string(json_file.get_path())?;
 
-        let json_file_for_source = JsonFile::new(file, None, None)?;
-        let json = JsonConfigSource::new(json_file_for_source, false);
+        let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
+        let mut json = JsonConfigSource::new(json_file_for_source, false);
 
         let r#type = if input.get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
@@ -325,7 +330,7 @@ impl RemoveCommand {
                 ));
                 if io.is_interactive() {
                     if io.ask_confirmation(
-                        &format!(
+                        format!(
                             "Do you want to remove it from {} [<comment>yes</comment>]? ",
                             alt_type
                         ),
@@ -388,7 +393,7 @@ impl RemoveCommand {
                         ));
                         if io.is_interactive() {
                             if io.ask_confirmation(
-                                &format!(
+                                format!(
                                     "Do you want to remove it from {} [<comment>yes</comment>]? ",
                                     alt_type
                                 ),
@@ -421,16 +426,17 @@ impl RemoveCommand {
         }
 
         // TODO(plugin): deactivate installed plugins
-        if let Some(composer_opt) = self.try_composer(None, None) {
+        if let Some(mut composer_opt) = self.try_composer(None, None) {
             composer_opt
-                .get_plugin_manager()
+                .get_plugin_manager_mut()
                 .deactivate_installed_plugins();
         }
 
         self.reset_composer();
-        let composer = self.require_composer(None, None)?;
+        let mut composer = self.require_composer(None, None)?;
 
         if dry_run {
+            // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; set_requires/set_dev_requires need &mut self; needs shared-ownership refactor
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
             links.insert("require".to_string(), root_package.get_requires().clone());
@@ -445,8 +451,10 @@ impl RemoveCommand {
                     }
                 }
             }
-            root_package.set_requires(links.remove("require").unwrap_or_default());
-            root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default());
+            let _ = links.remove("require").unwrap_or_default();
+            let _ = links.remove("require-dev").unwrap_or_default();
+            // root_package.set_requires(links.remove("require").unwrap_or_default().into_values().collect());
+            // root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default().into_values().collect());
         }
 
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, 'remove', input, output)
@@ -458,7 +466,9 @@ impl RemoveCommand {
         );
         composer
             .get_event_dispatcher()
-            .dispatch(command_event.get_name(), command_event);
+            .borrow_mut()
+            // TODO(phase-b): dispatch expects Option<Event>; CommandEvent is a different type
+            .dispatch(Some(command_event.get_name()), None);
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
         let removed_plugins: Vec<String> =
@@ -491,10 +501,12 @@ impl RemoveCommand {
         }
 
         composer
-            .get_installation_manager()
+            .get_installation_manager_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        let mut install = Installer::create(io, &composer);
+        // TODO(phase-b): Installer::create expects Box<dyn IOInterface>; io here is &mut dyn IOInterface
+        let io_box: Box<dyn IOInterface> = todo!("share IOInterface as Box<dyn IOInterface>");
+        let mut install = Installer::create(io_box, &composer);
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
         let optimize = input
@@ -580,16 +592,16 @@ impl RemoveCommand {
         install.set_update(true);
         install.set_install(!input.get_option("no-install").as_bool().unwrap_or(false));
         install.set_update_allow_transitive_dependencies(update_allow_transitive_dependencies);
-        install.set_platform_requirement_filter(self.get_platform_requirement_filter(input));
+        install.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
         install.set_dry_run(dry_run);
         install.set_audit_config(
-            self.create_audit_config(&mut *composer.get_config().borrow_mut(), input),
+            self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
         );
         install.set_minimal_update(minimal_changes);
 
         // if no lock is present, we do not do a partial update as
         // this is not supported by the Installer
-        if composer.get_locker().is_locked() {
+        if composer.get_locker_mut().is_locked() {
             install.set_update_allow_list(packages.clone());
         }
 

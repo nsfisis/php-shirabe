@@ -92,7 +92,7 @@ impl Perforce {
                 "-s".to_string(),
             ],
             &mut ignored_output,
-            None,
+            Option::<&str>::None,
         ) == 0
     }
 
@@ -169,7 +169,7 @@ impl Perforce {
         };
         self.process
             .borrow_mut()
-            .execute_args(&cmd_vec, &mut self.command_result, None)
+            .execute_args(&cmd_vec, &mut self.command_result, ())
     }
 
     pub fn get_client(&mut self) -> String {
@@ -245,7 +245,8 @@ impl Perforce {
 
     /// @return non-empty-string
     pub fn get_p4_client_spec(&mut self) -> String {
-        format!("{}/{}.p4.spec", self.path, self.get_client())
+        let path = self.path.clone();
+        format!("{}/{}.p4.spec", path, self.get_client())
     }
 
     pub fn get_user(&self) -> Option<String> {
@@ -391,12 +392,7 @@ impl Perforce {
             self.generate_p4_command(vec!["client".to_string(), "-i".to_string()], true);
 
         let mut process = Process::new(
-            PhpMixed::List(
-                p4_create_client_command
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            ),
+            p4_create_client_command,
             None,
             None,
             file_get_contents(&self.get_p4_client_spec()),
@@ -546,18 +542,7 @@ impl Perforce {
     pub fn windows_login(&mut self, password: Option<&str>) -> i64 {
         let command = self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], true);
 
-        let mut process = Process::new(
-            PhpMixed::List(
-                command
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            ),
-            None,
-            None,
-            password.map(|s| s.to_string()),
-            None,
-        );
+        let mut process = Process::new(command, None, None, password.map(|s| s.to_string()), None);
 
         process.run(None)
     }
@@ -572,18 +557,7 @@ impl Perforce {
                 let command =
                     self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], false);
 
-                let mut process = Process::new(
-                    PhpMixed::List(
-                        command
-                            .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
-                            .collect(),
-                    ),
-                    None,
-                    None,
-                    password,
-                    None,
-                );
+                let mut process = Process::new(command, None, None, password, None);
                 process.run(None);
 
                 if !process.is_successful() {
@@ -717,8 +691,9 @@ impl Perforce {
                     let branch = Preg::replace(
                         r"/[^A-Za-z0-9 ]/",
                         "",
-                        res_bits.get(4).cloned().unwrap_or_default(),
-                    );
+                        &res_bits.get(4).cloned().unwrap_or_default(),
+                    )
+                    .unwrap_or_default();
                     possible_branches.insert(branch, res_bits.get(1).cloned().unwrap_or_default());
                 }
             }
@@ -872,7 +847,7 @@ impl Perforce {
             .get_or_init(|| {
                 let finder = ExecutableFinder::new();
                 finder
-                    .find("p4", None, vec![])
+                    .find("p4", None, &[])
                     .unwrap_or_else(|| "p4".to_string())
             })
             .clone()

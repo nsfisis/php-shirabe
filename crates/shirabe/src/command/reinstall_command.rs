@@ -20,6 +20,7 @@ use crate::io::io_interface::IOInterface;
 use crate::package::alias_package::AliasPackage;
 use crate::package::base_package;
 use crate::package::base_package::BasePackage;
+use crate::package::package_interface::PackageInterface;
 use crate::plugin::command_event::CommandEvent;
 use crate::plugin::plugin_events::PluginEvents;
 use crate::script::script_events::ScriptEvents;
@@ -37,19 +38,19 @@ impl ReinstallCommand {
             .set_name("reinstall")
             .set_description("Uninstalls and reinstalls the given package names")
             .set_definition(&[
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into().unwrap().into(),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into().unwrap().into(),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into().unwrap().into(),
-                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into().unwrap().into(),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into().unwrap().into(),
-                InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into().unwrap().into(),
-                InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into().unwrap().into(),
-                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into().unwrap().into(),
-                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into().unwrap().into(),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into().unwrap().into(),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into().unwrap().into(),
-                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None).unwrap().into().unwrap().into(),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None).unwrap().into().unwrap().into(),
+                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
+                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
+                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
+                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+                InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+                InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
+                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
+                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None).unwrap().into(),
+                InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None).unwrap().into(),
             ])
             .set_help(
                 "The <info>reinstall</info> command looks up installed packages by name,\n\
@@ -61,10 +62,13 @@ impl ReinstallCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let io = self.get_io();
-
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
+        let io = self.get_io();
 
         let local_repo = composer.get_repository_manager().get_local_repository();
         let mut packages_to_reinstall: Vec<
@@ -145,10 +149,14 @@ impl ReinstallCommand {
         }
 
         let present_packages = local_repo.get_packages();
-        let result_packages = present_packages.clone();
-        let present_packages: Vec<_> = present_packages
+        let result_packages: Vec<Box<dyn PackageInterface>> = present_packages
+            .iter()
+            .map(|p| p.clone_package_box())
+            .collect();
+        let present_packages: Vec<Box<dyn PackageInterface>> = present_packages
             .into_iter()
             .filter(|package| !package_names_to_reinstall.contains(&package.get_name().to_string()))
+            .map(|p| p.clone_package_box())
             .collect();
 
         let transaction = Transaction::new(present_packages, result_packages);
@@ -183,21 +191,21 @@ impl ReinstallCommand {
         // TODO(plugin): dispatch CommandEvent
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "reinstall", input, output);
         let event_dispatcher = composer.get_event_dispatcher();
-        event_dispatcher.dispatch(Some(command_event.get_name()), None);
+        event_dispatcher
+            .borrow_mut()
+            .dispatch(Some(command_event.get_name()), None);
 
         let config = std::rc::Rc::clone(composer.get_config());
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input)?;
+            self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
         let installation_manager = composer.get_installation_manager();
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
-        installation_manager
-            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
-        if input.get_option("no-plugins").as_bool().unwrap_or(false) {
-            installation_manager.disable_plugins();
-        }
+        // TODO(phase-b): InstallationManager setters need &mut self; conflicts with the &installation_manager / &local_repo / &package borrows held below; needs shared-ownership refactor
+        let _no_progress = !input.get_option("no-progress").as_bool().unwrap_or(false);
+        let _no_plugins = input.get_option("no-plugins").as_bool().unwrap_or(false);
 
         download_manager
             .borrow_mut()
@@ -207,15 +215,24 @@ impl ReinstallCommand {
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
-        event_dispatcher.dispatch_script(
+        event_dispatcher.borrow_mut().dispatch_script(
             ScriptEvents::PRE_INSTALL_CMD,
             dev_mode,
             vec![],
             indexmap::IndexMap::new(),
         );
 
-        installation_manager.execute(local_repo, uninstall_operations, dev_mode);
-        installation_manager.execute(local_repo, install_operations, dev_mode);
+        // TODO(phase-b): InstallationManager::execute needs `&mut dyn InstalledRepositoryInterface`;
+        // local_repo is borrowed shared from RepositoryManager. Needs Rc<RefCell<dyn ...>> migration.
+        let _ = (
+            uninstall_operations,
+            install_operations,
+            dev_mode,
+            local_repo,
+            &installation_manager,
+        );
+        // installation_manager.execute(local_repo_mut, uninstall_ops_boxed, dev_mode, true, false);
+        // installation_manager.execute(local_repo_mut, install_ops_boxed, dev_mode, true, false);
 
         if !input.get_option("no-autoloader").as_bool().unwrap_or(false) {
             let optimize = input
@@ -251,23 +268,25 @@ impl ReinstallCommand {
                     .as_bool()
                     .unwrap_or(false);
 
-            let generator = composer.get_autoload_generator();
-            generator.set_class_map_authoritative(authoritative);
-            generator.set_apcu(apcu, apcu_prefix.as_deref());
-            generator.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
-            generator.dump(
+            // TODO(phase-b): AutoloadGenerator setters/dump need &mut self; conflicts with concurrent borrows of composer subsystems; needs shared-ownership refactor
+            let _ = (
+                authoritative,
+                apcu,
+                apcu_prefix.clone(),
+                self.get_platform_requirement_filter(input)?,
+                optimize,
                 &*config.borrow(),
                 local_repo,
                 package,
                 installation_manager,
-                "composer",
-                optimize,
-                None,
-                composer.get_locker(),
             );
+            // composer.get_autoload_generator_mut().set_class_map_authoritative(authoritative);
+            // composer.get_autoload_generator_mut().set_apcu(apcu, apcu_prefix.clone());
+            // composer.get_autoload_generator_mut().set_platform_requirement_filter(...);
+            // composer.get_autoload_generator_mut().dump(...);
         }
 
-        event_dispatcher.dispatch_script(
+        event_dispatcher.borrow_mut().dispatch_script(
             ScriptEvents::POST_INSTALL_CMD,
             dev_mode,
             vec![],

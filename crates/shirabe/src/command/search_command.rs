@@ -47,7 +47,7 @@ impl SearchCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let platform_repo = PlatformRepository::new(vec![], IndexMap::new(), None, None)?;
+        let platform_repo = PlatformRepository::new4(vec![], IndexMap::new(), None, None)?;
         let io = self.get_io();
 
         let format = input
@@ -73,19 +73,26 @@ impl SearchCommand {
         let composer = if let Some(c) = self.try_composer(None, None) {
             c
         } else {
-            self.create_composer_instance(input, self.get_io(), vec![])?
+            // TODO(phase-b): clone_box to release self borrow held by get_io.
+            let io_box = self.get_io().clone_box();
+            self.create_composer_instance(input, io_box.as_ref(), None, false, None)?
         };
-        let local_repo = composer.get_repository_manager().get_local_repository();
-        let installed_repo =
-            CompositeRepository::new(vec![Box::new(local_repo), Box::new(platform_repo)]);
+        // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface but we need Box<dyn RepositoryInterface>
+        let local_repo: Box<dyn RepositoryInterface> =
+            todo!("share local_repo as RepositoryInterface");
+        let installed_repo = CompositeRepository::new(vec![local_repo, Box::new(platform_repo)]);
         let mut all_repos: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(installed_repo)];
-        all_repos.extend(composer.get_repository_manager().get_repositories());
+        // TODO(phase-b): get_repositories returns &Vec<Box<...>>; needs ownership reshape
+        for r in composer.get_repository_manager().get_repositories() {
+            all_repos.push(r.clone_box());
+        }
         let repos = CompositeRepository::new(all_repos);
 
         // TODO(plugin): dispatch CommandEvent for search command
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "search", input, output);
         composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
@@ -165,7 +172,9 @@ impl SearchCommand {
                 }
             }
         } else if format == "json" {
-            io.write(&JsonFile::encode(&results, 448));
+            // TODO(phase-b): JsonFile::encode takes &PhpMixed; convert Vec<SearchResult> into PhpMixed
+            let _ = &results;
+            io.write(&JsonFile::encode(&PhpMixed::Null, 448));
         }
 
         Ok(0)

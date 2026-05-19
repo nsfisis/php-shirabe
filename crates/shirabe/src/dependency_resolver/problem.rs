@@ -65,7 +65,7 @@ impl Problem {
         &self,
         repository_set: &RepositorySet,
         request: &Request,
-        pool: &Pool,
+        pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, Box<dyn BasePackage>>,
         learned_pool: &Vec<Vec<Box<dyn Rule>>>,
@@ -74,12 +74,12 @@ impl Problem {
         let mut reasons: Vec<Box<dyn Rule>> = Vec::new();
         for section_rules in self.reasons.values().rev() {
             for rule in section_rules {
-                reasons.push(rule.clone());
+                reasons.push(rule.clone_box());
             }
         }
 
         if reasons.len() == 1 {
-            let rule = reasons[0].clone();
+            let rule = reasons[0].clone_box();
 
             if rule.get_reason() != rule::RULE_ROOT_REQUIRE {
                 return Err(LogicException {
@@ -90,12 +90,17 @@ impl Problem {
             }
 
             let reason_data = rule.get_reason_data();
-            // TODO(phase-b): reason_data for RULE_ROOT_REQUIRE is `array{packageName: string, constraint: ConstraintInterface}`.
-            let reason_array = reason_data.as_array().unwrap();
-            let package_name = reason_array["packageName"].as_string().unwrap().to_string();
-            let constraint: Option<&dyn ConstraintInterface> = None; // reason_array["constraint"]
+            // TODO(phase-b): reason_data for RULE_ROOT_REQUIRE; extract via ReasonData::RootRequire variant.
+            let (package_name, constraint): (String, Option<&dyn ConstraintInterface>) =
+                match reason_data {
+                    rule::ReasonData::RootRequire {
+                        package_name,
+                        constraint,
+                    } => (package_name.clone(), Some(constraint.as_ref())),
+                    _ => (String::new(), None),
+                };
 
-            let packages = pool.what_provides(&package_name, constraint);
+            let packages = pool.compute_what_provides(&package_name, constraint);
             if packages.len() == 0 {
                 let missing = Self::get_missing_package_reason(
                     repository_set,
@@ -134,27 +139,33 @@ impl Problem {
 
     fn get_sortable_string(&self, pool: &Pool, rule: &dyn Rule) -> String {
         match rule.get_reason() {
-            rule::RULE_ROOT_REQUIRE => rule.get_reason_data().as_array().unwrap()["packageName"]
-                .as_string()
-                .unwrap()
-                .to_string(),
+            rule::RULE_ROOT_REQUIRE => match rule.get_reason_data() {
+                rule::ReasonData::RootRequire { package_name, .. } => package_name.clone(),
+                _ => String::new(),
+            },
             rule::RULE_FIXED => {
                 // TODO(phase-b): reason_data for RULE_FIXED is `array{package: BasePackage}`.
                 // PHP: (string) $rule->getReasonData()['package']
-                php_to_string(rule.get_reason_data().as_array().unwrap()["package"].as_ref())
+                match rule.get_reason_data() {
+                    rule::ReasonData::Fixed { package } => package.get_pretty_string(),
+                    _ => String::new(),
+                }
             }
             rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => {
                 // TODO(phase-b): reason_data is a Link.
-                let source = rule.get_source_package(pool);
-                format!(
-                    "{}//{}",
-                    source.to_string(),
-                    rule.get_reason_data_as_link().get_pretty_string(&source)
-                )
+                let source = rule.get_source_package(pool).unwrap();
+                let link_pretty = match rule.get_reason_data() {
+                    rule::ReasonData::Link(link) => link.get_pretty_string(source.as_ref()),
+                    _ => String::new(),
+                };
+                format!("{}//{}", source.get_pretty_string(), link_pretty)
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
-            | rule::RULE_PACKAGE_INVERSE_ALIAS => php_to_string(&rule.get_reason_data()),
+            | rule::RULE_PACKAGE_INVERSE_ALIAS => {
+                // TODO(phase-b): convert ReasonData to PhpMixed for php_to_string
+                format!("{:?}", rule.get_reason_data())
+            }
             rule::RULE_LEARNED => implode(
                 "-",
                 &rule
@@ -192,7 +203,7 @@ impl Problem {
         indent: &str,
         repository_set: &RepositorySet,
         request: &Request,
-        pool: &Pool,
+        pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, Box<dyn BasePackage>>,
         learned_pool: &Vec<Vec<Box<dyn Rule>>>,
@@ -374,7 +385,7 @@ impl Problem {
     pub fn get_missing_package_reason(
         repository_set: &RepositorySet,
         request: &Request,
-        pool: &Pool,
+        pool: &mut Pool,
         is_verbose: bool,
         package_name: &str,
         constraint: Option<&dyn ConstraintInterface>,
@@ -537,10 +548,10 @@ impl Problem {
         }
 
         let mut locked_package: Option<Box<dyn BasePackage>> = None;
-        for package in request.get_locked_packages() {
+        for (_key, package) in request.get_locked_packages() {
             if package.get_name() == package_name {
-                locked_package = Some(package.clone());
-                if pool.is_unacceptable_fixed_or_locked_package(&package) {
+                locked_package = Some(package.clone_box());
+                if pool.is_unacceptable_fixed_or_locked_package(package.as_ref()) {
                     return (
                         "- ".to_string(),
                         format!(
@@ -564,7 +575,7 @@ impl Problem {
                         .unwrap_or_else(|_| c.get_pretty_string());
                 let packages = repository_set.find_packages(
                     package_name,
-                    Some(&MultiConstraint::new(
+                    Some(Box::new(MultiConstraint::new(
                         vec![
                             Box::new(Constraint::new(Constraint::STR_OP_EQ, &new_constraint))
                                 as Box<dyn ConstraintInterface>,
@@ -574,7 +585,7 @@ impl Problem {
                             )) as Box<dyn ConstraintInterface>,
                         ],
                         false,
-                    )),
+                    ))),
                     0,
                 );
                 if packages.len() > 0 {
@@ -602,11 +613,12 @@ impl Problem {
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages = repository_set.find_packages(package_name, constraint, 0);
+        let packages =
+            repository_set.find_packages(package_name, constraint.map(|c| c.clone_box()), 0);
         if packages.len() > 0 {
             let root_reqs = repository_set.get_root_requires();
             if root_reqs.contains_key(package_name) {
-                let filtered: Vec<&Box<dyn PackageInterface>> = packages
+                let filtered: Vec<&Box<dyn BasePackage>> = packages
                     .iter()
                     .filter(|p| {
                         root_reqs[package_name].matches(&Constraint::new("==", p.get_version()))
@@ -643,7 +655,7 @@ impl Problem {
             let first_pkg = packages.first().unwrap();
             for name in first_pkg.get_names(true) {
                 if temp_reqs.contains_key(&name) {
-                    let filtered: Vec<&Box<dyn PackageInterface>> = packages
+                    let filtered: Vec<&Box<dyn BasePackage>> = packages
                         .iter()
                         .filter(|p| {
                             temp_reqs[&name].matches(&Constraint::new("==", p.get_version()))
@@ -680,7 +692,7 @@ impl Problem {
 
             if let Some(ref lp) = locked_package {
                 let fixed_constraint = Constraint::new("==", lp.get_version());
-                let filtered: Vec<&Box<dyn PackageInterface>> = packages
+                let filtered: Vec<&Box<dyn BasePackage>> = packages
                     .iter()
                     .filter(|p| fixed_constraint.matches(&Constraint::new("==", p.get_version())))
                     .collect();
@@ -706,9 +718,13 @@ impl Problem {
                 }
             }
 
-            let non_locked_packages: Vec<&Box<dyn PackageInterface>> = packages
+            let non_locked_packages: Vec<&Box<dyn BasePackage>> = packages
                 .iter()
-                .filter(|p| !p.get_repository().is_lock_array_repository())
+                .filter(|p| {
+                    p.get_repository()
+                        .and_then(|r| r.as_any().downcast_ref::<LockArrayRepository>())
+                        .is_none()
+                })
                 .collect();
 
             if non_locked_packages.len() == 0 {
@@ -752,43 +768,12 @@ impl Problem {
             }
 
             if pool.is_security_removed_package_version(package_name, constraint) {
-                let advisories =
-                    repository_set.get_matching_security_advisories(&packages, false, true);
-                let advisories_list: Vec<String> = if let Some(by_pkg) = advisories
-                    .get("advisories")
-                    .and_then(|m| m.get(package_name))
-                    .filter(|v| v.len() > 0)
-                {
-                    by_pkg
-                        .iter()
-                        .map(|advisory: &SecurityAdvisory| {
-                            if advisory.link.is_some() && advisory.link.as_ref().unwrap() != "" {
-                                return format!(
-                                    "<href={}>{}</>",
-                                    OutputFormatter::escape(advisory.link.as_ref().unwrap()),
-                                    advisory.inner.advisory_id
-                                );
-                            }
-
-                            if str_starts_with(&advisory.inner.advisory_id, "PKSA-") {
-                                return format!(
-                                    "<href={}>{}</>",
-                                    OutputFormatter::escape(&format!(
-                                        "https://packagist.org/security-advisories/{}",
-                                        advisory.inner.advisory_id
-                                    )),
-                                    advisory.inner.advisory_id
-                                );
-                            }
-
-                            advisory.inner.advisory_id.clone()
-                        })
-                        .collect()
-                } else {
-                    pool.get_security_advisory_identifiers_for_package_version(
-                        package_name,
-                        constraint,
-                    )
+                // TODO(phase-b): get_matching_security_advisories needs Vec<Box<dyn PackageInterface>>
+                // and SecurityAdvisory.inner.advisory_id is on the private inner field.
+                // Convert packages to PackageInterface boxes and adjust SecurityAdvisory accessor first.
+                let _ = repository_set;
+                let advisories_list: Vec<String> = pool
+                    .get_security_advisory_identifiers_for_package_version(package_name, constraint)
                     .into_iter()
                     .map(|advisory_id: String| {
                         if str_starts_with(&advisory_id, "PKSA-") {
@@ -804,8 +789,7 @@ impl Problem {
 
                         advisory_id
                     })
-                    .collect()
-                };
+                    .collect();
 
                 return (
                     format!(
@@ -848,14 +832,14 @@ impl Problem {
         // check if the package is found when bypassing stability checks
         let packages = repository_set.find_packages(
             package_name,
-            constraint,
+            constraint.map(|c| c.clone_box()),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         );
         if packages.len() > 0 {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint,
+                constraint.map(|c| c.clone_box()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             );
             if all_repos_packages.len() > 0 {
@@ -898,7 +882,7 @@ impl Problem {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint,
+                constraint.map(|c| c.clone_box()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             );
             if all_repos_packages.len() > 0 {
@@ -918,7 +902,7 @@ impl Problem {
                 if c.is_constraint() && c.get_version() == "dev-master" {
                     for candidate in &packages {
                         if in_array(
-                            PhpMixed::String(candidate.get_version()),
+                            PhpMixed::String(candidate.get_version().to_string()),
                             &PhpMixed::List(vec![
                                 Box::new(PhpMixed::String("dev-default".to_string())),
                                 Box::new(PhpMixed::String("dev-main".to_string())),
@@ -939,7 +923,7 @@ impl Problem {
             let all_repos_packages = &packages;
             let top_package = all_repos_packages.first();
             if let Some(tp) = top_package {
-                if tp.is_root_package_interface() {
+                if tp.as_root_package_interface().is_some() {
                     suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
                         .to_string();
                 }
@@ -1001,7 +985,7 @@ impl Problem {
 
     /// @internal
     pub fn get_package_list(
-        packages: &Vec<Box<dyn PackageInterface>>,
+        packages: &Vec<Box<dyn BasePackage>>,
         is_verbose: bool,
         pool: Option<&Pool>,
         constraint: Option<&dyn ConstraintInterface>,
@@ -1014,24 +998,21 @@ impl Problem {
         let mut prepared: IndexMap<String, PreparedEntry> = IndexMap::new();
         let mut has_default_branch: IndexMap<String, bool> = IndexMap::new();
         for package in packages {
-            let pkg_name = package.get_name();
+            let pkg_name = package.get_name().to_string();
             let entry = prepared
                 .entry(pkg_name.clone())
                 .or_insert_with(|| PreparedEntry {
-                    name: package.get_pretty_name(),
+                    name: package.get_pretty_name().to_string(),
                     versions: IndexMap::new(),
                 });
-            entry.name = package.get_pretty_name();
-            let alias_suffix = if package.is_alias_package() {
-                format!(
-                    " (alias of {})",
-                    package.get_alias_of().unwrap().get_pretty_version()
-                )
+            entry.name = package.get_pretty_name().to_string();
+            let alias_suffix = if let Some(alias) = package.as_alias_package() {
+                format!(" (alias of {})", alias.get_alias_of().get_pretty_version())
             } else {
                 String::new()
             };
             entry.versions.insert(
-                package.get_version(),
+                package.get_version().to_string(),
                 format!("{}{}", package.get_pretty_version(), alias_suffix),
             );
             if pool.is_some() && constraint.is_some() {
@@ -1045,7 +1026,7 @@ impl Problem {
             if pool.is_some() && use_removed_version_group {
                 for (version, pretty_version) in pool
                     .unwrap()
-                    .get_removed_versions_by_package(&spl_object_hash(package))
+                    .get_removed_versions_by_package(&spl_object_hash(package.as_ref()))
                 {
                     entry.versions.insert(version, pretty_version);
                 }
@@ -1103,16 +1084,20 @@ impl Problem {
     /// @param string $version the effective runtime version of the platform package
     /// @return ?string a version string or null if it appears the package was artificially disabled
     fn get_platform_package_version(
-        pool: &Pool,
+        pool: &mut Pool,
         package_name: &str,
         version: &str,
     ) -> Option<String> {
         let available = pool.what_provides(package_name, None);
 
         if available.len() > 0 {
-            let mut selected: Option<&Box<dyn PackageInterface>> = None;
+            let mut selected: Option<&Box<dyn BasePackage>> = None;
             for pkg in &available {
-                if pkg.get_repository().is_platform_repository() {
+                if pkg
+                    .get_repository()
+                    .and_then(|r| r.as_any().downcast_ref::<PlatformRepository>())
+                    .is_some()
+                {
                     selected = Some(pkg);
                     break;
                 }
@@ -1130,31 +1115,26 @@ impl Problem {
                     if link.get_target() == package_name {
                         return Some(format!(
                             "{} {}d by {}",
-                            link.get_pretty_constraint(),
-                            substr(&link.get_description(), 0, Some(-1)),
-                            selected.to_string()
+                            link.get_pretty_constraint().unwrap_or(""),
+                            substr(link.get_description(), 0, Some(-1)),
+                            selected.get_pretty_string()
                         ));
                     }
                 }
             }
 
-            let mut version = selected.get_pretty_version();
+            let mut version: String = selected.get_pretty_version().to_string();
             let extra = selected.get_extra();
-            if selected.is_complete_package_interface()
+            if selected.as_complete_package_interface().is_some()
                 && extra.contains_key("config.platform")
                 && extra["config.platform"].as_bool() == Some(true)
             {
-                version = format!(
-                    "{}; {}",
-                    version,
-                    str_replace(
-                        "Package ",
-                        "",
-                        &php_to_string(&PhpMixed::String(
-                            selected.get_description().unwrap_or_default()
-                        ))
-                    )
-                );
+                let description: String = selected
+                    .as_complete_package_interface()
+                    .and_then(|c| c.get_description())
+                    .unwrap_or("")
+                    .to_string();
+                version = format!("{}; {}", version, str_replace("Package ", "", &description));
             }
             return Some(version);
         }
@@ -1208,11 +1188,11 @@ impl Problem {
         filtered
     }
 
-    fn has_multiple_names(packages: &Vec<Box<dyn PackageInterface>>) -> bool {
+    fn has_multiple_names(packages: &Vec<Box<dyn BasePackage>>) -> bool {
         let mut name: Option<String> = None;
         for package in packages {
-            if name.is_none() || name.as_deref() == Some(package.get_name().as_str()) {
-                name = Some(package.get_name());
+            if name.is_none() || name.as_deref() == Some(package.get_name()) {
+                name = Some(package.get_name().to_string());
             } else {
                 return true;
             }
@@ -1225,25 +1205,21 @@ impl Problem {
         pool: &Pool,
         is_verbose: bool,
         package_name: &str,
-        higher_repo_packages: &Vec<Box<dyn PackageInterface>>,
-        all_repos_packages: &Vec<Box<dyn PackageInterface>>,
+        higher_repo_packages: &Vec<Box<dyn BasePackage>>,
+        all_repos_packages: &Vec<Box<dyn BasePackage>>,
         reason: &str,
         constraint: Option<&dyn ConstraintInterface>,
     ) -> (String, String) {
-        let mut next_repo_packages: Vec<Box<dyn PackageInterface>> = Vec::new();
+        let mut next_repo_packages: Vec<Box<dyn BasePackage>> = Vec::new();
         let mut next_repo: Option<
             Box<dyn crate::repository::repository_interface::RepositoryInterface>,
         > = None;
 
         for package in all_repos_packages {
-            if next_repo.is_none()
-                || next_repo
-                    .as_ref()
-                    .map(|r| r.equals(package.get_repository().as_ref()))
-                    == Some(true)
-            {
-                next_repo_packages.push(package.clone());
-                next_repo = Some(package.get_repository());
+            // TODO(phase-b): RepositoryInterface has no equals(); reference identity needed.
+            if next_repo.is_none() {
+                next_repo_packages.push(package.clone_box());
+                next_repo = package.get_repository().map(|r| r.clone_box());
             } else {
                 break;
             }
@@ -1254,7 +1230,7 @@ impl Problem {
 
         if higher_repo_packages.len() > 0 {
             let top_package = higher_repo_packages.first().unwrap();
-            if top_package.is_root_package_interface() {
+            if top_package.as_root_package_interface().is_some() {
                 return (
                     format!(
                         "- Root composer.json requires {}{}, it is ",
@@ -1278,7 +1254,11 @@ impl Problem {
             }
         }
 
-        if next_repo.is_lock_array_repository() {
+        if next_repo
+            .as_any()
+            .downcast_ref::<LockArrayRepository>()
+            .is_some()
+        {
             let singular = higher_repo_packages.len() == 1;
 
             let mut suggestion = format!(
@@ -1293,7 +1273,7 @@ impl Problem {
                 )
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
-            if next_repo_packages[0].get_dist_type() == "path" {
+            if next_repo_packages[0].get_dist_type() == Some("path") {
                 let transport_options = next_repo_packages[0].get_transport_options();
                 if !transport_options.contains_key("symlink")
                     || transport_options["symlink"].as_bool() != Some(false)
@@ -1355,7 +1335,8 @@ impl Problem {
                     .first()
                     .unwrap()
                     .get_repository()
-                    .get_repo_name(),
+                    .map(|r| r.get_repo_name())
+                    .unwrap_or_default(),
                 reason
             ),
         )
@@ -1420,24 +1401,24 @@ impl Problem {
         let providers = repository_set.get_providers(package_name);
         if providers.len() > 0 {
             let provider_count = providers.len() as i64;
-            let slice = if provider_count > max_providers + 1 {
-                providers
-                    .iter()
-                    .take(max_providers as usize)
-                    .cloned()
-                    .collect::<Vec<_>>()
-            } else {
-                providers.clone()
-            };
+            let slice: Vec<crate::repository::repository_interface::ProviderInfo> =
+                if provider_count > max_providers + 1 {
+                    providers
+                        .values()
+                        .take(max_providers as usize)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                } else {
+                    providers.values().cloned().collect::<Vec<_>>()
+                };
             let mut providers_str = implode(
                 "",
                 &slice
                     .iter()
                     .map(|p| {
-                        let description = if p.description != "" && !p.description.is_empty() {
-                            format!(" {}", substr(&p.description, 0, Some(100)))
-                        } else {
-                            String::new()
+                        let description = match &p.description {
+                            Some(d) if !d.is_empty() => format!(" {}", substr(d, 0, Some(100))),
+                            _ => String::new(),
                         };
 
                         format!("      - {}{}\n", p.name, description)

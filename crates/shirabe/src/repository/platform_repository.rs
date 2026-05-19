@@ -444,17 +444,18 @@ impl PlatformRepository {
                             let mut is_fips = false;
                             let parsed_version = Version::parse_openssl(&ssl_version, &mut is_fips)
                                 .unwrap_or_default();
+                            let fips_provides: Vec<String> = if is_fips {
+                                vec!["curl-openssl".to_string()]
+                            } else {
+                                Vec::new()
+                            };
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-openssl{}", name, if is_fips { "-fips" } else { "" }),
                                 Some(&parsed_version),
                                 Some(&format!("curl OpenSSL version ({})", parsed_version)),
                                 &[],
-                                if is_fips {
-                                    &["curl-openssl".to_string()]
-                                } else {
-                                    &[]
-                                },
+                                &fips_provides,
                             )?;
                         } else {
                             let (shortlib, ssl_lib);
@@ -887,7 +888,8 @@ impl PlatformRepository {
                                 Box::new(PhpMixed::String("getUnicodeVersion".to_string())),
                             ])],
                         );
-                        let sliced = array_slice(&intl_char_versions, 0, Some(3));
+                        let sliced =
+                            shirabe_php_shim::array_slice_mixed(&intl_char_versions, 0, Some(3));
                         let joined = implode(".", &Self::php_array_to_string_vec(&sliced));
                         self.add_library(
                             &mut libraries,
@@ -1605,7 +1607,12 @@ impl PlatformRepository {
                 return Ok(());
             }
 
-            let overrider = self.inner.find_package(package.get_name(), "*".to_string());
+            let overrider = self.inner.find_package(
+                package.get_name(),
+                crate::repository::repository_interface::FindPackageConstraint::String(
+                    "*".to_string(),
+                ),
+            );
             let actual_text = if let Some(ref ov) = overrider {
                 if package.get_version() == ov.get_version() {
                     "same as actual".to_string()
@@ -1670,11 +1677,13 @@ impl PlatformRepository {
         package.set_description("Package overridden via config.platform".to_string());
         let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
-        package.set_extra(extra);
-        // TODO(phase-b): CompletePackage is `Box<dyn PackageInterface>`-cloneable in PHP;
-        // here we add a clone for ArrayRepository but also return the original.
-        self.inner.add_package(Box::new(package.clone()));
+        package.inner.set_extra(extra);
+        // TODO(phase-b): CompletePackage is a PHP class (shared by ref); cannot Clone.
+        // The container should likely store Rc<RefCell<CompletePackage>> so both the inner
+        // ArrayRepository and the function caller can share ownership.
+        let _: () = todo!("share CompletePackage via Rc between add_package and return");
 
+        #[allow(unreachable_code)]
         if package.get_name() == "php" {
             let parts = explode(".", package.get_version());
             let head = array_slice_strs(&parts, 0, Some(3));
@@ -1696,7 +1705,7 @@ impl PlatformRepository {
         ));
         let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
-        package.set_extra(extra);
+        package.inner.set_extra(extra);
 
         self.disabled_packages
             .insert(package.get_name().to_string(), Box::new(package));
@@ -1742,7 +1751,7 @@ impl PlatformRepository {
             name,
             extra_description.unwrap_or_default()
         ));
-        ext.set_type("php-ext".to_string());
+        ext.inner.set_type("php-ext".to_string());
 
         if name == "uuid" {
             let mut replaces: IndexMap<String, Link> = IndexMap::new();
@@ -1752,11 +1761,11 @@ impl PlatformRepository {
                     "ext-uuid".to_string(),
                     "lib-uuid".to_string(),
                     Box::new(Constraint::new("=", &version)),
-                    Link::TYPE_REPLACE.to_string(),
+                    Some(Link::TYPE_REPLACE.to_string()),
                     Some(ext.get_pretty_version().to_string()),
                 ),
             );
-            ext.set_replaces(replaces);
+            ext.inner.set_replaces(replaces);
         }
 
         self.add_package(Box::new(ext))?;
@@ -1817,7 +1826,7 @@ impl PlatformRepository {
                     format!("lib-{}", name),
                     format!("lib-{}", replace_lower),
                     Box::new(Constraint::new("=", &version)),
-                    Link::TYPE_REPLACE.to_string(),
+                    Some(Link::TYPE_REPLACE.to_string()),
                     Some(lib.get_pretty_version().to_string()),
                 ),
             );
@@ -1831,13 +1840,13 @@ impl PlatformRepository {
                     format!("lib-{}", name),
                     format!("lib-{}", provide_lower),
                     Box::new(Constraint::new("=", &version)),
-                    Link::TYPE_PROVIDE.to_string(),
+                    Some(Link::TYPE_PROVIDE.to_string()),
                     Some(lib.get_pretty_version().to_string()),
                 ),
             );
         }
-        lib.set_replaces(replace_links);
-        lib.set_provides(provide_links);
+        lib.inner.set_replaces(replace_links);
+        lib.inner.set_provides(provide_links);
 
         self.add_package(Box::new(lib))?;
         Ok(())
@@ -1872,7 +1881,7 @@ impl PlatformRepository {
         r#type: Option<String>,
     ) -> Vec<crate::repository::repository_interface::SearchResult> {
         // suppress vendor search as there are no vendors to match in platform packages
-        if mode == <dyn RepositoryInterface>::SEARCH_VENDOR {
+        if mode == crate::repository::repository_interface::SEARCH_VENDOR {
             return Vec::new();
         }
 

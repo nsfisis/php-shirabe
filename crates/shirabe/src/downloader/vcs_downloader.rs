@@ -6,7 +6,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, count, explode,
-    get_class, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
+    get_class, get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
+    trim,
 };
 
 use crate::config::Config;
@@ -40,9 +41,8 @@ impl VcsDownloaderBase {
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
-        let process = process.unwrap_or_else(|| {
-            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
-        });
+        let process = process
+            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(()))));
         let filesystem =
             fs.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
@@ -52,6 +52,21 @@ impl VcsDownloaderBase {
             filesystem,
             has_cleaned_changes: IndexMap::new(),
         }
+    }
+
+    /// Equivalent of PHP `parent::cleanChanges()`. Subclasses that override the trait method
+    /// call this when they need to invoke the base behavior. Since this lives on the data struct,
+    /// it cannot consult subclass-specific `get_local_changes`; it assumes any callers have
+    /// already verified that no local changes exist.
+    pub fn clean_changes(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _update: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        // TODO(phase-b): parent::cleanChanges() rechecks getLocalChanges via dynamic dispatch.
+        // Callers in subclasses must do that check themselves (they already have).
+        Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 }
 
@@ -140,7 +155,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io_mut().write_error3(
-                            &format!("Failed: [{}] {}", get_class(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -183,7 +198,9 @@ pub trait VcsDownloader:
             self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
-            self.filesystem_mut().borrow_mut().empty_directory(path);
+            self.filesystem_mut()
+                .borrow_mut()
+                .empty_directory(path, true)?;
         } else if r#type == "uninstall" {
             self.clean_changes(package, path, false)?;
         }
@@ -251,7 +268,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io_mut().write_error3(
-                            &format!("Failed: [{}] {}", get_class(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -326,7 +343,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io_mut().write_error3(
-                            &format!("Failed: [{}] {}", get_class(&e), e,),
+                            &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
                         );
@@ -406,22 +423,25 @@ pub trait VcsDownloader:
         let promise = self
             .filesystem_mut()
             .borrow_mut()
-            .remove_directory_async(path);
+            .remove_directory_async(path)?;
 
         let path = path.to_string();
-        Ok(
-            promise.then(Box::new(move |result: PhpMixed| -> Result<()> {
-                let result_bool = result.as_bool().unwrap_or(false);
-                if !result_bool {
-                    return Err(RuntimeException {
-                        message: format!("Could not completely delete {}, aborting.", path),
-                        code: 0,
+        // TODO(phase-b): closure return type mismatches PromiseInterface::then signature.
+        Ok(promise.then(
+            Some(Box::new(
+                move |result: Option<PhpMixed>| -> Option<PhpMixed> {
+                    let result_bool = result.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
+                    if !result_bool {
+                        let _: RuntimeException = RuntimeException {
+                            message: format!("Could not completely delete {}, aborting.", path),
+                            code: 0,
+                        };
                     }
-                    .into());
-                }
-                Ok(())
-            })),
-        )
+                    None
+                },
+            )),
+            None,
+        ))
     }
 
     fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
@@ -435,11 +455,9 @@ pub trait VcsDownloader:
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
-        if let Some(package_version) = guesser.guess_version(&package_config, path) {
-            return package_version
-                .get("commit")
-                .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+        let mut guesser = guesser;
+        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
+            return package_version.commit.clone();
         }
 
         None

@@ -22,7 +22,7 @@ pub struct RepositoryManager {
     io: Box<dyn IOInterface>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    event_dispatcher: Option<EventDispatcher>,
+    event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
@@ -31,7 +31,7 @@ impl RepositoryManager {
         io: &dyn IOInterface,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process
@@ -54,8 +54,13 @@ impl RepositoryManager {
         constraint: &dyn ConstraintInterface,
     ) -> Option<Box<dyn PackageInterface>> {
         for repository in &self.repositories {
-            if let Some(package) = repository.find_package(name, constraint) {
-                return Some(package);
+            if let Some(package) = repository.find_package(
+                name,
+                crate::repository::repository_interface::FindPackageConstraint::Constraint(
+                    constraint.clone_box(),
+                ),
+            ) {
+                return Some(package.clone_package_box());
             }
         }
         None
@@ -68,7 +73,16 @@ impl RepositoryManager {
     ) -> Vec<Box<dyn PackageInterface>> {
         let mut packages: Vec<Box<dyn PackageInterface>> = vec![];
         for repository in self.get_repositories() {
-            packages.extend(repository.find_packages(name, constraint));
+            for p in repository.find_packages(
+                name,
+                Some(
+                    crate::repository::repository_interface::FindPackageConstraint::Constraint(
+                        constraint.clone_box(),
+                    ),
+                ),
+            ) {
+                packages.push(p.clone_package_box());
+            }
         }
         packages
     }
@@ -126,7 +140,7 @@ impl RepositoryManager {
         let repository = self.create_repository_by_class(&class, cleaned_config)?;
 
         if let Some(filter_config) = filter_config {
-            return Ok(Box::new(FilterRepository::new(repository, filter_config)));
+            return Ok(Box::new(FilterRepository::new(repository, filter_config)?));
         }
 
         Ok(repository)

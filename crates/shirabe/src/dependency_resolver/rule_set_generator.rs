@@ -213,12 +213,18 @@ impl RuleSetGenerator {
                     .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
+                    let fallback = constraint.clone_box();
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, true)
-                        .unwrap_or(constraint);
+                        .unwrap_or(fallback);
                 }
 
-                let possible_requires = self.pool.what_provides(link.get_target(), &*constraint);
+                let possible_requires: Vec<Box<dyn PackageInterface>> = self
+                    .pool
+                    .what_provides(link.get_target(), Some(&*constraint))
+                    .into_iter()
+                    .map(|p| p.clone_package_box())
+                    .collect();
 
                 let rule = self.create_require_rule(
                     &*package,
@@ -262,12 +268,15 @@ impl RuleSetGenerator {
                     .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
+                    let fallback = constraint.clone_box();
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, false)
-                        .unwrap_or(constraint);
+                        .unwrap_or(fallback);
                 }
 
-                let conflicts = self.pool.what_provides(link.get_target(), &*constraint);
+                let conflicts = self
+                    .pool
+                    .what_provides(link.get_target(), Some(&*constraint));
 
                 for conflict in &conflicts {
                     // define the conflict rule for regular packages, for alias packages it's only needed if the name
@@ -341,7 +350,7 @@ impl RuleSetGenerator {
                 Box::new(PhpMixed::Null), // reasonData: $package (BasePackage)
             );
             let rule = self.create_install_one_of_rule(
-                &[package.clone_box()],
+                &[package.clone_package_box()],
                 rule::RULE_FIXED,
                 PhpMixed::Array(reason_data),
             );
@@ -356,15 +365,24 @@ impl RuleSetGenerator {
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
+                let fallback = constraint.clone_box();
                 constraint = ignore_list_filter
                     .filter_constraint(package_name, constraint, true)
-                    .unwrap_or(constraint);
+                    .unwrap_or(fallback);
             }
 
-            let packages = self.pool.what_provides(package_name, &*constraint);
+            let packages: Vec<Box<dyn PackageInterface>> = self
+                .pool
+                .what_provides(package_name, Some(&*constraint))
+                .into_iter()
+                .map(|p| p.clone_package_box())
+                .collect();
             if !packages.is_empty() {
                 for package in &packages {
-                    self.add_rules_for_package(package.clone_box(), platform_requirement_filter);
+                    self.add_rules_for_package(
+                        package.clone_package_box(),
+                        platform_requirement_filter,
+                    );
                 }
 
                 let mut reason_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
@@ -392,7 +410,13 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        for package in self.pool.get_packages() {
+        let packages: Vec<Box<dyn BasePackage>> = self
+            .pool
+            .get_packages()
+            .iter()
+            .map(|p| p.clone_box())
+            .collect();
+        for package in &packages {
             // ensure that rules for root alias packages and aliases of packages which were loaded are also loaded
             // even if the alias itself isn't required, otherwise a package could be installed without its alias which
             // leads to unexpected behavior
@@ -406,7 +430,7 @@ impl RuleSetGenerator {
                             .contains_key(&alias_pkg.get_alias_of().get_id())
                     {
                         self.add_rules_for_package(
-                            package.clone_box(),
+                            package.clone_package_box(),
                             platform_requirement_filter,
                         );
                     }

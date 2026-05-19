@@ -1,5 +1,15 @@
 use crate::symfony::component::finder::spl_file_info::SplFileInfo;
 
+/// Helper trait so `Finder::exclude` accepts both single strings and slices
+/// (PHP's variadic / array argument compatibility).
+pub trait IntoFinderExclude {}
+impl IntoFinderExclude for &str {}
+impl IntoFinderExclude for String {}
+impl IntoFinderExclude for &String {}
+impl IntoFinderExclude for &[String] {}
+impl IntoFinderExclude for &Vec<String> {}
+impl IntoFinderExclude for Vec<String> {}
+
 #[derive(Debug)]
 pub struct Finder;
 
@@ -38,7 +48,7 @@ impl Finder {
         todo!()
     }
 
-    pub fn exclude(&mut self, _exclude: &[String]) -> &mut Self {
+    pub fn exclude<E: IntoFinderExclude>(&mut self, _exclude: E) -> &mut Self {
         todo!()
     }
 
@@ -54,7 +64,18 @@ impl Finder {
         todo!()
     }
 
+    pub fn not_path(&mut self, _pattern: &str) -> &mut Self {
+        todo!()
+    }
+
     pub fn name(&mut self, _pattern: &str) -> &mut Self {
+        todo!()
+    }
+
+    pub fn sort<F>(&mut self, _comparator: F) -> &mut Self
+    where
+        F: FnMut(&SplFileInfo, &SplFileInfo) -> i64,
+    {
         todo!()
     }
 
@@ -77,6 +98,24 @@ impl Finder {
     pub fn iter(&self) -> impl Iterator<Item = SplFileInfo> {
         todo!();
         std::iter::empty()
+    }
+
+    /// PHP: Finder implements Countable.
+    pub fn len(&self) -> usize {
+        todo!()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl IntoIterator for &Finder {
+    type Item = SplFileInfo;
+    type IntoIter = std::vec::IntoIter<SplFileInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        todo!()
     }
 }
 

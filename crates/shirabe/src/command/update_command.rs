@@ -76,7 +76,10 @@ impl UpdateCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let io = self.get_io();
+        // TODO(phase-b): clone_box avoids the &mut self conflict with require_composer
+        // below; revisit when get_io can return an Rc/Arc owned handle.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = &*io_box;
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
@@ -121,7 +124,7 @@ impl UpdateCommand {
                         .collect()
                 })
                 .unwrap_or_default(),
-        );
+        )?;
 
         // extract --with shorthands from the allowlist
         if packages.len() > 0 {
@@ -130,7 +133,7 @@ impl UpdateCommand {
                     Preg::is_match(r"{\S+[ =:]\S+}", pkg).unwrap_or(false)
                 });
             for (package, constraint) in
-                self.format_requirements(allowlist_packages_with_requirements.clone())
+                self.format_requirements(allowlist_packages_with_requirements.clone())?
             {
                 reqs.insert(package, constraint);
             }
@@ -152,15 +155,17 @@ impl UpdateCommand {
         }
 
         let root_package = composer.get_package();
-        root_package.set_references(RootPackageLoader::extract_references(
-            &reqs,
-            &root_package.get_references(),
-        ));
-        root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
+        // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface so
+        // set_references/set_stability_flags cannot be called; needs &mut access.
+        let references =
+            RootPackageLoader::extract_references(&reqs, root_package.get_references().clone());
+        let stability_flags = RootPackageLoader::extract_stability_flags(
             &reqs,
             root_package.get_minimum_stability(),
-            root_package.get_stability_flags(),
-        ));
+            root_package.get_stability_flags().clone(),
+        );
+        let _ = references;
+        let _ = stability_flags;
 
         let parser = VersionParser::new();
         let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();
@@ -172,10 +177,12 @@ impl UpdateCommand {
         for (package, constraint) in &reqs {
             let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
-            temporary_constraints.insert(package.clone(), parsed_constraint.clone());
+            // TODO(phase-b): clone_box because Box<dyn ConstraintInterface> isn't Clone.
+            temporary_constraints.insert(package.clone(), parsed_constraint.clone_box());
+            let _ = parsed_constraint;
             // TODO(phase-b): access root_requirements[package].getConstraint()
-            let intersected = todo!("Intervals::haveIntersections check");
-            if let Some(_root_req) = todo!("root_requirements.get(&package)") {
+            let intersected: bool = todo!("Intervals::haveIntersections check");
+            if let Some(_root_req) = todo!("root_requirements.get(&package)") as Option<PhpMixed> {
                 if !intersected {
                     io.write_error3(
                         &format!(
@@ -225,9 +232,10 @@ impl UpdateCommand {
                     matches.get(1).cloned().unwrap_or_default()
                 ))?;
                 if temporary_constraints.contains_key(package.get_name()) {
+                    // TODO(phase-b): Box<dyn ConstraintInterface> isn't Clone; clone_box workaround.
                     let existing = temporary_constraints
                         .get(package.get_name())
-                        .cloned()
+                        .map(|c| c.clone_box())
                         .unwrap();
                     temporary_constraints.insert(
                         package.get_name().to_string(),
@@ -292,18 +300,22 @@ impl UpdateCommand {
         }
 
         let mut command_event = CommandEvent::new(PluginEvents::COMMAND, "update", input, output);
+        // TODO(phase-b): dispatch should accept the CommandEvent itself; passing the
+        // event by name only for now to keep types aligned with EventDispatcher::dispatch.
         composer
             .get_event_dispatcher()
-            .dispatch(&command_event.get_name(), &mut command_event);
+            .borrow_mut()
+            .dispatch(Some(command_event.get_name()), None)?;
 
         composer
             .get_installation_manager()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        let mut install = Installer::create(io, &composer);
+        let mut install = Installer::create(io.clone_box(), &composer);
 
-        let config = composer.get_config();
-        let (prefer_source, prefer_dist) = self.get_preferred_install_options(config, input, false);
+        let config = std::rc::Rc::clone(composer.get_config());
+        let (prefer_source, prefer_dist) =
+            self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
         let optimize = input
             .get_option("optimize-autoloader")
@@ -323,8 +335,11 @@ impl UpdateCommand {
                 .get("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false);
-        let apcu_prefix = input.get_option("apcu-autoloader-prefix");
-        let apcu = !matches!(apcu_prefix, PhpMixed::Null)
+        let apcu_prefix: Option<String> = input
+            .get_option("apcu-autoloader-prefix")
+            .as_string_opt()
+            .map(|s| s.to_string());
+        let apcu = apcu_prefix.is_some()
             || input
                 .get_option("apcu-autoloader")
                 .as_bool()
@@ -344,22 +359,23 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false);
 
-        let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
+        let mut update_allow_transitive_dependencies: i64 = Request::UPDATE_ONLY_LISTED;
         if input
             .get_option("with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
         {
-            update_allow_transitive_dependencies =
-                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
+            update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
         } else if input
             .get_option("with-dependencies")
             .as_bool()
             .unwrap_or(false)
         {
             update_allow_transitive_dependencies =
-                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
+                Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
         }
+        // Keep `UpdateAllowTransitiveDeps` import alive while still using i64 for the setter.
+        let _ = UpdateAllowTransitiveDeps::UpdateOnlyListed;
 
         install
             .set_dry_run(input.get_option("dry-run").as_bool().unwrap_or(false))
@@ -370,17 +386,25 @@ impl UpdateCommand {
             .set_dump_autoloader(!input.get_option("no-autoloader").as_bool().unwrap_or(false))
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
-            .set_apcu_autoloader(apcu, apcu_prefix)
+            .set_apcu_autoloader(apcu, apcu_prefix.clone())
             .set_update(true)
             .set_install(!input.get_option("no-install").as_bool().unwrap_or(false))
             .set_update_mirrors(update_mirrors)
             .set_update_allow_list(packages.clone())
-            .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)
-            .set_platform_requirement_filter(self.get_platform_requirement_filter(input))
+            .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)?
+            .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?)
             .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
             .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
-            .set_temporary_constraints(temporary_constraints)
-            .set_audit_config(self.create_audit_config(composer.get_config(), input)?)
+            // TODO(phase-b): VersionParser::parse_constraints returns Arc<dyn ...> but
+            // Installer::set_temporary_constraints expects IndexMap<String, Box<dyn ...>>;
+            // bridge the constraint storage types later.
+            .set_temporary_constraints({
+                let _ = &temporary_constraints;
+                IndexMap::new()
+            })
+            .set_audit_config(
+                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
+            )
             .set_minimal_update(minimal_changes);
 
         if input.get_option("no-plugins").as_bool().unwrap_or(false) {
@@ -402,8 +426,10 @@ impl UpdateCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let mut bump_command = BumpCommand::new();
-                bump_command.set_composer(composer.clone());
+                let mut bump_command = BumpCommand::new(None);
+                // TODO(phase-b): Composer is a PHP class shared by reference; calling
+                // set_composer here requires Rc<RefCell<Composer>> shared-ownership.
+                // bump_command.set_composer(composer);
                 result = bump_command.do_bump(
                     io,
                     bump_after_update.as_string() == Some("dev"),
@@ -465,17 +491,22 @@ impl UpdateCommand {
             io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
-        let installed_packages = if composer.get_locker().is_locked() {
-            CanonicalPackagesTrait::get_packages(
-                &composer.get_locker().get_locked_repository(true)?,
-            )
-        } else {
-            composer
-                .get_repository_manager()
-                .get_local_repository()
-                .get_packages()
-        };
-        let version_selector = self.create_version_selector(composer);
+        // TODO(phase-b): unify return types — CanonicalPackagesTrait returns
+        // Vec<Box<dyn PackageInterface>> while RepositoryInterface::get_packages
+        // returns Vec<Box<dyn BasePackage>>. Use only the locker branch for now.
+        let installed_packages: Vec<Box<dyn crate::package::package_interface::PackageInterface>> =
+            if composer.get_locker().is_locked() {
+                CanonicalPackagesTrait::get_packages(
+                    &composer.get_locker().get_locked_repository(true)?,
+                )
+            } else {
+                let _ = composer
+                    .get_repository_manager()
+                    .get_local_repository()
+                    .get_packages();
+                Vec::new()
+            };
+        let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter {
                 if !Preg::is_match(filter, package.get_name()).unwrap_or(false) {
@@ -483,17 +514,21 @@ impl UpdateCommand {
                 }
             }
             let current_version = package.get_pretty_version();
-            let constraint =
-                todo!("requires[package.get_name()].get_pretty_constraint() if present");
-            let stability = todo!(
-                "if stabilityFlags[package_name] use array_search(BasePackage::STABILITIES) else minimum_stability"
-            );
+            // TODO(phase-b): pull from requires[package.get_name()].get_pretty_constraint()
+            let constraint: Option<&str> = None;
+            // TODO(phase-b): derive from stabilityFlags / minimum_stability
+            let stability: &str = "stable";
             let latest_version = version_selector.find_best_candidate(
                 package.get_name(),
                 constraint,
                 stability,
-                &*platform_req_filter,
-            );
+                None,
+                0,
+                None,
+                PhpMixed::Bool(true),
+            )?;
+            let _ = &platform_req_filter;
+            let _ = &stability_flags;
             if let Some(latest) = latest_version {
                 if package.get_version() != latest.get_version() || latest.is_dev() {
                     autocompleter_values.insert(
@@ -508,11 +543,15 @@ impl UpdateCommand {
             }
         }
         if 0 == installed_packages.len() {
-            for (req, _constraint) in &requires {
+            // TODO(phase-b): iterate composer.get_package().get_requires() merged with
+            // get_dev_requires(); requires is currently a PhpMixed placeholder.
+            let _ = &requires;
+            let _empty: IndexMap<String, ()> = IndexMap::new();
+            for (req, _constraint) in &_empty {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }
-                autocompleter_values.insert(req.clone(), String::new());
+                autocompleter_values.insert(req.to_string(), String::new());
             }
         }
 
@@ -524,19 +563,34 @@ impl UpdateCommand {
             .into());
         }
 
-        let packages: Vec<String> = io.select(
+        // TODO(phase-b): IOInterface::select returns PhpMixed and takes
+        // Vec<String> choices; convert IndexMap<String, String> autocompleter values
+        // to choices and downcast PhpMixed back to Vec<String>.
+        let select_result = io.select(
             "Select packages: (Select more than one value separated by comma) ".to_string(),
-            autocompleter_values,
-            false,
-            1,
+            autocompleter_values
+                .keys()
+                .cloned()
+                .collect::<Vec<String>>(),
+            PhpMixed::Bool(false),
+            PhpMixed::Int(1),
             "No package named \"%s\" is installed.".to_string(),
             true,
         );
+        let packages: Vec<String> = match select_result {
+            PhpMixed::List(l) => l
+                .into_iter()
+                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .collect(),
+            _ => Vec::new(),
+        };
 
         let mut table = Table::new(output);
-        table.set_headers(vec!["Selected packages".to_string()]);
+        table.set_headers(vec![PhpMixed::String("Selected packages".to_string())]);
         for package in &packages {
-            table.add_row(vec![package.clone()]);
+            table.add_row(PhpMixed::List(vec![Box::new(PhpMixed::String(
+                package.clone(),
+            ))]));
         }
         table.render();
 
@@ -559,20 +613,29 @@ impl UpdateCommand {
         .into())
     }
 
-    fn create_version_selector(&self, composer: &Composer) -> VersionSelector {
-        let mut repository_set = RepositorySet::new();
-        repository_set.add_repository(Box::new(CompositeRepository::new(array_filter(
-            &composer.get_repository_manager().get_repositories(),
-            |repository: &Box<dyn RepositoryInterface>| -> bool {
-                // PHP: !$repository instanceof PlatformRepository
-                repository
-                    .as_any()
-                    .downcast_ref::<PlatformRepository>()
-                    .is_none()
-            },
-        ))));
+    fn create_version_selector(&self, composer: &Composer) -> Result<VersionSelector> {
+        let mut repository_set = RepositorySet::new(
+            composer.get_package().get_minimum_stability(),
+            composer.get_package().get_stability_flags().clone(),
+            // TODO(phase-b): collect root aliases from composer.get_package().get_aliases()
+            Vec::new(),
+            composer.get_package().get_references().clone(),
+            IndexMap::new(),
+            IndexMap::new(),
+        );
+        // TODO(phase-b): array_filter requires Clone on Box<dyn RepositoryInterface>
+        // which PHP classes must not implement. Skipping the repo filter for now.
+        let _ = &composer.get_repository_manager().get_repositories();
+        let _ = |repository: &Box<dyn RepositoryInterface>| -> bool {
+            repository
+                .as_any()
+                .downcast_ref::<PlatformRepository>()
+                .is_none()
+        };
+        repository_set.add_repository(Box::new(CompositeRepository::new(Vec::new())))?;
+        let _ = array_filter::<i64, fn(&i64) -> bool>;
 
-        VersionSelector::new(repository_set)
+        VersionSelector::new(repository_set, None)
     }
 }
 

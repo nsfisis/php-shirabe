@@ -44,9 +44,9 @@ impl PerforceDriver {
         let repo_config = self.inner.repo_config.clone();
         self.init_perforce(&repo_config)?;
         self.perforce.as_mut().unwrap().p4_login()?;
-        self.perforce.as_mut().unwrap().check_stream()?;
+        self.perforce.as_mut().unwrap().check_stream();
         self.perforce.as_mut().unwrap().write_p4_client_spec()?;
-        self.perforce.as_mut().unwrap().connect_client()?;
+        self.perforce.as_mut().unwrap().connect_client();
 
         Ok(())
     }
@@ -73,21 +73,26 @@ impl PerforceDriver {
 
         let repo_dir = format!("{}/{}", cache_vcs_dir, self.depot);
         self.perforce = Some(Perforce::create(
-            repo_config,
-            &self.inner.url,
-            &repo_dir,
-            &self.inner.process,
-            self.inner.io.as_ref(),
-        )?);
+            repo_config.clone(),
+            self.inner.url.clone(),
+            repo_dir,
+            std::rc::Rc::clone(&self.inner.process),
+            self.inner.io.clone_box(),
+        ));
 
         Ok(())
     }
 
-    pub fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
-        self.perforce
-            .as_ref()
+    pub fn get_file_content(
+        &mut self,
+        file: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Option<String>> {
+        Ok(self
+            .perforce
+            .as_mut()
             .unwrap()
-            .get_file_content(file, identifier)
+            .get_file_content(file, identifier))
     }
 
     pub fn get_change_date(
@@ -101,12 +106,12 @@ impl PerforceDriver {
         &self.branch
     }
 
-    pub fn get_branches(&self) -> anyhow::Result<IndexMap<String, String>> {
-        self.perforce.as_ref().unwrap().get_branches()
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(self.perforce.as_mut().unwrap().get_branches())
     }
 
-    pub fn get_tags(&self) -> anyhow::Result<IndexMap<String, String>> {
-        self.perforce.as_ref().unwrap().get_tags()
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(self.perforce.as_mut().unwrap().get_tags())
     }
 
     pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<String, PhpMixed>> {
@@ -130,7 +135,13 @@ impl PerforceDriver {
         );
         source.insert(
             "p4user".to_string(),
-            PhpMixed::String(self.perforce.as_ref().unwrap().get_user().to_string()),
+            PhpMixed::String(
+                self.perforce
+                    .as_ref()
+                    .unwrap()
+                    .get_user()
+                    .unwrap_or_default(),
+            ),
         );
         source
     }
@@ -139,13 +150,13 @@ impl PerforceDriver {
         &self.inner.url
     }
 
-    pub fn has_composer_file(&self, identifier: &str) -> bool {
+    pub fn has_composer_file(&mut self, identifier: &str) -> bool {
         let path = format!("//{}/{}", self.depot, identifier);
         self.perforce
-            .as_ref()
+            .as_mut()
             .unwrap()
             .get_composer_information(&path)
-            .map_or(false, |info| !info.is_empty())
+            .map_or(false, |info| info.map_or(false, |i| !i.is_empty()))
     }
 
     pub fn get_contents(&self, _url: &str) -> anyhow::Result<Response> {
@@ -156,15 +167,15 @@ impl PerforceDriver {
         .into())
     }
 
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, deep: bool) -> bool {
+    pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, deep: bool) -> bool {
         if deep || Preg::is_match(r"#\b(perforce|p4)\b#i", url).unwrap_or(false) {
-            return Perforce::check_server_exists(url, &ProcessExecutor::new(io));
+            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(io));
         }
         false
     }
 
     pub fn cleanup(&mut self) -> anyhow::Result<()> {
-        self.perforce.as_mut().unwrap().cleanup_client_spec()?;
+        self.perforce.as_mut().unwrap().cleanup_client_spec();
         self.perforce = None;
         Ok(())
     }

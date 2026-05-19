@@ -30,7 +30,9 @@ use crate::package::complete_alias_package::CompleteAliasPackage;
 use crate::package::complete_package::CompletePackage;
 use crate::package::package_interface::PackageInterface;
 use crate::package::version::stability_filter::StabilityFilter;
-use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
+use crate::repository::advisory_provider_interface::{
+    AdvisoryProviderInterface, PartialOrSecurityAdvisory,
+};
 use crate::repository::composite_repository::CompositeRepository;
 use crate::repository::installed_repository::InstalledRepository;
 use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
@@ -221,7 +223,7 @@ impl RepositorySet {
                 let constraint_clone = constraint
                     .as_ref()
                     .map(|c| FindPackageConstraint::Constraint(c.clone_box()));
-                let found = repository.find_packages(name.to_string(), constraint_clone);
+                let found = repository.find_packages(name, constraint_clone);
                 packages.push(found);
             }
         } else {
@@ -367,8 +369,8 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,
-    ) -> Result<IndexMap<String, Vec<PartialSecurityAdvisory>>> {
-        let mut repo_advisories: Vec<IndexMap<String, Vec<PartialSecurityAdvisory>>> = vec![];
+    ) -> Result<IndexMap<String, Vec<PartialOrSecurityAdvisory>>> {
+        let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrSecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<()> = (|| -> Result<()> {
@@ -451,7 +453,7 @@ impl RepositorySet {
         &mut self,
         request: Request,
         io: Box<dyn IOInterface>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         pool_optimizer: Option<PoolOptimizer>,
         ignored_types: Vec<String>,
         allowed_types: Option<Vec<String>>,
@@ -474,10 +476,7 @@ impl RepositorySet {
         pool_builder.set_allowed_types(allowed_types);
 
         for repo in &self.repositories {
-            let is_installed = repo
-                .as_any()
-                .downcast_ref::<dyn InstalledRepositoryInterface>()
-                .is_some()
+            let is_installed = repo.as_installed_repository_interface().is_some()
                 || repo
                     .as_any()
                     .downcast_ref::<InstalledRepository>()
@@ -494,17 +493,17 @@ impl RepositorySet {
 
         self.locked = true;
 
-        // TODO(phase-b): pass repositories by reference; pool_builder.build_pool expects &Vec<Box<dyn RepositoryInterface>>
-        pool_builder.build_pool(&self.repositories, &request)
+        // TODO(phase-b): pool_builder.build_pool takes owned Vec and &mut Request; revisit sharing model
+        pool_builder.build_pool(
+            todo!("share self.repositories"),
+            todo!("share request as &mut"),
+        )
     }
 
     /// Create a pool for dependency resolution from the packages in this repository set.
     pub fn create_pool_with_all_packages(&mut self) -> Result<Pool> {
         for repo in &self.repositories {
-            let is_installed = repo
-                .as_any()
-                .downcast_ref::<dyn InstalledRepositoryInterface>()
-                .is_some()
+            let is_installed = repo.as_installed_repository_interface().is_some()
                 || repo
                     .as_any()
                     .downcast_ref::<InstalledRepository>()
@@ -643,6 +642,6 @@ impl RepositorySet {
 
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<PartialSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
     pub unreachable_repos: Vec<String>,
 }

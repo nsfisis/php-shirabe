@@ -387,6 +387,18 @@ impl ConstraintInterface for Constraint {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn is_constraint(&self) -> bool {
+        true
+    }
+
+    fn get_operator(&self) -> &'static str {
+        Self::trans_op_int(self.operator)
+    }
+
+    fn get_version(&self) -> &str {
+        &self.version
+    }
 }
 
 impl std::fmt::Display for Constraint {

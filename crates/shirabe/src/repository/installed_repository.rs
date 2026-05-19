@@ -61,8 +61,7 @@ impl InstalledRepository {
             Some(FindPackageConstraint::Constraint(c)) => Some(c),
             Some(FindPackageConstraint::String(s)) => {
                 let version_parser = VersionParser::new();
-                // TODO(phase-b): Arc<dyn ConstraintInterface + Send + Sync> -> Box<dyn ConstraintInterface>
-                Some(Box::new(version_parser.parse_constraints(&s).unwrap()))
+                Some(version_parser.parse_constraints(&s).unwrap())
             }
         };
 
@@ -81,11 +80,13 @@ impl InstalledRepository {
                     continue;
                 }
 
+                let provides = candidate.get_provides();
+                let replaces = candidate.get_replaces();
                 let mut provides_and_replaces: Vec<&Link> = vec![];
-                for link in candidate.get_provides().values() {
+                for link in provides.values() {
                     provides_and_replaces.push(link);
                 }
-                for link in candidate.get_replaces().values() {
+                for link in replaces.values() {
                     provides_and_replaces.push(link);
                 }
                 for link in provides_and_replaces {
@@ -381,8 +382,9 @@ impl InstalledRepository {
         &mut self,
         repository: Box<dyn RepositoryInterface>,
     ) -> anyhow::Result<()> {
+        // TODO(phase-b): cannot Any::is::<dyn InstalledRepositoryInterface>; replace with a
+        // dedicated downcast/marker method on RepositoryInterface.
         if repository.as_any().is::<LockArrayRepository>()
-            || repository.as_any().is::<dyn InstalledRepositoryInterface>()
             || repository.as_any().is::<RootPackageRepository>()
             || repository.as_any().is::<PlatformRepository>()
         {

@@ -54,8 +54,8 @@ impl AuthHelper {
     pub fn store_auth(&self, origin: &str, store_auth: StoreAuth) -> Result<()> {
         // TODO(phase-b): config.get_auth_config_source() and ConfigSource methods are stubs
         let mut store: Option<()> = None;
-        let config = self.config.borrow();
-        let config_source = config.get_auth_config_source();
+        let mut config = self.config.borrow_mut();
+        let config_source = config.get_auth_config_source_mut();
         if matches!(store_auth, StoreAuth::Bool(true)) {
             store = Some(());
         } else if matches!(store_auth, StoreAuth::Prompt) {

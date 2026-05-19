@@ -39,44 +39,52 @@ impl StatusCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch CommandEvent
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "status", input, output);
         composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        composer.get_event_dispatcher().dispatch_script(
-            ScriptEvents::PRE_STATUS_CMD,
-            true,
-            vec![],
-            indexmap::IndexMap::new(),
-        );
+        composer
+            .get_event_dispatcher()
+            .borrow_mut()
+            .dispatch_script(
+                ScriptEvents::PRE_STATUS_CMD,
+                true,
+                vec![],
+                indexmap::IndexMap::new(),
+            );
 
         let exit_code = self.do_execute(input)?;
 
-        composer.get_event_dispatcher().dispatch_script(
-            ScriptEvents::POST_STATUS_CMD,
-            true,
-            vec![],
-            indexmap::IndexMap::new(),
-        );
+        composer
+            .get_event_dispatcher()
+            .borrow_mut()
+            .dispatch_script(
+                ScriptEvents::POST_STATUS_CMD,
+                true,
+                vec![],
+                indexmap::IndexMap::new(),
+            );
 
         Ok(exit_code)
     }
 
-    fn do_execute(&self, input: &dyn InputInterface) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
-
-        let installed_repo = composer.get_repository_manager().get_local_repository();
-
-        let dm = composer.get_download_manager();
-        let im = composer.get_installation_manager();
+    fn do_execute(&mut self, input: &dyn InputInterface) -> Result<i64> {
+        let mut composer = self.require_composer(None, None)?;
+        // TODO(phase-b): release the &mut self borrow held by get_io via clone_box.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = io_box.as_ref();
 
         let mut errors: IndexMap<String, String> = IndexMap::new();
-        let io = self.get_io();
         let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
         let mut vcs_version_changes: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
             IndexMap::new();
@@ -88,21 +96,34 @@ impl StatusCommand {
             .get_process_executor()
             .map(std::rc::Rc::clone)
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
-        let guesser = VersionGuesser::new(
+        let mut guesser = VersionGuesser::new(
             std::rc::Rc::clone(composer.get_config()),
             std::rc::Rc::clone(&process_executor),
             parser.clone(),
-            Some(io.clone_box()),
+            Some(io_box.clone_box()),
         );
         let dumper = ArrayDumper::new();
 
-        for package in installed_repo.get_canonical_packages() {
-            let downloader = dm.borrow().get_downloader_for_package(package.as_ref());
-            let target_dir = im.get_install_path(package.as_ref());
+        let dm = composer.get_download_manager().clone();
+        let packages: Vec<_> = composer
+            .get_repository_manager()
+            .get_local_repository()
+            .get_canonical_packages();
+        for package in packages {
+            let target_dir = composer
+                .get_installation_manager_mut()
+                .get_install_path(package.as_ref());
             let target_dir = match target_dir {
                 Some(d) => d,
                 None => continue,
             };
+            // TODO(phase-b): downloader borrow lifetime tied to dm.borrow() temporary; restructure later.
+            let dm_borrow = dm.borrow();
+            let downloader: &dyn crate::downloader::downloader_interface::DownloaderInterface =
+                match dm_borrow.get_downloader_for_package(package.as_ref())? {
+                    Some(d) => d,
+                    None => continue,
+                };
 
             // TODO(phase-b): isinstance checks using ChangeReportInterface/VcsCapableDownloaderInterface/DvcsDownloaderInterface
             if let Some(change_reporter) = downloader.as_change_report_interface() {
@@ -132,12 +153,11 @@ impl StatusCommand {
                     };
 
                     let current_version =
-                        guesser.guess_version(&dumper.dump(package.as_ref()), &target_dir);
+                        guesser.guess_version(&dumper.dump(package.as_ref()), &target_dir)?;
 
                     if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version) {
-                        if cur_version.get("commit").map(|s| s.as_str()) != Some(prev_ref.as_str())
-                            && cur_version.get("pretty_version").map(|s| s.as_str())
-                                != Some(prev_ref.as_str())
+                        if cur_version.commit.as_deref() != Some(prev_ref.as_str())
+                            && cur_version.pretty_version.as_deref() != Some(prev_ref.as_str())
                         {
                             let mut previous = IndexMap::new();
                             previous.insert(
@@ -149,14 +169,11 @@ impl StatusCommand {
                             let mut current = IndexMap::new();
                             current.insert(
                                 "version".to_string(),
-                                cur_version
-                                    .get("pretty_version")
-                                    .cloned()
-                                    .unwrap_or_default(),
+                                cur_version.pretty_version.clone().unwrap_or_default(),
                             );
                             current.insert(
                                 "ref".to_string(),
-                                cur_version.get("commit").cloned().unwrap_or_default(),
+                                cur_version.commit.clone().unwrap_or_default(),
                             );
 
                             let mut change = IndexMap::new();

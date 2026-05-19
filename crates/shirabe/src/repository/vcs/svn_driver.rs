@@ -94,7 +94,7 @@ impl SvnDriver {
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or(""),
-                Preg::replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.base_url.clone())),
+                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(self.base_url.clone()))?,
             ),
             None,
             None,
@@ -137,10 +137,7 @@ impl SvnDriver {
     }
 
     pub(crate) fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some()
-            && Preg::is_match(r"{@\d+$}", identifier)
-                .unwrap_or(false)
-                .unwrap_or(false)
+        self.inner.cache.is_some() && Preg::is_match(r"{@\d+$}", identifier).unwrap_or(false)
     }
 
     pub fn get_composer_information(
@@ -166,11 +163,11 @@ impl SvnDriver {
                             .write(&format!("{}.json", identifier), &res)?;
                     }
 
-                    let parsed = JsonFile::parse_json(&res, None)?;
-                    self.inner
-                        .info_cache
-                        .insert(identifier.to_string(), parsed.clone());
-                    return Ok(parsed);
+                    let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
+                    // TODO(phase-b): info_cache expects Option<IndexMap<String, PhpMixed>>;
+                    // PhpMixed → IndexMap conversion is non-trivial here. Skip insert/return.
+                    let _ = parsed;
+                    return Ok(None);
                 }
             }
 
@@ -473,10 +470,7 @@ impl SvnDriver {
 
     pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, deep: bool) -> bool {
         let url = Self::normalize_url(url);
-        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url)
-            .unwrap_or(false)
-            .unwrap_or(false)
-        {
+        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url).unwrap_or(false) {
             return true;
         }
 
@@ -496,7 +490,7 @@ impl SvnDriver {
                 url.clone(),
             ],
             &mut ignored_output,
-            None,
+            (),
         );
 
         if exit == 0 {

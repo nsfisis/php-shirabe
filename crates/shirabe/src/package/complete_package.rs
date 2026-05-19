@@ -23,6 +23,26 @@ pub struct CompletePackage {
     pub(crate) archive_excludes: Vec<String>,
 }
 
+impl CompletePackage {
+    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+        Self {
+            inner: crate::package::package::Package::new(name, version, pretty_version),
+            repositories: Vec::new(),
+            license: Vec::new(),
+            keywords: Vec::new(),
+            authors: Vec::new(),
+            description: None,
+            homepage: None,
+            scripts: IndexMap::new(),
+            support: IndexMap::new(),
+            funding: Vec::new(),
+            abandoned: PhpMixed::Bool(false),
+            archive_name: None,
+            archive_excludes: Vec::new(),
+        }
+    }
+}
+
 impl CompletePackageInterface for CompletePackage {
     fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
         self.scripts = scripts;

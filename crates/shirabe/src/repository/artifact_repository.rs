@@ -52,8 +52,8 @@ impl ArtifactRepository {
         let url = repo_config["url"].as_string().unwrap_or("").to_string();
         let lookup = Platform::expand_path(&url);
         Ok(Self {
-            inner: ArrayRepository::new(),
-            loader: Box::new(ArrayLoader::new()),
+            inner: ArrayRepository::new(Vec::new())?,
+            loader: Box::new(ArrayLoader::new(None, true)),
             lookup,
             repo_config,
             io,
@@ -65,7 +65,7 @@ impl ArtifactRepository {
     }
 
     fn initialize(&mut self) -> anyhow::Result<()> {
-        self.inner.initialize()?;
+        self.inner.initialize();
         let lookup = self.lookup.clone();
         self.scan_directory(&lookup)
     }
@@ -177,9 +177,10 @@ impl ArtifactRepository {
             return Ok(None);
         }
 
-        let mut package =
-            JsonFile::parse_json(&json.unwrap(), &format!("{}#composer.json", pathname))?;
-        let url_normalized = pathname.replace('\\', '/');
+        let json_str = json.unwrap();
+        let pathname_label = format!("{}#composer.json", pathname);
+        let mut package = JsonFile::parse_json(Some(&json_str), Some(&pathname_label))?;
+        let url_normalized = pathname.replace('\\', "/");
         let real_path = file
             .canonicalize()
             .ok()
@@ -197,9 +198,17 @@ impl ArtifactRepository {
             Box::new(PhpMixed::String(url_normalized)),
         );
         dist.insert("shasum".to_string(), Box::new(PhpMixed::String(shasum)));
-        package.insert("dist".to_string(), Box::new(PhpMixed::Array(dist)));
+        if let Some(arr) = package.as_array_mut() {
+            arr.insert("dist".to_string(), Box::new(PhpMixed::Array(dist)));
+        }
 
-        match self.loader.load(package, None) {
+        // TODO(phase-b): load wants IndexMap<String, PhpMixed>; convert from PhpMixed::Array.
+        let cfg: IndexMap<String, PhpMixed> = package
+            .as_array()
+            .cloned()
+            .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
+            .unwrap_or_default();
+        match self.loader.load(cfg, None) {
             Ok(package) => Ok(Some(package)),
             Err(exception) => Err(UnexpectedValueException {
                 message: format!("Failed loading package in {}: {}", pathname, exception),

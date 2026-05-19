@@ -43,15 +43,23 @@ impl Forgejo {
             io_interface::NORMAL,
         );
         self.io.write_error3(&url, true, io_interface::NORMAL);
-        let local_auth_config = self.config.borrow().get_local_auth_config_source();
+        let (local_auth_name, has_local_auth, auth_name): (String, bool, String) = {
+            let cfg = self.config.borrow();
+            let local = cfg
+                .get_local_auth_config_source()
+                .map(|s| s.get_name().to_string());
+            let auth = cfg.get_auth_config_source().get_name().to_string();
+            (local.clone().unwrap_or_default(), local.is_some(), auth)
+        };
+        let local_prefix = if has_local_auth {
+            format!("{} OR ", local_auth_name)
+        } else {
+            String::new()
+        };
         self.io.write_error3(
             &format!(
-                "Tokens will be stored in plain text in \"{}\" for future use by Composer.",
-                local_auth_config
-                    .as_ref()
-                    .map(|s| format!("{} OR ", s.get_name()))
-                    .unwrap_or_default()
-                    + self.config.borrow().get_auth_config_source().get_name()
+                "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
+                local_prefix, auth_name
             ),
             true,
             io_interface::NORMAL,
@@ -63,19 +71,25 @@ impl Forgejo {
         );
 
         let mut store_in_local_auth_config = false;
-        if local_auth_config.is_some() {
+        if has_local_auth {
             store_in_local_auth_config = self.io.ask_confirmation(
-                "A local auth config source was found, do you want to store the token there?",
+                "A local auth config source was found, do you want to store the token there?"
+                    .to_string(),
                 true,
             );
         }
 
-        let username = self.io.ask("Username: ", None).trim().to_string();
+        let username = self
+            .io
+            .ask("Username: ".to_string(), shirabe_php_shim::PhpMixed::Null)
+            .as_string()
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
         let token = self
             .io
-            .ask_and_hide_answer("Token (hidden): ")
-            .trim()
-            .to_string();
+            .ask_and_hide_answer("Token (hidden): ".to_string())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
 
         let add_token_manually = format!(
             "You can also add it manually later by using \"composer config --global --auth forgejo-token.{} <username> <token>\"",
@@ -93,8 +107,11 @@ impl Forgejo {
             return Ok(Ok(false));
         }
 
-        self.io
-            .set_authentication(origin_url.to_string(), username.clone(), token.clone());
+        self.io.set_authentication(
+            origin_url.to_string(),
+            username.clone(),
+            Some(token.clone()),
+        );
 
         match self.http_downloader.borrow_mut().get(
             &format!("https://{}/api/v1/version", origin_url),
@@ -104,7 +121,13 @@ impl Forgejo {
         ) {
             Ok(_) => {}
             Err(e) => {
-                if [403, 401, 404].contains(&e.get_code()) {
+                // TODO(phase-b): anyhow::Error has no get_code(); HTTP status codes come from
+                // TransportException::get_status_code().
+                let code = e
+                    .downcast_ref::<crate::downloader::transport_exception::TransportException>()
+                    .and_then(|te| te.get_status_code())
+                    .unwrap_or(0);
+                if [403, 401, 404].contains(&code) {
                     self.io.write_error3(
                         "<error>Invalid access token provided.</error>",
                         true,
@@ -116,30 +139,35 @@ impl Forgejo {
                     return Ok(Ok(false));
                 }
 
-                return Ok(Err(e));
+                // TODO(phase-b): downcast anyhow::Error to TransportException for the inner Err
+                return Err(e);
             }
         }
 
         // store value in local/user config
-        let local_auth_config = self.config.borrow().get_local_auth_config_source();
-        let auth_config_source = if store_in_local_auth_config {
-            local_auth_config
-                .as_ref()
-                .unwrap_or_else(|| self.config.borrow().get_auth_config_source())
+        // TODO(phase-b): Config getters return references; cross-borrows of self.config.borrow()
+        // cannot live across method calls. Needs Rc<RefCell<dyn ConfigSourceInterface>> shape.
+        let setting_key = format!("forgejo-token.{}", origin_url);
+        {
+            let mut cfg = self.config.borrow_mut();
+            cfg.get_config_source_mut()
+                .remove_config_setting(&setting_key)?;
+        }
+        let value: shirabe_php_shim::PhpMixed =
+            shirabe_php_shim::PhpMixed::Array(indexmap::indexmap! {
+                "username".to_string() => Box::new(username.clone().into()),
+                "token".to_string() => Box::new(token.clone().into()),
+            });
+        if store_in_local_auth_config && has_local_auth {
+            let mut cfg = self.config.borrow_mut();
+            if let Some(local) = cfg.get_local_auth_config_source_mut() {
+                local.add_config_setting(&setting_key, value)?;
+            }
         } else {
-            self.config.borrow().get_auth_config_source()
-        };
-        self.config
-            .borrow()
-            .get_config_source()
-            .remove_config_setting(&format!("forgejo-token.{}", origin_url));
-        auth_config_source.add_config_setting(
-            &format!("forgejo-token.{}", origin_url),
-            indexmap::indexmap! {
-                "username".to_string() => username.into(),
-                "token".to_string() => token.into(),
-            },
-        );
+            let mut cfg = self.config.borrow_mut();
+            cfg.get_auth_config_source_mut()
+                .add_config_setting(&setting_key, value)?;
+        }
 
         self.io.write_error3(
             "<info>Token stored successfully.</info>",

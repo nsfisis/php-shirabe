@@ -109,4 +109,8 @@ impl Process {
     pub fn set_working_directory(&mut self, _cwd: &str) -> &mut Self {
         todo!()
     }
+
+    pub fn set_tty(&mut self, _tty: bool) -> anyhow::Result<&mut Self> {
+        todo!()
+    }
 }

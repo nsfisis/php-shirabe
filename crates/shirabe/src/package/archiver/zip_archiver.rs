@@ -107,4 +107,8 @@ impl ArchiverInterface for ZipArchiver {
     fn supports(&self, format: String, _source_type: Option<String>) -> bool {
         Self::formats().contains_key(&format) && self.compression_available()
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }

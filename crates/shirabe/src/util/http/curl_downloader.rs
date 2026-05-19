@@ -371,7 +371,7 @@ impl CurlDownloader {
                 if !em.is_empty() {
                     em.push_str("\n");
                 }
-                em.push_str(&Preg::replace(r"{^fopen\(.*?\): }", "", msg));
+                em.push_str(&Preg::replace(r"{^fopen\(.*?\): }", "", msg).unwrap_or_default());
                 true
             }));
         }
@@ -552,7 +552,7 @@ impl CurlDownloader {
 
         let options = self
             .auth_helper
-            .add_authentication_options(options, origin, url);
+            .add_authentication_options(options, origin, url)?;
         let options = StreamContextFactory::init_options(url, options, true)
             .map_err(|e| anyhow::anyhow!(e.message))?;
 
@@ -601,13 +601,13 @@ impl CurlDownloader {
         curl_setopt_array(&curl_handle, &proxy_curl_options.into_iter().collect());
 
         let progress = array_diff_key(
-            &match curl_getinfo(&curl_handle) {
-                PhpMixed::Array(a) => a,
+            match curl_getinfo(&curl_handle) {
+                PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
                 _ => IndexMap::new(),
             },
             &time_info_static()
                 .into_iter()
-                .map(|(k, v)| (k, Box::new(PhpMixed::Bool(v))))
+                .map(|(k, v)| (k, PhpMixed::Bool(v)))
                 .collect(),
         );
 
@@ -633,7 +633,16 @@ impl CurlDownloader {
                     .collect(),
             ),
         );
-        job.insert("progress".to_string(), PhpMixed::Array(progress.clone()));
+        job.insert(
+            "progress".to_string(),
+            PhpMixed::Array(
+                progress
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| (k, Box::new(v)))
+                    .collect(),
+            ),
+        );
         // curlHandle, headerHandle, bodyHandle, resolve, reject are PHP resources/callables;
         // stored as opaque PhpMixed::Null placeholders (real values live in Rust-side fields).
         // TODO(phase-b): wire handle/closure storage properly.
@@ -1049,28 +1058,31 @@ impl CurlDownloader {
                         );
                     }
                     contents = c;
-                    response = Some(CurlResponse::new(
-                        {
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert(
-                                "url".to_string(),
-                                PhpMixed::String(
-                                    job.get("url")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                ),
-                            );
-                            m
-                        },
-                        status_code,
-                        headers.clone().unwrap_or_default(),
-                        contents.as_string().map(|s| s.to_string()),
-                        progress
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect(),
-                    ));
+                    response = Some(
+                        CurlResponse::new(
+                            {
+                                let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                                m.insert(
+                                    "url".to_string(),
+                                    PhpMixed::String(
+                                        job.get("url")
+                                            .and_then(|v| v.as_string())
+                                            .unwrap_or("")
+                                            .to_string(),
+                                    ),
+                                );
+                                m
+                            },
+                            status_code,
+                            headers.clone().unwrap_or_default(),
+                            contents.as_string().map(|s| s.to_string()),
+                            progress
+                                .iter()
+                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .collect(),
+                        )?
+                        .map_err(|e| anyhow::anyhow!(e.message))?,
+                    );
                     self.io.write_error3(
                         &format!(
                             "[{}] {}",
@@ -1125,28 +1137,31 @@ impl CurlDownloader {
                         );
                     }
 
-                    response = Some(CurlResponse::new(
-                        {
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert(
-                                "url".to_string(),
-                                PhpMixed::String(
-                                    job.get("url")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string(),
-                                ),
-                            );
-                            m
-                        },
-                        status_code,
-                        headers.clone().unwrap_or_default(),
-                        contents.as_string().map(|s| s.to_string()),
-                        progress
-                            .iter()
-                            .map(|(k, v)| (k.clone(), (**v).clone()))
-                            .collect(),
-                    ));
+                    response = Some(
+                        CurlResponse::new(
+                            {
+                                let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                                m.insert(
+                                    "url".to_string(),
+                                    PhpMixed::String(
+                                        job.get("url")
+                                            .and_then(|v| v.as_string())
+                                            .unwrap_or("")
+                                            .to_string(),
+                                    ),
+                                );
+                                m
+                            },
+                            status_code,
+                            headers.clone().unwrap_or_default(),
+                            contents.as_string().map(|s| s.to_string()),
+                            progress
+                                .iter()
+                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .collect(),
+                        )?
+                        .map_err(|e| anyhow::anyhow!(e.message))?,
+                    );
                     self.io.write_error3(
                         &format!(
                             "[{}] {}",
@@ -1404,13 +1419,13 @@ impl CurlDownloader {
             // $curlHandle = $this->jobs[$i]['curlHandle'];
             // $progress = array_diff_key(curl_getinfo($curlHandle), self::$timeInfo);
             let progress_now = array_diff_key(
-                &match curl_getinfo(/* TODO real handle */ &curl_init()) {
-                    PhpMixed::Array(a) => a,
+                match curl_getinfo(/* TODO real handle */ &curl_init()) {
+                    PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
                     _ => IndexMap::new(),
                 },
                 &time_info_static()
                     .into_iter()
-                    .map(|(k, v)| (k, Box::new(PhpMixed::Bool(v))))
+                    .map(|(k, v)| (k, PhpMixed::Bool(v)))
                     .collect(),
             );
 
@@ -1424,12 +1439,17 @@ impl CurlDownloader {
                 PhpMixed::Array(a) => a.clone(),
                 _ => IndexMap::new(),
             };
+            let progress_now_boxed: IndexMap<String, Box<PhpMixed>> = progress_now
+                .clone()
+                .into_iter()
+                .map(|(k, v)| (k, Box::new(v)))
+                .collect();
 
-            if !maps_equal(&prev_progress_map, &progress_now) {
+            if !maps_equal(&prev_progress_map, &progress_now_boxed) {
                 if let Some(job) = self.jobs.get_mut(&i) {
                     job.insert(
                         "progress".to_string(),
-                        PhpMixed::Array(progress_now.clone()),
+                        PhpMixed::Array(progress_now_boxed.clone()),
                     );
                 }
 
@@ -1516,10 +1536,10 @@ impl CurlDownloader {
                                         sprintf(
                                             "IP \"%s\" is blocked for \"%s\".",
                                             &[
-                                                (**primary_ip).clone(),
+                                                primary_ip.clone(),
                                                 progress_now
                                                     .get("url")
-                                                    .map(|b| (**b).clone())
+                                                    .cloned()
                                                     .unwrap_or(PhpMixed::Null),
                                             ],
                                         ),
@@ -1581,7 +1601,7 @@ impl CurlDownloader {
                         ),
                         &format!("\\1{}", location_header),
                         job_url,
-                    );
+                    )?;
                 } else {
                     // Relative path; e.g. foo
                     // This actually differs from PHP which seems to add duplicate slashes.
@@ -1590,7 +1610,7 @@ impl CurlDownloader {
                         r"{^(.+/)[^/?]*(?:\?.*)?$}",
                         &format!("\\1{}", location_header),
                         job_url,
-                    );
+                    )?;
                 }
             }
         }
@@ -1649,18 +1669,20 @@ impl CurlDownloader {
             .and_then(|b| b.as_bool())
             .unwrap_or(false)
         {
+            let status_message = response.inner.get_status_message();
+            let body = response.inner.get_body().map(|s| s.to_string());
             let result = self.auth_helper.prompt_auth_if_needed(
                 job.get("url").and_then(|v| v.as_string()).unwrap_or(""),
                 job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
                 response.inner.get_status_code(),
-                response.inner.get_status_message(),
+                status_message.as_deref(),
                 response.inner.get_headers().clone(),
                 job.get("attributes")
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get("retries"))
                     .and_then(|b| b.as_int())
                     .unwrap_or(0),
-                response.inner.get_body().map(|s| s.to_string()),
+                body.as_deref(),
             )?;
 
             if result.retry {
@@ -1689,7 +1711,7 @@ impl CurlDownloader {
                     .inner
                     .get_header("content-type")
                     .unwrap_or_default(),
-            )
+            )?
         {
             needs_auth_retry = Some("Bitbucket requires authentication and it was not provided");
         }

@@ -72,9 +72,11 @@ impl GlobalCommand {
             return self.run(input, output);
         }
 
-        let sub_input = self.prepare_subcommand_input(input, false)?;
+        // TODO(phase-b): sub_input/output need to be &mut for Application::run; placeholder marks.
+        let mut sub_input = self.prepare_subcommand_input(input, false)?;
         let mut app = self.get_application()?;
-        Ok(app.run(Some(&sub_input), Some(output))?)
+        let _ = output;
+        Ok(app.run(Some(&mut sub_input), None)?)
     }
 
     fn prepare_subcommand_input(

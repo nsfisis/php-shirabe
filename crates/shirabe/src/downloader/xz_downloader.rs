@@ -26,7 +26,7 @@ impl XzDownloader {
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-        event_dispatcher: Option<EventDispatcher>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         cache: Option<Cache>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -62,7 +62,7 @@ impl XzDownloader {
                     .collect(),
             ),
             Some(&mut ignored_output),
-            None,
+            (),
         )? == 0
         {
             return Ok(shirabe_external_packages::react::promise::resolve(None));

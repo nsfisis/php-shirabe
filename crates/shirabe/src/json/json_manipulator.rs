@@ -2,12 +2,13 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, LogicException, PREG_BACKTRACK_LIMIT_ERROR, PhpMixed,
     RuntimeException, StdClass, addcslashes, array_key_exists, array_keys, array_reverse, count,
-    explode, implode, in_array, is_array, is_int, is_numeric, json_decode, max_i64, preg_quote,
-    rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim, uksort,
+    empty, explode, implode, in_array, is_array, is_int, is_numeric, json_decode, max_i64,
+    preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
+    trim, uksort,
 };
 
 use crate::json::json_file::JsonFile;
@@ -32,7 +33,7 @@ impl JsonManipulator {
     )";
 
     pub fn new(contents: String) -> anyhow::Result<Self> {
-        let mut contents = trim(&contents, " \t\n\r\0\u{0B}");
+        let mut contents = trim(&contents, Some(" \t\n\r\0\u{0B}"));
         if contents == "" {
             contents = "{}".to_string();
         }
@@ -88,7 +89,7 @@ impl JsonManipulator {
             "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<property>{}\\s*:\\s*)(?P<value>(?&json))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(r#type.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(r#type.to_string()), 0),
                 None
             ),
         );
@@ -122,21 +123,23 @@ impl JsonManipulator {
                     Self::DEFINES,
                     package_regex
                 ),
-                Box::new(move |m: &IndexMap<String, String>| -> String {
+                move |m: &IndexMap<CaptureKey, String>| -> String {
                     format!(
                         "{}{}\"{}\"",
                         JsonFile::encode(
                             &PhpMixed::String(str_replace("\\/", "/", &existing_owned)),
                             0
                         ),
-                        m.get("separator").cloned().unwrap_or_default(),
+                        m.get(&CaptureKey::ByName("separator".to_string()))
+                            .cloned()
+                            .unwrap_or_default(),
                         constraint_owned
                     )
-                }),
+                },
                 &links,
-            );
+            )?;
         } else {
-            let mut groups: Vec<String> = vec![];
+            let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match_strict_groups3(
                 "#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s",
                 &links,
@@ -144,9 +147,13 @@ impl JsonManipulator {
             )
             .unwrap_or(false)
             {
+                let groups_1 = groups
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default();
                 // link missing but non empty links
                 links = Preg::replace(
-                    &format!("{{{}$}}", preg_quote(&groups[1], None)),
+                    &format!("{{{}$}}", preg_quote(&groups_1, None)),
                     // addcslashes is used to double up backslashes/$ since preg_replace resolves them as back references otherwise, see #1588
                     &addcslashes(
                         &format!(
@@ -154,14 +161,14 @@ impl JsonManipulator {
                             self.newline,
                             self.indent,
                             self.indent,
-                            JsonFile::encode(&PhpMixed::String(package.to_string()), 0)?,
-                            JsonFile::encode(&PhpMixed::String(constraint.to_string()), 0)?,
-                            groups[1]
+                            JsonFile::encode(&PhpMixed::String(package.to_string()), 0),
+                            JsonFile::encode(&PhpMixed::String(constraint.to_string()), 0),
+                            groups_1
                         ),
                         "\\$",
                     ),
                     &links,
-                );
+                )?;
             } else {
                 // links empty
                 links = format!(
@@ -169,8 +176,8 @@ impl JsonManipulator {
                     self.newline,
                     self.indent,
                     self.indent,
-                    JsonFile::encode(&PhpMixed::String(package.to_string()), 0)?,
-                    JsonFile::encode(&PhpMixed::String(constraint.to_string()), 0)?,
+                    JsonFile::encode(&PhpMixed::String(package.to_string()), 0),
+                    JsonFile::encode(&PhpMixed::String(constraint.to_string()), 0),
                     self.newline,
                     self.indent
                 );
@@ -192,30 +199,20 @@ impl JsonManipulator {
     fn sort_packages(packages: &mut PhpMixed) {
         let prefix = |requirement: &str| -> String {
             if PlatformRepository::is_platform_package(requirement) {
-                Preg::replace_array(
-                    &vec![
-                        "/^php/".to_string(),
-                        "/^hhvm/".to_string(),
-                        "/^ext/".to_string(),
-                        "/^lib/".to_string(),
-                        "/^\\D/".to_string(),
-                    ],
-                    &vec![
-                        "0-$0".to_string(),
-                        "1-$0".to_string(),
-                        "2-$0".to_string(),
-                        "3-$0".to_string(),
-                        "4-$0".to_string(),
-                    ],
-                    requirement,
-                )
+                let patterns = ["/^php/", "/^hhvm/", "/^ext/", "/^lib/", "/^\\D/"];
+                let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
+                let mut result = requirement.to_string();
+                for (p, r) in patterns.iter().zip(replacements.iter()) {
+                    result = Preg::replace(p, r, &result).unwrap_or(result);
+                }
+                result
             } else {
                 format!("5-{}", requirement)
             }
         };
 
         if let Some(arr) = packages.as_array_mut() {
-            uksort(arr, |a: &String, b: &String| -> std::cmp::Ordering {
+            uksort(arr, |a: &str, b: &str| -> i64 {
                 strnatcmp(&prefix(a), &prefix(b))
             });
         }
@@ -235,7 +232,10 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        let final_config = if is_array(&config) && !is_numeric(name) && "" != name {
+        let final_config = if is_array(&config)
+            && !is_numeric(&PhpMixed::String(name.to_string()))
+            && "" != name
+        {
             // PHP: ['name' => $name] + $config — preserve $config keys
             let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             merged.insert(
@@ -264,17 +264,21 @@ impl JsonManipulator {
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
         let decoded = json_decode(&self.contents, false)?;
 
-        let repositories_value = decoded.as_object().and_then(|o| o.get("repositories"));
+        let repositories_value: Option<Box<PhpMixed>> = decoded
+            .as_object()
+            .and_then(|o| o.to_array().get("repositories").cloned());
         let is_std_class = repositories_value
+            .as_ref()
             .map(|v| v.as_any().is::<StdClass>())
             .unwrap_or(false);
 
         if is_std_class {
             // delete from bottom to top, to ensure keys stay the same
             let repos_arr: IndexMap<String, Box<PhpMixed>> = repositories_value
+                .as_ref()
                 .and_then(|v| v.as_array().cloned())
                 .unwrap_or_default();
-            let entries_to_revert: Vec<String> = array_reverse(array_keys(&repos_arr));
+            let entries_to_revert: Vec<String> = array_reverse(&array_keys(&repos_arr), false);
 
             for entry_key in &entries_to_revert {
                 if !self.remove_sub_node("repositories", entry_key)? {
@@ -293,7 +297,7 @@ impl JsonManipulator {
                     if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
-                } else if is_numeric(repository_name) {
+                } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
                     if !self.add_list_item("repositories", (**repository).clone(), true)? {
                         return Ok(false);
                     }
@@ -366,7 +370,7 @@ impl JsonManipulator {
         let object_regex = format!(
             "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?\"repositories\"\\s*:\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?{}\\s*:\\s*)(?P<repository>(?&object))(?P<end>.*)}}sx",
             Self::DEFINES,
-            preg_quote(&JsonFile::encode(&repository_index, 0)?, None)
+            preg_quote(&JsonFile::encode(&repository_index, 0), None)
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
 
@@ -393,18 +397,22 @@ impl JsonManipulator {
                 matches.get("start").cloned().unwrap_or_default(),
                 Preg::replace_callback(
                     &repository_regex,
-                    Box::new(
-                        move |repository_matches: &IndexMap<String, String>| -> String {
-                            format!(
-                                "{}{}{}",
-                                repository_matches.get("start").cloned().unwrap_or_default(),
-                                JsonFile::encode(&PhpMixed::String(url_owned.clone()), 0),
-                                repository_matches.get("end").cloned().unwrap_or_default()
-                            )
-                        }
-                    ),
+                    move |repository_matches: &IndexMap<CaptureKey, String>| -> String {
+                        format!(
+                            "{}{}{}",
+                            repository_matches
+                                .get(&CaptureKey::ByName("start".to_string()))
+                                .cloned()
+                                .unwrap_or_default(),
+                            JsonFile::encode(&PhpMixed::String(url_owned.clone()), 0),
+                            repository_matches
+                                .get(&CaptureKey::ByName("end".to_string()))
+                                .cloned()
+                                .unwrap_or_default()
+                        )
+                    },
                     &raw_repo,
-                ),
+                )?,
                 matches.get("end").cloned().unwrap_or_default()
             );
 
@@ -468,7 +476,10 @@ impl JsonManipulator {
             None => return Ok(false),
         };
 
-        let final_config = if is_array(&config) && !is_numeric(name) && "" != name {
+        let final_config = if is_array(&config)
+            && !is_numeric(&PhpMixed::String(name.to_string()))
+            && "" != name
+        {
             let mut merged: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             merged.insert(
                 "name".to_string(),
@@ -499,12 +510,16 @@ impl JsonManipulator {
 
     fn do_remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
         let decoded = json_decode(&self.contents, false)?;
-        let repositories_value = decoded.as_object().and_then(|o| o.get("repositories"));
+        let repositories_value: Option<Box<PhpMixed>> = decoded
+            .as_object()
+            .and_then(|o| o.to_array().get("repositories").cloned());
         let is_assoc = repositories_value
+            .as_ref()
             .map(|v| v.as_any().is::<StdClass>())
             .unwrap_or(false);
 
         let repos: IndexMap<String, Box<PhpMixed>> = repositories_value
+            .as_ref()
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
 
@@ -517,11 +532,11 @@ impl JsonManipulator {
                 break;
             }
 
-            let repo_name = repository
+            let repo_name_owned: Option<String> = repository
                 .as_object()
-                .and_then(|o| o.get("name"))
-                .and_then(|v| v.as_string());
-            if Some(name) == repo_name {
+                .and_then(|o| o.to_array().get("name").cloned())
+                .and_then(|v| v.as_string().map(|s| s.to_string()));
+            if Some(name) == repo_name_owned.as_deref() {
                 if is_assoc {
                     if !self.remove_sub_node("repositories", repository_index)? {
                         return Ok(false);
@@ -552,7 +567,7 @@ impl JsonManipulator {
                     .get(name)
                     .map(|v| v.as_bool() == Some(false))
                     .unwrap_or(false)
-                    && 1 == count(&repository_as_array)
+                    && 1 == count(&PhpMixed::Array(repository_as_array.clone()))
                 {
                     let idx: i64 = repository_index.parse().unwrap_or(0);
                     if !self.remove_list_item("repositories", idx)? {
@@ -627,12 +642,12 @@ impl JsonManipulator {
         let mut name_owned = name.to_string();
         let mut sub_name: Option<String> = None;
         if in_array(
-            main_node,
-            &vec![
-                "config".to_string(),
-                "extra".to_string(),
-                "scripts".to_string(),
-            ],
+            PhpMixed::String(main_node.to_string()),
+            &PhpMixed::List(vec![
+                Box::new(PhpMixed::String("config".to_string())),
+                Box::new(PhpMixed::String("extra".to_string())),
+                Box::new(PhpMixed::String("scripts".to_string())),
+            ]),
             false,
         ) && strpos(name, ".").is_some()
         {
@@ -666,7 +681,7 @@ impl JsonManipulator {
             "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&object))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0),
                 None
             )
         );
@@ -711,10 +726,13 @@ impl JsonManipulator {
             };
             children = Preg::replace_callback(
                 &child_regex,
-                Box::new(move |matches: &IndexMap<String, String>| -> String {
+                move |matches: &IndexMap<CaptureKey, String>| -> String {
+                    let content_key = CaptureKey::ByName("content".to_string());
+                    let start_key = CaptureKey::ByName("start".to_string());
+                    let end_key = CaptureKey::ByName("end".to_string());
                     let mut value_local = value_capture.clone();
-                    if sub_name_capture.is_some() && matches.get("content").is_some() {
-                        let mut cur_val = json_decode(matches.get("content").unwrap(), true)
+                    if sub_name_capture.is_some() && matches.get(&content_key).is_some() {
+                        let mut cur_val = json_decode(matches.get(&content_key).unwrap(), true)
                             .unwrap_or(PhpMixed::Null);
                         if !is_array(&cur_val) {
                             cur_val = PhpMixed::Array(IndexMap::new());
@@ -730,13 +748,13 @@ impl JsonManipulator {
 
                     format!(
                         "{}{}{}",
-                        matches.get("start").cloned().unwrap_or_default(),
+                        matches.get(&start_key).cloned().unwrap_or_default(),
                         formatter.format(&value_local, 1, false).unwrap_or_default(),
-                        matches.get("end").cloned().unwrap_or_default()
+                        matches.get(&end_key).cloned().unwrap_or_default()
                     )
-                }),
+                },
                 &children,
-            );
+            )?;
         } else {
             let mut leading_match: IndexMap<String, String> = IndexMap::new();
             if Preg::is_match_named(
@@ -773,14 +791,14 @@ impl JsonManipulator {
                                     self.newline,
                                     self.indent,
                                     self.indent,
-                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0),
                                     self.format(&value_local, 1, false)?,
                                     whitespace
                                 ),
                                 "\\$",
                             ),
                             &children,
-                        );
+                        )?;
                     } else {
                         whitespace = leading_space.clone();
                         children = Preg::replace(
@@ -789,7 +807,7 @@ impl JsonManipulator {
                                 &format!(
                                     "{{{}{}: {},{}{}{}",
                                     whitespace,
-                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0),
                                     self.format(&value_local, 1, false)?,
                                     self.newline,
                                     self.indent,
@@ -798,7 +816,7 @@ impl JsonManipulator {
                                 "\\$",
                             ),
                             &children,
-                        );
+                        )?;
                     }
                 } else {
                     let mut value_local = value.clone();
@@ -814,7 +832,7 @@ impl JsonManipulator {
                         self.newline,
                         self.indent,
                         self.indent,
-                        JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0)?,
+                        JsonFile::encode(&PhpMixed::String(name_owned.clone()), 0),
                         self.format(&value_local, 1, false)?,
                         whitespace
                     );
@@ -831,16 +849,20 @@ impl JsonManipulator {
         let children_owned = children;
         self.contents = Preg::replace_callback(
             &node_regex,
-            Box::new(move |m: &IndexMap<String, String>| -> String {
+            move |m: &IndexMap<CaptureKey, String>| -> String {
                 format!(
                     "{}{}{}",
-                    m.get("start").cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("start".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
                     children_owned,
-                    m.get("end").cloned().unwrap_or_default()
+                    m.get(&CaptureKey::ByName("end".to_string()))
+                        .cloned()
+                        .unwrap_or_default()
                 )
-            }),
+            },
             &self.contents,
-        );
+        )?;
 
         Ok(true)
     }
@@ -850,7 +872,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| v.is_empty()).unwrap_or(true) {
+        if main_node_value.map(|v| empty(v.as_ref())).unwrap_or(true) {
             return Ok(true);
         }
 
@@ -859,7 +881,7 @@ impl JsonManipulator {
             "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&object))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0),
                 None
             )
         );
@@ -891,12 +913,12 @@ impl JsonManipulator {
         let mut name_owned = name.to_string();
         let mut sub_name: Option<String> = None;
         if in_array(
-            main_node,
-            &vec![
-                "config".to_string(),
-                "extra".to_string(),
-                "scripts".to_string(),
-            ],
+            PhpMixed::String(main_node.to_string()),
+            &PhpMixed::List(vec![
+                Box::new(PhpMixed::String("config".to_string())),
+                Box::new(PhpMixed::String("extra".to_string())),
+                Box::new(PhpMixed::String("scripts".to_string())),
+            ]),
             false,
         ) && strpos(name, ".").is_some()
         {
@@ -930,7 +952,7 @@ impl JsonManipulator {
             .unwrap_or(false)
         {
             // find best match for the value of "name"
-            let mut all_matches: Vec<Vec<String>> = vec![];
+            let mut all_matches: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
             if Preg::is_match_all3(
                 &format!(
                     "{{{}\"{}\"\\s*:\\s*(?:(?&json))}}x",
@@ -938,32 +960,36 @@ impl JsonManipulator {
                     key_regex
                 ),
                 &children,
-                &mut all_matches,
+                Some(&mut all_matches),
             )
             .unwrap_or(false)
             {
                 let mut best_match: String = String::new();
-                for m in &all_matches[0] {
+                let first_group = all_matches
+                    .get(&CaptureKey::ByIndex(0))
+                    .cloned()
+                    .unwrap_or_default();
+                for m in &first_group {
                     if strlen(&best_match) < strlen(m) {
                         best_match = m.clone();
                     }
                 }
-                let mut count_out: i64 = 0;
-                let cleaned = Preg::replace_count(
+                let mut count_out: usize = 0;
+                let cleaned = Preg::replace5(
                     &format!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
                     "",
                     &children,
                     -1,
                     &mut count_out,
-                );
+                )?;
                 if 1 != count_out {
-                    let cleaned2 = Preg::replace_count(
+                    let cleaned2 = Preg::replace5(
                         &format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
                         "",
                         &cleaned,
                         -1,
                         &mut count_out,
-                    );
+                    )?;
                     if 1 != count_out {
                         return Ok(false);
                     }
@@ -996,17 +1022,23 @@ impl JsonManipulator {
 
                 self.contents = Preg::replace_callback(
                     &node_regex,
-                    Box::new(move |matches: &IndexMap<String, String>| -> String {
+                    move |matches: &IndexMap<CaptureKey, String>| -> String {
                         format!(
                             "{}{{{}{}}}{}",
-                            matches.get("start").cloned().unwrap_or_default(),
+                            matches
+                                .get(&CaptureKey::ByName("start".to_string()))
+                                .cloned()
+                                .unwrap_or_default(),
                             newline,
                             indent,
-                            matches.get("end").cloned().unwrap_or_default()
+                            matches
+                                .get(&CaptureKey::ByName("end".to_string()))
+                                .cloned()
+                                .unwrap_or_default()
                         )
-                    }),
+                    },
                     &self.contents,
-                );
+                )?;
 
                 // we have a subname, so we restore the rest of $name
                 if let Some(sub) = sub_name {
@@ -1049,12 +1081,17 @@ impl JsonManipulator {
         };
         self.contents = Preg::replace_callback(
             &node_regex,
-            Box::new(move |matches: &IndexMap<String, String>| -> String {
+            move |matches: &IndexMap<CaptureKey, String>| -> String {
+                let content_key = CaptureKey::ByName("content".to_string());
+                let start_key = CaptureKey::ByName("start".to_string());
+                let end_key = CaptureKey::ByName("end".to_string());
                 let mut children_clean = children_clean_capture.clone();
                 if let Some(ref sub) = sub_name_capture {
-                    let mut cur_val =
-                        json_decode(matches.get("content").unwrap_or(&String::new()), true)
-                            .unwrap_or(PhpMixed::Null);
+                    let mut cur_val = json_decode(
+                        matches.get(&content_key).map(|s| s.as_str()).unwrap_or(""),
+                        true,
+                    )
+                    .unwrap_or(PhpMixed::Null);
                     if let Some(arr) = cur_val.as_array_mut() {
                         if let Some(inner) =
                             arr.get_mut(&name_capture).and_then(|v| v.as_array_mut())
@@ -1078,13 +1115,13 @@ impl JsonManipulator {
 
                 format!(
                     "{}{}{}",
-                    matches.get("start").cloned().unwrap_or_default(),
+                    matches.get(&start_key).cloned().unwrap_or_default(),
                     children_clean,
-                    matches.get("end").cloned().unwrap_or_default()
+                    matches.get(&end_key).cloned().unwrap_or_default()
                 )
-            }),
+            },
             &self.contents,
-        );
+        )?;
 
         Ok(true)
     }
@@ -1109,7 +1146,7 @@ impl JsonManipulator {
             "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0),
                 None
             )
         );
@@ -1179,7 +1216,7 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    );
+                    )?;
                 } else {
                     whitespace = leading_whitespace.clone();
                     children = Preg::replace(
@@ -1194,7 +1231,7 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    );
+                    )?;
                 }
             } else {
                 // children present but empty
@@ -1216,16 +1253,20 @@ impl JsonManipulator {
         let children_owned = children;
         self.contents = Preg::replace_callback(
             &node_regex,
-            Box::new(move |m: &IndexMap<String, String>| -> String {
+            move |m: &IndexMap<CaptureKey, String>| -> String {
                 format!(
                     "{}{}{}",
-                    m.get("start").cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("start".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
                     children_owned,
-                    m.get("end").cloned().unwrap_or_default()
+                    m.get(&CaptureKey::ByName("end".to_string()))
+                        .cloned()
+                        .unwrap_or_default()
                 )
-            }),
+            },
             &self.contents,
-        );
+        )?;
 
         Ok(true)
     }
@@ -1272,7 +1313,7 @@ impl JsonManipulator {
             "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0),
                 None
             )
         );
@@ -1312,34 +1353,46 @@ impl JsonManipulator {
         };
         children = Preg::replace_callback(
             &list_skip_to_item_regex,
-            Box::new(move |m: &IndexMap<String, String>| -> String {
+            move |m: &IndexMap<CaptureKey, String>| -> String {
                 format!(
                     "{}{}{},{}{}",
-                    m.get("start").cloned().unwrap_or_default(),
-                    m.get("space_before_item").cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("start".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("space_before_item".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
                     formatter
                         .format(&value_capture, 1, false)
                         .unwrap_or_default(),
-                    m.get("space_before_item").cloned().unwrap_or_default(),
-                    m.get("end").cloned().unwrap_or_default()
+                    m.get(&CaptureKey::ByName("space_before_item".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("end".to_string()))
+                        .cloned()
+                        .unwrap_or_default()
                 )
-            }),
+            },
             &children,
-        );
+        )?;
 
         let children_owned = children;
         self.contents = Preg::replace_callback(
             &node_regex,
-            Box::new(move |m: &IndexMap<String, String>| -> String {
+            move |m: &IndexMap<CaptureKey, String>| -> String {
                 format!(
                     "{}{}{}",
-                    m.get("start").cloned().unwrap_or_default(),
+                    m.get(&CaptureKey::ByName("start".to_string()))
+                        .cloned()
+                        .unwrap_or_default(),
                     children_owned,
-                    m.get("end").cloned().unwrap_or_default()
+                    m.get(&CaptureKey::ByName("end".to_string()))
+                        .cloned()
+                        .unwrap_or_default()
                 )
-            }),
+            },
             &self.contents,
-        );
+        )?;
 
         Ok(true)
     }
@@ -1354,7 +1407,7 @@ impl JsonManipulator {
 
         // no node or empty node
         let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
-        if main_node_value.map(|v| v.is_empty()).unwrap_or(true) {
+        if main_node_value.map(|v| empty(v.as_ref())).unwrap_or(true) {
             return Ok(true);
         }
 
@@ -1363,7 +1416,7 @@ impl JsonManipulator {
             "{{{}^(?P<start> \\s* \\{{ \\s* (?: (?&string) \\s* : (?&json) \\s* , \\s* )*?{}\\s*:\\s*)(?P<content>(?&array))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(main_node.to_string()), 0),
                 None
             )
         );
@@ -1457,7 +1510,7 @@ impl JsonManipulator {
             "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<key>{}\\s*:\\s*(?&json))(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                 None
             )
         );
@@ -1474,7 +1527,7 @@ impl JsonManipulator {
             self.contents = format!(
                 "{}{}: {}{}",
                 matches.get("start").cloned().unwrap_or_default(),
-                JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                 content,
                 matches.get("end").cloned().unwrap_or_default()
             );
@@ -1483,25 +1536,29 @@ impl JsonManipulator {
         }
 
         // append at the end of the file and keep whitespace
-        let mut tail_match: Vec<String> = vec![];
+        let mut tail_match: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("#[^{\\s](\\s*)\\}$#", &self.contents, Some(&mut tail_match))
             .unwrap_or(false)
         {
+            let tail_match_1 = tail_match
+                .get(&CaptureKey::ByIndex(1))
+                .cloned()
+                .unwrap_or_default();
             self.contents = Preg::replace(
-                &format!("#{}\\}}$#", tail_match[1]),
+                &format!("#{}\\}}$#", tail_match_1),
                 &addcslashes(
                     &format!(
                         ",{}{}{}: {}{}}}",
                         self.newline,
                         self.indent,
-                        JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                        JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                         content,
                         self.newline
                     ),
                     "\\$",
                 ),
                 &self.contents,
-            );
+            )?;
 
             return Ok(true);
         }
@@ -1513,14 +1570,14 @@ impl JsonManipulator {
                 &format!(
                     "{}{}: {}{}}}",
                     self.indent,
-                    JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                    JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                     content,
                     self.newline
                 ),
                 "\\$",
             ),
             &self.contents,
-        );
+        )?;
 
         Ok(true)
     }
@@ -1538,7 +1595,7 @@ impl JsonManipulator {
             "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?)(?P<removal>{}\\s*:\\s*(?&json))\\s*,?\\s*(?P<end>.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                 None
             )
         );
@@ -1556,7 +1613,10 @@ impl JsonManipulator {
             if Preg::is_match_strict_groups3("#,\\s*$#", &start, None).unwrap_or(false)
                 && Preg::is_match3("#^\\}$#", &end, None).unwrap_or(false)
             {
-                start = rtrim(&Preg::replace("#,(\\s*)$#", "$1", &start), &self.indent);
+                start = rtrim(
+                    &Preg::replace("#,(\\s*)$#", "$1", &start)?,
+                    Some(&self.indent),
+                );
             }
 
             self.contents = format!("{}{}", start, end);
@@ -1582,7 +1642,7 @@ impl JsonManipulator {
             "{{{}^(?P<start>\\s*\\{{\\s*(?:(?&string)\\s*:\\s*(?&json)\\s*,\\s*)*?{}\\s*:\\s*)(?P<removal>\\{{(?P<removal_space>\\s*+)\\}})(?P<end>\\s*,?\\s*.*)}}sx",
             Self::DEFINES,
             preg_quote(
-                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0)?,
+                &JsonFile::encode(&PhpMixed::String(key.to_string()), 0),
                 None
             )
         );
@@ -1668,7 +1728,7 @@ impl JsonManipulator {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(&PhpMixed::String(key.clone()), 0)?,
+                        JsonFile::encode(&PhpMixed::String(key.clone()), 0),
                         self.format(val, depth + 1, false)?
                     ));
                 }
@@ -1683,11 +1743,11 @@ impl JsonManipulator {
             ));
         }
 
-        Ok(JsonFile::encode(&data, 0)?)
+        Ok(JsonFile::encode(&data, 0))
     }
 
     pub(crate) fn detect_indenting(&mut self) {
-        self.indent = JsonFile::detect_indenting(&self.contents);
+        self.indent = JsonFile::detect_indenting(Some(&self.contents));
     }
 }
 
@@ -1739,7 +1799,7 @@ impl ManipulatorFormatter {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(&PhpMixed::String(key.clone()), 0)?,
+                        JsonFile::encode(&PhpMixed::String(key.clone()), 0),
                         self.format(val, depth + 1, false)?
                     ));
                 }
@@ -1754,6 +1814,6 @@ impl ManipulatorFormatter {
             ));
         }
 
-        Ok(JsonFile::encode(&data, 0)?)
+        Ok(JsonFile::encode(&data, 0))
     }
 }

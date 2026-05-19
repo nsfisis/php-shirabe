@@ -44,8 +44,9 @@ impl LibraryInstaller {
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
         // PHP: $this->downloadManager = $composer instanceof Composer ? $composer->getDownloadManager() : null;
-        let download_manager =
-            if let Some(full_composer) = composer.as_any().downcast_ref::<Composer>() {
+        // TODO(phase-b): PartialComposer cannot downcast to Composer in this Rust port.
+        let download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>> =
+            if let Some(_full_composer) = composer.as_any().downcast_ref::<Composer>() {
                 // TODO(phase-b): clone or borrow the DownloadManager from the full Composer
                 Some(todo!("composer.get_download_manager() as DownloadManager"))
             } else {
@@ -55,8 +56,12 @@ impl LibraryInstaller {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = rtrim(
-            // TODO(phase-b): composer.get_config().borrow_mut().get("vendor-dir") returns a PhpMixed/String
-            &composer.get_config().borrow_mut().get("vendor-dir"),
+            // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
+            &composer
+                .get_config()
+                .borrow_mut()
+                .get_str("vendor-dir")
+                .unwrap_or_default(),
             Some("/"),
         );
         let binary_installer = binary_installer.unwrap_or_else(|| {
@@ -64,13 +69,22 @@ impl LibraryInstaller {
                 // TODO(phase-b): pass io by reference/clone
                 todo!("io reference"),
                 rtrim(
-                    &composer.get_config().borrow_mut().get("bin-dir"),
+                    &composer
+                        .get_config()
+                        .borrow_mut()
+                        .get_str("bin-dir")
+                        .unwrap_or_default(),
                     Some("/"),
                 ),
-                composer.get_config().borrow_mut().get("bin-compat"),
+                // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
+                composer
+                    .get_config()
+                    .borrow_mut()
+                    .get_str("bin-compat")
+                    .unwrap_or_default(),
                 // TODO(phase-b): pass filesystem reference
                 todo!("filesystem reference"),
-                vendor_dir.clone(),
+                Some(vendor_dir.clone()),
             )
         });
 
@@ -86,12 +100,10 @@ impl LibraryInstaller {
     }
 
     /// Make sure binaries are installed for a given package.
-    pub fn ensure_binaries_presence(&self, package: &dyn PackageInterface) {
-        self.binary_installer.install_binaries(
-            package,
-            &self.get_install_path(package).unwrap(),
-            false,
-        );
+    pub fn ensure_binaries_presence(&mut self, package: &dyn PackageInterface) {
+        let install_path = self.get_install_path(package).unwrap();
+        self.binary_installer
+            .install_binaries(package, &install_path, false);
     }
 
     /// Returns the base path of the package without target-dir path
@@ -104,7 +116,7 @@ impl LibraryInstaller {
 
         if let Some(target_dir) = target_dir {
             if !target_dir.is_empty() {
-                return Preg::replace(
+                let replaced = Preg::replace(
                     &format!(
                         "{{/*{}/?$}}",
                         preg_quote(&target_dir, None).replace('/', "/+")
@@ -112,6 +124,7 @@ impl LibraryInstaller {
                     "",
                     &install_path,
                 );
+                return replaced.unwrap_or(install_path);
             }
         }
 
@@ -126,9 +139,11 @@ impl LibraryInstaller {
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let download_path = self.get_install_path(package).unwrap();
 
-        self.get_download_manager()
-            .borrow()
-            .install(package, &download_path)
+        Ok(Some(
+            self.get_download_manager()
+                .borrow()
+                .install(package, &download_path)?,
+        ))
     }
 
     /// @return PromiseInterface|null
@@ -152,17 +167,13 @@ impl LibraryInstaller {
                     None => shirabe_external_packages::react::promise::resolve(None),
                 };
 
-                return Ok(Some(promise.then(Box::new(
-                    move || -> Result<Box<dyn PromiseInterface>> {
-                        // TODO(phase-b): capture target/self into the closure
-                        let promise = self.install_code(target)?;
-                        if let Some(promise) = promise {
-                            return Ok(promise);
-                        }
-
-                        Ok(shirabe_external_packages::react::promise::resolve(None))
-                    },
-                ))));
+                // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
+                // arguments. Translating the original PHP closure (which captures &self and target)
+                // requires restructuring; tracked separately.
+                let _ = promise;
+                return Ok(Some(todo!(
+                    "promise.then(...) chain to install_code(target)"
+                )));
             }
 
             self.filesystem
@@ -170,9 +181,11 @@ impl LibraryInstaller {
                 .rename(&initial_download_path, &target_download_path);
         }
 
-        self.get_download_manager()
-            .borrow()
-            .update(initial, target, &target_download_path)
+        Ok(Some(self.get_download_manager().borrow().update(
+            initial,
+            target,
+            &target_download_path,
+        )?))
     }
 
     /// @return PromiseInterface|null
@@ -183,9 +196,11 @@ impl LibraryInstaller {
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         let download_path = self.get_package_base_path(package);
 
-        self.get_download_manager()
-            .borrow()
-            .remove(package, &download_path)
+        Ok(Some(
+            self.get_download_manager()
+                .borrow()
+                .remove(package, &download_path)?,
+        ))
     }
 
     pub(crate) fn initialize_vendor_dir(&mut self) {
@@ -262,9 +277,11 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        self.get_download_manager()
-            .borrow()
-            .download(package, &download_path, prev_package)
+        Ok(Some(self.get_download_manager().borrow().download(
+            package,
+            &download_path,
+            prev_package,
+        )?))
     }
 
     fn prepare(
@@ -277,9 +294,12 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        self.get_download_manager()
-            .borrow()
-            .prepare(r#type, package, &download_path, prev_package)
+        Ok(Some(self.get_download_manager().borrow().prepare(
+            r#type,
+            package,
+            &download_path,
+            prev_package,
+        )?))
     }
 
     fn cleanup(
@@ -292,9 +312,12 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        self.get_download_manager()
-            .borrow()
-            .cleanup(r#type, package, &download_path, prev_package)
+        Ok(Some(self.get_download_manager().borrow().cleanup(
+            r#type,
+            package,
+            &download_path,
+            prev_package,
+        )?))
     }
 
     fn install(
@@ -317,17 +340,13 @@ impl InstallerInterface for LibraryInstaller {
             None => shirabe_external_packages::react::promise::resolve(None),
         };
 
-        let binary_installer = &self.binary_installer;
-        let install_path = self.get_install_path(package).unwrap();
-
-        // TODO(phase-b): capture binary_installer/install_path/package/repo into the closure
-        Ok(Some(promise.then(Box::new(move || -> Result<()> {
-            binary_installer.install_binaries(package, &install_path, true);
-            if !repo.has_package(package) {
-                repo.add_package(package.clone_package_box())?;
-            }
-            Ok(())
-        }))))
+        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
+        // arguments. The original PHP closure captures &mut self/binary_installer/repo/package;
+        // restructuring required.
+        let _ = promise;
+        Ok(Some(todo!(
+            "promise.then(...) chain to install_binaries + repo.add_package"
+        )))
     }
 
     fn update(
@@ -354,18 +373,13 @@ impl InstallerInterface for LibraryInstaller {
             None => shirabe_external_packages::react::promise::resolve(None),
         };
 
-        let binary_installer = &self.binary_installer;
-        let install_path = self.get_install_path(target).unwrap();
-
-        // TODO(phase-b): capture binary_installer/install_path/target/initial/repo into the closure
-        Ok(Some(promise.then(Box::new(move || -> Result<()> {
-            binary_installer.install_binaries(target, &install_path, true);
-            repo.remove_package(initial)?;
-            if !repo.has_package(target) {
-                repo.add_package(target.clone_package_box())?;
-            }
-            Ok(())
-        }))))
+        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
+        // arguments. Closure captures &mut self/binary_installer/repo/initial/target;
+        // restructuring required.
+        let _ = promise;
+        Ok(Some(todo!(
+            "promise.then(...) chain to install_binaries + repo updates"
+        )))
     }
 
     fn uninstall(
@@ -387,28 +401,13 @@ impl InstallerInterface for LibraryInstaller {
             None => shirabe_external_packages::react::promise::resolve(None),
         };
 
-        let binary_installer = &self.binary_installer;
-        let download_path = self.get_package_base_path(package);
-        let filesystem = &self.filesystem;
-
-        // TODO(phase-b): capture binary_installer/filesystem/download_path/package/repo into the closure
-        Ok(Some(promise.then(Box::new(move || -> Result<()> {
-            binary_installer.remove_binaries(package);
-            repo.remove_package(package)?;
-
-            if strpos(package.get_name(), "/").is_some() {
-                let package_vendor_dir = shirabe_php_shim::dirname(&download_path);
-                if shirabe_php_shim::is_dir(&package_vendor_dir)
-                    && filesystem.borrow().is_dir_empty(&package_vendor_dir)
-                {
-                    Silencer::call(|| {
-                        rmdir(&package_vendor_dir);
-                        Ok(())
-                    })?;
-                }
-            }
-            Ok(())
-        }))))
+        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
+        // arguments. Closure captures binary_installer/filesystem/download_path/package/repo;
+        // restructuring required.
+        let _ = promise;
+        Ok(Some(todo!(
+            "promise.then(...) chain to remove_binaries/remove_package/rmdir"
+        )))
     }
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {
@@ -439,7 +438,10 @@ impl InstallerInterface for LibraryInstaller {
 }
 
 impl BinaryPresenceInterface for LibraryInstaller {
-    fn ensure_binaries_presence(&self, package: &dyn PackageInterface) {
-        LibraryInstaller::ensure_binaries_presence(self, package)
+    fn ensure_binaries_presence(&self, _package: &dyn PackageInterface) {
+        // TODO(phase-b): trait takes &self but LibraryInstaller::ensure_binaries_presence
+        // requires &mut self due to BinaryInstaller::install_binaries(&mut self, ...).
+        // Revisit the trait or use interior mutability.
+        todo!()
     }
 }

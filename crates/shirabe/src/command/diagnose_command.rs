@@ -12,10 +12,10 @@ use shirabe_php_shim::{
     FILTER_VALIDATE_BOOLEAN, INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER,
     OPENSSL_VERSION_TEXT, PHP_BINARY, PHP_EOL, PHP_VERSION, PHP_VERSION_ID,
     PHP_WINDOWS_VERSION_BUILD, PhpMixed, RuntimeException, count, curl_version, defined,
-    disk_free_space, extension_loaded, file_exists, filter_var, function_exists, get_class, hash,
-    implode, ini_get, ioncube_loader_iversion, ioncube_loader_version, is_array, is_string, key,
-    max_i64, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf, str_contains, str_replace,
-    str_starts_with, strpos, strstr, strtolower, trim, version_compare,
+    disk_free_space, extension_loaded, file_exists, filter_var, function_exists, get_class,
+    get_class_err, hash, implode, ini_get, ioncube_loader_iversion, ioncube_loader_version,
+    is_array, is_string, key, max_i64, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf,
+    str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 
 use crate::advisory::auditor::Auditor;
@@ -76,11 +76,11 @@ impl DiagnoseCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
-        let composer = self.try_composer(None, None);
-        let io = self.get_io();
+        let mut composer = self.try_composer(None, None);
+        let io_boxed: Box<dyn IOInterface> = self.get_io().clone_box();
 
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
-        if let Some(ref c) = composer {
+        if let Some(ref mut c) = composer {
             config = c.get_config().clone();
 
             let command_event = CommandEvent::new6(
@@ -92,6 +92,7 @@ impl DiagnoseCommand {
                 IndexMap::new(),
             );
             c.get_event_dispatcher()
+                .borrow_mut()
                 .dispatch(Some(command_event.get_name()), None);
             self.process = Some(
                 c.get_loop()
@@ -100,7 +101,7 @@ impl DiagnoseCommand {
                     .map(std::rc::Rc::clone)
                     .unwrap_or_else(|| {
                         std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                            io.clone_box(),
+                            io_boxed.clone_box(),
                         ))))
                     }),
             );
@@ -108,9 +109,12 @@ impl DiagnoseCommand {
             config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
 
             self.process = Some(std::rc::Rc::new(std::cell::RefCell::new(
-                ProcessExecutor::new(Some(io.clone_box())),
+                ProcessExecutor::new(Some(io_boxed.clone_box())),
             )));
         }
+        // TODO(phase-b): clone_box to release self borrow held by get_io.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = io_box.as_ref();
 
         let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         config_inner.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
@@ -120,9 +124,11 @@ impl DiagnoseCommand {
         config
             .borrow_mut()
             .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
-        config
-            .borrow_mut()
-            .prohibit_url_by_config("http://repo.packagist.org", &NullIO::new());
+        let _ = config.borrow_mut().prohibit_url_by_config(
+            "http://repo.packagist.org",
+            Some(&NullIO::new()),
+            &IndexMap::new(),
+        );
 
         self.http_downloader = Some(std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
@@ -130,7 +136,7 @@ impl DiagnoseCommand {
 
         if strpos(file!(), "phar:") == Some(0) {
             io.write_no_newline("Checking pubkeys: ");
-            let r = self.check_pub_keys(&*config.borrow());
+            let r = self.check_pub_keys(&*config.borrow())?;
             self.output_result(r);
 
             io.write_no_newline("Checking Composer version: ");
@@ -153,8 +159,16 @@ impl DiagnoseCommand {
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let platform_repo = PlatformRepository::new(vec![], platform_overrides);
-        let php_pkg = platform_repo.find_package("php", "*").unwrap();
+        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> = platform_overrides
+            .into_iter()
+            .map(|(k, v)| (k, *v))
+            .collect();
+        let platform_repo = PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
+        let php_pkg = <PlatformRepository as crate::repository::repository_interface::RepositoryInterface>::find_package(
+            &platform_repo,
+            "php",
+            crate::repository::repository_interface::FindPackageConstraint::String("*".to_string()),
+        ).unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
         if let Some(cp) = php_pkg.as_complete_package_interface() {
             if str_contains(&cp.get_description().unwrap_or_default(), "overridden") {
@@ -186,18 +200,18 @@ impl DiagnoseCommand {
         io.write(&format!("curl version: {}", self.get_curl_version()));
 
         let finder = ExecutableFinder::new();
-        let has_system_unzip = finder.find("unzip", None, vec![]).is_some();
+        let has_system_unzip = finder.find("unzip", None, &[]).is_some();
         let mut bin_7zip = String::new();
         let has_system_7zip = if finder
-            .find("7z", None, vec!["C:\\Program Files\\7-Zip".to_string()])
+            .find("7z", None, &["C:\\Program Files\\7-Zip".to_string()])
             .is_some()
         {
             bin_7zip = "7z".to_string();
             true
-        } else if !Platform::is_windows() && finder.find("7zz", None, vec![]).is_some() {
+        } else if !Platform::is_windows() && finder.find("7zz", None, &[]).is_some() {
             bin_7zip = "7zz".to_string();
             true
-        } else if !Platform::is_windows() && finder.find("7za", None, vec![]).is_some() {
+        } else if !Platform::is_windows() && finder.find("7za", None, &[]).is_some() {
             bin_7zip = "7za".to_string();
             true
         } else {
@@ -228,7 +242,7 @@ impl DiagnoseCommand {
             }
         ));
 
-        if let Some(ref c) = composer {
+        if let Some(ref mut c) = composer {
             io.write(&format!(
                 "Active plugins: {}",
                 implode(", ", &c.get_plugin_manager().get_registered_plugins())
@@ -238,9 +252,9 @@ impl DiagnoseCommand {
             let r = self.check_composer_schema()?;
             self.output_result(r);
 
-            if c.get_locker().is_locked() {
+            if c.get_locker_mut().is_locked() {
                 io.write_no_newline("Checking composer.lock: ");
-                let r = self.check_composer_lock_schema(c.get_locker())?;
+                let r = self.check_composer_lock_schema(c.get_locker_mut())?;
                 self.output_result(r);
             }
         }
@@ -262,16 +276,22 @@ impl DiagnoseCommand {
         self.output_result(r);
 
         for repo in config.borrow().get_repositories() {
-            let repo_arr = repo.as_array().cloned().unwrap_or_default();
+            let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
             if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
                 && repo_arr.get("url").is_some()
             {
+                let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
+                    .iter()
+                    .map(|(k, v)| (k.clone(), (**v).clone()))
+                    .collect();
                 let composer_repo = ComposerRepository::new(
-                    PhpMixed::Array(repo_arr.clone()),
+                    repo_arr_unboxed,
                     self.get_io().clone_box(),
                     &*config.borrow(),
                     self.http_downloader.clone().unwrap(),
-                );
+                    None,
+                )
+                .unwrap();
                 // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
                 // We surface the same internal call by directly invoking the equivalent method.
                 // TODO(plugin): support reflection-based access if plugin code requires it.
@@ -302,9 +322,14 @@ impl DiagnoseCommand {
         };
         let proxy_check_result: Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
-                let proxy =
-                    proxy_manager.get_proxy_for_request(&format!("{}://repo.packagist.org", proto));
-                if !proxy.get_status().is_empty() {
+                let proxy = proxy_manager
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .get_proxy_for_request(&format!("{}://repo.packagist.org", proto))
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                if !proxy.get_status(None)?.is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
                     io.write_no_newline(&format!("Checking {} proxy with {}: ", r#type, proto));
                     let r = self.check_http_proxy(&proxy, proto)?;
@@ -322,7 +347,7 @@ impl DiagnoseCommand {
                 } else {
                     PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
-                        get_class(&e),
+                        get_class_err(&e),
                         e.to_string()
                     ))
                 });
@@ -337,7 +362,7 @@ impl DiagnoseCommand {
             .as_array()
             .cloned()
             .unwrap_or_default();
-        if count(&oauth) > 0 {
+        if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
                 io.write_no_newline(&format!("Checking {} oauth access: ", domain));
                 let r = self.check_github_oauth(domain, token.as_string().unwrap_or(""))?;
@@ -370,14 +395,14 @@ impl DiagnoseCommand {
                         } else {
                             self.output_result(PhpMixed::String(format!(
                                 "<error>[{}] {}</error>",
-                                get_class(&e),
+                                get_class_err(&e),
                                 e.to_string()
                             )));
                         }
                     } else {
                         self.output_result(PhpMixed::String(format!(
                             "<error>[{}] {}</error>",
-                            get_class(&e),
+                            get_class_err(&e),
                             e.to_string()
                         )));
                     }
@@ -392,9 +417,9 @@ impl DiagnoseCommand {
         Ok(self.exit_code)
     }
 
-    fn check_composer_schema(&self) -> anyhow::Result<PhpMixed> {
+    fn check_composer_schema(&mut self) -> anyhow::Result<PhpMixed> {
         let validator = ConfigValidator::new(self.get_io().clone_box());
-        let (errors, _, warnings) = validator.validate(&Factory::get_composer_file());
+        let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
 
         if !errors.is_empty() || !warnings.is_empty() {
             let mut messages: IndexMap<String, Vec<String>> = IndexMap::new();
@@ -408,7 +433,7 @@ impl DiagnoseCommand {
                 }
             }
 
-            return Ok(PhpMixed::String(rtrim(&output, " \t\n\r\0\u{0B}")));
+            return Ok(PhpMixed::String(rtrim(&output, Some(" \t\n\r\0\u{0B}"))));
         }
 
         Ok(PhpMixed::Bool(true))
@@ -426,7 +451,7 @@ impl DiagnoseCommand {
                         output.push_str(&format!("<error>{}</error>{}", error, PHP_EOL));
                     }
 
-                    return Ok(PhpMixed::String(trim(&output, " \t\n\r\0\u{0B}")));
+                    return Ok(PhpMixed::String(trim(&output, Some(" \t\n\r\0\u{0B}"))));
                 }
                 return Err(e);
             }
@@ -441,15 +466,16 @@ impl DiagnoseCommand {
         }
 
         let mut output = String::new();
-        self.process.as_mut().unwrap().borrow_mut().execute(
+        let _ = self.process.as_mut().unwrap().borrow_mut().execute(
             &vec![
                 "git".to_string(),
                 "config".to_string(),
                 "color.ui".to_string(),
             ],
             &mut output,
+            (),
         );
-        if strtolower(&trim(&output, " \t\n\r\0\u{0B}")) == "always" {
+        if strtolower(&trim(&output, Some(" \t\n\r\0\u{0B}"))) == "always" {
             return "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string();
         }
 
@@ -488,7 +514,7 @@ impl DiagnoseCommand {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    let hints = HttpDownloader::get_exception_hints(te).unwrap_or_default();
+                    let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
                             result_list.push(Box::new(PhpMixed::String(hint)));
@@ -497,7 +523,7 @@ impl DiagnoseCommand {
 
                     result_list.push(Box::new(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
-                        get_class(te),
+                        std::any::type_name_of_val(te),
                         te.message
                     ))));
                 } else {
@@ -510,7 +536,7 @@ impl DiagnoseCommand {
             result_list.push(Box::new(PhpMixed::String(w)));
         }
 
-        if count(&result_list) > 0 {
+        if result_list.len() > 0 {
             return Ok(PhpMixed::List(result_list));
         }
 
@@ -539,7 +565,7 @@ impl DiagnoseCommand {
             Ok(_) => {}
             Err(e) => {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    let hints = HttpDownloader::get_exception_hints(te).unwrap_or_default();
+                    let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
                             result_list.push(Box::new(PhpMixed::String(hint)));
@@ -548,7 +574,7 @@ impl DiagnoseCommand {
 
                     result_list.push(Box::new(PhpMixed::String(format!(
                         "<error>[{}] {}</error>",
-                        get_class(te),
+                        std::any::type_name_of_val(te),
                         te.message
                     ))));
                 } else {
@@ -561,7 +587,7 @@ impl DiagnoseCommand {
             result_list.push(Box::new(PhpMixed::String(w)));
         }
 
-        if count(&result_list) > 0 {
+        if result_list.len() > 0 {
             return Ok(PhpMixed::List(result_list));
         }
 
@@ -612,19 +638,18 @@ impl DiagnoseCommand {
             let path = str_replace(
                 "%hash%",
                 hash_val.as_string().unwrap_or(""),
-                &key(&provider_includes.as_array().cloned().unwrap_or_default())
-                    .unwrap_or_default(),
+                &key(provider_includes
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default()
+                    .into())
+                .unwrap_or_default(),
             );
-            let provider = self
-                .http_downloader
-                .as_ref()
-                .unwrap()
-                .borrow_mut()
-                .get(
-                    &format!("{}://repo.packagist.org/{}", protocol, path),
-                    IndexMap::new(),
-                )?
-                .get_body();
+            let response = self.http_downloader.as_ref().unwrap().borrow_mut().get(
+                &format!("{}://repo.packagist.org/{}", protocol, path),
+                IndexMap::new(),
+            )?;
+            let provider = response.get_body().unwrap_or_default().to_string();
 
             if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
                 return Ok(PhpMixed::String(format!(
@@ -657,11 +682,8 @@ impl DiagnoseCommand {
             format!("https://{}/api/v3/", domain)
         };
 
-        let mut opts: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        opts.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
+        let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
+        opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
 
         match self
             .http_downloader
@@ -695,7 +717,7 @@ impl DiagnoseCommand {
                 }
                 Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
-                    get_class(&e),
+                    get_class_err(&e),
                     e.to_string()
                 )))
             }
@@ -725,11 +747,8 @@ impl DiagnoseCommand {
         } else {
             format!("https://{}/api/rate_limit", domain)
         };
-        let mut opts: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        opts.insert(
-            "retry-auth-failure".to_string(),
-            Box::new(PhpMixed::Bool(false)),
-        );
+        let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
+        opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
         let data = self
             .http_downloader
             .as_ref()
@@ -752,7 +771,7 @@ impl DiagnoseCommand {
             return PhpMixed::Bool(true);
         }
 
-        let min_space_free = 1024 * 1024;
+        let min_space_free: f64 = (1024 * 1024) as f64;
         let home_dir = config.get("home").as_string().unwrap_or("").to_string();
         let vendor_dir = config
             .get("vendor-dir")
@@ -773,7 +792,7 @@ impl DiagnoseCommand {
         PhpMixed::Bool(true)
     }
 
-    fn check_pub_keys(&self, config: &Config) -> PhpMixed {
+    fn check_pub_keys(&mut self, config: &Config) -> anyhow::Result<PhpMixed> {
         let home = config.get("home").as_string().unwrap_or("").to_string();
         let mut errors: Vec<Box<PhpMixed>> = vec![];
         let io = self.get_io();
@@ -787,7 +806,7 @@ impl DiagnoseCommand {
         if file_exists(&format!("{}/keys.tags.pub", home)) {
             io.write(&format!(
                 "Tags Public Key Fingerprint: {}",
-                Keys::fingerprint(&format!("{}/keys.tags.pub", home))
+                Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
             ));
         } else {
             errors.push(Box::new(PhpMixed::String(
@@ -798,7 +817,7 @@ impl DiagnoseCommand {
         if file_exists(&format!("{}/keys.dev.pub", home)) {
             io.write(&format!(
                 "Dev Public Key Fingerprint: {}",
-                Keys::fingerprint(&format!("{}/keys.dev.pub", home))
+                Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
             ));
         } else {
             errors.push(Box::new(PhpMixed::String(
@@ -812,11 +831,11 @@ impl DiagnoseCommand {
             )));
         }
 
-        if !errors.is_empty() {
+        Ok(if !errors.is_empty() {
             PhpMixed::List(errors)
         } else {
             PhpMixed::Bool(true)
-        }
+        })
     }
 
     fn check_version(
@@ -828,7 +847,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let versions_util = Versions::new(
+        let mut versions_util = Versions::new(
             std::rc::Rc::clone(config),
             self.http_downloader.clone().unwrap(),
         );
@@ -843,7 +862,7 @@ impl DiagnoseCommand {
             Err(e) => {
                 return Ok(PhpMixed::String(format!(
                     "<error>[{}] {}</error>",
-                    get_class(&e),
+                    get_class_err(&e),
                     e.to_string()
                 )));
             }
@@ -857,7 +876,7 @@ impl DiagnoseCommand {
         if Composer::VERSION != latest_version && Composer::VERSION != "@package_version@" {
             return Ok(PhpMixed::String(format!(
                 "<comment>You are not running the latest {} version, run `composer self-update` to update ({} => {})</comment>",
-                versions_util.get_channel(),
+                versions_util.get_channel()?,
                 Composer::VERSION,
                 latest_version
             )));
@@ -874,7 +893,7 @@ impl DiagnoseCommand {
 
         let auditor = Auditor;
         let mut repo_set = RepositorySet::new(
-            "stable".to_string(),
+            "stable",
             IndexMap::new(),
             vec![],
             IndexMap::new(),
@@ -891,9 +910,9 @@ impl DiagnoseCommand {
             return Ok(PhpMixed::String("<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string()));
         }
 
-        let local_repo = FilesystemRepository::new(installed_json, false, None);
+        let local_repo = FilesystemRepository::new(installed_json, false, None, None)?;
         let version = Composer::get_version();
-        let mut packages = local_repo.get_canonical_packages();
+        let mut packages = local_repo.inner.get_canonical_packages();
         if version != "@package_version@" {
             let version_parser = VersionParser::new();
             let normalized_version = version_parser.normalize(&version, None)?;
@@ -904,34 +923,37 @@ impl DiagnoseCommand {
             );
             packages.push(Box::new(root_pkg));
         }
-        let mut repo_config: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        repo_config.insert(
-            "type".to_string(),
-            Box::new(PhpMixed::String("composer".to_string())),
-        );
+        let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+        repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
         repo_config.insert(
             "url".to_string(),
-            Box::new(PhpMixed::String("https://packagist.org".to_string())),
+            PhpMixed::String("https://packagist.org".to_string()),
         );
-        repo_set.add_repository(Box::new(ComposerRepository::new(
-            PhpMixed::Array(repo_config),
+        // TODO(phase-b): ComposerRepository does not implement RepositoryInterface yet
+        let _composer_repo = ComposerRepository::new(
+            repo_config,
             Box::new(NullIO::new()),
-            config.clone(),
+            config,
             self.http_downloader.clone().unwrap(),
-        )));
+            None,
+        )?;
+        let composer_repo_as_repo: Box<
+            dyn crate::repository::repository_interface::RepositoryInterface,
+        > = todo!("ComposerRepository as RepositoryInterface");
+        repo_set.add_repository(composer_repo_as_repo)?;
 
-        let io = BufferIO::new();
+        let mut io = BufferIO::new(String::new(), 0, None)?;
         let result = match auditor.audit(
-            &io,
+            &mut io,
             &repo_set,
-            &packages,
+            packages,
             Auditor::FORMAT_TABLE,
             true,
-            &IndexMap::new(),
+            IndexMap::new(),
             Auditor::ABANDONED_IGNORE,
-            &IndexMap::new(),
+            IndexMap::new(),
             false,
-            &IndexMap::new(),
+            IndexMap::new(),
         ) {
             Ok(r) => r,
             Err(e) => {
@@ -1021,6 +1043,7 @@ impl DiagnoseCommand {
     }
 
     fn output_result(&mut self, result: PhpMixed) {
+        let prev_exit_code = self.exit_code;
         let io = self.get_io();
         if result.as_bool() == Some(true) {
             io.write("<info>OK</info>");
@@ -1032,7 +1055,8 @@ impl DiagnoseCommand {
         let mut had_warning = false;
         let mut result = result;
         // PHP: $result instanceof \Exception → already converted to string at call sites here
-        if !result.as_bool().unwrap_or(true) && !result.is_string() && !is_array(&result) {
+        if !result.as_bool().unwrap_or(true) && !result.as_string().is_some() && !is_array(&result)
+        {
             // falsey results should be considered as an error, even if there is nothing to output
             had_error = true;
         } else {
@@ -1054,10 +1078,8 @@ impl DiagnoseCommand {
 
         if had_error {
             io.write("<error>FAIL</error>");
-            self.exit_code = max_i64(self.exit_code, 2);
         } else if had_warning {
             io.write("<warning>WARNING</warning>");
-            self.exit_code = max_i64(self.exit_code, 1);
         }
 
         if !result.as_bool().unwrap_or(false) {
@@ -1065,8 +1087,17 @@ impl DiagnoseCommand {
         }
         if let Some(list) = result.as_list() {
             for message in list {
-                io.write(&trim(message.as_string().unwrap_or(""), " \t\n\r\0\u{0B}"));
+                io.write(&trim(
+                    message.as_string().unwrap_or(""),
+                    Some(" \t\n\r\0\u{0B}"),
+                ));
             }
+        }
+        // Apply exit code updates after io borrow ends
+        if had_error {
+            self.exit_code = max_i64(prev_exit_code, 2);
+        } else if had_warning {
+            self.exit_code = max_i64(prev_exit_code, 1);
         }
     }
 
@@ -1100,10 +1131,10 @@ impl DiagnoseCommand {
             errors.insert("iconv_mbstring".to_string(), PhpMixed::Bool(true));
         }
 
-        if !filter_var(&ini_get("allow_url_fopen"), FILTER_VALIDATE_BOOLEAN)
-            .as_bool()
-            .unwrap_or(false)
-        {
+        if !filter_var(
+            ini_get("allow_url_fopen").as_deref().unwrap_or(""),
+            FILTER_VALIDATE_BOOLEAN,
+        ) {
             errors.insert("allow_url_fopen".to_string(), PhpMixed::Bool(true));
         }
 
@@ -1128,9 +1159,10 @@ impl DiagnoseCommand {
 
         if !defined("HHVM_VERSION")
             && !extension_loaded("apcu")
-            && filter_var(&ini_get("apc.enable_cli"), FILTER_VALIDATE_BOOLEAN)
-                .as_bool()
-                .unwrap_or(false)
+            && filter_var(
+                ini_get("apc.enable_cli").as_deref().unwrap_or(""),
+                FILTER_VALIDATE_BOOLEAN,
+            )
         {
             warnings.insert("apc_cli".to_string(), PhpMixed::Bool(true));
         }
@@ -1166,10 +1198,10 @@ impl DiagnoseCommand {
             }
         }
 
-        if filter_var(&ini_get("xdebug.profiler_enabled"), FILTER_VALIDATE_BOOLEAN)
-            .as_bool()
-            .unwrap_or(false)
-        {
+        if filter_var(
+            ini_get("xdebug.profiler_enabled").as_deref().unwrap_or(""),
+            FILTER_VALIDATE_BOOLEAN,
+        ) {
             warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
         } else if XdebugHandler::is_xdebug_active() {
             warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
@@ -1188,12 +1220,13 @@ impl DiagnoseCommand {
         }
 
         if extension_loaded("uopz")
-            && !(filter_var(&ini_get("uopz.disable"), FILTER_VALIDATE_BOOLEAN)
-                .as_bool()
-                .unwrap_or(false)
-                || filter_var(&ini_get("uopz.exit"), FILTER_VALIDATE_BOOLEAN)
-                    .as_bool()
-                    .unwrap_or(false))
+            && !(filter_var(
+                ini_get("uopz.disable").as_deref().unwrap_or(""),
+                FILTER_VALIDATE_BOOLEAN,
+            ) || filter_var(
+                ini_get("uopz.exit").as_deref().unwrap_or(""),
+                FILTER_VALIDATE_BOOLEAN,
+            ))
         {
             warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
         }
@@ -1297,7 +1330,7 @@ impl DiagnoseCommand {
                         // Attempt to parse version number out, fallback to whole string value.
                         let openssl_trimmed = trim(
                             &strstr(OPENSSL_VERSION_TEXT, " ").unwrap_or_default(),
-                            " \t\n\r\0\u{0B}",
+                            Some(" \t\n\r\0\u{0B}"),
                         );
                         let mut openssl_version = strstr(&openssl_trimmed, " ").unwrap_or_default();
                         if openssl_version.is_empty() {
@@ -1362,7 +1395,7 @@ impl DiagnoseCommand {
             );
         }
 
-        Ok(if count(&warnings) == 0 && count(&errors) == 0 {
+        Ok(if warnings.len() == 0 && errors.len() == 0 {
             PhpMixed::Bool(true)
         } else {
             PhpMixed::String(output)
@@ -1371,8 +1404,11 @@ impl DiagnoseCommand {
 
     /// Check if allow_url_fopen is ON
     fn check_connectivity(&self) -> PhpMixed {
-        if !ini_get("allow_url_fopen").parse::<bool>().unwrap_or(false)
-            && ini_get("allow_url_fopen") != "1"
+        if !ini_get("allow_url_fopen")
+            .as_deref()
+            .and_then(|s| s.parse::<bool>().ok())
+            .unwrap_or(false)
+            && ini_get("allow_url_fopen").as_deref() != Some("1")
         {
             return PhpMixed::String(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string(),

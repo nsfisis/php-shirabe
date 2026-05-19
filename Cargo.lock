@@ -916,6 +916,7 @@ dependencies = [
  "anyhow",
  "indexmap",
  "shirabe-php-shim",
+ "shirabe-semver",
 ]
 
 [[package]]

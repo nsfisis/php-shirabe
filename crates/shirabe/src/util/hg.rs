@@ -52,12 +52,14 @@ impl Hg {
         }
 
         // Try with the authentication information available
-        let matches = Preg::is_match_with_captures(
+        let mut matches: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
+        let matched = Preg::is_match_named(
             r"(?i)^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?",
             &url,
+            &mut matches,
         )?;
 
-        if let Some(matches) = matches {
+        if matched {
             if self
                 .io
                 .has_authentication(matches.get("host").map(|s| s.as_str()).unwrap_or(""))
@@ -82,8 +84,16 @@ impl Hg {
                     format!(
                         "{}://{}:{}@{}{}",
                         matches.get("proto").unwrap_or(&String::new()),
-                        rawurlencode(auth.get("username").map(|s| s.as_str()).unwrap_or("")),
-                        rawurlencode(auth.get("password").map(|s| s.as_str()).unwrap_or("")),
+                        rawurlencode(
+                            auth.get("username")
+                                .and_then(|s| s.as_deref())
+                                .unwrap_or("")
+                        ),
+                        rawurlencode(
+                            auth.get("password")
+                                .and_then(|s| s.as_deref())
+                                .unwrap_or("")
+                        ),
                         matches.get("host").unwrap_or(&String::new()),
                         matches.get("path").unwrap_or(&String::new()),
                     )
@@ -100,7 +110,7 @@ impl Hg {
                     return Ok(());
                 }
 
-                let error = self.process.borrow().get_error_output();
+                let error = self.process.borrow().get_error_output().to_string();
                 return self
                     .throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url);
             }
@@ -117,7 +127,7 @@ impl Hg {
         if Self::get_version(&self.process).is_none() {
             anyhow::bail!(
                 "{}",
-                Url::sanitize(&format!(
+                Url::sanitize(format!(
                     "Failed to clone {}, hg was not found, check that it is installed and in your PATH env.\n\n{}",
                     url,
                     self.process.borrow().get_error_output()
@@ -125,7 +135,7 @@ impl Hg {
             );
         }
 
-        anyhow::bail!("{}", Url::sanitize(message));
+        anyhow::bail!("{}", Url::sanitize(message.to_string()));
     }
 
     pub fn get_version(
@@ -137,7 +147,7 @@ impl Hg {
                 if process.borrow_mut().execute_args(
                     &["hg".to_string(), "--version".to_string()],
                     &mut output,
-                    None,
+                    (),
                 ) == 0
                 {
                     if let Ok(Some(matches)) = Preg::is_match_with_indexed_captures(

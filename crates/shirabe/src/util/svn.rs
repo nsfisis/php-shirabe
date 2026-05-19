@@ -164,7 +164,7 @@ impl Svn {
             return Ok(output);
         }
 
-        let error_output = self.process.borrow().get_error_output();
+        let error_output = self.process.borrow().get_error_output().to_string();
         let full_output = trim(
             &implode("\n", &[output.clone().unwrap_or_default(), error_output]),
             None,
@@ -430,7 +430,7 @@ impl Svn {
             if 0 == self.process.borrow_mut().execute_args(
                 &["svn".to_string(), "--version".to_string()],
                 &mut output,
-                None,
+                (),
             ) {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches))

@@ -80,7 +80,7 @@ impl GitBitbucketDriver {
         self.repository = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
-            &*self.inner.io,
+            self.inner.io.clone_box(),
             &implode(
                 "/",
                 &[
@@ -97,6 +97,8 @@ impl GitBitbucketDriver {
                 ],
             ),
             None,
+            None,
+            false,
         ));
         self.inner.cache.as_mut().unwrap().set_read_only(
             self.inner
@@ -209,7 +211,11 @@ impl GitBitbucketDriver {
             .and_then(|v| v.as_string())
             .map(String::from);
 
-        self.repo_data = repo_data;
+        // TODO(phase-b): unwrap PhpMixed::Array into the typed IndexMap stored on self
+        self.repo_data = match repo_data {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
 
         Ok(true)
     }
@@ -226,13 +232,20 @@ impl GitBitbucketDriver {
         if !self.inner.info_cache.contains_key(identifier) {
             let mut composer: Option<IndexMap<String, PhpMixed>> = None;
             if self.inner.should_cache(identifier) && {
-                let res = self
-                    .inner
-                    .cache
-                    .as_ref()
-                    .and_then(|c| c.read(identifier).ok().flatten());
+                let res = self.inner.cache.as_mut().and_then(|c| c.read(identifier));
                 if let Some(res) = res {
-                    composer = Some(JsonFile::parse_json(&res, None)?);
+                    // TODO(phase-b): wrap parsed PhpMixed::Array into the IndexMap-shaped composer slot
+                    composer = Some(
+                        JsonFile::parse_json(Some(&res), None)?
+                            .as_array()
+                            .cloned()
+                            .map(|m| {
+                                m.into_iter()
+                                    .map(|(k, v)| (k, *v))
+                                    .collect::<IndexMap<String, PhpMixed>>()
+                            })
+                            .unwrap_or_default(),
+                    );
                     true
                 } else {
                     false
@@ -248,7 +261,7 @@ impl GitBitbucketDriver {
                 )?;
 
                 if self.inner.should_cache(identifier) {
-                    self.inner.cache.as_ref().unwrap().write(
+                    self.inner.cache.as_mut().unwrap().write(
                         identifier,
                         &JsonFile::encode_with_indent(
                             &PhpMixed::Array(
@@ -422,10 +435,10 @@ impl GitBitbucketDriver {
             ],
         );
 
-        Ok(Some(
-            self.fetch_with_oauth_credentials(&resource, false)?
-                .get_body(),
-        ))
+        Ok(self
+            .fetch_with_oauth_credentials(&resource, false)?
+            .get_body()
+            .map(|s| s.to_string()))
     }
 
     /// @inheritDoc
@@ -465,7 +478,8 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            return fallback.get_source(identifier);
+            // TODO(phase-b): trait returns Result; flatten for the inherent signature here
+            return fallback.get_source(identifier).unwrap_or_default();
         }
 
         let mut m: IndexMap<String, String> = IndexMap::new();
@@ -481,7 +495,8 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            return fallback.get_dist(identifier);
+            // TODO(phase-b): trait returns Result; flatten for the inherent signature here
+            return fallback.get_dist(identifier).ok().flatten();
         }
 
         let url = sprintf(
@@ -685,7 +700,8 @@ impl GitBitbucketDriver {
                     None,
                 )?;
 
-                if let Some(te) = e.downcast_ref::<TransportException>() {
+                {
+                    let te = &e;
                     let code = te.get_code();
                     let in_set = in_array(
                         PhpMixed::Int(code),
@@ -703,7 +719,7 @@ impl GitBitbucketDriver {
                         if !self.inner.io.has_authentication(&self.inner.origin_url)
                             && bitbucket_util.authorize_oauth(&self.inner.origin_url)
                         {
-                            return self.inner.get_contents(url);
+                            return self.inner.get_contents(url).map_err(anyhow::Error::from);
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
@@ -714,15 +730,15 @@ impl GitBitbucketDriver {
                                 .insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
                                 headers,
-                                200,
-                                IndexMap::new(),
-                                "null".to_string(),
-                            ));
+                                Some(200),
+                                vec![],
+                                Some("null".to_string()),
+                            )??);
                         }
                     }
                 }
 
-                Err(e)
+                Err(e.into())
             }
         }
     }
@@ -786,7 +802,8 @@ impl GitBitbucketDriver {
                         r"/https:\/\/([^@]+@)?/",
                         "https://",
                         m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
-                    );
+                    )
+                    .unwrap_or_default();
                 }
             }
         }

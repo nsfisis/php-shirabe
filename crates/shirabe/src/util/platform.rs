@@ -401,11 +401,11 @@ impl Platform {
                 // TODO(phase-b): PHP_OS_FAMILY constant comparison
                 && true
             {
-                let process = ProcessExecutor::new();
+                let mut process = ProcessExecutor::new(None);
                 // TODO(phase-b): inner Result for catch(\Exception); use anyhow::Result<Result<_, _>>
                 let mut output = String::new();
                 let result: Result<()> = (|| {
-                    if process.execute(&["lsmod"], &mut output)? == 0
+                    if process.execute_args(&["lsmod".to_string()], &mut output, ()) == 0
                         && shirabe_php_shim::str_contains(&output, "vboxguest")
                     {
                         *cached = Some(true);
@@ -430,5 +430,27 @@ impl Platform {
         }
 
         "/dev/null".to_string()
+    }
+
+    /// PHP: PHP_OS — returns the OS PHP was built on.
+    pub fn php_os() -> &'static str {
+        // TODO(phase-b): map to actual OS name (e.g. "Darwin", "Linux", "WINNT").
+        todo!()
+    }
+
+    /// PHP: rename($from, $to) — wrap the std rename so callers can use Platform::rename.
+    pub fn rename(from: &str, to: &str) -> bool {
+        std::fs::rename(from, to).is_ok()
+    }
+
+    /// PHP: mkdir($pathname, $mode, $recursive)
+    pub fn mkdir(pathname: &str, _mode: u32, recursive: bool) -> bool {
+        // TODO(phase-b): honor mode bits on Unix
+        let result = if recursive {
+            std::fs::create_dir_all(pathname)
+        } else {
+            std::fs::create_dir(pathname)
+        };
+        result.is_ok()
     }
 }

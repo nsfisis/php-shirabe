@@ -47,7 +47,7 @@ impl PathRepository {
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        dispatcher: Option<EventDispatcher>,
+        dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> anyhow::Result<Self> {
         if !repo_config.contains_key("url") {
@@ -73,7 +73,7 @@ impl PathRepository {
         let version_guesser = VersionGuesser::new(
             config,
             std::rc::Rc::clone(&process),
-            shirabe_semver::version_parser::VersionParser,
+            VersionParser::new(),
             Some(io.clone_box()),
         );
         let mut options = repo_config
@@ -173,7 +173,7 @@ impl PathRepository {
                 .unwrap_or("auto")
                 .to_string();
             if reference == "none" {
-                if let Some(PhpMixed::Array(ref mut dist)) = package.get_mut("dist") {
+                if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
                     dist.insert("reference".to_string(), Box::new(PhpMixed::Null));
                 }
             } else if reference == "config" || reference == "auto" {
@@ -184,7 +184,7 @@ impl PathRepository {
                         .collect(),
                 );
                 let ref_hash = hash("sha1", &format!("{}{}", json, serialize(&options_mixed)));
-                if let Some(PhpMixed::Array(ref mut dist)) = package.get_mut("dist") {
+                if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
                     dist.insert(
                         "reference".to_string(),
                         Box::new(PhpMixed::String(ref_hash)),
@@ -237,12 +237,12 @@ impl PathRepository {
                         let code2 = self
                             .process
                             .borrow_mut()
-                            .execute(cmd, Some(&mut ref2), None)
+                            .execute(cmd, Some(&mut ref2), ())
                             .unwrap_or(1);
                         if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                             package.insert(
                                 "version".to_string(),
-                                PhpMixed::String(self.version_guesser.get_root_version_from_env()),
+                                PhpMixed::String(self.version_guesser.get_root_version_from_env()?),
                             );
                         }
                     }
@@ -276,32 +276,33 @@ impl PathRepository {
                 let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)
                     .trim()
                     .to_string();
-                if let Some(PhpMixed::Array(ref mut dist)) = package.get_mut("dist") {
+                if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
                     dist.insert("reference".to_string(), Box::new(PhpMixed::String(ref_val)));
                 }
             }
 
             if !package.contains_key("version") {
-                let version_data = self.version_guesser.guess_version(&package, &path);
+                let version_data = self.version_guesser.guess_version(&package, &path)?;
                 if let Some(version_data) = version_data {
                     if let Some(pretty_version) = version_data
-                        .get("pretty_version")
-                        .and_then(|v| v.as_string())
+                        .pretty_version
+                        .as_ref()
                         .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string())
+                        .cloned()
                     {
                         // if there is a feature branch detected, we add a second package with the feature branch version
                         if let Some(feature_pretty_version) = version_data
-                            .get("feature_pretty_version")
-                            .and_then(|v| v.as_string())
+                            .feature_pretty_version
+                            .as_ref()
                             .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string())
+                            .cloned()
                         {
                             package.insert(
                                 "version".to_string(),
                                 PhpMixed::String(feature_pretty_version),
                             );
-                            self.inner.add_package(self.loader.load(package.clone())?);
+                            self.inner
+                                .add_package(self.loader.load(package.clone(), None)?);
                         }
 
                         package.insert("version".to_string(), PhpMixed::String(pretty_version));
@@ -320,17 +321,12 @@ impl PathRepository {
             }
 
             self.inner
-                .add_package(
-                    self.loader
-                        .load(package.clone())
-                        .map_err(|e| RuntimeException {
-                            message: format!(
-                                "Failed loading the package in {}",
-                                composer_file_path
-                            ),
-                            code: 0,
-                        })?,
-                );
+                .add_package(self.loader.load(package.clone(), None).map_err(|e| {
+                    RuntimeException {
+                        message: format!("Failed loading the package in {}", composer_file_path),
+                        code: 0,
+                    }
+                })?);
         }
 
         Ok(())

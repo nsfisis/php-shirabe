@@ -64,7 +64,7 @@ impl FossilDriver {
                 .into());
             }
 
-            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", &self.inner.url);
+            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", &self.inner.url)?;
             self.repo_file = Some(format!("{}/{}.fossil", cache_repo_dir, local_name));
             self.checkout_dir = format!("{}/{}/", cache_vcs_dir, local_name);
 
@@ -82,7 +82,7 @@ impl FossilDriver {
         if self.inner.process.borrow_mut().execute_args(
             &["fossil", "version"].map(|s| s.to_string()).to_vec(),
             &mut ignored_output,
-            None,
+            (),
         ) != 0
         {
             return Err(RuntimeException {
@@ -100,7 +100,7 @@ impl FossilDriver {
     pub(crate) fn update_local_repo(&mut self) -> anyhow::Result<()> {
         assert!(self.repo_file.is_some());
 
-        let fs = Filesystem::new(None);
+        let mut fs = Filesystem::new(None);
         fs.ensure_directory_exists(&self.checkout_dir)?;
 
         if !is_writable(&dirname(&self.checkout_dir)) {
@@ -149,10 +149,10 @@ impl FossilDriver {
                     .map(|s| s.to_string())
                     .to_vec(),
                 &mut output,
-                None,
+                (),
             ) != 0
             {
-                let output = self.inner.process.borrow().get_error_output();
+                let output = self.inner.process.borrow().get_error_output().to_string();
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to clone {} to repository {}\n\n{}",
@@ -171,7 +171,7 @@ impl FossilDriver {
                 Some(self.checkout_dir.clone()),
             ) != 0
             {
-                let output = self.inner.process.borrow().get_error_output();
+                let output = self.inner.process.borrow().get_error_output().to_string();
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to open repository {} in {}\n\n{}",
@@ -280,7 +280,7 @@ impl FossilDriver {
                 Some(self.checkout_dir.clone()),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                let branch = Preg::replace(r"/^\*/", "", &branch.trim());
+                let branch = Preg::replace(r"/^\*/", "", &branch.trim())?;
                 let branch = branch.trim().to_string();
                 branches.insert(branch.clone(), branch);
             }
@@ -310,7 +310,7 @@ impl FossilDriver {
                 return false;
             }
 
-            let process = ProcessExecutor::new(io);
+            let mut process = ProcessExecutor::new(io);
             let mut output = String::new();
             if process.execute_args(
                 &["fossil", "info"].map(|s| s.to_string()).to_vec(),

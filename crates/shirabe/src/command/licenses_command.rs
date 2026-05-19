@@ -16,10 +16,14 @@ use crate::composer::Composer;
 use crate::console::input::input_option::InputOption;
 use crate::io::io_interface::IOInterface;
 use crate::json::json_file::JsonFile;
+use crate::package::base_package::BasePackage;
 use crate::package::complete_package::CompletePackage;
 use crate::package::complete_package_interface::CompletePackageInterface;
+use crate::package::package_interface::PackageInterface;
 use crate::plugin::command_event::CommandEvent;
 use crate::plugin::plugin_events::PluginEvents;
+use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
+use crate::repository::repository_interface::RepositoryInterface;
 use crate::repository::repository_utils::RepositoryUtils;
 use crate::util::package_info::PackageInfo;
 use crate::util::package_sorter::PackageSorter;
@@ -71,38 +75,57 @@ impl LicensesCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
+        let mut composer = self.require_composer(None, None)?;
 
         // TODO(plugin): dispatch COMMAND event for plugin hooks
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "licenses", input, output);
         composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let root = composer.get_package();
+        // TODO(phase-b): snapshot root package fields up-front to release the immutable borrow.
+        let root_name = composer.get_package().get_pretty_name().to_string();
+        let root_version = composer.get_package().get_pretty_version().to_string();
+        let root_licenses_snap = composer.get_package().get_license().clone();
 
         let packages = if input.get_option("locked").as_bool().unwrap_or(false) {
-            if !composer.get_locker().is_locked() {
+            let locker = composer.get_locker_mut();
+            if !locker.is_locked() {
                 return Err(UnexpectedValueException {
                     message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
                     code: 0,
                 }.into());
             }
-            let locker = composer.get_locker();
             let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
-            repo.get_packages()
+            <crate::repository::lock_array_repository::LockArrayRepository as crate::repository::repository_interface::RepositoryInterface>::get_packages(&repo)
         } else {
             let repo = composer.get_repository_manager().get_local_repository();
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
-                RepositoryUtils::filter_required_packages(repo.get_packages(), root)
+                RepositoryUtils::filter_required_packages(
+                    &repo.get_packages(),
+                    composer.get_package(),
+                    false,
+                    vec![],
+                )
             } else {
                 repo.get_packages()
             }
         };
+        let _ = composer.get_package();
 
-        let packages = PackageSorter::sort_packages_alphabetically(packages);
+        // TODO(phase-b): convert BasePackage trait objects to PackageInterface for sorting.
+        let pkg_pi: Vec<Box<dyn crate::package::package_interface::PackageInterface>> = packages
+            .into_iter()
+            .map(|p| p.clone_package_box())
+            .collect();
+        let packages = PackageSorter::sort_packages_alphabetically(pkg_pi);
         let io = self.get_io();
 
         let format = input
@@ -112,20 +135,14 @@ impl LicensesCommand {
             .to_string();
         match format.as_str() {
             "text" => {
-                let root_licenses = root.get_license();
+                let root_licenses = root_licenses_snap.clone();
                 let licenses_str = if root_licenses.is_empty() {
                     "none".to_string()
                 } else {
                     root_licenses.join(", ")
                 };
-                io.write(&format!(
-                    "Name: <comment>{}</comment>",
-                    root.get_pretty_name()
-                ));
-                io.write(&format!(
-                    "Version: <comment>{}</comment>",
-                    root.get_full_pretty_version()
-                ));
+                io.write(&format!("Name: <comment>{}</comment>", root_name));
+                io.write(&format!("Version: <comment>{}</comment>", root_version));
                 io.write(&format!("Licenses: <comment>{}</comment>", licenses_str));
                 io.write("Dependencies:");
                 io.write("");
@@ -133,9 +150,9 @@ impl LicensesCommand {
                 let mut table = Table::new(output);
                 table.set_style("compact");
                 table.set_headers(vec![
-                    "Name".to_string(),
-                    "Version".to_string(),
-                    "Licenses".to_string(),
+                    PhpMixed::String("Name".to_string()),
+                    PhpMixed::String("Version".to_string()),
+                    PhpMixed::String("Licenses".to_string()),
                 ]);
                 for package in &packages {
                     let link = PackageInfo::get_view_source_or_homepage_url(package.as_ref());
@@ -160,11 +177,18 @@ impl LicensesCommand {
                     } else {
                         pkg_licenses.join(", ")
                     };
-                    table.add_row(vec![
-                        name,
-                        package.get_full_pretty_version().to_string(),
-                        licenses_str,
-                    ]);
+                    table.add_row(PhpMixed::List(vec![
+                        Box::new(PhpMixed::String(name)),
+                        Box::new(PhpMixed::String(
+                            package
+                                .get_full_pretty_version(
+                                    false,
+                                    <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
+                                )
+                                .to_string(),
+                        )),
+                        Box::new(PhpMixed::String(licenses_str)),
+                    ]));
                 }
                 table.render();
             }
@@ -197,15 +221,12 @@ impl LicensesCommand {
                 }
 
                 let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                output_map.insert(
-                    "name".to_string(),
-                    PhpMixed::String(root.get_pretty_name().to_string()),
-                );
+                output_map.insert("name".to_string(), PhpMixed::String(root_name.clone()));
                 output_map.insert(
                     "version".to_string(),
-                    PhpMixed::String(root.get_full_pretty_version(true, 0).to_string()),
+                    PhpMixed::String(root_version.clone()),
                 );
-                let root_licenses = root.get_license();
+                let root_licenses = root_licenses_snap.clone();
                 output_map.insert(
                     "license".to_string(),
                     PhpMixed::List(
@@ -231,7 +252,15 @@ impl LicensesCommand {
                             .collect(),
                     ),
                 );
-                io.write(&JsonFile::encode(&output_map, 448));
+                io.write(&JsonFile::encode(
+                    &PhpMixed::Array(
+                        output_map
+                            .into_iter()
+                            .map(|(k, v)| (k, Box::new(v)))
+                            .collect(),
+                    ),
+                    448,
+                ));
             }
             "summary" => {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();
@@ -254,14 +283,22 @@ impl LicensesCommand {
                 let mut entries: Vec<(String, i64)> = used_licenses.into_iter().collect();
                 entries.sort_by(|a, b| b.1.cmp(&a.1));
 
-                let rows: Vec<Vec<String>> = entries
+                let rows: Vec<PhpMixed> = entries
                     .iter()
-                    .map(|(license, count)| vec![license.clone(), count.to_string()])
+                    .map(|(license, count)| {
+                        PhpMixed::List(vec![
+                            Box::new(PhpMixed::String(license.clone())),
+                            Box::new(PhpMixed::String(count.to_string())),
+                        ])
+                    })
                     .collect();
 
-                let symfony_io = SymfonyStyle::new(input, output);
+                let mut symfony_io = SymfonyStyle::new(input, output);
                 symfony_io.table(
-                    vec!["License".to_string(), "Number of dependencies".to_string()],
+                    vec![
+                        PhpMixed::String("License".to_string()),
+                        PhpMixed::String("Number of dependencies".to_string()),
+                    ],
                     rows,
                 );
             }

@@ -130,7 +130,11 @@ impl AliasPackage {
     }
 
     pub fn get_alias_of(&self) -> &dyn BasePackage {
-        &self.alias_of
+        self.alias_of.as_ref()
+    }
+
+    pub fn get_alias_of_mut(&mut self) -> &mut dyn BasePackage {
+        &mut *self.alias_of
     }
 
     /// Stores whether this is an alias created by an aliasing in the requirements of the root package or not
@@ -181,7 +185,7 @@ impl AliasPackage {
                         Some(link_type.to_string()),
                         Some(pretty_version.clone()),
                     );
-                    constraint.set_pretty_string(&pretty_version);
+                    shirabe_semver::constraint::constraint_interface::ConstraintInterface::set_pretty_string(&mut constraint, Some(pretty_version.clone()));
                     new_links.push(new_link);
                 }
             }
@@ -201,7 +205,7 @@ impl AliasPackage {
                         Some(link_type.to_string()),
                         Some(pretty_version.clone()),
                     );
-                    constraint.set_pretty_string(&pretty_version);
+                    shirabe_semver::constraint::constraint_interface::ConstraintInterface::set_pretty_string(&mut constraint, Some(pretty_version.clone()));
                     links[index] = new_link;
                 }
             }
@@ -479,7 +483,7 @@ impl BasePackage for AliasPackage {
     }
 
     fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository.as_ref()
+        self.repository.as_deref()
     }
 
     fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {

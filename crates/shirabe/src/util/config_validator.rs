@@ -40,13 +40,16 @@ impl ConfigValidator {
         let mut manifest: Option<IndexMap<String, PhpMixed>> = None;
 
         // TODO(phase-b): io type mismatch (&dyn IOInterface vs Box<dyn IOInterface>)
-        let json =
+        let mut json =
             JsonFile::new(file.to_string(), None, None).expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-            manifest = Some(json.read()?);
-            json.validate_schema(Some(JsonFile::LAX_SCHEMA))?;
+            manifest = Some(match json.read()? {
+                PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                _ => IndexMap::new(),
+            });
+            json.validate_schema(JsonFile::LAX_SCHEMA, None)?;
             lax_valid = true;
-            json.validate_schema(None)?;
+            json.validate_schema(JsonFile::STRICT_SCHEMA, None)?;
             Ok(())
         })();
 
@@ -126,7 +129,12 @@ impl ConfigValidator {
             for license in &licenses {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if let Some(spdx_license) = spdx_license {
-                    if spdx_license[3] {
+                    // PHP: $spdxLicense[3] — fourth element is the deprecated flag.
+                    let is_deprecated = match &spdx_license {
+                        PhpMixed::List(l) => l.get(3).and_then(|v| v.as_bool()).unwrap_or(false),
+                        _ => false,
+                    };
+                    if is_deprecated {
                         if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?\+$}i", license)
                             .unwrap_or(false)
                         {
@@ -163,7 +171,8 @@ impl ConfigValidator {
                     r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
                     r"\1\3-\2\4",
                     name,
-                );
+                )
+                .unwrap_or_else(|_| name.clone());
                 let suggest_name = suggest_name.to_lowercase();
 
                 publish_errors.push(format!(
@@ -289,8 +298,8 @@ impl ConfigValidator {
             }
         }
 
-        let loader = ValidatingArrayLoader::new(
-            ArrayLoader::new(),
+        let mut loader = ValidatingArrayLoader::new(
+            Box::new(ArrayLoader::new(None, true)),
             true,
             None,
             array_loader_validation_flags,
@@ -305,7 +314,11 @@ impl ConfigValidator {
                 PhpMixed::String("dummy/dummy".to_string()),
             );
         }
-        match loader.load(manifest_for_load) {
+        let manifest_boxed: IndexMap<String, Box<PhpMixed>> = manifest_for_load
+            .into_iter()
+            .map(|(k, v)| (k, Box::new(v)))
+            .collect();
+        match loader.load(manifest_boxed, "Composer\\Package\\CompletePackage") {
             Ok(_) => {}
             Err(e) => {
                 if let Some(invalid_e) = e.downcast_ref::<InvalidPackageException>() {

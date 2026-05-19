@@ -196,5 +196,6 @@ impl SuggestedPackagesReporter {
 
     fn remove_control_characters(&self, string: &str) -> String {
         Preg::replace("/[[:cntrl:]]/", "", &string.replace('\n', " "))
+            .unwrap_or_else(|_| string.replace('\n', " "))
     }
 }

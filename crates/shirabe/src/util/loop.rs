@@ -8,12 +8,21 @@ use shirabe_external_packages::react::promise::promise_interface::PromiseInterfa
 use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
 use shirabe_php_shim::microtime;
 
-#[derive(Debug)]
 pub struct Loop {
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     process_executor: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     current_promises: IndexMap<i64, Vec<Box<dyn PromiseInterface>>>,
     wait_index: i64,
+}
+
+impl std::fmt::Debug for Loop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Loop")
+            .field("http_downloader", &self.http_downloader)
+            .field("process_executor", &self.process_executor)
+            .field("wait_index", &self.wait_index)
+            .finish()
+    }
 }
 
 impl Loop {
@@ -49,15 +58,17 @@ impl Loop {
     pub fn wait(
         &mut self,
         promises: Vec<Box<dyn PromiseInterface>>,
-        progress: Option<&mut ProgressBar>,
+        mut progress: Option<&mut ProgressBar>,
     ) -> Result<()> {
-        let mut uncaught: Option<anyhow::Error> = None;
+        let uncaught: Option<anyhow::Error> = None;
 
-        shirabe_external_packages::react::promise::all(&promises).then(
-            || {},
-            |e: anyhow::Error| {
-                uncaught = Some(e);
-            },
+        // TODO(phase-b): Promise::then captures uncaught by Fn; needs a Cell/RefCell wrapper
+        // and a thunk that matches FnOnce(Option<PhpMixed>) -> Option<PhpMixed>.
+        let _ = shirabe_external_packages::react::promise::all(
+            promises
+                .iter()
+                .map(|_| todo!("clone Box<dyn PromiseInterface>"))
+                .collect(),
         );
 
         // keep track of every group of promises that is waited on, so abortJobs can
@@ -66,13 +77,13 @@ impl Loop {
         self.wait_index += 1;
         self.current_promises.insert(wait_index, promises);
 
-        if let Some(ref progress) = progress {
+        if let Some(ref mut progress) = progress {
             let mut total_jobs: i64 = 0;
             total_jobs += self.http_downloader.borrow_mut().count_active_jobs(None);
             if let Some(ref pe) = self.process_executor {
                 total_jobs += pe.borrow_mut().count_active_jobs(None);
             }
-            progress.start(total_jobs);
+            progress.start(Some(total_jobs));
         }
 
         let mut last_update: f64 = 0.0;
@@ -84,10 +95,11 @@ impl Loop {
                 active_jobs += pe.borrow_mut().count_active_jobs(None);
             }
 
-            if let Some(ref progress) = progress {
+            if let Some(ref mut progress) = progress {
                 if microtime(true) - last_update > 0.1 {
                     last_update = microtime(true);
-                    progress.set_progress(progress.get_max_steps() - active_jobs);
+                    let new_progress = progress.get_max_steps() - active_jobs;
+                    progress.set_progress(new_progress);
                 }
             }
 
@@ -97,7 +109,7 @@ impl Loop {
         }
 
         // as we skip progress updates if they are too quick, make sure we do one last one here at 100%
-        if let Some(ref progress) = progress {
+        if let Some(ref mut progress) = progress {
             progress.finish();
         }
 
@@ -111,9 +123,9 @@ impl Loop {
 
     pub fn abort_jobs(&self) {
         for promise_group in self.current_promises.values() {
-            for promise in promise_group {
-                // to support react/promise 2.x we wrap the promise in a resolve() call for safety
-                shirabe_external_packages::react::promise::resolve(Some(promise)).cancel();
+            for _promise in promise_group {
+                // TODO(phase-b): cancel requires CancellablePromiseInterface; PromiseInterface trait
+                // doesn't expose it. Drop the wrap+cancel until we have the right trait.
             }
         }
     }

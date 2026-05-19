@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php
 
-use std::any::Any;
-
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::base_package::BasePackage;
+use crate::package::base_package::SUPPORTED_LINK_TYPES;
 use crate::package::complete_package::CompletePackage;
+use crate::package::complete_package_interface::CompletePackageInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::package::root_package::RootPackage;
+use crate::package::root_package_interface::RootPackageInterface;
 
 #[derive(Debug)]
 pub struct ArrayDumper;
@@ -131,10 +131,10 @@ impl ArrayDumper {
         }
 
         // corresponds to: foreach (BasePackage::$supportedLinkTypes as $type => $opts) { $links = $package->{'get'.ucfirst($opts['method'])}(); ... }
-        for (type_name, method_name) in <dyn BasePackage>::supported_link_types() {
+        for (type_name, opts) in SUPPORTED_LINK_TYPES.iter() {
             // TODO(phase-b): PackageInterface needs get_links_by_method to mimic PHP magic call
             let links: Vec<crate::package::link::Link> = Vec::new();
-            let _ = (&method_name, package);
+            let _ = (&opts.method, package);
             if links.is_empty() {
                 continue;
             }
@@ -142,11 +142,13 @@ impl ArrayDumper {
             for link in &links {
                 link_map.insert(
                     link.get_target().to_string(),
-                    Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
+                    Box::new(PhpMixed::String(
+                        link.get_pretty_constraint().unwrap_or_default().to_string(),
+                    )),
                 );
             }
             link_map.sort_keys();
-            data.insert(type_name, PhpMixed::Array(link_map));
+            data.insert(type_name.to_string(), PhpMixed::Array(link_map));
         }
 
         let suggests = package.get_suggests();
@@ -265,7 +267,7 @@ impl ArrayDumper {
                 let entry = data
                     .entry("archive".to_string())
                     .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
-                if let PhpMixed::Array(ref mut archive) = entry {
+                if let PhpMixed::Array(archive) = entry {
                     archive.insert(
                         "name".to_string(),
                         Box::new(PhpMixed::String(archive_name.to_string())),
@@ -277,7 +279,7 @@ impl ArrayDumper {
                 let entry = data
                     .entry("archive".to_string())
                     .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
-                if let PhpMixed::Array(ref mut archive) = entry {
+                if let PhpMixed::Array(archive) = entry {
                     archive.insert(
                         "exclude".to_string(),
                         Box::new(PhpMixed::List(

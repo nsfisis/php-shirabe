@@ -1,7 +1,17 @@
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
+
 #[derive(Debug)]
 pub struct DuplicateKeyException {
     pub message: String,
     pub code: i64,
+    pub details: IndexMap<String, PhpMixed>,
+}
+
+impl DuplicateKeyException {
+    pub fn get_details(&self) -> &IndexMap<String, PhpMixed> {
+        &self.details
+    }
 }
 
 impl std::fmt::Display for DuplicateKeyException {

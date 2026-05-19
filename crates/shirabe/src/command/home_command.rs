@@ -73,7 +73,9 @@ impl HomeCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let repos = self.initialize_repos()?;
-        let io = self.get_io();
+        // TODO(phase-b): clone_box to release self borrow held by get_io.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = io_box.as_ref();
         let mut return_code: i64 = 0;
 
         let packages: Vec<String> = input
@@ -178,23 +180,23 @@ impl HomeCommand {
         if Platform::is_windows() {
             let _ = process.execute(
                 PhpMixed::from(vec!["start", "\"web\"", "explorer", url]),
-                None,
-                None,
+                (),
+                (),
             );
             return;
         }
 
         let linux = process
-            .execute(PhpMixed::from(vec!["which", "xdg-open"]), None, None)
+            .execute(PhpMixed::from(vec!["which", "xdg-open"]), (), ())
             .unwrap_or(1);
         let osx = process
-            .execute(PhpMixed::from(vec!["which", "open"]), None, None)
+            .execute(PhpMixed::from(vec!["which", "open"]), (), ())
             .unwrap_or(1);
 
         if linux == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), None, None);
+            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), (), ());
         } else if osx == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["open", url]), None, None);
+            let _ = process.execute(PhpMixed::from(vec!["open", url]), (), ());
         } else {
             self.get_io().write_error(&format!(
                 "No suitable browser opening command found, open yourself: {}",
@@ -216,6 +218,7 @@ impl HomeCommand {
         }
 
         RepositoryFactory::default_repos_with_default_manager(self.get_io())
+            .map(|m| m.into_iter().map(|(_, v)| v).collect())
     }
 }
 

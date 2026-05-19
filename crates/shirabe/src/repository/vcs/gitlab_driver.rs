@@ -183,7 +183,7 @@ impl GitLabDriver {
         .unwrap_or_default();
 
         self.inner.cache = Some(Cache::new(
-            self.inner.io.as_ref(),
+            self.inner.io.clone_box(),
             &format!(
                 "{}/{}/{}/{}",
                 self.inner
@@ -240,17 +240,28 @@ impl GitLabDriver {
                 && self
                     .inner
                     .cache
-                    .as_ref()
+                    .as_mut()
                     .and_then(|c| c.read(identifier))
                     .is_some()
             {
                 let res = self
                     .inner
                     .cache
-                    .as_ref()
+                    .as_mut()
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
-                JsonFile::parse_json(&res, None)?
+                // TODO(phase-b): cached payload is wrapped to satisfy outer Option type
+                Some(
+                    JsonFile::parse_json(Some(&res), None)?
+                        .as_array()
+                        .cloned()
+                        .map(|m| {
+                            m.into_iter()
+                                .map(|(k, v)| (k, *v))
+                                .collect::<IndexMap<String, PhpMixed>>()
+                        })
+                        .unwrap_or_default(),
+                )
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
@@ -261,11 +272,17 @@ impl GitLabDriver {
 
                 if self.inner.should_cache(identifier) {
                     if let Some(ref composer_map) = composer {
-                        self.inner.cache.as_ref().map(|c| {
+                        self.inner.cache.as_mut().map(|c| {
                             c.write(
                                 identifier,
-                                &JsonFile::encode_with_options(
-                                    composer_map,
+                                &JsonFile::encode(
+                                    &PhpMixed::Array(
+                                        composer_map
+                                            .clone()
+                                            .into_iter()
+                                            .map(|(k, v)| (k, Box::new(v)))
+                                            .collect(),
+                                    ),
                                     shirabe_php_shim::JSON_UNESCAPED_UNICODE
                                         | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
                                 ),
@@ -281,7 +298,7 @@ impl GitLabDriver {
             if let Some(ref mut composer) = composer {
                 // specials for gitlab (this data is only available if authentication is provided)
                 if composer.contains_key("support")
-                    && !is_array(composer.get("support").cloned().unwrap_or(PhpMixed::Null))
+                    && !is_array(&composer.get("support").cloned().unwrap_or(PhpMixed::Null))
                 {
                     composer.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
                 }
@@ -501,7 +518,11 @@ impl GitLabDriver {
 
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
         if let Some(ref git_driver) = self.git_driver {
-            return git_driver.get_source(identifier);
+            return git_driver
+                .get_source(identifier)
+                .into_iter()
+                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .collect();
         }
 
         let mut result = IndexMap::new();
@@ -747,7 +768,7 @@ impl GitLabDriver {
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut git_driver = GitDriver::new(
             repo_config,
-            self.inner.io.clone(),
+            self.inner.io.clone_box(),
             self.inner.config.clone(),
             std::rc::Rc::clone(&self.inner.http_downloader),
             std::rc::Rc::clone(&self.inner.process),
@@ -766,10 +787,9 @@ impl GitLabDriver {
         match response_result {
             Ok(response) => {
                 if fetching_repo_data {
-                    let json = response.decode_json().map_err(|e| TransportException {
-                        message: e.to_string(),
-                        code: 0,
-                    })?;
+                    let json = response
+                        .decode_json()
+                        .map_err(|e| TransportException::new(e.to_string(), 0))?;
                     let json_map = match json {
                         PhpMixed::Array(ref m) => m.clone(),
                         _ => IndexMap::new(),
@@ -815,10 +835,7 @@ impl GitLabDriver {
                             );
 
                             self.attempt_clone_fallback()
-                                .map_err(|e| TransportException {
-                                    message: e.to_string(),
-                                    code: 0,
-                                })?;
+                                .map_err(|e| TransportException::new(e.to_string(), 0))?;
 
                             let mut req = IndexMap::new();
                             req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
@@ -841,23 +858,26 @@ impl GitLabDriver {
                             .and_then(|v| v.as_string())
                             == Some("disabled")
                         {
-                            return Err(TransportException {
-                                message: "The GitLab repository is disabled in the project"
-                                    .to_string(),
-                                code: 400,
-                            });
+                            return Err(TransportException::new(
+                                "The GitLab repository is disabled in the project".to_string(),
+                                400,
+                            ));
                         }
 
-                        if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
+                        if !empty(
+                            &*json_map
+                                .get("id")
+                                .cloned()
+                                .unwrap_or(Box::new(PhpMixed::Null)),
+                        ) {
                             self.is_private = false;
                         }
 
-                        return Err(TransportException {
-                            message:
-                                "GitLab API seems to not be authenticated as it did not return a default_branch"
+                        return Err(TransportException::new(
+                            "GitLab API seems to not be authenticated as it did not return a default_branch"
                                     .to_string(),
-                            code: 401,
-                        });
+                            401,
+                        ));
                     }
                 }
 
@@ -869,7 +889,8 @@ impl GitLabDriver {
                     std::rc::Rc::clone(&self.inner.config),
                     Some(std::rc::Rc::clone(&self.inner.process)),
                     Some(std::rc::Rc::clone(&self.inner.http_downloader)),
-                )?;
+                )
+                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                 match e.code {
                     401 | 404 => {
@@ -885,16 +906,14 @@ impl GitLabDriver {
                         if git_lab_util.is_oauth_expired(&self.inner.origin_url)
                             && git_lab_util
                                 .authorize_oauth_refresh(&self.scheme, &self.inner.origin_url)
+                                .map_err(|err| TransportException::new(err.to_string(), 0))?
                         {
                             return self.inner.get_contents(url);
                         }
 
                         if !self.inner.io.is_interactive() {
                             self.attempt_clone_fallback()
-                                .map_err(|err| TransportException {
-                                    message: err.to_string(),
-                                    code: 0,
-                                })?;
+                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             let mut req = IndexMap::new();
                             req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
@@ -935,10 +954,7 @@ impl GitLabDriver {
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
                             self.attempt_clone_fallback()
-                                .map_err(|err| TransportException {
-                                    message: err.to_string(),
-                                    code: 0,
-                                })?;
+                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             let mut req = IndexMap::new();
                             req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
@@ -1095,7 +1111,9 @@ impl GitLabDriver {
                 false,
             ) || (port_number.is_some()
                 && in_array(
-                    PhpMixed::String(Preg::replace(r"{:\d+}", "", &guessed_domain)),
+                    PhpMixed::String(
+                        Preg::replace(r"{:\d+}", "", &guessed_domain).unwrap_or_default(),
+                    ),
                     configured_domains,
                     false,
                 ))

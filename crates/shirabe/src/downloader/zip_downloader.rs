@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
 use crate::downloader::archive_downloader::ArchiveDownloader;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::file_downloader::FileDownloader;
 use crate::package::package_interface::PackageInterface;
 use crate::util::ini_helper::IniHelper;
@@ -31,6 +32,36 @@ pub struct ZipDownloader {
 }
 
 impl ZipDownloader {
+    pub fn new(
+        io: Box<dyn crate::io::io_interface::IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
+        http_downloader: std::rc::Rc<
+            std::cell::RefCell<crate::util::http_downloader::HttpDownloader>,
+        >,
+        event_dispatcher: Option<
+            std::rc::Rc<
+                std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>,
+            >,
+        >,
+        cache: Option<crate::cache::Cache>,
+        filesystem: std::rc::Rc<std::cell::RefCell<crate::util::filesystem::Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::process_executor::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: FileDownloader::new(
+                io,
+                config,
+                http_downloader,
+                event_dispatcher,
+                cache,
+                Some(filesystem),
+                Some(process),
+            ),
+            cleanup_executed: IndexMap::new(),
+            zip_archive_object: None,
+        }
+    }
+
     pub fn download(
         &mut self,
         package: &dyn PackageInterface,
@@ -45,7 +76,9 @@ impl ZipDownloader {
                 let finder = ExecutableFinder::new();
                 let commands = unzip_commands.as_mut().unwrap();
                 if Platform::is_windows() {
-                    if let Some(cmd) = finder.find("7z", None, &[r"C:\Program Files\7-Zip"]) {
+                    if let Some(cmd) =
+                        finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
+                    {
                         commands.push(vec![
                             "7z".to_string(),
                             cmd,
@@ -216,7 +249,9 @@ impl ZipDownloader {
             if self
                 .inner
                 .process
-                .execute(&[command_spec[1].as_str()], &mut output)
+                .borrow_mut()
+                .execute(&[command_spec[1].as_str()], &mut output, None::<&str>)
+                .unwrap_or(1)
                 == 0
             {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -238,97 +273,22 @@ impl ZipDownloader {
             }
         }
 
-        let io = &self.inner.io;
-        let try_fallback = |process_error: anyhow::Error| -> Result<Box<dyn PromiseInterface>> {
-            if is_last_chance {
-                return Err(process_error);
-            }
-
-            if process_error.to_string().contains("zip bomb") {
-                return Err(process_error);
-            }
-
-            if !is_file(file) {
-                io.write_error(&format!("    <warning>{}</warning>", process_error));
-                io.write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
-                io.write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
-            } else {
-                io.write_error(&format!("    <warning>{}</warning>", process_error));
-                io.write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-                io.write_error(&format!(
-                    "    Unzip with {} command failed, falling back to ZipArchive class",
-                    executable
-                ));
-
-                if Platform::get_env("GITHUB_ACTIONS").is_some()
-                    && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
-                {
-                    io.write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                    io.write_error(&format!("File size: {}", filesize(file).unwrap_or(0)));
-                    io.write_error(&format!(
-                        "File SHA1: {}",
-                        hash_file("sha1", file).unwrap_or_default()
-                    ));
-                    let content = file_get_contents(file).unwrap_or_default();
-                    let bytes = content.as_bytes();
-                    io.write_error(&format!(
-                        "First 100 bytes (hex): {}",
-                        bin2hex(&bytes[..bytes.len().min(100)])
-                    ));
-                    let len = bytes.len();
-                    io.write_error(&format!(
-                        "Last 100 bytes (hex): {}",
-                        bin2hex(&bytes[len.saturating_sub(100)..])
-                    ));
-                    if package.get_dist_url().map_or(false, |u| !u.is_empty()) {
-                        io.write_error(&format!(
-                            "Origin URL: {}",
-                            self.inner
-                                .process_url(package, &package.get_dist_url().unwrap_or_default())
-                        ));
-                        let headers = FileDownloader::response_headers.lock().unwrap();
-                        io.write_error(&format!(
-                            "Response Headers: {}",
-                            json_encode(&shirabe_php_shim::PhpMixed::Null)
-                                .unwrap_or_else(|| "[]".to_string())
-                        ));
-                    }
-                }
-            }
-
-            self.extract_with_zip_archive(package, file, path)
-        };
-
-        match self.inner.process.borrow_mut().execute_async(&command) {
-            Ok(promise) => Ok(promise.then(
-                Box::new(move |process: Process| -> Result<()> {
-                    if !process.is_successful() {
-                        if self.inner.cleanup_executed.contains_key(package.get_name()) {
-                            return Err(RuntimeException {
-                                message: format!("Failed to extract {} as the installation was aborted by another package operation.", package.get_name()),
-                                code: 0,
-                            }.into());
-                        }
-
-                        let mut output = process.get_error_output();
-                        output = output.replace(&format!(", {}.zip or {}.ZIP", file, file), "");
-
-                        return try_fallback(RuntimeException {
-                            message: format!(
-                                "Failed to extract {}: ({}) {}\n\n{}",
-                                package.get_name(),
-                                process.get_exit_code().unwrap_or(0),
-                                command.join(" "),
-                                output,
-                            ),
-                            code: 0,
-                        }.into());
-                    }
-                    Ok(())
-                }),
-                None,
-            )),
-            Err(e) => try_fallback(e),
+        // TODO(phase-b): full try_fallback closure deferred — PHP captures `$io`, `$self`
+        // and several locals by reference, conflicting with Rust's borrow checker because
+        // `extract_with_zip_archive` later needs `&mut self`. Restructure once the
+        // promise/closure plumbing supports that shape.
+        let _ = (
+            is_last_chance,
+            file,
+            path,
+            executable,
+            package,
+            &command,
+            &self.inner.io,
+        );
+        match self.inner.process.borrow_mut().execute_async(&command, ()) {
+            Ok(_promise) => todo!("phase-b: chain promise.then with fallback closure"),
+            Err(_e) => todo!("phase-b: pipe execute_async error into try_fallback"),
         }
     }
 
@@ -460,5 +420,71 @@ impl ZipDownloader {
                 file, retval
             ),
         }
+    }
+}
+
+// TODO(phase-b): ZipDownloader::download is overridden with extra setup (UNZIP_COMMANDS init,
+// etc.). The trait method here delegates straight to the inner FileDownloader; the bespoke
+// override on the struct itself takes &mut self and is not yet routed through the trait.
+impl crate::downloader::downloader_interface::DownloaderInterface for ZipDownloader {
+    fn get_installation_source(&self) -> String {
+        self.inner.get_installation_source()
+    }
+
+    fn download(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.download(package, path, prev_package, output)
+    }
+
+    fn prepare(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.prepare(r#type, package, path, prev_package)
+    }
+
+    fn install(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.install(package, path, output)
+    }
+
+    fn update(
+        &self,
+        initial: &dyn PackageInterface,
+        target: &dyn PackageInterface,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.update(initial, target, path)
+    }
+
+    fn remove(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.remove(package, path, output)
+    }
+
+    fn cleanup(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

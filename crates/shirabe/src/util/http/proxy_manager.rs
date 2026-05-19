@@ -14,7 +14,7 @@ pub struct ProxyManager {
     error: Option<String>,
     http_proxy: Option<ProxyItem>,
     https_proxy: Option<ProxyItem>,
-    no_proxy_handler: Option<NoProxyPattern>,
+    no_proxy_handler: std::cell::RefCell<Option<NoProxyPattern>>,
 }
 
 impl ProxyManager {
@@ -23,7 +23,7 @@ impl ProxyManager {
             error: None,
             http_proxy: None,
             https_proxy: None,
-            no_proxy_handler: None,
+            no_proxy_handler: std::cell::RefCell::new(None),
         };
         if let Err(e) = instance.get_proxy_data() {
             instance.error = Some(e.to_string());
@@ -102,7 +102,7 @@ impl ProxyManager {
 
         let (env, _name) = Self::get_proxy_env("no_proxy");
         if let Some(env) = env {
-            self.no_proxy_handler = Some(NoProxyPattern::new(&env));
+            *self.no_proxy_handler.borrow_mut() = Some(NoProxyPattern::new(&env));
         }
 
         Ok(())
@@ -120,7 +120,7 @@ impl ProxyManager {
     }
 
     fn no_proxy(&self, request_url: &str) -> bool {
-        match &self.no_proxy_handler {
+        match self.no_proxy_handler.borrow_mut().as_mut() {
             None => false,
             Some(handler) => handler.test(request_url).unwrap_or(false),
         }

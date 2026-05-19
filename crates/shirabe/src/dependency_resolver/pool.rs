@@ -214,7 +214,7 @@ impl Pool {
 
     /// Retrieves the package object for a given package id.
     pub fn package_by_id(&self, id: i64) -> &dyn BasePackage {
-        &self.packages[(id - 1) as usize]
+        self.packages[(id - 1) as usize].as_ref()
     }
 
     /// Searches all packages providing the given package name and match the constraint
@@ -230,7 +230,7 @@ impl Pool {
     ) -> Vec<Box<dyn BasePackage>> {
         // PHP: $key = (string) $constraint;
         let key = match constraint {
-            Some(c) => c.to_string(),
+            Some(c) => c.__to_string(),
             None => String::new(),
         };
         if let Some(by_key) = self.provider_cache.get(name) {
@@ -251,7 +251,7 @@ impl Pool {
     /// @param  ?ConstraintInterface $constraint A constraint that all returned
     ///                                          packages must match or null to return all
     /// @return BasePackage[]
-    fn compute_what_provides(
+    pub(crate) fn compute_what_provides(
         &self,
         name: &str,
         constraint: Option<&dyn ConstraintInterface>,
@@ -281,11 +281,11 @@ impl Pool {
     pub fn literal_to_pretty_string(
         &self,
         literal: i64,
-        installed_map: &IndexMap<i64, Box<dyn BasePackage>>,
+        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
     ) -> String {
         let package = self.literal_to_package(literal);
 
-        let prefix = if installed_map.contains_key(&package.id()) {
+        let prefix = if installed_map.contains_key(&package.id().to_string()) {
             if literal > 0 { "keep" } else { "remove" }
         } else {
             if literal > 0 {
@@ -316,7 +316,7 @@ impl Pool {
                 || CompilingMatcher::r#match(
                     constraint.unwrap(),
                     Constraint::OP_EQ,
-                    candidate_version,
+                    candidate_version.to_string(),
                 );
         }
 

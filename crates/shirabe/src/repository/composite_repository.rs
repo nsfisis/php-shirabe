@@ -120,11 +120,30 @@ impl RepositoryInterface for CompositeRepository {
         let mut all_names_found = vec![];
 
         for repository in &self.repositories {
+            // TODO(phase-b): manual deep clone since trait objects in maps don't derive Clone.
+            let name_map_cloned: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
+                package_name_map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.as_ref().map(|c| c.clone_box())))
+                    .collect();
+            let already_loaded_cloned: IndexMap<
+                String,
+                IndexMap<String, Box<dyn PackageInterface>>,
+            > = already_loaded
+                .iter()
+                .map(|(k, inner)| {
+                    let inner_cloned: IndexMap<String, Box<dyn PackageInterface>> = inner
+                        .iter()
+                        .map(|(ik, iv)| (ik.clone(), iv.clone_package_box()))
+                        .collect();
+                    (k.clone(), inner_cloned)
+                })
+                .collect();
             let result = repository.load_packages(
-                package_name_map.clone(),
+                name_map_cloned,
                 acceptable_stabilities.clone(),
                 stability_flags.clone(),
-                already_loaded.clone(),
+                already_loaded_cloned,
             );
             all_packages.extend(result.packages);
             all_names_found.extend(result.names_found);

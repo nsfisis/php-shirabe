@@ -58,16 +58,16 @@ impl IOInterface for NullIO {
     ) {
     }
 
-    fn ask(&mut self, _question: String, default: PhpMixed) -> PhpMixed {
+    fn ask(&self, _question: String, default: PhpMixed) -> PhpMixed {
         default
     }
 
-    fn ask_confirmation(&mut self, _question: String, default: bool) -> bool {
+    fn ask_confirmation(&self, _question: String, default: bool) -> bool {
         default
     }
 
     fn ask_and_validate(
-        &mut self,
+        &self,
         _question: String,
         _validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
         _attempts: Option<i64>,
@@ -76,12 +76,12 @@ impl IOInterface for NullIO {
         default
     }
 
-    fn ask_and_hide_answer(&mut self, _question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, _question: String) -> Option<String> {
         None
     }
 
     fn select(
-        &mut self,
+        &self,
         _question: String,
         _choices: Vec<String>,
         default: PhpMixed,

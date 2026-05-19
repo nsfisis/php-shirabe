@@ -28,4 +28,10 @@ pub trait OperationInterface: std::fmt::Debug {
     fn as_uninstall_operation(&self) -> Option<&UninstallOperation> {
         None
     }
+
+    /// PHP duck-typed accessor. Only InstallOperation/UninstallOperation/MarkAlias*Operation
+    /// expose this; UpdateOperation has getInitialPackage()/getTargetPackage() instead.
+    fn get_package(&self) -> &dyn crate::package::package_interface::PackageInterface {
+        todo!("get_package is not available on this operation type")
+    }
 }

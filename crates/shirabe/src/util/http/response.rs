@@ -82,8 +82,16 @@ impl Response {
         let mut value = None;
         let pattern = format!("(?i)^{}:\\s*(.+?)\\s*$", preg_quote(name, None));
         for header in headers {
-            if let Some(m) = Preg::match_(&pattern, header) {
-                value = Some(m[1].clone());
+            let mut matches: indexmap::IndexMap<
+                shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                String,
+            > = indexmap::IndexMap::new();
+            if Preg::match3(&pattern, header, Some(&mut matches)).unwrap_or(false) {
+                if let Some(s) = matches
+                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(1))
+                {
+                    value = Some(s.clone());
+                }
             }
         }
         value
@@ -94,7 +102,16 @@ impl Response {
         todo!()
     }
 
-    pub fn new_fake(_body: Option<String>) -> Self {
+    pub fn to_php_mixed(&self) -> PhpMixed {
+        todo!()
+    }
+
+    pub fn new_fake(
+        _url: &str,
+        _code: i64,
+        _headers: IndexMap<String, PhpMixed>,
+        _body: String,
+    ) -> Self {
         todo!()
     }
 }

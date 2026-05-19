@@ -9,6 +9,7 @@ use crate::package::base_package::BasePackage;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
 use crate::repository::lock_array_repository::LockArrayRepository;
+use crate::repository::repository_interface::RepositoryInterface;
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
 pub const UPDATE_ONLY_LISTED: i64 = 0;
@@ -21,6 +22,13 @@ pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE: i64 = 1;
 /// Identifies a partial update for listed packages and recursively all their dependencies, even
 /// dependencies also directly required by the root composer.json will be updated.
 pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS: i64 = 2;
+
+impl Request {
+    pub const UPDATE_ONLY_LISTED: i64 = UPDATE_ONLY_LISTED;
+    pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE: i64 =
+        UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
+    pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS: i64 = UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
+}
 
 /// Represents the value of updateAllowTransitiveDependencies, which is false|UPDATE_* in PHP.
 #[derive(Debug, Clone, PartialEq)]
@@ -114,7 +122,8 @@ impl Request {
     /// still marks them as locked packages at the same time.
     pub fn fix_locked_package(&mut self, package: Box<dyn BasePackage>) {
         let hash = spl_object_hash(&package);
-        self.fixed_packages.insert(hash.clone(), package.clone());
+        self.fixed_packages
+            .insert(hash.clone(), package.clone_box());
         self.fixed_locked_packages.insert(hash, package);
     }
 
@@ -168,8 +177,16 @@ impl Request {
     }
 
     pub fn get_fixed_or_locked_packages(&self) -> IndexMap<String, Box<dyn BasePackage>> {
-        let mut result = self.fixed_packages.clone();
-        result.extend(self.locked_packages.clone());
+        let mut result: IndexMap<String, Box<dyn BasePackage>> = self
+            .fixed_packages
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone_box()))
+            .collect();
+        result.extend(
+            self.locked_packages
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone_box())),
+        );
         result
     }
 
@@ -181,7 +198,7 @@ impl Request {
         let mut present_map: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
-            for package in locked_repository.get_packages() {
+            for package in RepositoryInterface::get_packages(locked_repository) {
                 let key = if package_ids {
                     package.get_id().to_string()
                 } else {
@@ -197,7 +214,7 @@ impl Request {
             } else {
                 spl_object_hash(package)
             };
-            present_map.insert(key, package.clone());
+            present_map.insert(key, package.clone_box());
         }
 
         present_map
@@ -206,7 +223,7 @@ impl Request {
     pub fn get_fixed_packages_map(&self) -> IndexMap<i64, Box<dyn BasePackage>> {
         let mut fixed_packages_map: IndexMap<i64, Box<dyn BasePackage>> = IndexMap::new();
         for (_, package) in &self.fixed_packages {
-            fixed_packages_map.insert(package.get_id(), package.clone());
+            fixed_packages_map.insert(package.get_id(), package.clone_box());
         }
         fixed_packages_map
     }

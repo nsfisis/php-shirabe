@@ -9,8 +9,8 @@ use shirabe_external_packages::composer::pcre::preg::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
     UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
-    get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir, realpath, sort,
-    sort_with_flags, str_repeat, strtr, trim, usort, var_export,
+    get_class_err, get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir,
+    realpath, sort, sort_with_flags, str_repeat, strtr, trim, usort, var_export,
 };
 
 use crate::installed_versions::InstalledVersions;
@@ -139,7 +139,7 @@ impl FilesystemRepository {
                     message: format!(
                         "Invalid repository data in {}, packages could not be loaded: [{}] {}",
                         self.file.get_path(),
-                        get_class(&e),
+                        get_class_err(&e),
                         e,
                     ),
                     code: 0,
@@ -151,18 +151,34 @@ impl FilesystemRepository {
         let mut loader = ArrayLoader::new(None, true);
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
-                let package = loader.load(
-                    (**package_data).clone(),
-                    "Composer\\Package\\CompletePackage",
-                )?;
+                // TODO(phase-b): expected IndexMap<String, PhpMixed> but package_data is PhpMixed.
+                let cfg = (**package_data)
+                    .as_array()
+                    .cloned()
+                    .map(|m| {
+                        m.into_iter()
+                            .map(|(k, v)| (k, *v))
+                            .collect::<IndexMap<String, PhpMixed>>()
+                    })
+                    .unwrap_or_default();
+                let package =
+                    loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
                 self.inner.add_package(package)?;
             }
         } else if let Some(packages_array) = packages.as_array() {
             for (_, package_data) in packages_array.iter() {
-                let package = loader.load(
-                    (**package_data).clone(),
-                    "Composer\\Package\\CompletePackage",
-                )?;
+                // TODO(phase-b): expected IndexMap<String, PhpMixed> but package_data is PhpMixed.
+                let cfg = (**package_data)
+                    .as_array()
+                    .cloned()
+                    .map(|m| {
+                        m.into_iter()
+                            .map(|(k, v)| (k, *v))
+                            .collect::<IndexMap<String, PhpMixed>>()
+                    })
+                    .unwrap_or_default();
+                let package =
+                    loader.load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))?;
                 self.inner.add_package(package)?;
             }
         }
@@ -180,7 +196,7 @@ impl FilesystemRepository {
     pub fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &InstallationManager,
+        installation_manager: &mut InstallationManager,
     ) -> Result<()> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert("packages".to_string(), PhpMixed::List(vec![]));
@@ -226,6 +242,7 @@ impl FilesystemRepository {
                         &repo_dir,
                         &normalized_path,
                         true,
+                        false,
                     ));
                 }
             }
@@ -267,9 +284,8 @@ impl FilesystemRepository {
         }
 
         // PHP: sort($data['dev-package-names']);
-        if let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names") {
-            // TODO(phase-b): sort PhpMixed::List in-place using string comparison
-            sort(list);
+        if let Some(PhpMixed::List(_list)) = data.get_mut("dev-package-names") {
+            // TODO(phase-b): sort PhpMixed::List in-place using string comparison; PhpMixed: !Ord.
         }
         // PHP: usort($data['packages'], static function ($a, $b): int { return strcmp($a['name'], $b['name']); });
         if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
@@ -576,11 +592,7 @@ impl FilesystemRepository {
             };
             // TODO(phase-b): mutate nested versions['versions'][name]['aliases']
             todo!("append alias->getPrettyVersion() to versions['versions'][name]['aliases']");
-            if package
-                .as_any()
-                .downcast_ref::<dyn RootPackageInterface>()
-                .is_some()
-            {
+            if package.as_root_package_interface().is_some() {
                 // TODO(phase-b): same mutation on versions['root']['aliases']
                 todo!("append alias->getPrettyVersion() to versions['root']['aliases']");
             }
@@ -596,9 +608,11 @@ impl FilesystemRepository {
             for (_name, version) in versions_map.iter_mut() {
                 if let PhpMixed::Array(version_map) = version.as_mut() {
                     for key in ["aliases", "replaced", "provided"] {
-                        if let Some(PhpMixed::List(list)) = version_map.get_mut(key) {
-                            // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
-                            sort_with_flags(list, SORT_NATURAL);
+                        if let Some(boxed) = version_map.get_mut(key) {
+                            if let PhpMixed::List(_list) = boxed.as_mut() {
+                                // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
+                                // TODO(phase-b): PhpMixed lacks Ord; needs custom comparator.
+                            }
                         }
                     }
                 }
@@ -642,18 +656,14 @@ impl FilesystemRepository {
             };
         }
 
-        let install_path = if package
-            .as_any()
-            .downcast_ref::<dyn RootPackageInterface>()
-            .is_some()
-        {
+        let install_path = if package.as_root_package_interface().is_some() {
             let to = self.filesystem.borrow_mut().normalize_path(
                 &realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
             );
             Some(
                 self.filesystem
                     .borrow_mut()
-                    .find_shortest_path(repo_dir, &to, true),
+                    .find_shortest_path(repo_dir, &to, true, false),
             )
         } else {
             install_paths.get(package.get_name()).cloned().flatten()

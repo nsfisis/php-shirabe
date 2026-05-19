@@ -39,7 +39,7 @@ use crate::util::platform::Platform;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
-    event_dispatcher: EventDispatcher,
+    event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
     io: Box<dyn IOInterface>,
     dev_mode: Option<bool>,
     class_map_authoritative: bool,
@@ -51,7 +51,10 @@ pub struct AutoloadGenerator {
 }
 
 impl AutoloadGenerator {
-    pub fn new(event_dispatcher: EventDispatcher, io: Option<Box<dyn IOInterface>>) -> Self {
+    pub fn new(
+        event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
+        io: Option<Box<dyn IOInterface>>,
+    ) -> Self {
         let io: Box<dyn IOInterface> = io.unwrap_or_else(|| Box::new(NullIO::new()));
 
         Self {
@@ -122,11 +125,11 @@ impl AutoloadGenerator {
         config: &Config,
         local_repo: &dyn InstalledRepositoryInterface,
         root_package: &dyn RootPackageInterface,
-        installation_manager: &InstallationManager,
+        installation_manager: &mut InstallationManager,
         target_dir: &str,
         scan_psr_packages: bool,
         suffix: Option<String>,
-        locker: Option<&Locker>,
+        locker: Option<&mut Locker>,
         strict_ambiguous: bool,
     ) -> anyhow::Result<ClassMap> {
         let mut scan_psr_packages = scan_psr_packages;
@@ -140,7 +143,7 @@ impl AutoloadGenerator {
             // we assume no-dev mode if no vendor dir is present or it is too old to contain dev information
             self.dev_mode = Some(false);
 
-            let installed_json = JsonFile::new(
+            let mut installed_json = JsonFile::new(
                 format!(
                     "{}/composer/installed.json",
                     config.get("vendor-dir").as_string().unwrap_or("")
@@ -173,7 +176,7 @@ impl AutoloadGenerator {
 
             let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
-            self.event_dispatcher.dispatch_script(
+            self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.unwrap_or(false),
                 vec![],
@@ -185,7 +188,7 @@ impl AutoloadGenerator {
             ClassMapGenerator::new(vec!["php".to_string(), "inc".to_string(), "hh".to_string()]);
         class_map_generator.avoid_duplicate_scans(None);
 
-        let filesystem = Filesystem::new(None);
+        let mut filesystem = Filesystem::new(None);
         filesystem.ensure_directory_exists(config.get("vendor-dir").as_string().unwrap_or(""))?;
         // Do not remove double realpath() calls.
         // Fixes failing Windows realpath() implementation.
@@ -417,11 +420,12 @@ impl AutoloadGenerator {
                         .to_string();
                     for dir in &paths {
                         let dir_str = dir.as_string().unwrap_or("").to_string();
+                        let joined = format!("{}/{}", base_path, dir_str);
                         let dir_str =
                             filesystem.normalize_path(if filesystem.is_absolute_path(&dir_str) {
                                 &dir_str
                             } else {
-                                &format!("{}/{}", base_path, dir_str)
+                                &joined
                             });
                         if !shirabe_php_shim::is_dir(&dir_str) {
                             continue;
@@ -666,7 +670,7 @@ impl AutoloadGenerator {
         if self.run_scripts {
             let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
             additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
-            self.event_dispatcher.dispatch_script(
+            self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.unwrap_or(false),
                 vec![],
@@ -735,7 +739,7 @@ impl AutoloadGenerator {
 
     pub fn build_package_map(
         &self,
-        installation_manager: &InstallationManager,
+        installation_manager: &mut InstallationManager,
         root_package: &dyn RootPackageInterface,
         packages: Vec<Box<dyn PackageInterface>>,
     ) -> anyhow::Result<Vec<(Box<dyn PackageInterface>, Option<String>)>> {
@@ -1731,12 +1735,13 @@ impl AutoloadGenerator {
                         });
 
                         // add support for up-level relative paths
-                        let mut updir: Option<String> = None;
+                        let updir_cell: std::cell::RefCell<Option<String>> =
+                            std::cell::RefCell::new(None);
                         let p = Preg::replace_callback(
                             "{^((?:(?:\\\\\\.){1,2}+/)+)}",
                             |matches: &IndexMap<CaptureKey, String>| -> String {
                                 // undo preg_quote for the matched string
-                                updir = Some(str_replace(
+                                *updir_cell.borrow_mut() = Some(str_replace(
                                     "\\.",
                                     ".",
                                     matches
@@ -1750,6 +1755,7 @@ impl AutoloadGenerator {
                             &p,
                         )
                         .unwrap_or_default();
+                        let updir: Option<String> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
                             strtr(&Platform::get_cwd(false).unwrap_or_default(), "\\", "/")
                         } else {

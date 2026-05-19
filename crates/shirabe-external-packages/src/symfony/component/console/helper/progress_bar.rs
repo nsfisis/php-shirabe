@@ -31,4 +31,8 @@ impl ProgressBar {
     pub fn get_max_steps(&self) -> i64 {
         todo!()
     }
+
+    pub fn set_progress(&mut self, _step: i64) {
+        todo!()
+    }
 }

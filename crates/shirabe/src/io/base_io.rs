@@ -446,11 +446,11 @@ pub trait BaseIO: IOInterface {
         let mut message_str = message.as_string().unwrap_or("").to_string();
 
         if !context.is_empty() {
-            let json = Silencer::call(|| {
-                json_encode_ex(
+            let json: anyhow::Result<Option<String>> = Silencer::call(|| {
+                Ok(json_encode_ex(
                     &PhpMixed::Array(context.clone()),
                     JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-                )
+                ))
             });
             if let Ok(Some(json_str)) = json {
                 message_str += " ";

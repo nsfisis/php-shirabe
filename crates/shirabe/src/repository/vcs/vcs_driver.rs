@@ -70,12 +70,21 @@ impl VcsDriverBase {
     }
 
     pub fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
-        let options = self
+        let options_mixed = self
             .repo_config
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        self.http_downloader.borrow_mut().get(url, &options)
+        // TODO(phase-b): convert PhpMixed::Array options into IndexMap<String, PhpMixed> properly.
+        let options: IndexMap<String, PhpMixed> = match options_mixed {
+            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
+        // TODO(phase-b): map anyhow::Error from HttpDownloader::get into TransportException.
+        self.http_downloader
+            .borrow_mut()
+            .get(url, options)
+            .map_err(|e| TransportException::new(e.to_string(), 0))
     }
 
     // Helper for concrete drivers: produces the same value as the trait default
@@ -155,9 +164,15 @@ pub trait VcsDriver: VcsDriverInterface {
     ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         if !self.info_cache().contains_key(identifier) {
             if self.should_cache(identifier) {
-                if let Some(res) = self.cache().and_then(|c| c.read(identifier)) {
-                    let parsed = JsonFile::parse_json(&res, None)?;
-                    self.info_cache_mut().insert(identifier.to_string(), parsed);
+                if let Some(res) = self.cache_mut().and_then(|c| c.read(identifier)) {
+                    let parsed = JsonFile::parse_json(Some(&res), None)?;
+                    // TODO(phase-b): unwrap PhpMixed::Array into IndexMap<String, PhpMixed>.
+                    let parsed_map: Option<IndexMap<String, PhpMixed>> = match parsed {
+                        PhpMixed::Array(a) => Some(a.into_iter().map(|(k, v)| (k, *v)).collect()),
+                        _ => None,
+                    };
+                    self.info_cache_mut()
+                        .insert(identifier.to_string(), parsed_map);
                     return Ok(self.info_cache().get(identifier).and_then(|v| v.clone()));
                 }
             }
@@ -166,11 +181,18 @@ pub trait VcsDriver: VcsDriverInterface {
 
             if self.should_cache(identifier) {
                 if let Some(ref composer_map) = composer {
-                    let encoded = JsonFile::encode_with_options(
-                        composer_map,
+                    // TODO(phase-b): use a dedicated encode-with-options helper; reuse encode for now.
+                    let composer_mixed = PhpMixed::Array(
+                        composer_map
+                            .iter()
+                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                            .collect(),
+                    );
+                    let encoded = JsonFile::encode(
+                        &composer_mixed,
                         JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
                     );
-                    self.cache().map(|c| c.write(identifier, &encoded));
+                    self.cache_mut().map(|c| c.write(identifier, &encoded));
                 }
             }
 
@@ -194,14 +216,14 @@ pub trait VcsDriver: VcsDriverInterface {
         };
 
         let composer = JsonFile::parse_json(
-            &composer_file_content,
+            Some(&composer_file_content),
             Some(&format!("{}:composer.json", identifier)),
         )?;
 
-        let mut composer = match composer {
-            None => return Ok(None),
-            Some(c) if c.is_empty() => return Ok(None),
-            Some(c) => c,
+        // TODO(phase-b): unwrap PhpMixed::Array into IndexMap<String, PhpMixed>.
+        let mut composer: IndexMap<String, PhpMixed> = match composer {
+            PhpMixed::Array(a) if !a.is_empty() => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => return Ok(None),
         };
 
         if !composer.contains_key("time")
@@ -235,12 +257,21 @@ pub trait VcsDriver: VcsDriverInterface {
     }
 
     fn get_contents(&self, url: &str) -> anyhow::Result<Response, TransportException> {
-        let options = self
+        let options_mixed = self
             .repo_config()
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        self.http_downloader().borrow_mut().get(url, &options)
+        // TODO(phase-b): convert PhpMixed::Array options into IndexMap<String, PhpMixed> properly.
+        let options: IndexMap<String, PhpMixed> = match options_mixed {
+            PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => IndexMap::new(),
+        };
+        // TODO(phase-b): map anyhow::Error from HttpDownloader::get into TransportException.
+        self.http_downloader()
+            .borrow_mut()
+            .get(url, options)
+            .map_err(|e| TransportException::new(e.to_string(), 0))
     }
 
     fn cleanup(&self) {}

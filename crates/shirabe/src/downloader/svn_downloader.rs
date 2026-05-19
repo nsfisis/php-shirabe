@@ -7,10 +7,14 @@ use shirabe_external_packages::react::promise;
 use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
+use crate::config::Config;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::vcs_downloader::VcsDownloaderBase;
 use crate::io::io_interface::IOInterface;
 use crate::package::package_interface::PackageInterface;
 use crate::repository::vcs_repository::VcsRepository;
+use crate::util::filesystem::Filesystem;
+use crate::util::process_executor::ProcessExecutor;
 use crate::util::svn::Svn as SvnUtil;
 
 #[derive(Debug)]
@@ -20,6 +24,18 @@ pub struct SvnDownloader {
 }
 
 impl SvnDownloader {
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+        fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+    ) -> Self {
+        Self {
+            inner: VcsDownloaderBase::new(io, config, Some(process), Some(fs)),
+            cache_credentials: true,
+        }
+    }
+
     pub(crate) fn do_download(
         &mut self,
         package: &dyn PackageInterface,
@@ -28,8 +44,8 @@ impl SvnDownloader {
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Box<dyn PromiseInterface>> {
         SvnUtil::clean_env();
-        let util = SvnUtil::new(
-            url,
+        let mut util = SvnUtil::new(
+            url.to_string(),
             self.inner.io.clone_box(),
             std::rc::Rc::clone(&self.inner.config),
             Some(std::rc::Rc::clone(&self.inner.process)),
@@ -70,7 +86,10 @@ impl SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(" Checking out {}", package.get_source_reference()),
+            &format!(
+                " Checking out {}",
+                package.get_source_reference().unwrap_or_default()
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -78,7 +97,7 @@ impl SvnDownloader {
             package,
             url,
             vec!["svn".to_string(), "co".to_string()],
-            &format!("{}/{}", url, r#ref),
+            &format!("{}/{}", url, r#ref.unwrap_or_default()),
             None,
             Some(path),
         )?;
@@ -107,8 +126,8 @@ impl SvnDownloader {
             .into());
         }
 
-        let util = SvnUtil::new(
-            url,
+        let mut util = SvnUtil::new(
+            url.to_string(),
             self.inner.io.clone_box(),
             std::rc::Rc::clone(&self.inner.config),
             Some(std::rc::Rc::clone(&self.inner.process)),
@@ -119,7 +138,7 @@ impl SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(" Checking out {}", r#ref),
+            &format!(" Checking out {}", r#ref.unwrap_or_default()),
             true,
             io_interface::NORMAL,
         );
@@ -129,7 +148,7 @@ impl SvnDownloader {
             target,
             url,
             command,
-            &format!("{}/{}", url, r#ref),
+            &format!("{}/{}", url, r#ref.unwrap_or_default()),
             Some(path),
             None,
         )?;
@@ -168,7 +187,7 @@ impl SvnDownloader {
         path: Option<&str>,
     ) -> anyhow::Result<String> {
         let mut util = SvnUtil::new(
-            base_url,
+            base_url.to_string(),
             self.inner.io.clone_box(),
             std::rc::Rc::clone(&self.inner.config),
             Some(std::rc::Rc::clone(&self.inner.process)),
@@ -212,6 +231,7 @@ impl SvnDownloader {
 
         let changes_str = changes.unwrap();
         let changes: Vec<String> = Preg::split(r"{\s*\r?\n\s*}", &changes_str)
+            .unwrap_or_default()
             .into_iter()
             .map(|elem| format!("    {}", elem))
             .collect();
@@ -226,16 +246,10 @@ impl SvnDownloader {
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        self.inner.io.write_error3(
-            PhpMixed::List(
-                changes[..slice_end]
-                    .iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                    .collect(),
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+        // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line for now.
+        for line in &changes[..slice_end] {
+            self.inner.io.write_error3(line, true, io_interface::NORMAL);
+        }
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
             self.inner.io.write_error3(
@@ -271,34 +285,28 @@ impl SvnDownloader {
                     .into());
                 }
                 Some("v") => {
-                    self.inner.io.write_error3(
-                        PhpMixed::List(
-                            changes
-                                .iter()
-                                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                .collect(),
-                        ),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line.
+                    for line in &changes {
+                        self.inner.io.write_error3(line, true, io_interface::NORMAL);
+                    }
                 }
                 _ => {
-                    self.inner.io.write_error3(
-                        PhpMixed::List(vec![
-                            Box::new(PhpMixed::String(format!(
-                                "    y - discard changes and apply the {}",
-                                if update { "update" } else { "uninstall" }
-                            ))),
-                            Box::new(PhpMixed::String(format!(
-                                "    n - abort the {} and let you manually clean things up",
-                                if update { "update" } else { "uninstall" }
-                            ))),
-                            Box::new(PhpMixed::String("    v - view modified files".to_string())),
-                            Box::new(PhpMixed::String("    ? - print help".to_string())),
-                        ]),
-                        true,
-                        io_interface::NORMAL,
-                    );
+                    // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line.
+                    let help_lines = vec![
+                        format!(
+                            "    y - discard changes and apply the {}",
+                            if update { "update" } else { "uninstall" }
+                        ),
+                        format!(
+                            "    n - abort the {} and let you manually clean things up",
+                            if update { "update" } else { "uninstall" }
+                        ),
+                        "    v - view modified files".to_string(),
+                        "    ? - print help".to_string(),
+                    ];
+                    for line in &help_lines {
+                        self.inner.io.write_error3(line, true, io_interface::NORMAL);
+                    }
                 }
             }
         }
@@ -374,7 +382,7 @@ impl SvnDownloader {
             ];
 
             let mut util = SvnUtil::new(
-                &base_url,
+                base_url,
                 self.inner.io.clone_box(),
                 std::rc::Rc::clone(&self.inner.config),
                 Some(std::rc::Rc::clone(&self.inner.process)),
@@ -419,5 +427,71 @@ impl SvnDownloader {
 
     pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {
         is_dir(&format!("{}/.svn", path))
+    }
+}
+
+// TODO(phase-b): wire up VcsDownloader trait properly. SvnDownloader extends VcsDownloader which
+// implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
+// VcsDownloaderBase exposes the matching impl surface.
+impl DownloaderInterface for SvnDownloader {
+    fn get_installation_source(&self) -> String {
+        todo!()
+    }
+
+    fn download(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+        _output: bool,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn prepare(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn install(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn update(
+        &self,
+        _initial: &dyn PackageInterface,
+        _target: &dyn PackageInterface,
+        _path: &str,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn remove(
+        &self,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _output: bool,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
+    }
+
+    fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _path: &str,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+        todo!()
     }
 }

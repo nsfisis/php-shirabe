@@ -88,7 +88,7 @@ impl GitHubDriver {
             self.inner.origin_url = "github.com".to_string();
         }
         self.inner.cache = Some(Cache::new(
-            self.inner.io.as_ref(),
+            self.inner.io.clone_box(),
             &format!(
                 "{}/{}/{}/{}",
                 self.inner
@@ -186,7 +186,11 @@ impl GitHubDriver {
 
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
         if let Some(ref git_driver) = self.git_driver {
-            return git_driver.get_source(identifier);
+            return git_driver
+                .get_source(identifier)
+                .into_iter()
+                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .collect();
         }
         let url = if self.is_private {
             // Private GitHub repositories should be accessed using the
@@ -239,17 +243,21 @@ impl GitHubDriver {
                 && self
                     .inner
                     .cache
-                    .as_ref()
+                    .as_mut()
                     .and_then(|c| c.read(identifier))
                     .is_some()
             {
                 let res = self
                     .inner
                     .cache
-                    .as_ref()
+                    .as_mut()
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
-                JsonFile::parse_json(&res, None)?
+                // TODO(phase-b): cached payload is JSON string; parse to PhpMixed -> Option<IndexMap>
+                let parsed = JsonFile::parse_json(Some(&res), None)?;
+                parsed
+                    .as_array()
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
@@ -260,11 +268,17 @@ impl GitHubDriver {
 
                 if self.inner.should_cache(identifier) {
                     if let Some(ref composer_map) = composer {
-                        self.inner.cache.as_ref().map(|c| {
+                        let php_value: PhpMixed = PhpMixed::Array(
+                            composer_map
+                                .iter()
+                                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                .collect(),
+                        );
+                        self.inner.cache.as_mut().map(|c| {
                             c.write(
                                 identifier,
-                                &JsonFile::encode_with_options(
-                                    composer_map,
+                                &JsonFile::encode(
+                                    &php_value,
                                     shirabe_php_shim::JSON_UNESCAPED_UNICODE
                                         | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
                                 ),
@@ -410,10 +424,11 @@ impl GitHubDriver {
         ] {
             let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
             options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-            let response = self.inner.http_downloader.borrow_mut().get(
-                file_url,
-                &PhpMixed::Array(options.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-            );
+            let response = self
+                .inner
+                .http_downloader
+                .borrow_mut()
+                .get(file_url, options);
             let response = match response {
                 Ok(r) => r,
                 Err(_) => continue,
@@ -1004,7 +1019,8 @@ impl GitHubDriver {
                     std::rc::Rc::clone(&self.inner.config),
                     Some(std::rc::Rc::clone(&self.inner.process)),
                     Some(std::rc::Rc::clone(&self.inner.http_downloader)),
-                )?;
+                )
+                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                 match e.code {
                     401 | 404 => {
@@ -1018,12 +1034,8 @@ impl GitHubDriver {
                         }
 
                         if !self.inner.io.is_interactive() {
-                            self.attempt_clone_fallback(Some(&e)).map_err(|err| {
-                                TransportException {
-                                    message: err.to_string(),
-                                    code: 0,
-                                }
-                            })?;
+                            self.attempt_clone_fallback(Some(&e))
+                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             let mut req = IndexMap::new();
                             req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
@@ -1088,12 +1100,8 @@ impl GitHubDriver {
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
-                            self.attempt_clone_fallback(Some(&e)).map_err(|err| {
-                                TransportException {
-                                    message: err.to_string(),
-                                    code: 0,
-                                }
-                            })?;
+                            self.attempt_clone_fallback(Some(&e))
+                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
                             let mut req = IndexMap::new();
                             req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
@@ -1286,7 +1294,7 @@ impl GitHubDriver {
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut git_driver = GitDriver::new(
             repo_config,
-            self.inner.io.clone(),
+            self.inner.io.clone_box(),
             self.inner.config.clone(),
             std::rc::Rc::clone(&self.inner.http_downloader),
             std::rc::Rc::clone(&self.inner.process),

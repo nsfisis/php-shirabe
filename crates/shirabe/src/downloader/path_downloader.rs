@@ -11,10 +11,14 @@ use shirabe_php_shim::{
     RuntimeException, file_exists, function_exists, is_dir, realpath,
 };
 
+use crate::cache::Cache;
+use crate::config::Config;
 use crate::dependency_resolver::operation::install_operation::InstallOperation;
 use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
+use crate::downloader::downloader_interface::DownloaderInterface;
 use crate::downloader::file_downloader::FileDownloader;
 use crate::downloader::vcs_capable_downloader_interface::VcsCapableDownloaderInterface;
+use crate::event_dispatcher::event_dispatcher::EventDispatcher;
 use crate::io::io_interface::IOInterface;
 use crate::package::archiver::archivable_files_finder::ArchivableFilesFinder;
 use crate::package::dumper::array_dumper::ArrayDumper;
@@ -22,7 +26,9 @@ use crate::package::package_interface::PackageInterface;
 use crate::package::version::version_guesser::VersionGuesser;
 use crate::package::version::version_parser::VersionParser;
 use crate::util::filesystem::Filesystem;
+use crate::util::http_downloader::HttpDownloader;
 use crate::util::platform::Platform;
+use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct PathDownloader {
@@ -32,6 +38,28 @@ pub struct PathDownloader {
 impl PathDownloader {
     const STRATEGY_SYMLINK: i64 = 10;
     const STRATEGY_MIRROR: i64 = 20;
+
+    pub fn new(
+        io: Box<dyn IOInterface>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
+        event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
+        cache: Option<Cache>,
+        filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: FileDownloader::new(
+                io,
+                config,
+                http_downloader,
+                event_dispatcher,
+                cache,
+                Some(filesystem),
+                Some(process),
+            ),
+        }
+    }
 
     pub fn download(
         &mut self,
@@ -140,7 +168,7 @@ impl PathDownloader {
         let (mut current_strategy, allowed_strategies) =
             self.compute_allowed_strategies(&transport_options)?;
 
-        let symfony_filesystem = SymfonyFilesystem::new(None);
+        let symfony_filesystem = SymfonyFilesystem::new();
         self.inner.filesystem.borrow_mut().remove_directory(&path);
 
         if output {
@@ -153,58 +181,63 @@ impl PathDownloader {
 
         let mut is_fallback = false;
         if Self::STRATEGY_SYMLINK == current_strategy {
-            let symlink_result: Result<Result<(), IOException>> = (|| {
-                if Platform::is_windows() {
-                    // Implement symlinks as NTFS junctions on Windows
-                    if output {
-                        self.inner.io.write_error3(
-                            &format!("Junctioning from {}", url),
-                            false,
-                            io_interface::NORMAL,
-                        );
-                    }
-                    Ok(self
-                        .inner
-                        .filesystem
-                        .borrow_mut()
-                        .junction(&real_url, &path))
-                } else {
-                    let path = path.trim_end_matches('/').to_string();
-                    if output {
-                        self.inner.io.write_error3(
-                            &format!("Symlinking from {}", url),
-                            false,
-                            io_interface::NORMAL,
-                        );
-                    }
-                    if transport_options
-                        .get("relative")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false)
-                    {
-                        let absolute_path =
-                            if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
-                                format!(
-                                    "{}{}{}",
-                                    Platform::get_cwd(false),
-                                    DIRECTORY_SEPARATOR,
-                                    path
-                                )
-                            } else {
-                                path.clone()
-                            };
-                        let shortest_path = self.inner.filesystem.borrow_mut().find_shortest_path(
-                            &absolute_path,
-                            &real_url,
-                            false,
-                            true,
-                        );
-                        Ok(symfony_filesystem.symlink(&format!("{}/", shortest_path), &path))
+            // TODO(phase-b): PHP catches IOException; shim symfony filesystem returns anyhow::Result.
+            let symlink_result: Result<anyhow::Result<()>> =
+                (|| {
+                    if Platform::is_windows() {
+                        // Implement symlinks as NTFS junctions on Windows
+                        if output {
+                            self.inner.io.write_error3(
+                                &format!("Junctioning from {}", url),
+                                false,
+                                io_interface::NORMAL,
+                            );
+                        }
+                        Ok(self
+                            .inner
+                            .filesystem
+                            .borrow_mut()
+                            .junction(&real_url, &path))
                     } else {
-                        Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path))
+                        let path = path.trim_end_matches('/').to_string();
+                        if output {
+                            self.inner.io.write_error3(
+                                &format!("Symlinking from {}", url),
+                                false,
+                                io_interface::NORMAL,
+                            );
+                        }
+                        if transport_options
+                            .get("relative")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false)
+                        {
+                            let absolute_path =
+                                if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
+                                    format!(
+                                        "{}{}{}",
+                                        Platform::get_cwd(false)?,
+                                        DIRECTORY_SEPARATOR,
+                                        path
+                                    )
+                                } else {
+                                    path.clone()
+                                };
+                            let shortest_path = self
+                                .inner
+                                .filesystem
+                                .borrow_mut()
+                                .find_shortest_path(&absolute_path, &real_url, false, true);
+                            Ok(symfony_filesystem.symlink(
+                                &format!("{}/", shortest_path),
+                                &path,
+                                false,
+                            ))
+                        } else {
+                            Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path, false))
+                        }
                     }
-                }
-            })();
+                })();
 
             match symlink_result? {
                 Ok(()) => {}
@@ -249,8 +282,9 @@ impl PathDownloader {
                     io_interface::NORMAL,
                 );
             }
-            let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
-            symfony_filesystem.mirror(&real_url, &path, Some(&iterator));
+            let _iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
+            // TODO(phase-b): pass iterator as PhpMixed; ArchivableFilesFinder iterator wrapping not modelled yet.
+            symfony_filesystem.mirror(&real_url, &path, None, &IndexMap::new())?;
         }
 
         if output {
@@ -325,12 +359,12 @@ impl PathDownloader {
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {
-            format!("{}/{}", Platform::get_cwd(false), path)
+            format!("{}/{}", Platform::get_cwd(false)?, path)
         };
         let abs_dist_url = if fs.is_absolute_path(&url) {
-            url.clone()
+            url.to_string()
         } else {
-            format!("{}/{}", Platform::get_cwd(false), url)
+            format!("{}/{}", Platform::get_cwd(false)?, url)
         };
         if fs.normalize_path(&abs_path) == fs.normalize_path(&abs_dist_url) {
             if output {
@@ -354,7 +388,7 @@ impl PathDownloader {
     pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
-        let guesser = VersionGuesser::new(
+        let mut guesser = VersionGuesser::new(
             std::rc::Rc::clone(&self.inner.config),
             std::rc::Rc::clone(&self.inner.process),
             parser.clone(),
@@ -364,11 +398,8 @@ impl PathDownloader {
 
         let package_config = dumper.dump(package);
         let package_version = guesser.guess_version(&package_config, &path);
-        if let Some(version) = package_version {
-            return version
-                .get("commit")
-                .and_then(|v| v.as_string())
-                .map(|s| s.to_owned());
+        if let Ok(Some(version)) = package_version {
+            return version.commit;
         }
 
         None
@@ -500,5 +531,72 @@ impl PathDownloader {
 impl VcsCapableDownloaderInterface for PathDownloader {
     fn get_vcs_reference(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
         PathDownloader::get_vcs_reference(self, package, &path)
+    }
+}
+
+// TODO(phase-b): wire up PathDownloader trait properly. PathDownloader extends FileDownloader and
+// overrides download/install/remove with &mut self signatures that diverge from the trait. The
+// trait methods here delegate to the inner FileDownloader; the bespoke overrides on the struct
+// itself are not yet routed through the trait.
+impl DownloaderInterface for PathDownloader {
+    fn get_installation_source(&self) -> String {
+        self.inner.get_installation_source()
+    }
+
+    fn download(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.download(package, path, prev_package, output)
+    }
+
+    fn prepare(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.prepare(r#type, package, path, prev_package)
+    }
+
+    fn install(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.install(package, path, output)
+    }
+
+    fn update(
+        &self,
+        initial: &dyn PackageInterface,
+        target: &dyn PackageInterface,
+        path: &str,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.update(initial, target, path)
+    }
+
+    fn remove(
+        &self,
+        package: &dyn PackageInterface,
+        path: &str,
+        output: bool,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.remove(package, path, output)
+    }
+
+    fn cleanup(
+        &self,
+        r#type: &str,
+        package: &dyn PackageInterface,
+        path: &str,
+        prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Box<dyn PromiseInterface>> {
+        self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

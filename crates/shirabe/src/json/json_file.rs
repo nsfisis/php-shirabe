@@ -413,17 +413,27 @@ impl JsonFile {
 
         if (options & JSON_PRETTY_PRINT) > 0 && indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
-            let indent = indent.to_string();
+            let indent_owned = indent.to_string();
             return Preg::replace_callback(
                 r"#^ {4,}#m",
-                move |m| -> String {
-                    str_repeat(
-                        &indent,
-                        (strlen(m.get(&0).map(|s| s.as_str()).unwrap_or("")) / 4) as usize,
-                    )
+                move |m: &indexmap::IndexMap<
+                    shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                    String,
+                >|
+                      -> String {
+                    let whole = m
+                        .get(
+                            &shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(
+                                0,
+                            ),
+                        )
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    str_repeat(&indent_owned, (strlen(whole) / 4) as usize)
                 },
                 &json,
-            );
+            )
+            .unwrap_or(json);
         }
 
         json
@@ -471,13 +481,15 @@ impl JsonFile {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
             if let Some(file) = file {
                 if str_ends_with(file, ".lock") && str_contains(json, "\"content-hash\"") {
-                    // TODO(phase-b): Preg::replace_with_count signature unavailable; ignoring $count
-                    let replaced = Preg::replace(
+                    let mut count: usize = 0;
+                    let replaced = Preg::replace5(
                         r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#,
                         "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
                         json,
-                    );
-                    let count = todo!("Preg::replace returning $count");
+                        -1,
+                        &mut count,
+                    )
+                    .unwrap_or_else(|_| json.to_string());
                     if count == 1 {
                         data = json_decode(&replaced, true)?;
                         if !matches!(data, PhpMixed::Null) {
@@ -523,7 +535,7 @@ impl JsonFile {
                     "The input does not contain valid JSON\n{}",
                     result.get_message()
                 ),
-                result.get_details(),
+                None,
             ),
             Some(f) => ParsingException::new(
                 format!(
@@ -531,7 +543,7 @@ impl JsonFile {
                     f,
                     result.get_message()
                 ),
-                result.get_details(),
+                None,
             ),
         }
         .into())

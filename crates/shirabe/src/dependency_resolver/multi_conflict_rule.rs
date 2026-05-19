@@ -143,6 +143,10 @@ impl Rule for MultiConflictRule {
     fn is_assertion(&self) -> bool {
         todo!()
     }
+
+    fn as_multi_conflict(&self) -> Option<&MultiConflictRule> {
+        Some(self)
+    }
 }
 
 impl std::fmt::Display for MultiConflictRule {

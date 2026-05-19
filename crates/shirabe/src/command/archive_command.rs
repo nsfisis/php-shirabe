@@ -62,7 +62,11 @@ impl ArchiveCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let composer = self.try_composer(None, None);
         let mut config: Option<std::rc::Rc<std::cell::RefCell<Config>>> = None;
 
@@ -71,8 +75,10 @@ impl ArchiveCommand {
             // TODO(plugin): dispatch CommandEvent
             let command_event = CommandEvent::new(PluginEvents::COMMAND, "archive", input, output);
             let event_dispatcher = composer.get_event_dispatcher();
-            event_dispatcher.dispatch(Some(command_event.get_name()), None);
-            event_dispatcher.dispatch_script(
+            event_dispatcher
+                .borrow_mut()
+                .dispatch(Some(command_event.get_name()), None);
+            event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,
                 vec![],
@@ -111,8 +117,10 @@ impl ArchiveCommand {
                     .to_string()
             });
 
+        // TODO(phase-b): clone_box to release self borrow held by get_io.
+        let mut io_box = self.get_io().clone_box();
         let return_code = self.archive(
-            self.get_io(),
+            io_box.as_mut(),
             &config,
             input
                 .get_argument("package")
@@ -137,12 +145,15 @@ impl ArchiveCommand {
 
         if return_code == 0 {
             if let Some(ref composer) = composer {
-                composer.get_event_dispatcher().dispatch_script(
-                    ScriptEvents::POST_ARCHIVE_CMD,
-                    true,
-                    vec![],
-                    indexmap::IndexMap::new(),
-                );
+                composer
+                    .get_event_dispatcher()
+                    .borrow_mut()
+                    .dispatch_script(
+                        ScriptEvents::POST_ARCHIVE_CMD,
+                        true,
+                        vec![],
+                        indexmap::IndexMap::new(),
+                    );
             }
         }
 
@@ -150,8 +161,8 @@ impl ArchiveCommand {
     }
 
     pub fn archive(
-        &self,
-        io: &dyn IOInterface,
+        &mut self,
+        io: &mut dyn IOInterface,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: Option<String>,
         version: Option<String>,
@@ -166,7 +177,7 @@ impl ArchiveCommand {
             composer.get_archive_manager()
         } else {
             let factory = Factory;
-            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())));
             let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
                 Factory::create_http_downloader(io, config, indexmap::IndexMap::new())?,
             ));
@@ -221,8 +232,8 @@ impl ArchiveCommand {
     }
 
     pub fn select_package(
-        &self,
-        io: &dyn IOInterface,
+        &mut self,
+        io: &mut dyn IOInterface,
         package_name: &str,
         version: Option<&str>,
     ) -> Result<Option<Box<dyn CompletePackageInterface>>> {
@@ -248,12 +259,12 @@ impl ArchiveCommand {
             min_stability = composer.get_package().get_minimum_stability().to_string();
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io)?;
-            let repo_names: Vec<String> = default_repos.iter().map(|r| r.get_repo_name()).collect();
+            let repo_names: Vec<String> = default_repos.keys().cloned().collect();
             io.write_error(&format!(
                 "No composer.json found in the current directory, searching packages from {}",
                 repo_names.join(", ")
             ));
-            repo = CompositeRepository::new(default_repos);
+            repo = CompositeRepository::new(default_repos.into_values().collect());
             min_stability = "stable".to_string();
         }
 

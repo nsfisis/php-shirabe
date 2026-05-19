@@ -158,7 +158,7 @@ impl DownloadManager {
                 message: sprintf(
                     "Downloader \"%s\" is a %s type downloader and can not be used to download %s for package %s",
                     &[
-                        PhpMixed::String(get_class(downloader)),
+                        PhpMixed::String(shirabe_php_shim::get_class_obj(downloader)),
                         PhpMixed::String(downloader.get_installation_source()),
                         PhpMixed::String(installation_source.unwrap_or("").to_string()),
                         PhpMixed::String(package.to_string()),
@@ -273,9 +273,12 @@ impl DownloadManager {
 
             // PHP: $result->then(static fn ($res) => $res, $handleError);
             // TODO(phase-b): chain $handleError as the rejection handler on the promise
-            let res = result.then(Box::new(move |res: PhpMixed| -> Result<PhpMixed> {
-                Ok(res)
-            }));
+            let res = result.then(
+                Some(Box::new(move |res: Option<PhpMixed>| -> Option<PhpMixed> {
+                    res
+                })),
+                None,
+            );
 
             return Ok(res);
         }
@@ -384,12 +387,15 @@ impl DownloadManager {
         let promise = initial_downloader.unwrap().remove2(initial, &target_dir)?;
 
         let target_dir_owned = target_dir.clone();
-        // TODO(phase-b): capture self and target into the closure
-        Ok(promise.then(Box::new(
-            move |_res: PhpMixed| -> Result<Box<dyn PromiseInterface>> {
+        // TODO(phase-b): capture self and target into the closure; type mismatch with then signature.
+        let _ = target_dir_owned;
+        Ok(promise.then(
+            Some(Box::new(move |res: Option<PhpMixed>| -> Option<PhpMixed> {
+                let _ = res;
                 todo!("self.install(target, &target_dir_owned)")
-            },
-        )))
+            })),
+            None,
+        ))
     }
 
     /// Removes package from target dir.

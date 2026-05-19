@@ -19,13 +19,13 @@ impl ConsoleOutput {
 }
 
 impl OutputInterface for ConsoleOutput {
-    fn write(&mut self, _messages: &str, _newline: bool, _type: i64) {
+    fn write(&self, _messages: &str, _newline: bool, _type: i64) {
         todo!()
     }
-    fn writeln(&mut self, _messages: &str, _type: i64) {
+    fn writeln(&self, _messages: &str, _type: i64) {
         todo!()
     }
-    fn set_verbosity(&mut self, _level: i64) {
+    fn set_verbosity(&self, _level: i64) {
         todo!()
     }
     fn get_verbosity(&self) -> i64 {
@@ -43,13 +43,13 @@ impl OutputInterface for ConsoleOutput {
     fn is_debug(&self) -> bool {
         todo!()
     }
-    fn set_decorated(&mut self, _decorated: bool) {
+    fn set_decorated(&self, _decorated: bool) {
         todo!()
     }
     fn is_decorated(&self) -> bool {
         todo!()
     }
-    fn set_formatter(&mut self, _formatter: OutputFormatter) {
+    fn set_formatter(&self, _formatter: OutputFormatter) {
         todo!()
     }
     fn get_formatter(&self) -> &OutputFormatter {

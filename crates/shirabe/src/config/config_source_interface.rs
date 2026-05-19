@@ -1,20 +1,14 @@
 //! ref: composer/src/Composer/Config/ConfigSourceInterface.php
 
-use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 pub trait ConfigSourceInterface: std::fmt::Debug {
-    fn add_repository(
-        &mut self,
-        name: &str,
-        config: Option<IndexMap<String, PhpMixed>>,
-        append: bool,
-    ) -> anyhow::Result<()>;
+    fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()>;
 
     fn insert_repository(
         &mut self,
         name: &str,
-        config: Option<IndexMap<String, PhpMixed>>,
+        config: PhpMixed,
         reference_name: &str,
         offset: i64,
     ) -> anyhow::Result<()>;

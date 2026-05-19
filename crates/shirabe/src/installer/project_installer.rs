@@ -97,9 +97,11 @@ impl InstallerInterface for ProjectInstaller {
         _repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
-        self.download_manager
-            .borrow()
-            .install(package, &self.install_path)
+        Ok(Some(
+            self.download_manager
+                .borrow()
+                .install(package, &self.install_path)?,
+        ))
     }
 
     fn update(

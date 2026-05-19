@@ -5,7 +5,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, time};
 
 use crate::config::Config;
-use crate::config::config_source_interface::ConfigSourceInterface;
 use crate::downloader::transport_exception::TransportException;
 use crate::factory::Factory;
 use crate::io::io_interface::IOInterface;
@@ -83,7 +82,7 @@ impl Bitbucket {
             .execute(
                 PhpMixed::from(vec!["git", "config", "bitbucket.accesstoken"]),
                 Some(&mut output),
-                None,
+                (),
             )
             .unwrap_or(1)
             == 0
@@ -212,17 +211,21 @@ impl Bitbucket {
             self.io.write_error3(msg, true, io_interface::NORMAL);
         }
 
-        let config_ref = self.config.borrow();
-        let local_auth_config = config_ref.get_local_auth_config_source();
+        let local_auth_config_name: Option<String> = self
+            .config
+            .borrow()
+            .get_local_auth_config_source()
+            .map(|c| c.get_name());
+        let has_local_auth_config = local_auth_config_name.is_some();
+        let auth_config_source_name = self.config.borrow().get_auth_config_source().get_name();
         let url =
             "https://support.atlassian.com/bitbucket-cloud/docs/use-oauth-on-bitbucket-cloud/";
         self.io
             .write_error3("Follow the instructions here:", true, io_interface::NORMAL);
         self.io.write_error3(url, true, io_interface::NORMAL);
-        let auth_config_source_name = config_ref.get_auth_config_source().get_name();
-        let local_name_prefix = local_auth_config
+        let local_name_prefix = local_auth_config_name
             .as_ref()
-            .map(|c| format!("{} OR ", c.get_name()))
+            .map(|name| format!("{} OR ", name))
             .unwrap_or_default();
         self.io.write_error3(
             &format!(
@@ -239,7 +242,7 @@ impl Bitbucket {
         );
 
         let mut store_in_local_auth_config = false;
-        if local_auth_config.is_some() {
+        if has_local_auth_config {
             store_in_local_auth_config = self.io.ask_confirmation(
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
@@ -299,34 +302,14 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        let use_local = store_in_local_auth_config
-            && self
-                .config
-                .borrow()
-                .get_local_auth_config_source()
-                .is_some();
-        if use_local {
-            let mut auth_config_source =
-                self.config.borrow().get_local_auth_config_source().unwrap();
-            self.store_in_auth_config(
-                &mut *auth_config_source,
-                origin_url,
-                &consumer_key,
-                &consumer_secret,
-            )?;
-        } else {
-            let mut auth_config_source = self.config.borrow().get_auth_config_source();
-            self.store_in_auth_config(
-                &mut *auth_config_source,
-                origin_url,
-                &consumer_key,
-                &consumer_secret,
-            )?;
-        }
+        // TODO(phase-b): PHP $authConfigSource parameter is unused inside storeInAuthConfig
+        //   (upstream Composer bug); the dispatch on local vs. global is dropped here too.
+        let _ = store_in_local_auth_config;
+        self.store_in_auth_config(origin_url, &consumer_key, &consumer_secret)?;
 
         self.config
-            .borrow()
-            .get_auth_config_source()
+            .borrow_mut()
+            .get_auth_config_source_mut()
             .remove_config_setting(&format!("http-basic.{}", origin_url))?;
 
         self.io.write_error3(
@@ -364,29 +347,9 @@ impl Bitbucket {
             return Ok(String::new());
         }
 
-        let use_local = self
-            .config
-            .borrow()
-            .get_local_auth_config_source()
-            .is_some();
-        if use_local {
-            let mut auth_config_source =
-                self.config.borrow().get_local_auth_config_source().unwrap();
-            self.store_in_auth_config(
-                &mut *auth_config_source,
-                origin_url,
-                consumer_key,
-                consumer_secret,
-            )?;
-        } else {
-            let mut auth_config_source = self.config.borrow().get_auth_config_source();
-            self.store_in_auth_config(
-                &mut *auth_config_source,
-                origin_url,
-                consumer_key,
-                consumer_secret,
-            )?;
-        }
+        // TODO(phase-b): PHP $authConfigSource parameter is unused inside storeInAuthConfig
+        //   (upstream Composer bug); the dispatch on local vs. global is dropped here too.
+        self.store_in_auth_config(origin_url, consumer_key, consumer_secret)?;
 
         let access_token = self
             .token
@@ -405,16 +368,16 @@ impl Bitbucket {
         }
     }
 
+    // TODO(phase-b): PHP $authConfigSource parameter dropped — unused in upstream Composer too.
     fn store_in_auth_config(
         &mut self,
-        auth_config_source: &mut dyn ConfigSourceInterface,
         origin_url: &str,
         consumer_key: &str,
         consumer_secret: &str,
     ) -> anyhow::Result<()> {
         self.config
-            .borrow()
-            .get_config_source()
+            .borrow_mut()
+            .get_config_source_mut()
             .remove_config_setting(&format!("bitbucket-oauth.{}", origin_url))?;
 
         let token = self.token.as_ref().ok_or_else(|| LogicException {
@@ -460,8 +423,8 @@ impl Bitbucket {
         );
 
         self.config
-            .borrow()
-            .get_auth_config_source()
+            .borrow_mut()
+            .get_auth_config_source_mut()
             .add_config_setting(
                 &format!("bitbucket-oauth.{}", origin_url),
                 PhpMixed::Array(consumer),

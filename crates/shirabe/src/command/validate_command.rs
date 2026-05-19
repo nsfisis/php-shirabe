@@ -108,13 +108,20 @@ impl ValidateCommand {
             );
     }
 
-    pub fn execute(&self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> Result<i64> {
         let file = input
             .get_argument("file")
             .as_string_opt()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| Factory::get_composer_file());
-        let io = self.get_io();
+            .map(Ok)
+            .unwrap_or_else(Factory::get_composer_file)?;
+        // TODO(phase-b): get_io() takes &mut self via BaseCommand; clone_box to release the borrow.
+        let io_box = self.get_io().clone_box();
+        let io: &dyn IOInterface = io_box.as_ref();
 
         if !std::path::Path::new(&file).exists() {
             io.write_error(&format!("<error>{} not found.</error>", file));
@@ -125,7 +132,7 @@ impl ValidateCommand {
             return Ok(3);
         }
 
-        let validator = ConfigValidator::new(io);
+        let validator = ConfigValidator::new(io.clone_box());
         let check_all = if input.get_option("no-check-all").as_bool().unwrap_or(false) {
             0
         } else {
@@ -147,10 +154,10 @@ impl ValidateCommand {
         };
         let is_strict = input.get_option("strict").as_bool().unwrap_or(false);
         let (mut errors, mut publish_errors, mut warnings) =
-            validator.validate(&file, check_all, check_version)?;
+            validator.validate(&file, check_all, check_version);
 
         let mut lock_errors: Vec<String> = vec![];
-        let composer = self.create_composer_instance(input, io, vec![])?;
+        let mut composer = self.create_composer_instance(input, io, None, false, None)?;
         let check_lock = (check_lock
             && composer
                 .get_config()
@@ -159,13 +166,17 @@ impl ValidateCommand {
                 .as_bool()
                 .unwrap_or(true))
             || input.get_option("check-lock").as_bool().unwrap_or(false);
-        let locker = composer.get_locker();
+        // TODO(phase-b): get_missing_requirement_info needs &package from composer while
+        // locker holds &mut composer; cloning lock state isn't trivial. Use todo!() for the
+        // package-arg subexpression below.
+        let locker = composer.get_locker_mut();
         if locker.is_locked() && !locker.is_fresh()? {
             lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `composer update` or `composer update <package name>`.".to_string());
         }
 
         if locker.is_locked() {
-            lock_errors.extend(locker.get_missing_requirement_info(composer.get_package(), true)?);
+            // TODO(phase-b): borrows composer twice; use todo!() for the package arg.
+            lock_errors.extend(locker.get_missing_requirement_info(todo!(), true)?);
         }
 
         self.output_result(
@@ -195,10 +206,13 @@ impl ValidateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let local_repo = composer.get_repository_manager().get_local_repository();
-            for package in local_repo.get_packages() {
+            let packages = composer
+                .get_repository_manager()
+                .get_local_repository()
+                .get_packages();
+            for package in packages {
                 let path = composer
-                    .get_installation_manager()
+                    .get_installation_manager_mut()
                     .get_install_path(package.as_ref());
                 let path = match path {
                     Some(p) => p,
@@ -208,7 +222,7 @@ impl ValidateCommand {
                 if std::path::Path::new(&path).is_dir() && std::path::Path::new(&dep_file).exists()
                 {
                     let (mut dep_errors, mut dep_publish_errors, mut dep_warnings) =
-                        validator.validate(&dep_file, check_all, check_version)?;
+                        validator.validate(&dep_file, check_all, check_version);
 
                     self.output_result(
                         io,
@@ -238,6 +252,7 @@ impl ValidateCommand {
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "validate", input, output);
         let event_code = composer
             .get_event_dispatcher()
+            .borrow_mut()
             .dispatch(Some(command_event.get_name()), None)?;
 
         Ok(exit_code.max(event_code))

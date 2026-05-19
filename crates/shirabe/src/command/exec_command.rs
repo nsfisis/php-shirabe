@@ -143,7 +143,12 @@ impl ExecCommand {
             })
             .unwrap_or_default();
 
-        Ok(dispatcher.dispatch_script("__exec_command", true, args, indexmap::IndexMap::new())?)
+        Ok(dispatcher.borrow_mut().dispatch_script(
+            "__exec_command",
+            true,
+            args,
+            indexmap::IndexMap::new(),
+        )?)
     }
 
     fn get_binaries(&mut self, for_display: bool) -> Result<Vec<String>> {
