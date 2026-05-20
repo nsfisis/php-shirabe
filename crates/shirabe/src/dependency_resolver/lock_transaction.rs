@@ -3,14 +3,14 @@
 use std::any::Any;
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 
-use crate::dependency_resolver::decisions::Decisions;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::transaction::Transaction;
-use crate::package::alias_package::AliasPackage;
-use crate::package::package::Package;
-use crate::package::package_interface::PackageInterface;
+use crate::dependency_resolver::Decisions;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Transaction;
+use crate::package::AliasPackage;
+use crate::package::Package;
+use crate::package::PackageInterface;
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -226,8 +226,7 @@ impl LockTransaction {
 
     pub fn get_operations(
         &self,
-    ) -> &Vec<Box<dyn crate::dependency_resolver::operation::operation_interface::OperationInterface>>
-    {
+    ) -> &Vec<Box<dyn crate::dependency_resolver::operation::OperationInterface>> {
         self.inner.get_operations()
     }
 }

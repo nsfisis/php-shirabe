@@ -3,37 +3,37 @@
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::composer::semver::compiling_matcher::CompilingMatcher;
-use shirabe_external_packages::composer::semver::intervals::Intervals;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::composer::semver::CompilingMatcher;
+use shirabe_external_packages::composer::semver::Intervals;
 use shirabe_php_shim::{
     LogicException, PhpMixed, array_chunk, array_flip, array_flip_strings, array_map, array_merge,
     array_search, array_search_mixed, count, in_array, microtime, number_format, round,
     spl_object_hash, sprintf, strpos,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::MultiConstraint;
 
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::pool_optimizer::PoolOptimizer;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::security_advisory_pool_filter::SecurityAdvisoryPoolFilter;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::package::alias_package::AliasPackage;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::PoolOptimizer;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::package::AliasPackage;
+use crate::package::CompleteAliasPackage;
+use crate::package::CompletePackage;
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::stability_filter::StabilityFilter;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::root_package_repository::RootPackageRepository;
+use crate::package::version::StabilityFilter;
+use crate::plugin::PluginEvents;
+use crate::plugin::PrePoolCreateEvent;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RootPackageRepository;
 
 #[derive(Debug)]
 pub struct PoolBuilder {
@@ -560,7 +560,7 @@ impl PoolBuilder {
                     }
                 }
                 let packages_in_result = result.packages;
-                for package in &packages_in_result {
+                for (_, package) in &packages_in_result {
                     // TODO(phase-b): proper upcast Box<dyn BasePackage> → Box<dyn PackageInterface>;
                     // clone_box on BasePackage produces a BasePackage, while loaded_per_repo stores PackageInterface.
                     let pkg_name = package.get_name().to_string();

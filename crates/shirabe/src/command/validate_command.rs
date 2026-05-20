@@ -1,20 +1,20 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::util::config_validator::ConfigValidator;
-use crate::util::filesystem::Filesystem;
+use crate::io::IOInterface;
+use crate::package::loader::ValidatingArrayLoader;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::util::ConfigValidator;
+use crate::util::Filesystem;
 
 #[derive(Debug)]
 pub struct ValidateCommand {

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php
 
-use crate::dependency_resolver::decisions::Decisions;
-use crate::dependency_resolver::generic_rule::RuleLiterals;
+use crate::dependency_resolver::Decisions;
+use crate::dependency_resolver::RuleLiterals;
 
 pub struct RuleWatchNode {
     pub watch1: i64,
@@ -59,7 +59,7 @@ impl RuleWatchNode {
 
     /// Owned clone for callers that need a `Box<dyn Rule>`. Default impl in
     /// `RuleLiterals` returns `todo!()`; concrete rule impls override it.
-    pub fn get_rule_boxed(&self) -> Box<dyn crate::dependency_resolver::rule::Rule> {
+    pub fn get_rule_boxed(&self) -> Box<dyn crate::dependency_resolver::Rule> {
         self.rule.clone_rule_box()
     }
 

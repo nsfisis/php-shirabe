@@ -2,31 +2,31 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     LogicException, PhpMixed, defined, extension_loaded, implode, in_array, php_to_string,
     phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
     strtolower, substr, substr_count, version_compare,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MultiConstraint;
 
-use crate::advisory::security_advisory::SecurityAdvisory;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::request::Request;
+use crate::advisory::SecurityAdvisory;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_set::RepositorySet;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::package::version::VersionParser;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositorySet;
 
 /// Represents a problem detected while solving dependencies
 #[derive(Debug)]
@@ -1211,9 +1211,7 @@ impl Problem {
         constraint: Option<&dyn ConstraintInterface>,
     ) -> (String, String) {
         let mut next_repo_packages: Vec<Box<dyn BasePackage>> = Vec::new();
-        let mut next_repo: Option<
-            Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-        > = None;
+        let mut next_repo: Option<Box<dyn crate::repository::RepositoryInterface>> = None;
 
         for package in all_repos_packages {
             // TODO(phase-b): RepositoryInterface has no equals(); reference identity needed.
@@ -1401,16 +1399,16 @@ impl Problem {
         let providers = repository_set.get_providers(package_name);
         if providers.len() > 0 {
             let provider_count = providers.len() as i64;
-            let slice: Vec<crate::repository::repository_interface::ProviderInfo> =
-                if provider_count > max_providers + 1 {
-                    providers
-                        .values()
-                        .take(max_providers as usize)
-                        .cloned()
-                        .collect::<Vec<_>>()
-                } else {
-                    providers.values().cloned().collect::<Vec<_>>()
-                };
+            let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
+            {
+                providers
+                    .values()
+                    .take(max_providers as usize)
+                    .cloned()
+                    .collect::<Vec<_>>()
+            } else {
+                providers.values().cloned().collect::<Vec<_>>()
+            };
             let mut providers_str = implode(
                 "",
                 &slice

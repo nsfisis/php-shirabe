@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Repository/ComposerRepository.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::metadata_minifier::metadata_minifier::MetadataMinifier;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::composer::metadata_minifier::MetadataMinifier;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     Countable, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     LogicException, PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -12,37 +12,37 @@ use shirabe_php_shim::{
 };
 
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
 
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
+use crate::advisory::PartialSecurityAdvisory;
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::stability_filter::StabilityFilter;
-use crate::package::version::version_parser::VersionParser;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::plugin::post_file_download_event::PostFileDownloadEvent;
-use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
-use crate::repository::advisory_provider_interface::{
-    PartialOrSecurityAdvisory, SecurityAdvisoryResult,
-};
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_security_exception::RepositorySecurityException;
-use crate::util::http::response::Response;
-use crate::util::http_downloader::HttpDownloader;
+use crate::package::loader::ArrayLoader;
+use crate::package::version::StabilityFilter;
+use crate::package::version::VersionParser;
+use crate::plugin::PluginEvents;
+use crate::plugin::PostFileDownloadEvent;
+use crate::plugin::PreFileDownloadEvent;
+use crate::repository::ArrayRepository;
+use crate::repository::ConfigurableRepositoryInterface;
+use crate::repository::LoadPackagesResult;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySecurityException;
+use crate::repository::{PartialOrSecurityAdvisory, SecurityAdvisoryResult};
+use crate::repository::{SEARCH_FULLTEXT, SEARCH_VENDOR};
+use crate::util::HttpDownloader;
+use crate::util::Url;
+use crate::util::http::Response;
 use crate::util::r#loop::Loop;
-use crate::util::url::Url;
 
 #[derive(Debug)]
 pub enum RootData {
@@ -123,12 +123,6 @@ pub enum FindPackageReturn {
     Package(Box<dyn BasePackage>),
     Packages(Vec<Box<dyn BasePackage>>),
     None,
-}
-
-#[derive(Debug)]
-pub struct LoadPackagesResult {
-    pub names_found: Vec<String>,
-    pub packages: IndexMap<String, Box<dyn BasePackage>>,
 }
 
 #[derive(Debug)]
@@ -394,7 +388,7 @@ impl ComposerRepository {
 
         Ok(self.inner.find_package(
             &name,
-            crate::repository::repository_interface::FindPackageConstraint::Constraint(constraint),
+            crate::repository::FindPackageConstraint::Constraint(constraint),
         ))
     }
 
@@ -464,8 +458,7 @@ impl ComposerRepository {
 
         Ok(self.inner.find_packages(
             &name,
-            constraint
-                .map(crate::repository::repository_interface::FindPackageConstraint::Constraint),
+            constraint.map(crate::repository::FindPackageConstraint::Constraint),
         ))
     }
 
@@ -3597,9 +3590,6 @@ impl ComposerRepository {
         Ok(false)
     }
 }
-
-pub const SEARCH_FULLTEXT: i64 = 0;
-pub const SEARCH_VENDOR: i64 = 2;
 
 #[derive(Debug)]
 enum FetchFileIfLastModifiedResult {

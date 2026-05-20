@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     CURL_HTTP_VERSION_2_0, CURL_HTTP_VERSION_3, CURL_IPRESOLVE_V4, CURL_IPRESOLVE_V6,
     CURL_LOCK_DATA_COOKIE, CURL_LOCK_DATA_DNS, CURL_LOCK_DATA_SSL_SESSION, CURL_VERSION_HTTP2,
@@ -26,17 +26,17 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::downloader::max_file_size_exceeded_exception::MaxFileSizeExceededException;
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::util::auth_helper::{AuthHelper, PromptAuthResult, StoreAuth};
-use crate::util::http::curl_response::CurlResponse;
-use crate::util::http::proxy_manager::ProxyManager;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::stream_context_factory::StreamContextFactory;
-use crate::util::url::Url;
-// use shirabe_external_packages::react::promise::promise::Promise; // typehint only in PHP
+use crate::downloader::MaxFileSizeExceededException;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::StreamContextFactory;
+use crate::util::Url;
+use crate::util::http::CurlResponse;
+use crate::util::http::ProxyManager;
+use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
+// use shirabe_external_packages::react::promise::Promise; // typehint only in PHP
 
 /// @phpstan-type Attributes array{retryAuthFailure: bool, redirects: int<0, max>, retries: int<0, max>, storeAuth: 'prompt'|bool, ipResolve: 4|6|null}
 /// @phpstan-type Job array{url: non-empty-string, origin: string, attributes: Attributes, options: mixed[], progress: mixed[], curlHandle: \CurlHandle, filename: string|null, headerHandle: resource, bodyHandle: resource, resolve: callable, reject: callable, primaryIp: string}
@@ -699,7 +699,7 @@ impl CurlDownloader {
                     if_modified
                 ),
                 true,
-                crate::io::io_interface::DEBUG,
+                crate::io::DEBUG,
             );
         }
 
@@ -843,7 +843,7 @@ impl CurlDownloader {
                         self.io.write_error3(
                             "<warning>A connection timeout was encountered. If you intend to run Composer without connecting to the internet, run the command again prefixed with COMPOSER_DISABLE_NETWORK=1 to make Composer run in offline mode.</warning>",
                             true,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                     }
 
@@ -929,7 +929,7 @@ impl CurlDownloader {
                                 errno
                             ),
                             true,
-                            crate::io::io_interface::DEBUG,
+                            crate::io::DEBUG,
                         );
                         self.restart_job_with_delay(
                             &job,
@@ -961,7 +961,7 @@ impl CurlDownloader {
                                 errno
                             ),
                             true,
-                            crate::io::io_interface::DEBUG,
+                            crate::io::DEBUG,
                         );
                         let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
                         attrs.insert(
@@ -1095,7 +1095,7 @@ impl CurlDownloader {
                             )
                         ),
                         true,
-                        crate::io::io_interface::DEBUG,
+                        crate::io::DEBUG,
                     );
                 } else {
                     let max_file_size: Option<i64> = job
@@ -1174,7 +1174,7 @@ impl CurlDownloader {
                             )
                         ),
                         true,
-                        crate::io::io_interface::DEBUG,
+                        crate::io::DEBUG,
                     );
                 }
                 fclose(job.get("bodyHandle").cloned().unwrap_or(PhpMixed::Null));
@@ -1323,7 +1323,7 @@ impl CurlDownloader {
                                 sc
                             ),
                             true,
-                            crate::io::io_interface::DEBUG,
+                            crate::io::DEBUG,
                         );
                         let mut attrs: IndexMap<String, PhpMixed> = IndexMap::new();
                         attrs.insert(
@@ -1632,7 +1632,7 @@ impl CurlDownloader {
                     ],
                 ),
                 true,
-                crate::io::io_interface::DEBUG,
+                crate::io::DEBUG,
             );
 
             return Ok(Ok(target_url));

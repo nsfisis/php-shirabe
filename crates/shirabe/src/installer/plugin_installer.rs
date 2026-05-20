@@ -1,17 +1,17 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php
 
-use crate::installer::binary_installer::BinaryInstaller;
-use crate::installer::installer_interface::InstallerInterface;
-use crate::installer::library_installer::LibraryInstaller;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
+use crate::installer::BinaryInstaller;
+use crate::installer::InstallerInterface;
+use crate::installer::LibraryInstaller;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
 use crate::partial_composer::PartialComposer;
-use crate::plugin::plugin_manager::PluginManager;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
+use crate::plugin::PluginManager;
+use crate::repository::InstalledRepositoryInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{LogicException, PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]

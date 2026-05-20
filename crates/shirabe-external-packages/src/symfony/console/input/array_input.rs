@@ -1,4 +1,4 @@
-use crate::symfony::console::input::input_interface::InputInterface;
+use crate::symfony::console::input::InputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

@@ -2,12 +2,12 @@
 
 use shirabe_php_shim::RuntimeException;
 
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::problem::Problem;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::Rule;
-use crate::repository::repository_set::RepositorySet;
-use crate::util::ini_helper::IniHelper;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Problem;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::Rule;
+use crate::repository::RepositorySet;
+use crate::util::IniHelper;
 
 #[derive(Debug)]
 pub struct SolverProblemsException {
@@ -70,7 +70,7 @@ impl SolverProblemsException {
                     .unwrap_or_default()
             ));
             // TODO(phase-b): get_reasons returns an IndexMap; flatten its values into Vec<Vec<...>>.
-            let reasons_vec: Vec<Vec<Box<dyn crate::dependency_resolver::rule::Rule>>> = problem
+            let reasons_vec: Vec<Vec<Box<dyn crate::dependency_resolver::Rule>>> = problem
                 .get_reasons()
                 .values()
                 .map(|v| v.iter().map(|r| r.clone_box()).collect())

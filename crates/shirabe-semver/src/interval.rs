@@ -2,7 +2,7 @@
 
 use std::sync::OnceLock;
 
-use crate::constraint::constraint::Constraint;
+use crate::constraint::Constraint;
 
 #[derive(Debug, Clone)]
 pub struct DevConstraintSet {

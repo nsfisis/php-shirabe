@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/MaxFileSizeExceededException.php
 
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
 
 #[derive(Debug)]
 pub struct MaxFileSizeExceededException(pub TransportException);

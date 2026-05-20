@@ -2,10 +2,10 @@
 
 use indexmap::IndexMap;
 
-use crate::dependency_resolver::request::Request;
-use crate::event_dispatcher::event::Event;
-use crate::package::base_package::BasePackage;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::dependency_resolver::Request;
+use crate::event_dispatcher::Event;
+use crate::package::BasePackage;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct PrePoolCreateEvent {

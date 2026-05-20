@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Version/StabilityFilter.php
 
-use crate::package::base_package::STABILITIES;
+use crate::package::STABILITIES;
 use indexmap::IndexMap;
 
 pub struct StabilityFilter;

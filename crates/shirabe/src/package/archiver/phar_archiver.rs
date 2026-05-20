@@ -6,9 +6,9 @@ use shirabe_php_shim::{
     file_put_contents, function_exists, gzcompress, pack, str_repeat, strrpos, unlink,
 };
 
-use crate::package::archiver::archivable_files_filter::ArchivableFilesFilter;
-use crate::package::archiver::archivable_files_finder::ArchivableFilesFinder;
-use crate::package::archiver::archiver_interface::ArchiverInterface;
+use crate::package::archiver::ArchivableFilesFilter;
+use crate::package::archiver::ArchivableFilesFinder;
+use crate::package::archiver::ArchiverInterface;
 
 fn formats() -> IndexMap<&'static str, i64> {
     let mut m = IndexMap::new();

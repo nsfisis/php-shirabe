@@ -2,10 +2,10 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use crate::downloader::transport_exception::TransportException;
-use crate::util::http::proxy_item::ProxyItem;
-use crate::util::http::request_proxy::RequestProxy;
-use crate::util::no_proxy_pattern::NoProxyPattern;
+use crate::downloader::TransportException;
+use crate::util::NoProxyPattern;
+use crate::util::http::ProxyItem;
+use crate::util::http::RequestProxy;
 
 static INSTANCE: OnceLock<Mutex<Option<ProxyManager>>> = OnceLock::new();
 

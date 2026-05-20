@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Plugin/CommandEvent.php
 
-use crate::event_dispatcher::event::Event;
+use crate::event_dispatcher::Event;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Util/SyncHelper.php
 
-use crate::downloader::download_manager::DownloadManager;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::package::package_interface::PackageInterface;
+use crate::downloader::DownloadManager;
+use crate::downloader::DownloaderInterface;
+use crate::package::PackageInterface;
 use crate::util::r#loop::Loop;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a dyn DownloaderInterface),

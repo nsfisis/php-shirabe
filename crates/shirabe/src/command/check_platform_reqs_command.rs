@@ -2,22 +2,22 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, strip_tags};
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::link::Link;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::root_package_repository::RootPackageRepository;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::Link;
+use crate::repository::InstalledRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RootPackageRepository;
 
 struct CheckResult {
     platform_package: String,
@@ -62,9 +62,11 @@ impl CheckPlatformReqsCommand {
         let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
         let mut remove_packages: Vec<String> = vec![];
 
-        let installed_repo_base: Box<
-            dyn crate::repository::repository_interface::RepositoryInterface,
-        > = if input.get_option("lock").as_bool().unwrap_or(false) {
+        let installed_repo_base: Box<dyn crate::repository::RepositoryInterface> = if input
+            .get_option("lock")
+            .as_bool()
+            .unwrap_or(false)
+        {
             io.write_error(&format!(
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
@@ -78,7 +80,7 @@ impl CheckPlatformReqsCommand {
                     if no_dev { "non-dev " } else { "" }
                 ));
                 Box::new(composer.get_locker_mut().get_locked_repository(!no_dev)?)
-                    as Box<dyn crate::repository::repository_interface::RepositoryInterface>
+                    as Box<dyn crate::repository::RepositoryInterface>
             } else {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names().clone();

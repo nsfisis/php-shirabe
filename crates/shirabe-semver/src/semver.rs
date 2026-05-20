@@ -3,7 +3,7 @@
 use std::sync::OnceLock;
 
 use crate::comparator::Comparator;
-use crate::constraint::constraint::Constraint;
+use crate::constraint::Constraint;
 use crate::version_parser::VersionParser;
 
 pub struct Semver;

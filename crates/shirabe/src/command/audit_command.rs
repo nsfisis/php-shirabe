@@ -1,20 +1,20 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
-use crate::advisory::audit_config::AuditConfig;
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::advisory::Auditor;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_set::RepositorySet;
-use crate::repository::repository_utils::RepositoryUtils;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::InstalledRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySet;
+use crate::repository::RepositoryUtils;
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
     implode, in_array,

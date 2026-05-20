@@ -2,12 +2,12 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::application::Application;
-use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::php_executable_finder::PhpExecutableFinder;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::Application;
+use shirabe_external_packages::symfony::component::console::input::StringInput;
+use shirabe_external_packages::symfony::component::console::output::ConsoleOutput;
+use shirabe_external_packages::symfony::component::process::ExecutableFinder;
+use shirabe_external_packages::symfony::component::process::PhpExecutableFinder;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PATH_SEPARATOR, PHP_VERSION_ID, PhpMixed,
     RuntimeException, array_pop, array_push, array_search_in_vec, array_splice, class_exists,
@@ -18,26 +18,26 @@ use shirabe_php_shim::{
     substr, trim,
 };
 
-use crate::autoload::class_loader::ClassLoader;
+use crate::autoload::ClassLoader;
 use crate::composer::Composer;
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::transaction::Transaction;
-use crate::event_dispatcher::event::Event;
-use crate::event_dispatcher::event_subscriber_interface::EventSubscriberInterface;
-use crate::event_dispatcher::script_execution_exception::ScriptExecutionException;
-use crate::installer::binary_installer::BinaryInstaller;
-use crate::installer::installer_event::InstallerEvent;
-use crate::installer::package_event::PackageEvent;
-use crate::io::console_io::ConsoleIO;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
+use crate::dependency_resolver::Transaction;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventSubscriberInterface;
+use crate::event_dispatcher::ScriptExecutionException;
+use crate::installer::BinaryInstaller;
+use crate::installer::InstallerEvent;
+use crate::installer::PackageEvent;
+use crate::io::ConsoleIO;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
 use crate::partial_composer::PartialComposer;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::pre_command_run_event::PreCommandRunEvent;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::script::event::Event as ScriptEvent;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::plugin::CommandEvent;
+use crate::plugin::PreCommandRunEvent;
+use crate::repository::RepositoryInterface;
+use crate::script::Event as ScriptEvent;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.
@@ -214,7 +214,7 @@ impl EventDispatcher {
                         .unwrap_or_default()
                 ),
                 true,
-                crate::io::io_interface::NORMAL,
+                crate::io::NORMAL,
             );
         }
 
@@ -333,7 +333,7 @@ impl EventDispatcher {
                             ],
                         ),
                         true,
-                        crate::io::io_interface::VERBOSE,
+                        crate::io::VERBOSE,
                     );
                 }
                 // TODO(plugin): actually invoke callable with $event and inspect result
@@ -350,7 +350,7 @@ impl EventDispatcher {
                                 ],
                             ),
                             true,
-                            crate::io::io_interface::VERBOSE,
+                            crate::io::VERBOSE,
                         );
 
                         let mut script: Vec<String> = substr(callable_str, 1, None)
@@ -411,7 +411,7 @@ impl EventDispatcher {
                                         PhpMixed::String(callable_str.clone()),
                                         PhpMixed::String(event.get_name().to_string()),
                                     ],
-                                ), true, crate::io::io_interface::QUIET);
+                                ), true, crate::io::QUIET);
 
                                 return Err(anyhow::anyhow!(ScriptExecutionException(
                                     RuntimeException {
@@ -435,7 +435,7 @@ impl EventDispatcher {
                                 self.io.write_error3(&sprintf(
                                     "<warning>You made a reference to a non-existent script %s</warning>",
                                     &[PhpMixed::String(callable_str.clone())],
-                                ), true, crate::io::io_interface::QUIET);
+                                ), true, crate::io::QUIET);
                             }
 
                             let composer_full = self.composer_as_full_or_panic();
@@ -470,7 +470,7 @@ impl EventDispatcher {
                                                 ],
                                             ),
                                             true,
-                                            crate::io::io_interface::QUIET,
+                                            crate::io::QUIET,
                                         );
                                     }
                                     return Err(e);
@@ -489,7 +489,7 @@ impl EventDispatcher {
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
                             continue;
                         }
                         if !is_callable(&PhpMixed::String(callable_str.clone())) {
@@ -497,7 +497,7 @@ impl EventDispatcher {
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
                                 callable_str,
                                 event.get_name()
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
                             continue;
                         }
 
@@ -520,7 +520,7 @@ impl EventDispatcher {
                                         )
                                     ),
                                     true,
-                                    crate::io::io_interface::QUIET,
+                                    crate::io::QUIET,
                                 );
                                 return Err(e);
                             }
@@ -541,7 +541,7 @@ impl EventDispatcher {
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
                             continue;
                         }
                         if !is_a(
@@ -553,7 +553,7 @@ impl EventDispatcher {
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
                             continue;
                         }
                         if defined(&format!(
@@ -563,7 +563,7 @@ impl EventDispatcher {
                             self.io.write_error3(&format!(
                                 "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
                                 event.get_name()
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
                             continue;
                         }
 
@@ -628,7 +628,7 @@ impl EventDispatcher {
                                         )
                                     ),
                                     true,
-                                    crate::io::io_interface::QUIET,
+                                    crate::io::QUIET,
                                 );
                                 return Err(e);
                             }
@@ -668,13 +668,13 @@ impl EventDispatcher {
                                     ],
                                 ),
                                 true,
-                                crate::io::io_interface::NORMAL,
+                                crate::io::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
                             self.io.write_error3(
                                 &sprintf("> %s", &[PhpMixed::String(exec.clone())]),
                                 true,
-                                crate::io::io_interface::NORMAL,
+                                crate::io::NORMAL,
                             );
                         }
 
@@ -802,7 +802,7 @@ impl EventDispatcher {
                                     PhpMixed::String(callable_str.clone()),
                                     PhpMixed::String(event.get_name().to_string()),
                                 ],
-                            ), true, crate::io::io_interface::QUIET);
+                            ), true, crate::io::QUIET);
 
                             return Err(anyhow::anyhow!(ScriptExecutionException(
                                 RuntimeException {
@@ -922,7 +922,7 @@ impl EventDispatcher {
                     ],
                 ),
                 true,
-                crate::io::io_interface::NORMAL,
+                crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
@@ -934,7 +934,7 @@ impl EventDispatcher {
                     ],
                 ),
                 true,
-                crate::io::io_interface::NORMAL,
+                crate::io::NORMAL,
             );
         }
 
@@ -1069,7 +1069,7 @@ impl EventDispatcher {
                     event.get_name()
                 ),
                 true,
-                crate::io::io_interface::VERBOSE,
+                crate::io::VERBOSE,
             );
 
             return Vec::new();

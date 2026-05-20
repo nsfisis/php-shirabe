@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Command/ProhibitsCommand.php
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::base_dependency_command::BaseDependencyCommand;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use crate::command::BaseDependencyCommand;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ProhibitsCommand {

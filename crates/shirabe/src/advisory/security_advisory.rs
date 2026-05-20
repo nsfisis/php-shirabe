@@ -2,10 +2,10 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::advisory::ignored_security_advisory::IgnoredSecurityAdvisory;
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
+use crate::advisory::IgnoredSecurityAdvisory;
+use crate::advisory::PartialSecurityAdvisory;
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,27 +1,27 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::exception::invalid_argument_exception::InvalidArgumentException;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::exception::InvalidArgumentException;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower};
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::Auditor;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::config::config_source_interface::ConfigSourceInterface;
-use crate::config::json_config_source::JsonConfigSource;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::dependency_resolver::request::Request;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::dependency_resolver::Request;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::BasePackage;
 use crate::package::base_package;
-use crate::package::base_package::BasePackage;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
+use crate::repository::CanonicalPackagesTrait;
 
 #[derive(Debug)]
 pub struct RemoveCommand {
@@ -458,8 +458,8 @@ impl RemoveCommand {
         }
 
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, 'remove', input, output)
-        let command_event = crate::plugin::command_event::CommandEvent::new(
-            crate::plugin::plugin_events::PluginEvents::COMMAND,
+        let command_event = crate::plugin::CommandEvent::new(
+            crate::plugin::PluginEvents::COMMAND,
             "remove",
             input,
             output,

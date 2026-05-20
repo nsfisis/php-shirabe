@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Plugin/PluginInterface.php
 
 use crate::composer::Composer;
-use crate::io::io_interface::IOInterface;
-use crate::plugin::capable::Capable;
+use crate::io::IOInterface;
+use crate::plugin::Capable;
 
 pub const PLUGIN_API_VERSION: &'static str = "2.9.0";
 

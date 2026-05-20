@@ -3,10 +3,10 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
     InvalidArgumentException, OPENSSL_ALGO_SHA384, PHP_EOL, PHP_VERSION_ID, Phar, PharException,
     PhpMixed, RuntimeException, UnexpectedValueException, array_map, base64_decode,
@@ -19,18 +19,18 @@ use shirabe_php_shim::{
     usleep, version_compare,
 };
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::downloader::filesystem_exception::FilesystemException;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::downloader::FilesystemException;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::self_update::keys::Keys;
-use crate::self_update::versions::Versions;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
+use crate::io::IOInterface;
+use crate::self_update::Keys;
+use crate::self_update::Versions;
+use crate::util::Filesystem;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct SelfUpdateCommand {

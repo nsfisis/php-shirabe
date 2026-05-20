@@ -3,12 +3,12 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::base_package::SUPPORTED_LINK_TYPES;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package::RootPackage;
-use crate::package::root_package_interface::RootPackageInterface;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::RootPackage;
+use crate::package::RootPackageInterface;
+use crate::package::SUPPORTED_LINK_TYPES;
 
 #[derive(Debug)]
 pub struct ArrayDumper;
@@ -133,7 +133,7 @@ impl ArrayDumper {
         // corresponds to: foreach (BasePackage::$supportedLinkTypes as $type => $opts) { $links = $package->{'get'.ucfirst($opts['method'])}(); ... }
         for (type_name, opts) in SUPPORTED_LINK_TYPES.iter() {
             // TODO(phase-b): PackageInterface needs get_links_by_method to mimic PHP magic call
-            let links: Vec<crate::package::link::Link> = Vec::new();
+            let links: Vec<crate::package::Link> = Vec::new();
             let _ = (&opts.method, package);
             if links.is_empty() {
                 continue;

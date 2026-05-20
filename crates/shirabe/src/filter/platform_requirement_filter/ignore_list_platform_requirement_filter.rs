@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreListPlatformRequirementFilter.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::interval::Interval;
 use shirabe_semver::intervals::Intervals;
 
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct IgnoreListPlatformRequirementFilter {

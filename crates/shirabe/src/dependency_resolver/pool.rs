@@ -5,12 +5,12 @@ use std::fmt;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, spl_object_hash, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
-use crate::package::base_package::BasePackage;
-use crate::package::version::version_parser::VersionParser;
+use crate::advisory::PartialSecurityAdvisory;
+use crate::package::BasePackage;
+use crate::package::version::VersionParser;
 
 /// A package pool contains all packages for dependency resolution
 #[derive(Debug)]

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Util/Forgejo.php
 
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
 use crate::io::io_interface;
-use crate::io::io_interface::IOInterface;
-use crate::util::http_downloader::HttpDownloader;
+use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -124,7 +124,7 @@ impl Forgejo {
                 // TODO(phase-b): anyhow::Error has no get_code(); HTTP status codes come from
                 // TransportException::get_status_code().
                 let code = e
-                    .downcast_ref::<crate::downloader::transport_exception::TransportException>()
+                    .downcast_ref::<crate::downloader::TransportException>()
                     .and_then(|te| te.get_status_code())
                     .unwrap_or(0);
                 if [403, 401, 404].contains(&code) {

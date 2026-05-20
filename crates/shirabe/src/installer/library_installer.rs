@@ -3,24 +3,24 @@
 use std::any::Any;
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, is_link, preg_quote, realpath, rmdir, rtrim, strpos,
 };
 
 use crate::composer::Composer;
-use crate::downloader::download_manager::DownloadManager;
-use crate::installer::binary_installer::BinaryInstaller;
-use crate::installer::binary_presence_interface::BinaryPresenceInterface;
-use crate::installer::installer_interface::InstallerInterface;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
+use crate::downloader::DownloadManager;
+use crate::installer::BinaryInstaller;
+use crate::installer::BinaryPresenceInterface;
+use crate::installer::InstallerInterface;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
 use crate::partial_composer::PartialComposer;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
-use crate::util::silencer::Silencer;
+use crate::repository::InstalledRepositoryInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::Silencer;
 
 /// Package installation manager.
 #[derive(Debug)]

@@ -2,49 +2,49 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
     UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,
     is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::Auditor;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::config::config_source_interface::ConfigSourceInterface;
-use crate::config::json_config_source::JsonConfigSource;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::dependency_resolver::operation::InstallOperation;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
+use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
-use crate::installer::project_installer::ProjectInstaller;
-use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::{STABILITIES, SUPPORTED_LINK_TYPES};
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::plugin::plugin_blocked_exception::PluginBlockedException;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::installed_array_repository::InstalledArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_set::RepositorySet;
-use crate::script::script_events::ScriptEvents;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::installer::ProjectInstaller;
+use crate::installer::SuggestedPackagesReporter;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::AliasPackage;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::plugin::PluginBlockedException;
+use crate::repository::CompositeRepository;
+use crate::repository::InstalledArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositorySet;
+use crate::script::ScriptEvents;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 /// Install a package as new project into new directory.
 #[derive(Debug)]
@@ -299,7 +299,7 @@ impl CreateProjectCommand {
                     let _ = &composer_json_repositories_config;
                     let placeholder_existing: IndexMap<
                         String,
-                        Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+                        Box<dyn crate::repository::RepositoryInterface>,
                     > = IndexMap::new();
                     let name = RepositoryFactory::generate_repository_name(
                         &PhpMixed::Int(index as i64),
@@ -502,7 +502,7 @@ impl CreateProjectCommand {
                 // PHP: $package->{'get'.$meta['method']}() — dynamic getter dispatch
                 // TODO(phase-b): dynamic getter dispatch by name
                 let _method = format!("get{}", meta.method);
-                let links: Vec<crate::package::link::Link> = vec![];
+                let links: Vec<crate::package::Link> = vec![];
                 for link in links {
                     if link.get_pretty_constraint().as_deref().ok() == Some("self.version") {
                         config_source.add_link(
@@ -888,7 +888,7 @@ impl CreateProjectCommand {
             package.get_name(),
             package.get_full_pretty_version(
                 false,
-                <dyn crate::package::package_interface::PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV
+                <dyn crate::package::PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV
             )
         ));
 
@@ -967,7 +967,7 @@ impl CreateProjectCommand {
         &self,
         config: &Config,
         input: &dyn InputInterface,
-    ) -> Result<crate::advisory::audit_config::AuditConfig> {
+    ) -> Result<crate::advisory::AuditConfig> {
         self.create_audit_config(config, input)
     }
 }

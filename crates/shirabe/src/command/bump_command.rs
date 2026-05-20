@@ -3,25 +3,25 @@
 use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::json::json_manipulator::JsonManipulator;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::version::version_bumper::VersionBumper;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::util::filesystem::Filesystem;
-use crate::util::silencer::Silencer;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::json::JsonManipulator;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::version::VersionBumper;
+use crate::repository::PlatformRepository;
+use crate::util::Filesystem;
+use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct BumpCommand {
@@ -142,27 +142,26 @@ impl BumpCommand {
                 .get("lock")
                 .as_bool()
                 .unwrap_or(true);
-        let repo: Box<dyn crate::repository::repository_interface::RepositoryInterface> =
-            if !has_lock_file_disabled {
-                Box::new(composer.get_locker_mut().get_locked_repository(true)?)
-            } else if composer.get_locker_mut().is_locked() {
-                if !composer.get_locker_mut().is_fresh()? {
-                    io.write_error3(
+        let repo: Box<dyn crate::repository::RepositoryInterface> = if !has_lock_file_disabled {
+            Box::new(composer.get_locker_mut().get_locked_repository(true)?)
+        } else if composer.get_locker_mut().is_locked() {
+            if !composer.get_locker_mut().is_fresh()? {
+                io.write_error3(
                     "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
                     true,
                     io_interface::NORMAL,
                 );
-                    return Ok(Self::ERROR_LOCK_OUTDATED);
-                }
-                Box::new(composer.get_locker_mut().get_locked_repository(true)?)
-            } else {
-                // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
-                // cloning into an owned Box requires clone_box on that trait.
-                composer
-                    .get_repository_manager()
-                    .get_local_repository()
-                    .clone_box()
-            };
+                return Ok(Self::ERROR_LOCK_OUTDATED);
+            }
+            Box::new(composer.get_locker_mut().get_locked_repository(true)?)
+        } else {
+            // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
+            // cloning into an owned Box requires clone_box on that trait.
+            composer
+                .get_repository_manager()
+                .get_local_repository()
+                .clone_box()
+        };
 
         if composer.get_package().get_type() != "project" && !dev_only {
             io.write_error3(
@@ -235,9 +234,7 @@ impl BumpCommand {
 
                 let package_opt = repo.find_package(
                     pkg_name,
-                    crate::repository::repository_interface::FindPackageConstraint::String(
-                        "*".to_string(),
-                    ),
+                    crate::repository::FindPackageConstraint::String("*".to_string()),
                 );
                 let mut package = match package_opt {
                     None => continue,

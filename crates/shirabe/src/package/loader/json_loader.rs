@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Package/Loader/JsonLoader.php
 
-use crate::json::json_file::JsonFile;
-use crate::package::base_package::BasePackage;
-use crate::package::loader::loader_interface::LoaderInterface;
+use crate::json::JsonFile;
+use crate::package::BasePackage;
+use crate::package::loader::LoaderInterface;
 use anyhow::Result;
 use std::path::Path;
 

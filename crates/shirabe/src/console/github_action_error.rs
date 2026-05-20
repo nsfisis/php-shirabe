@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/GithubActionError.php
 
-use crate::io::io_interface::IOInterface;
-use crate::util::platform::Platform;
+use crate::io::IOInterface;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct GithubActionError {

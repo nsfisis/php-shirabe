@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/TlsHelper.php
 
-use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::ca_bundle::CaBundle;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_decode, openssl_get_publickey, openssl_pkey_get_details,
     openssl_x509_parse, preg_quote, substr_count,

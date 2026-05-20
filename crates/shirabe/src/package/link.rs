@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Package/Link.php
 
 use shirabe_php_shim::UnexpectedValueException;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::package::package_interface::PackageInterface;
+use crate::package::PackageInterface;
 
 pub struct Link {
     pub(crate) source: String,

@@ -1,19 +1,19 @@
 //! ref: composer/src/Composer/Repository/PackageRepository.php
 
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
-use crate::advisory::security_advisory::SecurityAdvisory;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::advisory_provider_interface::{
+use crate::advisory::PartialSecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::ValidatingArrayLoader;
+use crate::package::version::VersionParser;
+use crate::repository::ArrayRepository;
+use crate::repository::InvalidRepositoryException;
+use crate::repository::{
     AdvisoryProviderInterface, PartialOrSecurityAdvisory, SecurityAdvisoryResult,
 };
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::invalid_repository_exception::InvalidRepositoryException;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct PackageRepository {
@@ -78,7 +78,7 @@ impl PackageRepository {
     }
 
     pub fn get_repo_name(&self) -> String {
-        use crate::repository::repository_interface::RepositoryInterface;
+        use crate::repository::RepositoryInterface;
         Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
             .unwrap_or_else(|_| self.inner.get_repo_name())
     }

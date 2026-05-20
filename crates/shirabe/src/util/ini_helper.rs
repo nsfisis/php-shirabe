@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/IniHelper.php
 
-use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 
 pub struct IniHelper;
 

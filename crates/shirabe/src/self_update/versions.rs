@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/SelfUpdate/Versions.php
 
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::util::http_downloader::HttpDownloader;
+use crate::io::IOInterface;
+use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
     UnexpectedValueException,

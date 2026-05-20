@@ -5,23 +5,23 @@ use std::cell::RefCell;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Countable, InvalidArgumentException, LogicException, implode, preg_quote, spl_object_hash,
     strtolower,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::stability_filter::StabilityFilter;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::repository_interface::{
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::CompleteAliasPackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::version::StabilityFilter;
+use crate::package::version::VersionParser;
+use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     SearchResult,
 };
@@ -222,7 +222,7 @@ impl RepositoryInterface for ArrayRepository {
 
         LoadPackagesResult {
             names_found: names_found.into_keys().collect(),
-            packages: result.into_values().collect(),
+            packages: result,
         }
     }
 
@@ -288,7 +288,7 @@ impl RepositoryInterface for ArrayRepository {
     }
 
     fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
-        let regex = if mode == crate::repository::repository_interface::SEARCH_FULLTEXT {
+        let regex = if mode == crate::repository::SEARCH_FULLTEXT {
             let parts = Preg::split("{\\s+}", &preg_quote(&query, None)).unwrap_or_default();
             format!("{{(?:{})}}i", implode("|", &parts))
         } else {
@@ -300,7 +300,7 @@ impl RepositoryInterface for ArrayRepository {
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
         for package in self.get_packages() {
             let mut name = PackageInterface::get_name(package.as_ref()).to_string();
-            if mode == crate::repository::repository_interface::SEARCH_VENDOR {
+            if mode == crate::repository::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
                 let parts: Vec<&str> = name.splitn(2, '/').collect();
                 name = parts[0].to_string();
@@ -316,7 +316,7 @@ impl RepositoryInterface for ArrayRepository {
 
             let complete = package.as_any().downcast_ref::<CompletePackage>();
 
-            let fulltext_match = mode == crate::repository::repository_interface::SEARCH_FULLTEXT
+            let fulltext_match = mode == crate::repository::SEARCH_FULLTEXT
                 && complete.is_some()
                 && Preg::is_match(
                     &regex,
@@ -329,7 +329,7 @@ impl RepositoryInterface for ArrayRepository {
                 .unwrap_or(false);
 
             if Preg::is_match(&regex, &name).unwrap_or(false) || fulltext_match {
-                if mode == crate::repository::repository_interface::SEARCH_VENDOR {
+                if mode == crate::repository::SEARCH_VENDOR {
                     matches.insert(
                         name.clone(),
                         SearchResult {

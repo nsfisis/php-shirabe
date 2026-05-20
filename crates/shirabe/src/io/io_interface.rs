@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use indexmap::IndexMap;
-use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
+use shirabe_external_packages::psr::log::LoggerInterface;
 use shirabe_php_shim::PhpMixed;
 
 pub const QUIET: i64 = 1;

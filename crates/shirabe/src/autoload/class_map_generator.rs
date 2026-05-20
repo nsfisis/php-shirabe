@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator as ExternalClassMapGenerator;
 use shirabe_php_shim::PhpMixed;
 
-use crate::io::io_interface::IOInterface;
+use crate::io::IOInterface;
 
 #[derive(Debug)]
 pub struct ClassMapGenerator;

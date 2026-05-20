@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Repository/WritableRepositoryInterface.php
 
-use crate::installer::installation_manager::InstallationManager;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::installer::InstallationManager;
+use crate::package::PackageInterface;
+use crate::repository::RepositoryInterface;
 use anyhow::Result;
 
 pub trait WritableRepositoryInterface: RepositoryInterface {

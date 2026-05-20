@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
 
-use crate::advisory::security_advisory::SecurityAdvisory;
-use crate::repository::advisory_provider_interface::PartialOrSecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
+use crate::repository::PartialOrSecurityAdvisory;
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 use shirabe_semver::version_parser::VersionParser;
 
 fn serialize_constraint<S: serde::Serializer>(

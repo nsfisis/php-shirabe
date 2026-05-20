@@ -3,7 +3,7 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, base64_encode,
     explode, in_array, is_array, is_string, json_decode, parse_url, sprintf, str_replace, strpos,
@@ -11,11 +11,11 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::util::bitbucket::Bitbucket;
-use crate::util::github::GitHub;
-use crate::util::gitlab::GitLab;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::util::Bitbucket;
+use crate::util::GitHub;
+use crate::util::GitLab;
 
 #[derive(Debug)]
 pub struct AuthHelper {

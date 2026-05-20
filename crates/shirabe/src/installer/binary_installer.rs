@@ -2,19 +2,19 @@
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir, substr,
     trim, umask,
 };
 
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 
 /// Utility to handle installation of package "bin"/binaries
 #[derive(Debug)]

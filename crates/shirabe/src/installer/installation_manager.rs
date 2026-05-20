@@ -4,32 +4,32 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_search_mixed, array_splice, array_unshift, count,
     http_build_query, json_encode, str_contains, str_replace, strpos, strtolower, ucfirst,
 };
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::mark_alias_installed_operation::MarkAliasInstalledOperation;
-use crate::dependency_resolver::operation::mark_alias_uninstalled_operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::installer::binary_presence_interface::BinaryPresenceInterface;
-use crate::installer::installer_interface::InstallerInterface;
-use crate::installer::package_events::PackageEvents;
-use crate::installer::plugin_installer::PluginInstaller;
-use crate::io::console_io::ConsoleIO;
-use crate::io::io_interface::IOInterface;
-use crate::package::alias_package::AliasPackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
+use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::downloader::FileDownloader;
+use crate::event_dispatcher::EventDispatcher;
+use crate::installer::BinaryPresenceInterface;
+use crate::installer::InstallerInterface;
+use crate::installer::PackageEvents;
+use crate::installer::PluginInstaller;
+use crate::io::ConsoleIO;
+use crate::io::IOInterface;
+use crate::package::AliasPackage;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepositoryInterface;
+use crate::util::Platform;
 use crate::util::r#loop::Loop;
-use crate::util::platform::Platform;
 
 /// Package operation manager.
 #[derive(Debug)]

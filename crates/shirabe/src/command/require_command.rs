@@ -3,10 +3,10 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, array_fill_keys, array_intersect,
     array_keys, array_map, array_merge, array_merge_recursive, array_unique, count, empty,
@@ -14,36 +14,36 @@ use shirabe_php_shim::{
     strtolower, unlink,
 };
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::package_discovery_trait::PackageDiscoveryTrait;
+use crate::advisory::Auditor;
+use crate::command::PackageDiscoveryTrait;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::dependency_resolver::request::Request;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::dependency_resolver::Request;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::installer::installer_events::InstallerEvents;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::json::json_manipulator::JsonManipulator;
-use crate::package::alias_package::AliasPackage;
+use crate::installer::InstallerEvents;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::json::JsonManipulator;
+use crate::package::AliasPackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::root_package_loader::RootPackageLoader;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_set::RepositorySet;
-use crate::util::filesystem::Filesystem;
-use crate::util::package_sorter::PackageSorter;
-use crate::util::silencer::Silencer;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::RootPackageLoader;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySet;
+use crate::util::Filesystem;
+use crate::util::PackageSorter;
+use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct RequireCommand {
@@ -89,7 +89,8 @@ impl PackageDiscoveryTrait for RequireCommand {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>{
+    ) -> Box<dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>
+    {
         todo!()
     }
 
@@ -259,9 +260,7 @@ impl RequireCommand {
             .unwrap_or_default();
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepository::new(vec![], platform_overrides_map)?;
-        let mut combined: Vec<
-            Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-        > = vec![
+        let mut combined: Vec<Box<dyn crate::repository::RepositoryInterface>> = vec![
             // TODO(phase-b): PlatformRepository should be shared via Rc; use placeholder until
             // CompositeRepository accepts shared references
             Box::new(todo!("share platform_repo with PlatformRepository") as PlatformRepository),
@@ -691,13 +690,13 @@ impl RequireCommand {
         // self.dependency_resolution_completed = true when invoked.
         composer.get_event_dispatcher().borrow_mut().add_listener(
             InstallerEvents::PRE_OPERATIONS_EXEC,
-            crate::event_dispatcher::event_dispatcher::Callable::Closure,
+            crate::event_dispatcher::Callable::Closure,
             10000,
         );
 
         if input.get_option("dry-run").as_bool().unwrap_or(false) {
             let root_package = composer.get_package();
-            let mut links: IndexMap<String, IndexMap<String, crate::package::link::Link>> =
+            let mut links: IndexMap<String, IndexMap<String, crate::package::Link>> =
                 IndexMap::new();
             links.insert("require".to_string(), root_package.get_requires());
             links.insert("require-dev".to_string(), root_package.get_dev_requires());
@@ -948,9 +947,7 @@ impl RequireCommand {
         for package_name in requirements_to_update {
             let mut package = repo.find_package(
                 package_name,
-                crate::repository::repository_interface::FindPackageConstraint::String(
-                    "*".to_string(),
-                ),
+                crate::repository::FindPackageConstraint::String("*".to_string()),
             );
             // TODO(phase-b): `$package instanceof AliasPackage` downcast
             let package_as_alias: Option<&AliasPackage> = None;

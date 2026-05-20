@@ -1,12 +1,15 @@
 //! ref: composer/src/Composer/Config.php
 
-pub mod config_source_interface;
-pub mod json_config_source;
+mod config_source_interface;
+mod json_config_source;
+
+pub use config_source_interface::*;
+pub use json_config_source::*;
 
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, array_merge_recursive, array_reverse, array_search_mixed,
@@ -15,12 +18,11 @@ use shirabe_php_shim::{
 };
 use std::cell::RefCell;
 
-use crate::advisory::auditor::Auditor;
-use crate::config::config_source_interface::ConfigSourceInterface;
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::advisory::Auditor;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct Config {

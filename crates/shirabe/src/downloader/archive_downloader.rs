@@ -2,17 +2,17 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
 };
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::package::package_interface::PackageInterface;
-use crate::util::platform::Platform;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::FileDownloader;
+use crate::package::PackageInterface;
+use crate::util::Platform;
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;

@@ -2,9 +2,9 @@
 
 use std::cell::RefCell;
 
-use crate::constraint::bound::Bound;
-use crate::constraint::constraint_interface::ConstraintInterface;
-use crate::constraint::match_all_constraint::MatchAllConstraint;
+use crate::constraint::Bound;
+use crate::constraint::ConstraintInterface;
+use crate::constraint::MatchAllConstraint;
 
 pub struct MultiConstraint {
     pub(crate) constraints: Vec<Box<dyn ConstraintInterface>>,

@@ -3,19 +3,19 @@
 use std::path::Path;
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::input::StringInput;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
+use crate::console::input::InputArgument;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
+use crate::io::IOInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct GlobalCommand {

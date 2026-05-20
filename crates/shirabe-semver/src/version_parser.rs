@@ -1,9 +1,9 @@
 //! ref: composer/vendor/composer/semver/src/VersionParser.php
 
-use crate::constraint::constraint::Constraint;
-use crate::constraint::constraint_interface::ConstraintInterface;
-use crate::constraint::match_all_constraint::MatchAllConstraint;
-use crate::constraint::multi_constraint::MultiConstraint;
+use crate::constraint::Constraint;
+use crate::constraint::ConstraintInterface;
+use crate::constraint::MatchAllConstraint;
+use crate::constraint::MultiConstraint;
 use shirabe_php_shim as php;
 
 // Regex to match pre-release data (sort of).

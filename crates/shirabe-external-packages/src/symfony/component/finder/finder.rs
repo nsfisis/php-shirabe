@@ -1,4 +1,4 @@
-use crate::symfony::component::finder::spl_file_info::SplFileInfo;
+use crate::symfony::component::finder::SplFileInfo;
 
 /// Helper trait so `Finder::exclude` accepts both single strings and slices
 /// (PHP's variadic / array argument compatibility).

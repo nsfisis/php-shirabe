@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Repository/RepositoryInterface.php
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::repository::AdvisoryProviderInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 pub enum FindPackageConstraint {
     String(String),
@@ -21,9 +21,10 @@ impl Clone for FindPackageConstraint {
     }
 }
 
+#[derive(Debug)]
 pub struct LoadPackagesResult {
     pub names_found: Vec<String>,
-    pub packages: Vec<Box<dyn BasePackage>>,
+    pub packages: IndexMap<String, Box<dyn BasePackage>>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,8 +89,7 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
 
     fn as_installed_repository_interface(
         &self,
-    ) -> Option<&dyn crate::repository::installed_repository_interface::InstalledRepositoryInterface>
-    {
+    ) -> Option<&dyn crate::repository::InstalledRepositoryInterface> {
         None
     }
 

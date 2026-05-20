@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::version_compare;
 
 pub struct Version;

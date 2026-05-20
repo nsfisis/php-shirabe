@@ -5,9 +5,9 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys, array_slice,
     array_unshift, array_values, asort, count, explode, file_get_contents, implode, in_array,
@@ -17,20 +17,20 @@ use shirabe_php_shim::{
 
 use crate::composer::Composer;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::io::io_interface::IOInterface;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_interface::{RepositoryInterface, SearchResult};
-use crate::repository::repository_set::RepositorySet;
-use crate::util::filesystem::Filesystem;
+use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::io::IOInterface;
+use crate::package::BasePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositorySet;
+use crate::repository::{RepositoryInterface, SearchResult};
+use crate::util::Filesystem;
 
 /// @internal
 pub trait PackageDiscoveryTrait {
@@ -50,16 +50,14 @@ pub trait PackageDiscoveryTrait {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>;
+    ) -> Box<dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>;
 
     fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>>;
 
     fn get_repos(&mut self) -> &CompositeRepository {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
-            let mut repos: Vec<
-                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-            > = vec![
+            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> = vec![
                 // TODO(phase-b): PlatformRepository::new() signature
                 Box::new(todo!("PlatformRepository::new()") as PlatformRepository),
             ];
@@ -274,10 +272,8 @@ pub trait PackageDiscoveryTrait {
                 // no match, prompt which to pick
                 if !exact_match {
                     // TODO(phase-b): self.get_repos() (&mut self) conflicts with io borrow (&self)
-                    let providers: IndexMap<
-                        String,
-                        crate::repository::repository_interface::ProviderInfo,
-                    > = todo!("self.get_repos().get_providers()");
+                    let providers: IndexMap<String, crate::repository::ProviderInfo> =
+                        todo!("self.get_repos().get_providers()");
                     if count(&PhpMixed::List(
                         providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
                     )) > 0
@@ -299,13 +295,10 @@ pub trait PackageDiscoveryTrait {
                         let mut abandoned = String::new();
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
-                                crate::repository::repository_interface::AbandonedInfo::Replacement(r) => {
-                                    sprintf(
-                                        "Use %s instead",
-                                        &[PhpMixed::String(r.clone())],
-                                    )
+                                crate::repository::AbandonedInfo::Replacement(r) => {
+                                    sprintf("Use %s instead", &[PhpMixed::String(r.clone())])
                                 }
-                                crate::repository::repository_interface::AbandonedInfo::Abandoned => {
+                                crate::repository::AbandonedInfo::Abandoned => {
                                     "No replacement was suggested".to_string()
                                 }
                             };
@@ -820,9 +813,7 @@ pub trait PackageDiscoveryTrait {
             if installed_repo
                 .find_package(
                     &result.name,
-                    crate::repository::repository_interface::FindPackageConstraint::String(
-                        "*".to_string(),
-                    ),
+                    crate::repository::FindPackageConstraint::String("*".to_string()),
                 )
                 .is_some()
             {
@@ -853,9 +844,7 @@ pub trait PackageDiscoveryTrait {
             }
             let platform_pkg = platform_repo.find_package(
                 link.get_target(),
-                crate::repository::repository_interface::FindPackageConstraint::String(
-                    "*".to_string(),
-                ),
+                crate::repository::FindPackageConstraint::String("*".to_string()),
             );
             let platform_pkg = match platform_pkg {
                 None => {
@@ -881,12 +870,13 @@ pub trait PackageDiscoveryTrait {
                 }
                 Some(p) => p,
             };
-            if !link.get_constraint().matches(
-                &shirabe_semver::constraint::constraint::Constraint::new(
+            if !link
+                .get_constraint()
+                .matches(&shirabe_semver::constraint::Constraint::new(
                     "==",
                     platform_pkg.get_version(),
-                ),
-            ) {
+                ))
+            {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key("config.platform");

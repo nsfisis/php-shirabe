@@ -3,11 +3,11 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::OutOfBoundsException;
 
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::Rule;
-use crate::dependency_resolver::rule_set_iterator::RuleSetIterator;
-use crate::repository::repository_set::RepositorySet;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::Rule;
+use crate::dependency_resolver::RuleSetIterator;
+use crate::repository::RepositorySet;
 
 #[derive(Debug)]
 pub struct RuleSet {

@@ -1,5 +1,5 @@
-use crate::symfony::component::console::input::input_definition::InputDefinition;
-use crate::symfony::component::console::input::input_interface::InputInterface;
+use crate::symfony::component::console::input::InputDefinition;
+use crate::symfony::component::console::input::InputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

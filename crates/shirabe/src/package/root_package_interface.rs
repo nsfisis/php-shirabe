@@ -3,10 +3,10 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::package_interface::PackageInterface;
+use crate::package::PackageInterface;
 
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
 
 pub trait RootPackageInterface: CompletePackageInterface {
     fn get_aliases(&self) -> &[IndexMap<String, String>];

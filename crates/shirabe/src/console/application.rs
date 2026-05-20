@@ -3,86 +3,85 @@
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
-use shirabe_external_packages::symfony::component::console::application::Application as BaseApplication;
-use shirabe_external_packages::symfony::component::console::command::command::Command;
-use shirabe_external_packages::symfony::component::console::exception::command_not_found_exception::CommandNotFoundException;
-use shirabe_external_packages::symfony::component::console::exception::exception_interface::ExceptionInterface;
-use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
-use shirabe_external_packages::symfony::component::console::helper::question_helper::QuestionHelper;
-use shirabe_external_packages::symfony::component::console::input::input_definition::InputDefinition;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::input_option::InputOption;
-use shirabe_external_packages::symfony::component::console::output::console_output_interface::ConsoleOutputInterface;
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::seld::json_lint::ParsingException;
+use shirabe_external_packages::symfony::component::console::Application as BaseApplication;
+use shirabe_external_packages::symfony::component::console::SingleCommandApplication;
+use shirabe_external_packages::symfony::component::console::command::Command;
+use shirabe_external_packages::symfony::component::console::exception::CommandNotFoundException;
+use shirabe_external_packages::symfony::component::console::exception::ExceptionInterface;
+use shirabe_external_packages::symfony::component::console::helper::HelperSet;
+use shirabe_external_packages::symfony::component::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::component::console::input::InputDefinition;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputOption;
+use shirabe_external_packages::symfony::component::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::{
     self as output_interface, OutputInterface,
 };
-use shirabe_external_packages::symfony::component::console::single_command_application::SingleCommandApplication;
-use shirabe_external_packages::symfony::component::process::exception::process_timed_out_exception::ProcessTimedOutException;
+use shirabe_external_packages::symfony::component::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
-    array_merge, bin2hex, chdir, clone, count, date_default_timezone_get,
-    date_default_timezone_set, defined, dirname, disk_free_space, error_get_last,
-    extension_loaded, file_exists, file_get_contents, file_put_contents, function_exists, get_class,
-    getcwd, getmypid, glob, ini_set, in_array, is_array, is_dir, is_file, is_string,
-    is_subclass_of, json_decode, max_i64, memory_get_peak_usage, memory_get_usage, microtime,
-    method_exists, php_uname, posix_getuid, random_bytes, realpath, register_shutdown_function,
-    restore_error_handler, round, sprintf, str_contains, str_replace, strpos, strtoupper,
-    sys_get_temp_dir, time, unlink, PhpMixed, RuntimeException, UnexpectedValueException,
-    LogicException as ShimLogicException,
-    PHP_BINARY, PHP_VERSION, PHP_VERSION_ID,
+    LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
+    RuntimeException, UnexpectedValueException, array_merge, bin2hex, chdir, clone, count,
+    date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
+    error_get_last, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    function_exists, get_class, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir,
+    is_file, is_string, is_subclass_of, json_decode, max_i64, memory_get_peak_usage,
+    memory_get_usage, method_exists, microtime, php_uname, posix_getuid, random_bytes, realpath,
+    register_shutdown_function, restore_error_handler, round, sprintf, str_contains, str_replace,
+    strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 
-use crate::command::about_command::AboutCommand;
-use crate::command::archive_command::ArchiveCommand;
-use crate::command::audit_command::AuditCommand;
-use crate::command::base_command::BaseCommand;
-use crate::command::bump_command::BumpCommand;
-use crate::command::check_platform_reqs_command::CheckPlatformReqsCommand;
-use crate::command::clear_cache_command::ClearCacheCommand;
-use crate::command::config_command::ConfigCommand;
-use crate::command::create_project_command::CreateProjectCommand;
-use crate::command::depends_command::DependsCommand;
-use crate::command::diagnose_command::DiagnoseCommand;
-use crate::command::dump_autoload_command::DumpAutoloadCommand;
-use crate::command::exec_command::ExecCommand;
-use crate::command::fund_command::FundCommand;
-use crate::command::global_command::GlobalCommand;
-use crate::command::home_command::HomeCommand;
-use crate::command::init_command::InitCommand;
-use crate::command::install_command::InstallCommand;
-use crate::command::licenses_command::LicensesCommand;
-use crate::command::outdated_command::OutdatedCommand;
-use crate::command::prohibits_command::ProhibitsCommand;
-use crate::command::reinstall_command::ReinstallCommand;
-use crate::command::remove_command::RemoveCommand;
-use crate::command::repository_command::RepositoryCommand;
-use crate::command::require_command::RequireCommand;
-use crate::command::run_script_command::RunScriptCommand;
-use crate::command::script_alias_command::ScriptAliasCommand;
-use crate::command::search_command::SearchCommand;
-use crate::command::self_update_command::SelfUpdateCommand;
-use crate::command::show_command::ShowCommand;
-use crate::command::status_command::StatusCommand;
-use crate::command::suggests_command::SuggestsCommand;
-use crate::command::update_command::UpdateCommand;
-use crate::command::validate_command::ValidateCommand;
+use crate::command::AboutCommand;
+use crate::command::ArchiveCommand;
+use crate::command::AuditCommand;
+use crate::command::BaseCommand;
+use crate::command::BumpCommand;
+use crate::command::CheckPlatformReqsCommand;
+use crate::command::ClearCacheCommand;
+use crate::command::ConfigCommand;
+use crate::command::CreateProjectCommand;
+use crate::command::DependsCommand;
+use crate::command::DiagnoseCommand;
+use crate::command::DumpAutoloadCommand;
+use crate::command::ExecCommand;
+use crate::command::FundCommand;
+use crate::command::GlobalCommand;
+use crate::command::HomeCommand;
+use crate::command::InitCommand;
+use crate::command::InstallCommand;
+use crate::command::LicensesCommand;
+use crate::command::OutdatedCommand;
+use crate::command::ProhibitsCommand;
+use crate::command::ReinstallCommand;
+use crate::command::RemoveCommand;
+use crate::command::RepositoryCommand;
+use crate::command::RequireCommand;
+use crate::command::RunScriptCommand;
+use crate::command::ScriptAliasCommand;
+use crate::command::SearchCommand;
+use crate::command::SelfUpdateCommand;
+use crate::command::ShowCommand;
+use crate::command::StatusCommand;
+use crate::command::SuggestsCommand;
+use crate::command::UpdateCommand;
+use crate::command::ValidateCommand;
 use crate::composer::Composer;
-use crate::console::github_action_error::GithubActionError;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::script_execution_exception::ScriptExecutionException;
-use crate::exception::no_ssl_exception::NoSslException;
+use crate::console::GithubActionError;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::ScriptExecutionException;
+use crate::exception::NoSslException;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::console_io::ConsoleIO;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::json::json_validation_exception::JsonValidationException;
-use crate::util::error_handler::ErrorHandler;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::silencer::Silencer;
+use crate::io::ConsoleIO;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::json::JsonValidationException;
+use crate::util::ErrorHandler;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct Application {
@@ -636,9 +635,11 @@ impl Application {
                                         // TODO(phase-b): build_package_map needs &mut InstallationManager
                                         // but get_composer returns &Composer; skip until shared ownership is settled.
                                         let package_map: Vec<(
-                                            Box<dyn crate::package::package_interface::PackageInterface>,
+                                            Box<dyn crate::package::PackageInterface>,
                                             Option<String>,
-                                        )> = todo!("build_package_map requires &mut InstallationManager");
+                                        )> = todo!(
+                                            "build_package_map requires &mut InstallationManager"
+                                        );
                                         let map = generator.parse_autoloads(
                                             package_map,
                                             &*root_package,

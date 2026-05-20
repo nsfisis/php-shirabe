@@ -2,7 +2,7 @@
 
 use shirabe_php_shim::PhpMixed;
 
-use crate::event_dispatcher::event::Event;
+use crate::event_dispatcher::Event;
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {

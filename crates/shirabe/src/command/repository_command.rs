@@ -1,24 +1,24 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
 };
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::base_config_command::BaseConfigCommand;
+use crate::command::BaseConfigCommand;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::config::config_source_interface::ConfigSourceInterface;
-use crate::config::json_config_source::JsonConfigSource;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
 
 #[derive(Debug)]
 pub struct RepositoryCommand {

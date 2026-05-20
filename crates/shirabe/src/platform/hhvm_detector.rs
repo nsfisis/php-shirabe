@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Platform/HhvmDetector.php
 
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use shirabe_external_packages::symfony::process::executable_finder::ExecutableFinder;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{HHVM_VERSION, defined};
 use std::sync::Mutex;
 

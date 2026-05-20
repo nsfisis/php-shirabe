@@ -3,33 +3,33 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_search_mixed, count, get_class, in_array,
     str_replace, strpos,
 };
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::package::base_package::BasePackage;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::invalid_package_exception::InvalidPackageException;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
-use crate::repository::invalid_repository_exception::InvalidRepositoryException;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::vcs::vcs_driver_interface::VcsDriverInterface;
-use crate::repository::version_cache_interface::{VersionCacheInterface, VersionCacheResult};
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::package::BasePackage;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::InvalidPackageException;
+use crate::package::loader::LoaderInterface;
+use crate::package::loader::ValidatingArrayLoader;
+use crate::package::version::VersionParser;
+use crate::repository::ArrayRepository;
+use crate::repository::ConfigurableRepositoryInterface;
+use crate::repository::InvalidRepositoryException;
+use crate::repository::RepositoryInterface;
+use crate::repository::vcs::VcsDriverInterface;
+use crate::repository::{VersionCacheInterface, VersionCacheResult};
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Url;
 
 #[derive(Debug)]
 pub struct VcsRepository {
@@ -387,8 +387,7 @@ impl VcsRepository {
             match cached_package {
                 CachedPackageResult::Package(pkg) => {
                     // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                    let pkg_pi: Box<dyn crate::package::package_interface::PackageInterface> =
-                        pkg.clone_package_box();
+                    let pkg_pi: Box<dyn crate::package::PackageInterface> = pkg.clone_package_box();
                     self.inner.add_package(pkg_pi)?;
                     continue;
                 }
@@ -515,9 +514,9 @@ impl VcsRepository {
                     });
                 if let Some(existing_package) = self.inner.find_package(
                     &tag_package_name,
-                    crate::repository::repository_interface::FindPackageConstraint::Constraint(
-                        Box::new(Constraint::new("=", &version_normalized)),
-                    ),
+                    crate::repository::FindPackageConstraint::Constraint(Box::new(
+                        Constraint::new("=", &version_normalized),
+                    )),
                 ) {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -537,7 +536,7 @@ impl VcsRepository {
                 let processed = self.pre_process(&**driver, data, &identifier)?;
                 let loaded = self.loader.as_ref().unwrap().load(processed, None)?;
                 // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                let loaded_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                let loaded_pi: Box<dyn crate::package::PackageInterface> =
                     loaded.clone_package_box();
                 self.inner.add_package(loaded_pi)?;
                 Ok(())
@@ -658,8 +657,7 @@ impl VcsRepository {
             match cached_package {
                 CachedPackageResult::Package(pkg) => {
                     // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                    let pkg_pi: Box<dyn crate::package::package_interface::PackageInterface> =
-                        pkg.clone_package_box();
+                    let pkg_pi: Box<dyn crate::package::PackageInterface> = pkg.clone_package_box();
                     self.inner.add_package(pkg_pi)?;
                     continue;
                 }
@@ -724,7 +722,7 @@ impl VcsRepository {
                     }
                 }
                 // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                let package_pi: Box<dyn crate::package::package_interface::PackageInterface> =
+                let package_pi: Box<dyn crate::package::PackageInterface> =
                     package.clone_package_box();
                 self.inner.add_package(package_pi)?;
                 Ok(())
@@ -951,9 +949,10 @@ impl VcsRepository {
                 .to_string();
             if let Some(existing_package) = self.inner.find_package(
                 &name,
-                crate::repository::repository_interface::FindPackageConstraint::Constraint(
-                    Box::new(Constraint::new("=", &version_normalized)),
-                ),
+                crate::repository::FindPackageConstraint::Constraint(Box::new(Constraint::new(
+                    "=",
+                    &version_normalized,
+                ))),
             ) {
                 if is_very_verbose {
                     self.io.write_error(&format!(

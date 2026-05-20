@@ -9,3 +9,15 @@ pub mod post_file_download_event;
 pub mod pre_command_run_event;
 pub mod pre_file_download_event;
 pub mod pre_pool_create_event;
+
+pub use capability::*;
+pub use capable::*;
+pub use command_event::*;
+pub use plugin_blocked_exception::*;
+pub use plugin_events::*;
+pub use plugin_interface::*;
+pub use plugin_manager::*;
+pub use post_file_download_event::*;
+pub use pre_command_run_event::*;
+pub use pre_file_download_event::*;
+pub use pre_pool_create_event::*;

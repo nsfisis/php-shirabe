@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/PackageInfo.php
 
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
 
 pub struct PackageInfo;
 

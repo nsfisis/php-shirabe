@@ -3,12 +3,12 @@
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_semver::constraint::ConstraintInterface;
 use shirabe_semver::semver::Semver;
 use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
 
-use crate::repository::platform_repository::PlatformRepository;
+use crate::repository::PlatformRepository;
 
 static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, Arc<dyn ConstraintInterface + Send + Sync>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));

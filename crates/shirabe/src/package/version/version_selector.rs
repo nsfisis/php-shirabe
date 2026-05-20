@@ -4,27 +4,27 @@ use crate::io::io_interface;
 use std::any::Any;
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, strtolower, version_compare,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::filter::platform_requirement_filter::ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::io::io_interface::IOInterface;
-use crate::package::alias_package::AliasPackage;
+use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::package::AliasPackage;
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_set::RepositorySet;
+use crate::package::dumper::ArrayDumper;
+use crate::package::loader::ArrayLoader;
+use crate::package::version::VersionParser;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySet;
 
 #[derive(Debug)]
 pub struct VersionSelector {
@@ -36,7 +36,7 @@ pub struct VersionSelector {
 impl VersionSelector {
     pub fn new(
         repository_set: RepositorySet,
-        platform_repo: Option<&crate::repository::platform_repository::PlatformRepository>,
+        platform_repo: Option<&crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
         let mut platform_constraints: IndexMap<String, Vec<Box<dyn ConstraintInterface>>> =
             IndexMap::new();

@@ -4,12 +4,12 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct RootPackage {
@@ -90,23 +90,23 @@ impl RootPackageInterface for RootPackage {
         &self.aliases
     }
 
-    fn set_requires(&mut self, requires: Vec<super::link::Link>) {
+    fn set_requires(&mut self, requires: Vec<super::Link>) {
         todo!()
     }
 
-    fn set_dev_requires(&mut self, dev_requires: Vec<super::link::Link>) {
+    fn set_dev_requires(&mut self, dev_requires: Vec<super::Link>) {
         todo!()
     }
 
-    fn set_conflicts(&mut self, conflicts: Vec<super::link::Link>) {
+    fn set_conflicts(&mut self, conflicts: Vec<super::Link>) {
         todo!()
     }
 
-    fn set_provides(&mut self, provides: Vec<super::link::Link>) {
+    fn set_provides(&mut self, provides: Vec<super::Link>) {
         todo!()
     }
 
-    fn set_replaces(&mut self, replaces: Vec<super::link::Link>) {
+    fn set_replaces(&mut self, replaces: Vec<super::Link>) {
         todo!()
     }
 

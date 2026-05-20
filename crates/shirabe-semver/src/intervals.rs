@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use crate::constraint::constraint::Constraint;
-use crate::constraint::constraint_interface::ConstraintInterface;
-use crate::constraint::match_all_constraint::MatchAllConstraint;
-use crate::constraint::match_none_constraint::MatchNoneConstraint;
-use crate::constraint::multi_constraint::MultiConstraint;
+use crate::constraint::Constraint;
+use crate::constraint::ConstraintInterface;
+use crate::constraint::MatchAllConstraint;
+use crate::constraint::MatchNoneConstraint;
+use crate::constraint::MultiConstraint;
 use crate::interval::{DevConstraintSet, Interval};
 use shirabe_php_shim as php;
 

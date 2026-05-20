@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Package/CompleteAliasPackage.php
 
-use crate::package::alias_package::AliasPackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
+use crate::package::AliasPackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
 
 #[derive(Debug)]
 pub struct CompleteAliasPackage {

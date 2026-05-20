@@ -1,48 +1,48 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::composer::semver::semver::Semver;
-use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::semver::Semver;
+use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException, array_search,
     date, extension_loaded, in_array, realpath, strtolower, version_compare,
 };
 
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::dependency_resolver::default_policy::DefaultPolicy;
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
+use crate::console::input::InputOption;
+use crate::dependency_resolver::DefaultPolicy;
+use crate::dependency_resolver::PolicyInterface;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::BasePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
 use crate::package::base_package;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::filter_repository::FilterRepository;
-use crate::repository::installed_array_repository::InstalledArrayRepository;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_set::RepositorySet;
-use crate::repository::repository_utils::RepositoryUtils;
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::util::package_info::PackageInfo;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CompositeRepository;
+use crate::repository::FilterRepository;
+use crate::repository::InstalledArrayRepository;
+use crate::repository::InstalledRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySet;
+use crate::repository::RepositoryUtils;
+use crate::repository::RootPackageRepository;
+use crate::util::PackageInfo;
 
 // keep InputOption referenced; the configure() definition list is currently abbreviated
 #[allow(dead_code)]

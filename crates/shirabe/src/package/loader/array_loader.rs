@@ -3,23 +3,23 @@
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, Exception, LogicException, PhpMixed, UnexpectedValueException, is_scalar,
     is_string, json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr,
     trigger_error, trim, ucfirst,
 };
 
-use crate::package::base_package::{BasePackage, SUPPORTED_LINK_TYPES};
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_alias_package::RootAliasPackage;
-use crate::package::root_package::RootPackage;
-use crate::package::version::version_parser::VersionParser;
+use crate::package::CompleteAliasPackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootAliasPackage;
+use crate::package::RootPackage;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionParser;
+use crate::package::{BasePackage, SUPPORTED_LINK_TYPES};
 
 #[derive(Debug)]
 pub struct ArrayLoader {

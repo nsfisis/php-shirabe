@@ -1,18 +1,16 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::package_interface::PackageInterface;
-use crate::repository::advisory_provider_interface::{
-    AdvisoryProviderInterface, SecurityAdvisoryResult,
-};
-use crate::repository::repository_interface::{
+use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
+use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct FilterRepository {
@@ -199,7 +197,7 @@ impl RepositoryInterface for FilterRepository {
         if package_name_map.is_empty() {
             return LoadPackagesResult {
                 names_found: Vec::new(),
-                packages: Vec::new(),
+                packages: IndexMap::new(),
             };
         }
 

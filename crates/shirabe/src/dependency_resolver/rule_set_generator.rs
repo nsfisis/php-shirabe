@@ -6,20 +6,20 @@ use std::collections::VecDeque;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::dependency_resolver::generic_rule::GenericRule;
-use crate::dependency_resolver::multi_conflict_rule::MultiConflictRule;
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::request::Request;
+use crate::dependency_resolver::GenericRule;
+use crate::dependency_resolver::MultiConflictRule;
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::Rule2Literals;
+use crate::dependency_resolver::RuleSet;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::dependency_resolver::rule_set::RuleSet;
-use crate::dependency_resolver::rule2_literals::Rule2Literals;
-use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
+use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {

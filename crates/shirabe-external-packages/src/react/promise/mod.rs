@@ -1,7 +1,9 @@
 pub mod promise;
 pub mod promise_interface;
 
-use self::promise_interface::PromiseInterface;
+pub use promise::*;
+pub use promise_interface::*;
+
 use shirabe_php_shim::PhpMixed;
 
 pub fn resolve(_value: Option<PhpMixed>) -> Box<dyn PromiseInterface> {

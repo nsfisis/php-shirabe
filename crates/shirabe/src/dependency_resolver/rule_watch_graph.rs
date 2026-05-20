@@ -4,11 +4,11 @@ use std::any::Any;
 
 use indexmap::IndexMap;
 
-use crate::dependency_resolver::decisions::Decisions;
-use crate::dependency_resolver::multi_conflict_rule::MultiConflictRule;
-use crate::dependency_resolver::rule::Rule;
-use crate::dependency_resolver::rule_watch_chain::RuleWatchChain;
-use crate::dependency_resolver::rule_watch_node::RuleWatchNode;
+use crate::dependency_resolver::Decisions;
+use crate::dependency_resolver::MultiConflictRule;
+use crate::dependency_resolver::Rule;
+use crate::dependency_resolver::RuleWatchChain;
+use crate::dependency_resolver::RuleWatchNode;
 
 #[derive(Debug)]
 pub struct RuleWatchGraph {

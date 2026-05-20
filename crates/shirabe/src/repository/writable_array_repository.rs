@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Repository/WritableArrayRepository.php
 
-use crate::installer::installation_manager::InstallationManager;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::installer::InstallationManager;
+use crate::repository::ArrayRepository;
+use crate::repository::RepositoryInterface;
 use anyhow::Result;
 use shirabe_php_shim::Countable;
 
@@ -14,9 +14,7 @@ pub struct WritableArrayRepository {
 }
 
 impl WritableArrayRepository {
-    pub fn new(
-        packages: Vec<Box<dyn crate::package::package_interface::PackageInterface>>,
-    ) -> Result<Self> {
+    pub fn new(packages: Vec<Box<dyn crate::package::PackageInterface>>) -> Result<Self> {
         Ok(Self {
             inner: ArrayRepository::new(packages)?,
             dev_package_names: Vec::new(),
@@ -52,15 +50,12 @@ impl WritableArrayRepository {
 
     pub fn add_package(
         &mut self,
-        package: Box<dyn crate::package::package_interface::PackageInterface>,
+        package: Box<dyn crate::package::PackageInterface>,
     ) -> Result<()> {
         self.inner.add_package(package)
     }
 
-    pub fn remove_package(
-        &mut self,
-        package: &dyn crate::package::package_interface::PackageInterface,
-    ) -> Result<()> {
+    pub fn remove_package(&mut self, package: &dyn crate::package::PackageInterface) -> Result<()> {
         let _ = package;
         // TODO(phase-b): delegate to ArrayRepository once it implements remove_package
         Ok(())
@@ -71,16 +66,12 @@ impl WritableArrayRepository {
         Ok(())
     }
 
-    pub fn get_canonical_packages(
-        &self,
-    ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+    pub fn get_canonical_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
         // TODO(phase-b): delegate to inner once it exposes get_canonical_packages
         Vec::new()
     }
 
-    pub fn get_packages(
-        &self,
-    ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+    pub fn get_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
         // TODO(phase-b): delegate to inner ArrayRepository::get_packages
         Vec::new()
     }

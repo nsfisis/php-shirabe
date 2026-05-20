@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Repository/LockArrayRepository.php
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::repository_interface::{
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::repository::ArrayRepository;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct LockArrayRepository {

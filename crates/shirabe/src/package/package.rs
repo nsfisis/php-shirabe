@@ -3,15 +3,15 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::composer::util::composer_mirror::ComposerMirror;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::composer::util::ComposerMirror;
 use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, strpos, trigger_error};
 
-use crate::package::base_package::BasePackage;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::BasePackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
+use crate::repository::RepositoryInterface;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Json/JsonFormatter.php
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, function_exists, mb_convert_encoding, pack};
 
 pub struct JsonFormatter;

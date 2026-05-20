@@ -1,19 +1,19 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
-use crate::io::io_interface::IOInterface;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::root_package_repository::RootPackageRepository;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::installer::SuggestedPackagesReporter;
+use crate::io::IOInterface;
+use crate::repository::InstalledRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RootPackageRepository;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, empty, in_array};
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ impl SuggestsCommand {
         let filter = input.get_argument("packages");
         let mut packages = RepositoryInterface::get_packages(&installed_repo);
         // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; pushing into Vec<Box<dyn BasePackage>> requires conversion
-        let root_pkg_as_base: Box<dyn crate::package::base_package::BasePackage> =
+        let root_pkg_as_base: Box<dyn crate::package::BasePackage> =
             todo!("convert RootPackageInterface to Box<dyn BasePackage>");
         packages.push(root_pkg_as_base);
         for package in &packages {
@@ -120,7 +120,7 @@ impl SuggestsCommand {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
-        let only_dependents_of: Option<&dyn crate::package::package_interface::PackageInterface> =
+        let only_dependents_of: Option<&dyn crate::package::PackageInterface> =
             if empty(&filter) && !input.get_option("all").as_bool().unwrap_or(false) {
                 // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; need conversion to &dyn PackageInterface
                 Some(todo!(

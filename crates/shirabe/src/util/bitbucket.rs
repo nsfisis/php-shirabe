@@ -5,11 +5,11 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, time};
 
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.downcast_ref::<TransportException>().map(|te| te.code)

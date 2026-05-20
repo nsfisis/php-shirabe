@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::Mutex;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     array_merge_recursive, clearstatcache, count, explode, implode, in_array, is_array,
@@ -14,16 +14,16 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::util::auth_helper::{AuthHelper, StoreAuth};
-use crate::util::bitbucket::Bitbucket;
-use crate::util::filesystem::Filesystem;
-use crate::util::github::GitHub;
-use crate::util::gitlab::GitLab;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url;
+use crate::io::IOInterface;
+use crate::util::Bitbucket;
+use crate::util::Filesystem;
+use crate::util::GitHub;
+use crate::util::GitLab;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Url;
+use crate::util::{AuthHelper, StoreAuth};
 
 #[derive(Debug)]
 pub struct Git {

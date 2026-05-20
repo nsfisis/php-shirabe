@@ -1,24 +1,39 @@
 //! ref: composer/src/Composer/Installer.php
 
-pub mod binary_installer;
-pub mod binary_presence_interface;
-pub mod installation_manager;
-pub mod installer_event;
-pub mod installer_events;
-pub mod installer_interface;
-pub mod library_installer;
-pub mod metapackage_installer;
-pub mod noop_installer;
-pub mod package_event;
-pub mod package_events;
-pub mod plugin_installer;
-pub mod project_installer;
-pub mod suggested_packages_reporter;
+mod binary_installer;
+mod binary_presence_interface;
+mod installation_manager;
+mod installer_event;
+mod installer_events;
+mod installer_interface;
+mod library_installer;
+mod metapackage_installer;
+mod noop_installer;
+mod package_event;
+mod package_events;
+mod plugin_installer;
+mod project_installer;
+mod suggested_packages_reporter;
+
+pub use binary_installer::*;
+pub use binary_presence_interface::*;
+pub use installation_manager::*;
+pub use installer_event::*;
+pub use installer_events::*;
+pub use installer_interface::*;
+pub use library_installer::*;
+pub use metapackage_installer::*;
+pub use noop_installer::*;
+pub use package_event::*;
+pub use package_events::*;
+pub use plugin_installer::*;
+pub use project_installer::*;
+pub use suggested_packages_reporter::*;
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
+use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_flip, array_map, array_merge, array_unique, array_values,
     clone, count, defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array,
@@ -27,66 +42,63 @@ use shirabe_php_shim::{
 };
 use shirabe_semver;
 
-use crate::advisory::audit_config::AuditConfig;
-use crate::advisory::auditor::Auditor;
-use crate::autoload::autoload_generator::AutoloadGenerator;
+use crate::advisory::AuditConfig;
+use crate::advisory::Auditor;
+use crate::autoload::AutoloadGenerator;
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::console::github_action_error::GithubActionError;
-use crate::dependency_resolver::default_policy::DefaultPolicy;
-use crate::dependency_resolver::local_repo_transaction::LocalRepoTransaction;
-use crate::dependency_resolver::lock_transaction::LockTransaction;
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::pool_optimizer::PoolOptimizer;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::security_advisory_pool_filter::SecurityAdvisoryPoolFilter;
-use crate::dependency_resolver::solver::Solver;
-use crate::dependency_resolver::solver_problems_exception::SolverProblemsException;
-use crate::downloader::download_manager::DownloadManager;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::installer::installation_manager::InstallationManager;
-use crate::installer::installer_events::InstallerEvents;
-use crate::installer::suggested_packages_reporter::SuggestedPackagesReporter;
-use crate::io::io_interface::IOInterface;
-use crate::package::alias_package::AliasPackage;
+use crate::console::GithubActionError;
+use crate::dependency_resolver::DefaultPolicy;
+use crate::dependency_resolver::LocalRepoTransaction;
+use crate::dependency_resolver::LockTransaction;
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::PoolOptimizer;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::dependency_resolver::Solver;
+use crate::dependency_resolver::SolverProblemsException;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::downloader::DownloadManager;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
+use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::package::AliasPackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::Locker;
+use crate::package::Package;
+use crate::package::PackageInterface;
+use crate::package::RootAliasPackage;
+use crate::package::RootPackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::link::Link;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::locker::Locker;
-use crate::package::package::Package;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_alias_package::RootAliasPackage;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::installed_array_repository::InstalledArrayRepository;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_manager::RepositoryManager;
-use crate::repository::repository_set::RepositorySet;
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::script::script_events::ScriptEvents;
-use crate::util::platform::Platform;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionParser;
+use crate::repository::ArrayRepository;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::CompositeRepository;
+use crate::repository::InstalledArrayRepository;
+use crate::repository::InstalledRepository;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryManager;
+use crate::repository::RepositorySet;
+use crate::repository::RootPackageRepository;
+use crate::script::ScriptEvents;
+use crate::util::Platform;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct Installer {
@@ -1283,7 +1295,7 @@ impl Installer {
         );
 
         // TODO(phase-b): convert root_aliases (Vec<IndexMap<String, String>>) into Vec<RootAliasInput>
-        let root_aliases_input: Vec<crate::repository::repository_set::RootAliasInput> = vec![];
+        let root_aliases_input: Vec<crate::repository::RootAliasInput> = vec![];
         let _ = root_aliases;
         // TODO(phase-b): temporary_constraints holds Box<dyn ConstraintInterface> which can't Clone
         let temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();

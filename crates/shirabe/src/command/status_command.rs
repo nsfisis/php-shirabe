@@ -2,20 +2,20 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::script::script_events::ScriptEvents;
-use crate::util::process_executor::ProcessExecutor;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::script::ScriptEvents;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct StatusCommand {
@@ -119,7 +119,7 @@ impl StatusCommand {
             };
             // TODO(phase-b): downloader borrow lifetime tied to dm.borrow() temporary; restructure later.
             let dm_borrow = dm.borrow();
-            let downloader: &dyn crate::downloader::downloader_interface::DownloaderInterface =
+            let downloader: &dyn crate::downloader::DownloaderInterface =
                 match dm_borrow.get_downloader_for_package(package.as_ref())? {
                     Some(d) => d,
                     None => continue,

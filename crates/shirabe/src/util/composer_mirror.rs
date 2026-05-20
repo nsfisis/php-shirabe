@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::hash;
 
 pub struct ComposerMirror;

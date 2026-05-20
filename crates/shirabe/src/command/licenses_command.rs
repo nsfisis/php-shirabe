@@ -4,29 +4,29 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::helper::table::Table;
-use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::helper::Table;
+use shirabe_external_packages::symfony::console::style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_utils::RepositoryUtils;
-use crate::util::package_info::PackageInfo;
-use crate::util::package_sorter::PackageSorter;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::BasePackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryUtils;
+use crate::util::PackageInfo;
+use crate::util::PackageSorter;
 
 #[derive(Debug)]
 pub struct LicensesCommand {
@@ -104,7 +104,7 @@ impl LicensesCommand {
             }
             let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
-            <crate::repository::lock_array_repository::LockArrayRepository as crate::repository::repository_interface::RepositoryInterface>::get_packages(&repo)
+            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&repo)
         } else {
             let repo = composer.get_repository_manager().get_local_repository();
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
@@ -121,7 +121,7 @@ impl LicensesCommand {
         let _ = composer.get_package();
 
         // TODO(phase-b): convert BasePackage trait objects to PackageInterface for sorting.
-        let pkg_pi: Vec<Box<dyn crate::package::package_interface::PackageInterface>> = packages
+        let pkg_pi: Vec<Box<dyn crate::package::PackageInterface>> = packages
             .into_iter()
             .map(|p| p.clone_package_box())
             .collect();

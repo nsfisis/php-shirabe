@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, InvalidArgumentException, PhpMixed, RuntimeException, array_filter,
     array_keys, array_map, array_merge, array_merge_recursive, array_reverse, array_shift,
@@ -14,28 +14,28 @@ use shirabe_php_shim::{
     sprintf, str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr,
     substr_count, trigger_error, trim, unlink, var_export,
 };
-use shirabe_semver::constraint::bound::Bound;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Bound;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::autoload::class_loader::ClassLoader;
+use crate::autoload::ClassLoader;
 use crate::config::Config;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::filter::platform_requirement_filter::ignore_all_platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::installer::installation_manager::InstallationManager;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::json::json_file::JsonFile;
-use crate::package::alias_package::AliasPackage;
-use crate::package::locker::Locker;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::script::script_events::ScriptEvents;
-use crate::util::filesystem::Filesystem;
-use crate::util::package_sorter::PackageSorter;
-use crate::util::platform::Platform;
+use crate::event_dispatcher::EventDispatcher;
+use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::installer::InstallationManager;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::json::JsonFile;
+use crate::package::AliasPackage;
+use crate::package::Locker;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::repository::InstalledRepositoryInterface;
+use crate::script::ScriptEvents;
+use crate::util::Filesystem;
+use crate::util::PackageSorter;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
@@ -1092,7 +1092,7 @@ impl AutoloadGenerator {
         let mut required_extensions: IndexMap<String, String> = IndexMap::new();
         let mut extension_providers: IndexMap<
             String,
-            Vec<Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>>,
+            Vec<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
         > = IndexMap::new();
 
         for item in package_map {

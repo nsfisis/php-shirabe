@@ -3,7 +3,7 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, count, explode,
     get_class, get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
@@ -11,19 +11,19 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::downloader::change_report_interface::ChangeReportInterface;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::vcs_capable_downloader_interface::VcsCapableDownloaderInterface;
-use crate::io::io_interface::IOInterface;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
-use crate::util::filesystem::Filesystem;
-use crate::util::process_executor::ProcessExecutor;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::downloader::ChangeReportInterface;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsCapableDownloaderInterface;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
+use crate::util::Filesystem;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {

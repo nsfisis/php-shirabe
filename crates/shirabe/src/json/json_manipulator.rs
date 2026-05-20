@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, LogicException, PREG_BACKTRACK_LIMIT_ERROR, PhpMixed,
     RuntimeException, StdClass, addcslashes, array_key_exists, array_keys, array_reverse, count,
@@ -11,8 +11,8 @@ use shirabe_php_shim::{
     trim, uksort,
 };
 
-use crate::json::json_file::JsonFile;
-use crate::repository::platform_repository::PlatformRepository;
+use crate::json::JsonFile;
+use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct JsonManipulator {

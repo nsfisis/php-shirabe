@@ -1,17 +1,17 @@
 //! ref: composer/src/Composer/Downloader/PerforceDownloader.php
 
 use crate::config::Config;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::vcs_downloader::VcsDownloaderBase;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::vcs_repository::VcsRepository;
-use crate::util::filesystem::Filesystem;
-use crate::util::perforce::Perforce;
-use crate::util::process_executor::ProcessExecutor;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsDownloaderBase;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::repository::VcsRepository;
+use crate::util::Filesystem;
+use crate::util::Perforce;
+use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::PhpMixed;
 use std::any::Any;
 

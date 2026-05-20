@@ -3,13 +3,13 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, in_array};
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
-use crate::package::base_package::BasePackage;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::BasePackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct AliasPackage {
@@ -185,7 +185,10 @@ impl AliasPackage {
                         Some(link_type.to_string()),
                         Some(pretty_version.clone()),
                     );
-                    shirabe_semver::constraint::constraint_interface::ConstraintInterface::set_pretty_string(&mut constraint, Some(pretty_version.clone()));
+                    shirabe_semver::constraint::ConstraintInterface::set_pretty_string(
+                        &mut constraint,
+                        Some(pretty_version.clone()),
+                    );
                     new_links.push(new_link);
                 }
             }
@@ -205,7 +208,10 @@ impl AliasPackage {
                         Some(link_type.to_string()),
                         Some(pretty_version.clone()),
                     );
-                    shirabe_semver::constraint::constraint_interface::ConstraintInterface::set_pretty_string(&mut constraint, Some(pretty_version.clone()));
+                    shirabe_semver::constraint::ConstraintInterface::set_pretty_string(
+                        &mut constraint,
+                        Some(pretty_version.clone()),
+                    );
                     links[index] = new_link;
                 }
             }

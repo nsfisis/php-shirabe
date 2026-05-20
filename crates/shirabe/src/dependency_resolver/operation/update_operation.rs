@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/UpdateOperation.php
 
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::operation::solver_operation::SolverOperation;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::SolverOperation;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
 
 #[derive(Debug)]
 pub struct UpdateOperation {

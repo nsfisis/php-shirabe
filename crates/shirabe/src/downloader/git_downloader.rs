@@ -3,9 +3,9 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
     preg_quote, realpath, rtrim, sprintf, strlen, strpos, substr, trim, version_compare,
@@ -13,15 +13,15 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::dvcs_downloader_interface::DvcsDownloaderInterface;
-use crate::downloader::vcs_downloader::VcsDownloaderBase;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::git::Git as GitUtil;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url;
+use crate::downloader::DvcsDownloaderInterface;
+use crate::downloader::VcsDownloaderBase;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::util::Filesystem;
+use crate::util::Git as GitUtil;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Url;
 
 #[derive(Debug)]
 pub struct GitDownloader {
@@ -1360,7 +1360,7 @@ impl DvcsDownloaderInterface for GitDownloader {
 // TODO(phase-b): GitDownloader extends VcsDownloader which implements DownloaderInterface.
 // Delegating each trait method to todo!() until the inner VcsDownloaderBase exposes the
 // matching impl surface.
-impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloader {
+impl crate::downloader::DownloaderInterface for GitDownloader {
     fn get_installation_source(&self) -> String {
         todo!()
     }
@@ -1371,9 +1371,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 
@@ -1383,9 +1381,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 
@@ -1394,9 +1390,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 
@@ -1405,9 +1399,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
         _path: &str,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 
@@ -1416,9 +1408,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 
@@ -1428,9 +1418,7 @@ impl crate::downloader::downloader_interface::DownloaderInterface for GitDownloa
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<
-        Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>,
-    > {
+    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
         todo!()
     }
 }

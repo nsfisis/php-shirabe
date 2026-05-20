@@ -1,28 +1,28 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::symfony::component::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
-use shirabe_semver::constraint::bound::Bound;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Bound;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package::Package;
-use crate::package::root_package::RootPackage;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::installed_array_repository::InstalledArrayRepository;
-use crate::repository::installed_repository::{DependentsEntry, InstalledRepository, NeedleInput};
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_interface::{FindPackageConstraint, RepositoryInterface};
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::util::package_info::PackageInfo;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::Package;
+use crate::package::RootPackage;
+use crate::package::version::VersionParser;
+use crate::repository::CompositeRepository;
+use crate::repository::InstalledArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryFactory;
+use crate::repository::RootPackageRepository;
+use crate::repository::{DependentsEntry, InstalledRepository, NeedleInput};
+use crate::repository::{FindPackageConstraint, RepositoryInterface};
+use crate::util::PackageInfo;
 
 pub const ARGUMENT_PACKAGE: &str = "package";
 pub const ARGUMENT_CONSTRAINT: &str = "version";
@@ -86,7 +86,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             {
                 output.writeln(
                     "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>",
-                    shirabe_external_packages::symfony::console::output::output_interface::OUTPUT_NORMAL,
+                    shirabe_external_packages::symfony::console::output::OUTPUT_NORMAL,
                 );
 
                 return Ok(1);

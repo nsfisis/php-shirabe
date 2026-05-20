@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Util/StreamContextFactory.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
-use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
+use shirabe_external_packages::composer::ca_bundle::CaBundle;
+use shirabe_external_packages::psr::log::LoggerInterface;
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
     RuntimeException, array_replace_recursive, curl_version, extension_loaded, function_exists,
@@ -10,11 +10,11 @@ use shirabe_php_shim::{
 };
 
 use crate::composer::Composer;
-use crate::downloader::transport_exception::TransportException;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::util::filesystem::Filesystem;
-use crate::util::http::proxy_manager::ProxyManager;
-use crate::util::platform::Platform;
+use crate::downloader::TransportException;
+use crate::repository::PlatformRepository;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::http::ProxyManager;
 
 pub struct StreamContextFactory;
 

@@ -1,4 +1,4 @@
-use crate::symfony::console::input::input_interface::InputInterface;
+use crate::symfony::console::input::InputInterface;
 use shirabe_php_shim::PhpMixed;
 
 pub trait StreamableInputInterface: InputInterface {

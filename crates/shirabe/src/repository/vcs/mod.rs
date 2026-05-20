@@ -9,3 +9,15 @@ pub mod perforce_driver;
 pub mod svn_driver;
 pub mod vcs_driver;
 pub mod vcs_driver_interface;
+
+pub use forgejo_driver::*;
+pub use fossil_driver::*;
+pub use git_bitbucket_driver::*;
+pub use git_driver::*;
+pub use github_driver::*;
+pub use gitlab_driver::*;
+pub use hg_driver::*;
+pub use perforce_driver::*;
+pub use svn_driver::*;
+pub use vcs_driver::*;
+pub use vcs_driver_interface::*;

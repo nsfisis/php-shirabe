@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
-use crate::io::console_io::ConsoleIO;
+use crate::io::ConsoleIO;
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::string_input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
-use shirabe_external_packages::symfony::console::helper::question_helper::QuestionHelper;
-use shirabe_external_packages::symfony::console::output::stream_output::StreamOutput;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::helper::HelperSet;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::input::StringInput;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, fopen, fseek, fwrite, rewind, stream_get_contents,
     strip_tags,
@@ -71,16 +71,16 @@ impl BufferIO {
         let output = Preg::replace_callback(
             r"{(?<=^|\n|\x08)(.+?)(\x08+)}",
             |matches: &indexmap::IndexMap<
-                shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                shirabe_external_packages::composer::pcre::CaptureKey,
                 String,
             >|
              -> String {
                 let empty = String::new();
                 let g1 = matches
-                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(1))
+                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
                     .unwrap_or(&empty);
                 let g2 = matches
-                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(2))
+                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(2))
                     .unwrap_or(&empty);
                 let pre = strip_tags(g1);
 
@@ -131,7 +131,7 @@ impl BufferIO {
 
 // TODO(phase-b): PHP `class BufferIO extends ConsoleIO` — delegate all IOInterface,
 // LoggerInterface, and BaseIO methods to `self.inner` (ConsoleIO).
-impl shirabe_external_packages::psr::log::logger_interface::LoggerInterface for BufferIO {
+impl shirabe_external_packages::psr::log::LoggerInterface for BufferIO {
     fn emergency(&self, message: &str, context: &[(&str, &str)]) {
         self.inner.emergency(message, context)
     }
@@ -161,7 +161,7 @@ impl shirabe_external_packages::psr::log::logger_interface::LoggerInterface for 
     }
 }
 
-impl crate::io::io_interface::IOInterface for BufferIO {
+impl crate::io::IOInterface for BufferIO {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
     }
@@ -261,7 +261,7 @@ impl crate::io::io_interface::IOInterface for BufferIO {
     }
 }
 
-impl crate::io::base_io::BaseIO for BufferIO {
+impl crate::io::BaseIO for BufferIO {
     fn authentications(
         &self,
     ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {

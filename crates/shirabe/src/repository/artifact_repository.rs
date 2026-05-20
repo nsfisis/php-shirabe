@@ -8,16 +8,16 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
 };
 
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::base_package::BasePackage;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
-use crate::util::platform::Platform;
-use crate::util::tar::Tar;
-use crate::util::zip::Zip;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::BasePackage;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::repository::ArrayRepository;
+use crate::repository::ConfigurableRepositoryInterface;
+use crate::util::Platform;
+use crate::util::Tar;
+use crate::util::Zip;
 
 pub struct ArtifactRepository {
     inner: ArrayRepository,

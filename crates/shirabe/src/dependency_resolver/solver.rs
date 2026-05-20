@@ -5,28 +5,28 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, array_pop, array_shift, array_unshift, microtime, spl_object_hash, sprintf,
 };
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::dependency_resolver::decisions::Decisions;
-use crate::dependency_resolver::generic_rule::GenericRule;
-use crate::dependency_resolver::lock_transaction::LockTransaction;
-use crate::dependency_resolver::multi_conflict_rule::MultiConflictRule;
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::problem::Problem;
-use crate::dependency_resolver::request::Request;
+use crate::dependency_resolver::Decisions;
+use crate::dependency_resolver::GenericRule;
+use crate::dependency_resolver::LockTransaction;
+use crate::dependency_resolver::MultiConflictRule;
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Problem;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::RuleSet;
+use crate::dependency_resolver::RuleSetGenerator;
+use crate::dependency_resolver::RuleWatchGraph;
+use crate::dependency_resolver::RuleWatchNode;
+use crate::dependency_resolver::SolverBugException;
+use crate::dependency_resolver::SolverProblemsException;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::dependency_resolver::rule_set::RuleSet;
-use crate::dependency_resolver::rule_set_generator::RuleSetGenerator;
-use crate::dependency_resolver::rule_watch_graph::RuleWatchGraph;
-use crate::dependency_resolver::rule_watch_node::RuleWatchNode;
-use crate::dependency_resolver::solver_bug_exception::SolverBugException;
-use crate::dependency_resolver::solver_problems_exception::SolverProblemsException;
-use crate::filter::platform_requirement_filter::ignore_list_platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::io::io_interface::IOInterface;
-use crate::package::base_package::BasePackage;
+use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::package::BasePackage;
 
 #[derive(Debug)]
 pub struct Solver {
@@ -251,7 +251,7 @@ impl Solver {
         self.setup_fixed_map(request);
 
         self.io
-            .write_error3("Generating rules", true, crate::io::io_interface::DEBUG);
+            .write_error3("Generating rules", true, crate::io::DEBUG);
         // TODO(phase-b): Pool is a PHP class without Clone; RuleSetGenerator should hold
         // a shared reference (Rc<RefCell<Pool>>). Using a placeholder pool until then.
         let mut rule_set_generator = RuleSetGenerator::new(
@@ -276,22 +276,18 @@ impl Solver {
         // make decisions based on root require/fix assertions
         self.make_assertion_rule_decisions()?;
 
-        self.io.write_error3(
-            "Resolving dependencies through SAT",
-            true,
-            crate::io::io_interface::DEBUG,
-        );
+        self.io
+            .write_error3("Resolving dependencies through SAT", true, crate::io::DEBUG);
         let before = microtime(true);
         self.run_sat()?;
-        self.io
-            .write_error3("", true, crate::io::io_interface::DEBUG);
+        self.io.write_error3("", true, crate::io::DEBUG);
         self.io.write_error3(
             &sprintf(
                 "Dependency resolution completed in %.3f seconds",
                 &[PhpMixed::Float(microtime(true) - before)],
             ),
             true,
-            crate::io::io_interface::VERBOSE,
+            crate::io::VERBOSE,
         );
 
         if self.problems.len() > 0 {
@@ -796,11 +792,8 @@ impl Solver {
             let mut rules_count = self.rules.count();
             let mut pass = 1_i64;
 
-            self.io.write_error3(
-                "Looking at all rules.",
-                true,
-                crate::io::io_interface::DEBUG,
-            );
+            self.io
+                .write_error3("Looking at all rules.", true, crate::io::DEBUG);
             let mut i = 0_i64;
             let mut n = 0_i64;
             while n < rules_count {
@@ -812,7 +805,7 @@ impl Solver {
                                 pass
                             ),
                             false,
-                            crate::io::io_interface::DEBUG,
+                            crate::io::DEBUG,
                         );
                     } else {
                         self.io.overwrite_error4(
@@ -822,7 +815,7 @@ impl Solver {
                             ),
                             false,
                             None,
-                            crate::io::io_interface::DEBUG,
+                            crate::io::DEBUG,
                         );
                     }
 

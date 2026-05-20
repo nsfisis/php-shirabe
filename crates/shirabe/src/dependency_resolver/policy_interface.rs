@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/PolicyInterface.php
 
-use crate::dependency_resolver::pool::Pool;
-use crate::package::package_interface::PackageInterface;
+use crate::dependency_resolver::Pool;
+use crate::package::PackageInterface;
 
 pub trait PolicyInterface: std::fmt::Debug {
     fn version_compare(

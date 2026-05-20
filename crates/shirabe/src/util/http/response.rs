@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Util/Http/Response.php
 
-use crate::json::json_file::JsonFile;
+use crate::json::JsonFile;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{LogicException, PhpMixed, preg_quote};
 
 #[derive(Debug)]
@@ -83,12 +83,12 @@ impl Response {
         let pattern = format!("(?i)^{}:\\s*(.+?)\\s*$", preg_quote(name, None));
         for header in headers {
             let mut matches: indexmap::IndexMap<
-                shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                shirabe_external_packages::composer::pcre::CaptureKey,
                 String,
             > = indexmap::IndexMap::new();
             if Preg::match3(&pattern, header, Some(&mut matches)).unwrap_or(false) {
-                if let Some(s) = matches
-                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(1))
+                if let Some(s) =
+                    matches.get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
                 {
                     value = Some(s.clone());
                 }

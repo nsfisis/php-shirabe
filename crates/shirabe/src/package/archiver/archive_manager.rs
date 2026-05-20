@@ -1,22 +1,22 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchiveManager.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, bin2hex, file_exists, random_bytes, realpath,
     sys_get_temp_dir,
 };
 
-use crate::downloader::download_manager::DownloadManager;
-use crate::json::json_file::JsonFile;
-use crate::package::archiver::archiver_interface::ArchiverInterface;
-use crate::package::archiver::phar_archiver::PharArchiver;
-use crate::package::archiver::zip_archiver::ZipArchiver;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::util::filesystem::Filesystem;
+use crate::downloader::DownloadManager;
+use crate::json::JsonFile;
+use crate::package::CompletePackageInterface;
+use crate::package::RootPackageInterface;
+use crate::package::archiver::ArchiverInterface;
+use crate::package::archiver::PharArchiver;
+use crate::package::archiver::ZipArchiver;
+use crate::util::Filesystem;
+use crate::util::SyncHelper;
 use crate::util::r#loop::Loop;
-use crate::util::sync_helper::SyncHelper;
 
 pub struct ArchiveManager {
     pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,

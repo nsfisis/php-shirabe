@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID, PhpMixed,
     RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
@@ -13,16 +13,16 @@ use shirabe_php_shim::{
 };
 
 use crate::config::Config;
-use crate::downloader::max_file_size_exceeded_exception::MaxFileSizeExceededException;
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::util::auth_helper::AuthHelper;
-use crate::util::http::proxy_manager::ProxyManager;
-use crate::util::http::response::Response;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::stream_context_factory::StreamContextFactory;
-use crate::util::url::Url;
+use crate::downloader::MaxFileSizeExceededException;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::util::AuthHelper;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::StreamContextFactory;
+use crate::util::Url;
+use crate::util::http::ProxyManager;
+use crate::util::http::Response;
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
 #[derive(Debug, Clone)]
@@ -283,7 +283,7 @@ impl RemoteFilesystem {
                 using_proxy
             ),
             true,
-            crate::io::io_interface::DEBUG,
+            crate::io::DEBUG,
         );
 
         if (!Preg::is_match("{^http://(repo\\.)?packagist\\.org/p/}", &file_url).unwrap_or(false)
@@ -301,7 +301,7 @@ impl RemoteFilesystem {
             self.io.write_error3(
                 "Downloading (<comment>connecting...</comment>)",
                 false,
-                crate::io::io_interface::NORMAL,
+                crate::io::NORMAL,
             );
         }
 
@@ -383,7 +383,7 @@ impl RemoteFilesystem {
                             base64_encode(result.as_deref().unwrap_or(""))
                         ),
                         true,
-                        crate::io::io_interface::DEBUG,
+                        crate::io::DEBUG,
                     );
 
                     return Err(anyhow::anyhow!(e));
@@ -426,8 +426,7 @@ impl RemoteFilesystem {
                 let msg_owned = format!("{}", e);
                 if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                     self.degraded_mode = true;
-                    self.io
-                        .write_error3("", true, crate::io::io_interface::NORMAL);
+                    self.io.write_error3("", true, crate::io::NORMAL);
                     // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
                     self.io.write_error3(
                         &format!(
@@ -435,7 +434,7 @@ impl RemoteFilesystem {
                             msg_owned,
                         ),
                         true,
-                        crate::io::io_interface::NORMAL,
+                        crate::io::NORMAL,
                     );
 
                     return self.get(
@@ -523,7 +522,7 @@ impl RemoteFilesystem {
                             "Downloading (<error>failed</error>)",
                             false,
                             None,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                     }
 
@@ -558,7 +557,7 @@ impl RemoteFilesystem {
                 ),
                 false,
                 None,
-                crate::io::io_interface::NORMAL,
+                crate::io::NORMAL,
             );
         }
 
@@ -584,7 +583,7 @@ impl RemoteFilesystem {
                             e,
                         ),
                         true,
-                        crate::io::io_interface::NORMAL,
+                        crate::io::NORMAL,
                     );
 
                     return self.get(
@@ -644,7 +643,7 @@ impl RemoteFilesystem {
             if self.store_auth {
                 let _ = self.auth_helper.store_auth(
                     &self.origin_url,
-                    crate::util::auth_helper::StoreAuth::Bool(self.store_auth),
+                    crate::util::StoreAuth::Bool(self.store_auth),
                 );
                 self.store_auth = false;
             }
@@ -667,8 +666,7 @@ impl RemoteFilesystem {
             let msg_owned = format!("{}", e);
             if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                 self.degraded_mode = true;
-                self.io
-                    .write_error3("", true, crate::io::io_interface::NORMAL);
+                self.io.write_error3("", true, crate::io::NORMAL);
                 // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
                 self.io.write_error3(
                     &format!(
@@ -676,7 +674,7 @@ impl RemoteFilesystem {
                         msg_owned,
                     ),
                     true,
-                    crate::io::io_interface::NORMAL,
+                    crate::io::NORMAL,
                 );
 
                 return self.get(
@@ -797,7 +795,7 @@ impl RemoteFilesystem {
                             &format!("Downloading (<comment>{}%</comment>)", progression),
                             false,
                             None,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                     }
                 }
@@ -827,8 +825,7 @@ impl RemoteFilesystem {
 
         self.store_auth = matches!(
             result.store_auth,
-            crate::util::auth_helper::StoreAuth::Bool(true)
-                | crate::util::auth_helper::StoreAuth::Prompt
+            crate::util::StoreAuth::Bool(true) | crate::util::StoreAuth::Prompt
         );
         self.retry = result.retry;
 
@@ -973,8 +970,7 @@ impl RemoteFilesystem {
         if let Some(target_url) = target_url {
             self.redirects += 1;
 
-            self.io
-                .write_error3("", true, crate::io::io_interface::DEBUG);
+            self.io.write_error3("", true, crate::io::DEBUG);
             self.io.write_error3(
                 &sprintf(
                     "Following redirect (%u) %s",
@@ -984,7 +980,7 @@ impl RemoteFilesystem {
                     ],
                 ),
                 true,
-                crate::io::io_interface::DEBUG,
+                crate::io::DEBUG,
             );
 
             additional_options.insert("redirects".to_string(), PhpMixed::Int(self.redirects));

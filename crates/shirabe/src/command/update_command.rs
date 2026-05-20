@@ -4,38 +4,38 @@ use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::helper::table::Table;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::helper::Table;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge, array_search, count, empty, in_array, sprintf, strtolower,
 };
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::bump_command::BumpCommand;
+use crate::advisory::Auditor;
+use crate::command::BumpCommand;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
 use crate::installer::Installer;
-use crate::io::io_interface::IOInterface;
-use crate::package::base_package::BasePackage;
-use crate::package::loader::root_package_loader::RootPackageLoader;
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_set::RepositorySet;
-use crate::util::http_downloader::HttpDownloader;
+use crate::io::IOInterface;
+use crate::package::BasePackage;
+use crate::package::loader::RootPackageLoader;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositorySet;
+use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct UpdateCommand {
@@ -199,7 +199,7 @@ impl UpdateCommand {
                         package, package, constraint,
                     ));
 
-                    return Ok(crate::command::base_command::FAILURE);
+                    return Ok(crate::command::FAILURE);
                 }
             }
         }
@@ -494,7 +494,7 @@ impl UpdateCommand {
         // TODO(phase-b): unify return types — CanonicalPackagesTrait returns
         // Vec<Box<dyn PackageInterface>> while RepositoryInterface::get_packages
         // returns Vec<Box<dyn BasePackage>>. Use only the locker branch for now.
-        let installed_packages: Vec<Box<dyn crate::package::package_interface::PackageInterface>> =
+        let installed_packages: Vec<Box<dyn crate::package::PackageInterface>> =
             if composer.get_locker().is_locked() {
                 CanonicalPackagesTrait::get_packages(
                     &composer.get_locker().get_locked_repository(true)?,

@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/Repository/Vcs/PerforceDriver.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException};
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::repository::vcs::vcs_driver::VcsDriverBase;
-use crate::util::http::response::Response;
-use crate::util::perforce::Perforce;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::Perforce;
+use crate::util::ProcessExecutor;
+use crate::util::http::Response;
 
 #[derive(Debug)]
 pub struct PerforceDriver {

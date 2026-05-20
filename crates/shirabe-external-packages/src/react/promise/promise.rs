@@ -1,6 +1,6 @@
 use shirabe_php_shim::PhpMixed;
 
-use super::promise_interface::PromiseInterface;
+use super::PromiseInterface;
 
 #[derive(Debug)]
 pub struct Promise;

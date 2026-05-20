@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Repository/RootPackageRepository.php
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::repository_interface::{ProviderInfo, RepositoryInterface, SearchResult};
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::repository::ArrayRepository;
+use crate::repository::{ProviderInfo, RepositoryInterface, SearchResult};
 use indexmap::IndexMap;
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ impl RepositoryInterface for RootPackageRepository {
     fn find_package(
         &self,
         name: &str,
-        constraint: crate::repository::repository_interface::FindPackageConstraint,
+        constraint: crate::repository::FindPackageConstraint,
     ) -> Option<Box<dyn BasePackage>> {
         self.inner.find_package(name, constraint)
     }
@@ -50,7 +50,7 @@ impl RepositoryInterface for RootPackageRepository {
     fn find_packages(
         &self,
         name: &str,
-        constraint: Option<crate::repository::repository_interface::FindPackageConstraint>,
+        constraint: Option<crate::repository::FindPackageConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         self.inner.find_packages(name, constraint)
     }
@@ -63,12 +63,12 @@ impl RepositoryInterface for RootPackageRepository {
         &self,
         package_name_map: IndexMap<
             String,
-            Option<Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>>,
+            Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
         >,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
-    ) -> crate::repository::repository_interface::LoadPackagesResult {
+    ) -> crate::repository::LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,

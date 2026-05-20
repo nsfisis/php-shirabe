@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/PearRepository.php
 
-use super::array_repository::ArrayRepository;
+use super::ArrayRepository;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]

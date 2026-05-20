@@ -29,7 +29,7 @@ impl OutputFormatter {
     pub fn set_style(
         &mut self,
         _name: &str,
-        _style: crate::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle,
+        _style: crate::symfony::component::console::formatter::OutputFormatterStyle,
     ) {
         todo!()
     }

@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Downloader/DownloaderInterface.php
 
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 
-use crate::package::package_interface::PackageInterface;
+use crate::package::PackageInterface;
 
 pub trait DownloaderInterface: std::fmt::Debug {
     fn get_installation_source(&self) -> String;
@@ -81,25 +81,21 @@ pub trait DownloaderInterface: std::fmt::Debug {
     ) -> anyhow::Result<Box<dyn PromiseInterface>>;
 
     /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
-    fn as_change_report_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::change_report_interface::ChangeReportInterface> {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         None
     }
 
     /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
     fn as_vcs_capable_downloader_interface(
         &self,
-    ) -> Option<
-        &dyn crate::downloader::vcs_capable_downloader_interface::VcsCapableDownloaderInterface,
-    > {
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
         None
     }
 
     /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
     fn as_dvcs_downloader_interface(
         &self,
-    ) -> Option<&dyn crate::downloader::dvcs_downloader_interface::DvcsDownloaderInterface> {
+    ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
         None
     }
 }

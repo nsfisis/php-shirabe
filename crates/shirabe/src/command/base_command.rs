@@ -3,35 +3,35 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::helper::table::Table;
-use shirabe_external_packages::symfony::component::console::helper::table_separator::TableSeparator;
-use shirabe_external_packages::symfony::component::console::input::input_definition::InputDefinition;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::component::console::terminal::Terminal;
+use shirabe_external_packages::symfony::component::console::Terminal;
+use shirabe_external_packages::symfony::component::console::helper::Table;
+use shirabe_external_packages::symfony::component::console::helper::TableSeparator;
+use shirabe_external_packages::symfony::component::console::input::InputDefinition;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
     count, explode, in_array, is_string, max,
 };
 
-use crate::advisory::audit_config::AuditConfig;
-use crate::advisory::auditor::Auditor;
-use crate::command::self_update_command::SelfUpdateCommand;
+use crate::advisory::AuditConfig;
+use crate::advisory::Auditor;
+use crate::command::SelfUpdateCommand;
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::console::application::Application;
+use crate::console::Application;
+use crate::console::input::InputArgument;
 use crate::console::input::InputDefinitionItem;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_factory::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::package::version::version_parser::VersionParser;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::plugin::pre_command_run_event::PreCommandRunEvent;
-use crate::util::platform::Platform;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::package::version::VersionParser;
+use crate::plugin::PluginEvents;
+use crate::plugin::PreCommandRunEvent;
+use crate::util::Platform;
 
 pub const SUCCESS: i64 = 0;
 pub const FAILURE: i64 = 1;

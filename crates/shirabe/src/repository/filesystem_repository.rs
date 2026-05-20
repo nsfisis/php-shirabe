@@ -2,10 +2,10 @@
 
 use std::any::Any;
 
-use crate::util::silencer::Silencer;
+use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
     UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
@@ -14,20 +14,20 @@ use shirabe_php_shim::{
 };
 
 use crate::installed_versions::InstalledVersions;
-use crate::installer::installation_manager::InstallationManager;
-use crate::json::json_file::JsonFile;
-use crate::package::alias_package::AliasPackage;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_alias_package::RootAliasPackage;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::invalid_repository_exception::InvalidRepositoryException;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::writable_array_repository::WritableArrayRepository;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
+use crate::installer::InstallationManager;
+use crate::json::JsonFile;
+use crate::package::AliasPackage;
+use crate::package::PackageInterface;
+use crate::package::RootAliasPackage;
+use crate::package::RootPackageInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::repository::InvalidRepositoryException;
+use crate::repository::PlatformRepository;
+use crate::repository::WritableArrayRepository;
+use crate::util::Filesystem;
+use crate::util::Platform;
 
 /// Filesystem repository.
 #[derive(Debug)]

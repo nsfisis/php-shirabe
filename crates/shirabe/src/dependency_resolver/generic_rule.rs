@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/GenericRule.php
 
-use crate::dependency_resolver::rule::{Rule, RuleBase};
+use crate::dependency_resolver::{Rule, RuleBase};
 use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, implode, unpack};
 

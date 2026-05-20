@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     FILTER_VALIDATE_INT, FILTER_VALIDATE_IP, PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, chr, empty, explode, filter_var, filter_var_with_options,

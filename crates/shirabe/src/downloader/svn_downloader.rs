@@ -2,20 +2,20 @@
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 use crate::config::Config;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::vcs_downloader::VcsDownloaderBase;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::vcs_repository::VcsRepository;
-use crate::util::filesystem::Filesystem;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::svn::Svn as SvnUtil;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsDownloaderBase;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::repository::VcsRepository;
+use crate::util::Filesystem;
+use crate::util::ProcessExecutor;
+use crate::util::Svn as SvnUtil;
 
 #[derive(Debug)]
 pub struct SvnDownloader {

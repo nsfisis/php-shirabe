@@ -1,5 +1,5 @@
-use crate::symfony::console::formatter::output_formatter::OutputFormatter;
-use crate::symfony::console::output::output_interface::OutputInterface;
+use crate::symfony::console::formatter::OutputFormatter;
+use crate::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

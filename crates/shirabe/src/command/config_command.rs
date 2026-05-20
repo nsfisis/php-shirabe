@@ -3,10 +3,10 @@
 use crate::io::io_interface;
 use indexmap::IndexMap;
 
-use crate::console::input::input_option::InputOption;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use crate::console::input::InputOption;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     JsonObject, PhpMixed, RuntimeException, array_filter, array_filter_use_key, array_is_list,
@@ -16,21 +16,21 @@ use shirabe_php_shim::{
     strtolower, system, touch, var_export,
 };
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::base_config_command::BaseConfigCommand;
+use crate::advisory::Auditor;
+use crate::command::BaseConfigCommand;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::config::config_source_interface::ConfigSourceInterface;
-use crate::config::json_config_source::JsonConfigSource;
-use crate::console::input::input_argument::InputArgument;
+use crate::config::ConfigSourceInterface;
+use crate::config::JsonConfigSource;
+use crate::console::input::InputArgument;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
 use crate::package::base_package::{self, BasePackage};
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
-use crate::util::silencer::Silencer;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::Silencer;
 use shirabe_semver::version_parser::VersionParser;
 
 #[derive(Debug)]

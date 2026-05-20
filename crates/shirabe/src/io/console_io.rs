@@ -4,18 +4,18 @@ use crate::config::Config;
 use crate::io::io_interface;
 use indexmap::IndexMap;
 use indexmap::indexmap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
-use shirabe_external_packages::symfony::component::console::helper::helper_set::HelperSet;
-use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
-use shirabe_external_packages::symfony::component::console::helper::table::Table;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::console_output_interface::ConsoleOutputInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::psr::log::LoggerInterface;
+use shirabe_external_packages::symfony::component::console::helper::HelperSet;
+use shirabe_external_packages::symfony::component::console::helper::ProgressBar;
+use shirabe_external_packages::symfony::component::console::helper::Table;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::component::console::output::output_interface::{
     self as output_interface, OutputInterface,
 };
-use shirabe_external_packages::symfony::component::console::question::choice_question::ChoiceQuestion;
-use shirabe_external_packages::symfony::component::console::question::question::Question;
+use shirabe_external_packages::symfony::component::console::question::ChoiceQuestion;
+use shirabe_external_packages::symfony::component::console::question::Question;
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_keys, array_search, count, function_exists, implode, in_array,
     is_array, is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat,
@@ -23,10 +23,10 @@ use shirabe_php_shim::{
 };
 use std::cell::RefCell;
 
-use crate::io::base_io::BaseIO;
-use crate::io::io_interface::IOInterface;
-use crate::question::strict_confirmation_question::StrictConfirmationQuestion;
-use crate::util::silencer::Silencer;
+use crate::io::BaseIO;
+use crate::io::IOInterface;
+use crate::question::StrictConfirmationQuestion;
+use crate::util::Silencer;
 
 /// The Input/Output helper.
 pub struct ConsoleIO {

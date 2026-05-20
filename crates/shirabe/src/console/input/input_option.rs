@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/Input/InputOption.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_option::InputOption as BaseInputOption;
+use shirabe_external_packages::symfony::console::input::InputOption as BaseInputOption;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/PartialComposer.php
 
 use crate::config::Config;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::installer::installation_manager::InstallationManager;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::repository_manager::RepositoryManager;
+use crate::event_dispatcher::EventDispatcher;
+use crate::installer::InstallationManager;
+use crate::package::RootPackageInterface;
+use crate::repository::RepositoryManager;
 use crate::util::r#loop::Loop;
 
 #[derive(Debug, Default)]

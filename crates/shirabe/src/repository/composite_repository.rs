@@ -3,11 +3,11 @@
 use std::any::Any;
 
 use indexmap::IndexMap;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::repository_interface::{
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
 
@@ -116,7 +116,7 @@ impl RepositoryInterface for CompositeRepository {
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
     ) -> LoadPackagesResult {
-        let mut all_packages = vec![];
+        let mut all_packages = IndexMap::new();
         let mut all_names_found = vec![];
 
         for repository in &self.repositories {

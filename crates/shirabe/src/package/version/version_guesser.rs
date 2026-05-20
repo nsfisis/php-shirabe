@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::process::process::Process;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::process::Process;
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
     function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,
@@ -12,15 +12,15 @@ use shirabe_php_shim::{
 use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
 
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::vcs::hg_driver::HgDriver;
-use crate::util::git::Git as GitUtil;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::svn::Svn as SvnUtil;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::package::version::VersionParser;
+use crate::repository::vcs::HgDriver;
+use crate::util::Git as GitUtil;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Svn as SvnUtil;
 
 /// Try to guess the current version number based on different VCS configuration.
 ///
@@ -518,8 +518,9 @@ impl VersionGuesser {
                 strnatcasecmp(b, a)
             });
 
-            let mut promises: Vec<Box<dyn shirabe_external_packages::react::promise::promise_interface::PromiseInterface>> =
-                vec![];
+            let mut promises: Vec<
+                Box<dyn shirabe_external_packages::react::promise::PromiseInterface>,
+            > = vec![];
             self.process.borrow_mut().set_max_jobs(30);
             // TODO(phase-b): try/finally with resetMaxJobs
             let result: Result<()> = (|| -> Result<()> {

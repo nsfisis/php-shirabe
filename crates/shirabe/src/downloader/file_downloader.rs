@@ -5,8 +5,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
-use crate::util::silencer::Silencer;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use crate::util::Silencer;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::react::promise::resolve as react_promise_resolve;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
@@ -17,27 +17,27 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::downloader::change_report_interface::ChangeReportInterface;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::max_file_size_exceeded_exception::MaxFileSizeExceededException;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::exception::irrecoverable_download_exception::IrrecoverableDownloadException;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::package::comparer::comparer::Comparer;
-use crate::package::package_interface::PackageInterface;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::plugin::post_file_download_event::PostFileDownloadEvent;
-use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url as UrlUtil;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::downloader::ChangeReportInterface;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::MaxFileSizeExceededException;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
+use crate::exception::IrrecoverableDownloadException;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::package::PackageInterface;
+use crate::package::comparer::Comparer;
+use crate::plugin::PluginEvents;
+use crate::plugin::PostFileDownloadEvent;
+use crate::plugin::PreFileDownloadEvent;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Url as UrlUtil;
 
 /// @var array<string, int|string>
 /// @private

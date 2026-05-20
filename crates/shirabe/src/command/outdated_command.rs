@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::input::array_input::ArrayInput;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

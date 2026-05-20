@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Comparator.php
 
-use crate::constraint::constraint::Constraint;
+use crate::constraint::Constraint;
 
 pub struct Comparator;
 

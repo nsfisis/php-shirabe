@@ -1,28 +1,28 @@
 //! ref: composer/src/Composer/Repository/PathRepository.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined,
     file_exists, file_get_contents, glob_with_flags, hash, realpath, serialize,
 };
 
 use crate::config::Config;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::configurable_repository_interface::ConfigurableRepositoryInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::git::Git as GitUtil;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
+use crate::repository::ArrayRepository;
+use crate::repository::ConfigurableRepositoryInterface;
+use crate::util::Filesystem;
+use crate::util::Git as GitUtil;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Url;
 
 #[derive(Debug)]
 pub struct PathRepository {

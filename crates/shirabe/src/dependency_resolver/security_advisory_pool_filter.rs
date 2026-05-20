@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/DependencyResolver/SecurityAdvisoryPoolFilter.php
 
-use crate::advisory::audit_config::AuditConfig;
-use crate::advisory::auditor::Auditor;
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::request::Request;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::advisory::AuditConfig;
+use crate::advisory::Auditor;
+use crate::advisory::PartialSecurityAdvisory;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::package::PackageInterface;
+use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
 #[derive(Debug)]
 pub struct SecurityAdvisoryPoolFilter {

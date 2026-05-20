@@ -3,8 +3,8 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, call_user_func, file_get_contents, filemtime, function_exists, hash,
@@ -12,27 +12,27 @@ use shirabe_php_shim::{
     trim, usort,
 };
 
-use crate::installer::installation_manager::InstallationManager;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::link::Link;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_parser::VersionParser;
+use crate::installer::InstallationManager;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::CompleteAliasPackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionParser;
 use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::FindPackageConstraint;
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::util::git::Git as GitUtil;
-use crate::util::process_executor::ProcessExecutor;
+use crate::repository::FindPackageConstraint;
+use crate::repository::InstalledRepository;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RootPackageRepository;
+use crate::util::Git as GitUtil;
+use crate::util::ProcessExecutor;
 
 /// Reads/writes project lockfile (composer.lock).
 #[derive(Debug)]

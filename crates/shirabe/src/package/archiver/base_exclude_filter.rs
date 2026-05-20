@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::finder::glob::Glob;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::finder::Glob;
 
 #[derive(Debug)]
 pub struct BaseExcludeFilterBase {

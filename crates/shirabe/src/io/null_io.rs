@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/IO/NullIO.php
 
-use crate::io::base_io::BaseIO;
-use crate::io::io_interface::IOInterface;
-use shirabe_external_packages::psr::log::logger_interface::LoggerInterface;
+use crate::io::BaseIO;
+use crate::io::IOInterface;
+use shirabe_external_packages::psr::log::LoggerInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

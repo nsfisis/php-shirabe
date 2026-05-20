@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/UninstallOperation.php
 
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::operation::solver_operation::SolverOperation;
-use crate::package::package_interface::PackageInterface;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::SolverOperation;
+use crate::package::PackageInterface;
 
 #[derive(Debug)]
 pub struct UninstallOperation {

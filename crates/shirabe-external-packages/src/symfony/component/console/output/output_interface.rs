@@ -1,4 +1,4 @@
-use crate::symfony::component::console::formatter::output_formatter::OutputFormatter;
+use crate::symfony::component::console::formatter::OutputFormatter;
 
 pub trait OutputInterface {
     // PHP class semantics: OutputInterface methods take &self with interior mutability,

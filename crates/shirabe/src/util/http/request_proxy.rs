@@ -7,7 +7,7 @@ use shirabe_php_shim::{
     PhpMixed, curl_version,
 };
 
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
 
 // contextOptions = array{http: array{proxy: string, header?: string, request_fulluri?: bool}}
 type ContextOptions = IndexMap<String, IndexMap<String, PhpMixed>>;

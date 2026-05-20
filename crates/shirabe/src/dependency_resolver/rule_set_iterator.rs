@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetIterator.php
 
-use crate::dependency_resolver::rule::Rule;
+use crate::dependency_resolver::Rule;
 use indexmap::IndexMap;
 
 /// Implements PHP \Iterator over a grouped rule set.

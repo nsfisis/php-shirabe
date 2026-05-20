@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MatchAllConstraint.php
 
-use crate::constraint::bound::Bound;
-use crate::constraint::constraint_interface::ConstraintInterface;
+use crate::constraint::Bound;
+use crate::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct MatchAllConstraint {

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Advisory/IgnoredSecurityAdvisory.php
 
-use crate::advisory::security_advisory::SecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]

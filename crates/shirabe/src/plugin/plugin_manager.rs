@@ -6,36 +6,36 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, array_key_exists,
     array_reverse, array_search, clone, get_class, get_class_obj, implode, in_array, is_a,
     is_array, is_string, ksort, preg_quote, str_replace, strrpos, strtr, substr, trigger_error,
     trim, var_export, var_export_str, version_compare,
 };
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
 use crate::composer::Composer;
-use crate::event_dispatcher::event_subscriber_interface::EventSubscriberInterface;
-use crate::installer::installer_interface::InstallerInterface;
-use crate::io::io_interface::IOInterface;
+use crate::event_dispatcher::EventSubscriberInterface;
+use crate::installer::InstallerInterface;
+use crate::io::IOInterface;
+use crate::package::CompletePackage;
+use crate::package::Link;
+use crate::package::Locker;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_package::CompletePackage;
-use crate::package::link::Link;
-use crate::package::locker::Locker;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_parser::VersionParser;
+use crate::package::version::VersionParser;
 use crate::partial_composer::PartialComposer;
-use crate::plugin::capability::capability::Capability;
-use crate::plugin::capable::Capable;
-use crate::plugin::plugin_blocked_exception::PluginBlockedException;
+use crate::plugin::Capable;
+use crate::plugin::PluginBlockedException;
+use crate::plugin::capability::Capability;
 use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_utils::RepositoryUtils;
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::util::package_sorter::PackageSorter;
+use crate::repository::InstalledRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryUtils;
+use crate::repository::RootPackageRepository;
+use crate::util::PackageSorter;
 
 /// Marker for the disablePlugins variant: false | "local" | "global" | true.
 #[derive(Debug, Clone, PartialEq)]
@@ -195,7 +195,7 @@ impl PluginManager {
         if package.get_type() == "composer-plugin" {
             let requires_map = package.get_requires();
             let mut requires_composer: Option<
-                &dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface,
+                &dyn shirabe_semver::constraint::ConstraintInterface,
             > = None;
             for (_k, link) in &requires_map {
                 if "composer-plugin-api" == link.get_target() {
@@ -501,7 +501,7 @@ impl PluginManager {
             // PHP: $requiredPackages = RepositoryUtils::filterRequiredPackages($packages, $rootPackage, true);
             // RepositoryUtils::filter_required_packages takes &[Box<dyn BasePackage>] plus a bucket.
             // We need to convert &[Box<dyn BasePackage>] from packages.
-            let bucket: Vec<Box<dyn crate::package::base_package::BasePackage>> = vec![];
+            let bucket: Vec<Box<dyn crate::package::BasePackage>> = vec![];
             RepositoryUtils::filter_required_packages(
                 packages.as_slice(),
                 root_package.unwrap(),

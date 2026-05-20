@@ -2,15 +2,15 @@
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, date, stripos, strtolower};
 
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct GitHub {
@@ -240,7 +240,7 @@ impl GitHub {
             Err(te) => {
                 // TODO(phase-b): downcast anyhow::Error to TransportException for status code
                 let code = te
-                    .downcast_ref::<crate::downloader::transport_exception::TransportException>()
+                    .downcast_ref::<crate::downloader::TransportException>()
                     .and_then(|t| t.get_status_code())
                     .unwrap_or(0);
                 if code == 403 || code == 401 {

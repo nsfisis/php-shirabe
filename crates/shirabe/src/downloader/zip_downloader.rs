@@ -1,17 +1,17 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
-use crate::downloader::archive_downloader::ArchiveDownloader;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::package::package_interface::PackageInterface;
-use crate::util::ini_helper::IniHelper;
-use crate::util::platform::Platform;
+use crate::downloader::ArchiveDownloader;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::FileDownloader;
+use crate::package::PackageInterface;
+use crate::util::IniHelper;
+use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::process::Process;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::symfony::component::process::ExecutableFinder;
+use shirabe_external_packages::symfony::component::process::Process;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, RuntimeException, UnexpectedValueException, ZipArchive,
     bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
@@ -33,19 +33,15 @@ pub struct ZipDownloader {
 
 impl ZipDownloader {
     pub fn new(
-        io: Box<dyn crate::io::io_interface::IOInterface>,
+        io: Box<dyn crate::io::IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
-        http_downloader: std::rc::Rc<
-            std::cell::RefCell<crate::util::http_downloader::HttpDownloader>,
-        >,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
         event_dispatcher: Option<
-            std::rc::Rc<
-                std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>,
-            >,
+            std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
         >,
         cache: Option<crate::cache::Cache>,
-        filesystem: std::rc::Rc<std::cell::RefCell<crate::util::filesystem::Filesystem>>,
-        process: std::rc::Rc<std::cell::RefCell<crate::util::process_executor::ProcessExecutor>>,
+        filesystem: std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
     ) -> Self {
         Self {
             inner: FileDownloader::new(
@@ -426,7 +422,7 @@ impl ZipDownloader {
 // TODO(phase-b): ZipDownloader::download is overridden with extra setup (UNZIP_COMMANDS init,
 // etc.). The trait method here delegates straight to the inner FileDownloader; the bespoke
 // override on the struct itself takes &mut self and is not yet routed through the trait.
-impl crate::downloader::downloader_interface::DownloaderInterface for ZipDownloader {
+impl crate::downloader::DownloaderInterface for ZipDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()
     }

@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Package/Archiver/ZipArchiver.php
 
-use crate::package::archiver::archivable_files_finder::ArchivableFilesFinder;
-use crate::package::archiver::archiver_interface::ArchiverInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
+use crate::package::archiver::ArchivableFilesFinder;
+use crate::package::archiver::ArchiverInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, ZipArchive, class_exists, fileperms, method_exists, pack, realpath,

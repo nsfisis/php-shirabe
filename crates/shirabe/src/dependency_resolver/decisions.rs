@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Decisions.php
 
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::rule::Rule;
-use crate::dependency_resolver::solver_bug_exception::SolverBugException;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Rule;
+use crate::dependency_resolver::SolverBugException;
 use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;
 use std::fmt;

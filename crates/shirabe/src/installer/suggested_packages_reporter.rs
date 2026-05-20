@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
 
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepository;
+use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {

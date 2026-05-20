@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/Http/ProxyItem.php
 
-use crate::util::http::request_proxy::RequestProxy;
+use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_encode, parse_url_all, rawurldecode, strpbrk,

@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use super::response::Response;
+use super::Response;
 
 #[derive(Debug)]
 pub struct CurlResponse {

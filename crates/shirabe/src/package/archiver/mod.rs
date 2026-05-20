@@ -7,3 +7,13 @@ pub mod composer_exclude_filter;
 pub mod git_exclude_filter;
 pub mod phar_archiver;
 pub mod zip_archiver;
+
+pub use archivable_files_filter::*;
+pub use archivable_files_finder::*;
+pub use archive_manager::*;
+pub use archiver_interface::*;
+pub use base_exclude_filter::*;
+pub use composer_exclude_filter::*;
+pub use git_exclude_filter::*;
+pub use phar_archiver::*;
+pub use zip_archiver::*;

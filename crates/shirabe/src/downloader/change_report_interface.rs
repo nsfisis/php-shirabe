@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 
-use crate::package::package_interface::PackageInterface;
+use crate::package::PackageInterface;
 
 pub trait ChangeReportInterface {
     fn get_local_changes(

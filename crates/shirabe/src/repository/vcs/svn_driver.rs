@@ -3,7 +3,7 @@
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, array_key_exists,
     is_array, max, sprintf, stripos, strrpos, strtr, substr, trim,
@@ -11,14 +11,14 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::repository::vcs::vcs_driver::VcsDriverBase;
-use crate::util::filesystem::Filesystem;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::svn::Svn as SvnUtil;
-use crate::util::url::Url;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::Filesystem;
+use crate::util::ProcessExecutor;
+use crate::util::Svn as SvnUtil;
+use crate::util::Url;
 
 #[derive(Debug)]
 pub struct SvnDriver {

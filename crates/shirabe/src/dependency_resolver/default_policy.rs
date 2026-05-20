@@ -5,14 +5,14 @@ use std::cell::RefCell;
 
 use indexmap::IndexMap;
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::dependency_resolver::pool::Pool;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::{BasePackage, STABILITIES};
-use crate::package::package_interface::PackageInterface;
-use crate::util::platform::Platform;
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::package::AliasPackage;
+use crate::package::PackageInterface;
+use crate::package::{BasePackage, STABILITIES};
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct DefaultPolicy {

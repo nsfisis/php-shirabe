@@ -4,7 +4,7 @@ use crate::io::io_interface;
 use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
     sys_get_temp_dir,
@@ -12,12 +12,12 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::repository::vcs::vcs_driver::VcsDriverBase;
-use crate::util::filesystem::Filesystem;
-use crate::util::git::Git as GitUtil;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::url::Url;
+use crate::io::IOInterface;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::Filesystem;
+use crate::util::Git as GitUtil;
+use crate::util::ProcessExecutor;
+use crate::util::Url;
 
 #[derive(Debug)]
 pub struct GitDriver {
@@ -33,9 +33,7 @@ impl GitDriver {
         repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        http_downloader: std::rc::Rc<
-            std::cell::RefCell<crate::util::http_downloader::HttpDownloader>,
-        >,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
         Self {
@@ -481,7 +479,7 @@ impl GitDriver {
 // TODO(phase-b): implement VcsDriverInterface for GitDriver — signatures here
 // differ from the trait (some &mut self vs &self, different return shapes), so
 // each method delegates via todo!() until reconciled.
-impl crate::repository::vcs::vcs_driver_interface::VcsDriverInterface for GitDriver {
+impl crate::repository::vcs::VcsDriverInterface for GitDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         GitDriver::initialize(self)
     }

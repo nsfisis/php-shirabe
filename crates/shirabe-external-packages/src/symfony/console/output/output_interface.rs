@@ -1,4 +1,4 @@
-use crate::symfony::console::formatter::output_formatter::OutputFormatter;
+use crate::symfony::console::formatter::OutputFormatter;
 
 pub trait OutputInterface {
     fn write(&mut self, messages: &str, newline: bool, r#type: i64);

@@ -1,4 +1,4 @@
-use crate::symfony::component::console::output::output_interface::OutputInterface;
+use crate::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

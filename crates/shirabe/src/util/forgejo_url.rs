@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]
@@ -39,13 +39,13 @@ impl ForgejoUrl {
     pub fn try_from(repo_url: Option<&str>) -> Option<Self> {
         let repo_url = repo_url?;
         let mut matches: indexmap::IndexMap<
-            shirabe_external_packages::composer::pcre::preg::CaptureKey,
+            shirabe_external_packages::composer::pcre::CaptureKey,
             String,
         > = indexmap::IndexMap::new();
         if !Preg::match3(Self::URL_REGEX, repo_url, Some(&mut matches)).unwrap_or(false) {
             return None;
         }
-        use shirabe_external_packages::composer::pcre::preg::CaptureKey;
+        use shirabe_external_packages::composer::pcre::CaptureKey;
         let m: Vec<String> = (0..5)
             .map(|i| {
                 matches

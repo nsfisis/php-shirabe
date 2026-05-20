@@ -2,15 +2,15 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
+use crate::io::IOInterface;
 use crate::io::io_interface;
-use crate::io::io_interface::IOInterface;
-use crate::repository::vcs::vcs_driver::VcsDriverBase;
-use crate::util::filesystem::Filesystem;
-use crate::util::hg::Hg as HgUtils;
-use crate::util::url::Url;
+use crate::repository::vcs::VcsDriverBase;
+use crate::util::Filesystem;
+use crate::util::Hg as HgUtils;
+use crate::util::Url;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
@@ -84,7 +84,7 @@ impl HgDriver {
                     Some(self.repo_dir.clone()),
                 ) != 0
                 {
-                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::io_interface::NORMAL);
+                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::NORMAL);
                 }
             } else {
                 let mut fs2 = Filesystem::new(None);
@@ -324,7 +324,7 @@ impl HgDriver {
                 return false;
             }
 
-            let mut process = crate::util::process_executor::ProcessExecutor::new(io);
+            let mut process = crate::util::ProcessExecutor::new(io);
             let mut output = String::new();
             if process.execute_args(
                 &["hg", "summary"].map(|s| s.to_string()).to_vec(),
@@ -340,7 +340,7 @@ impl HgDriver {
             return false;
         }
 
-        let mut process = crate::util::process_executor::ProcessExecutor::new(io);
+        let mut process = crate::util::ProcessExecutor::new(io);
         let mut ignored = String::new();
         let exit = process.execute_args(
             &["hg", "identify", "--", url]

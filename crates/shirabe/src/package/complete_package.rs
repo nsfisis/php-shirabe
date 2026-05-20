@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package::Package;
-use crate::package::package_interface::PackageInterface;
+use crate::package::CompletePackageInterface;
+use crate::package::Package;
+use crate::package::PackageInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -26,7 +26,7 @@ pub struct CompletePackage {
 impl CompletePackage {
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
         Self {
-            inner: crate::package::package::Package::new(name, version, pretty_version),
+            inner: crate::package::Package::new(name, version, pretty_version),
             repositories: Vec::new(),
             license: Vec::new(),
             keywords: Vec::new(),
@@ -273,23 +273,23 @@ impl PackageInterface for CompletePackage {
         todo!()
     }
 
-    fn get_requires(&self) -> IndexMap<String, super::link::Link> {
+    fn get_requires(&self) -> IndexMap<String, super::Link> {
         todo!()
     }
 
-    fn get_conflicts(&self) -> IndexMap<String, super::link::Link> {
+    fn get_conflicts(&self) -> IndexMap<String, super::Link> {
         todo!()
     }
 
-    fn get_provides(&self) -> IndexMap<String, super::link::Link> {
+    fn get_provides(&self) -> IndexMap<String, super::Link> {
         todo!()
     }
 
-    fn get_replaces(&self) -> IndexMap<String, super::link::Link> {
+    fn get_replaces(&self) -> IndexMap<String, super::Link> {
         todo!()
     }
 
-    fn get_dev_requires(&self) -> IndexMap<String, super::link::Link> {
+    fn get_dev_requires(&self) -> IndexMap<String, super::Link> {
         todo!()
     }
 
@@ -315,14 +315,12 @@ impl PackageInterface for CompletePackage {
 
     fn set_repository(
         &mut self,
-        repository: Box<dyn crate::repository::repository_interface::RepositoryInterface>,
+        repository: Box<dyn crate::repository::RepositoryInterface>,
     ) -> anyhow::Result<()> {
         todo!()
     }
 
-    fn get_repository(
-        &self,
-    ) -> Option<&dyn crate::repository::repository_interface::RepositoryInterface> {
+    fn get_repository(&self) -> Option<&dyn crate::repository::RepositoryInterface> {
         todo!()
     }
 

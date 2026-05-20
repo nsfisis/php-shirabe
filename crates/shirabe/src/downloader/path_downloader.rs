@@ -3,9 +3,9 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::filesystem::exception::io_exception::IOException;
-use shirabe_external_packages::symfony::component::filesystem::filesystem::Filesystem as SymfonyFilesystem;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::symfony::component::filesystem::Filesystem as SymfonyFilesystem;
+use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed,
     RuntimeException, file_exists, function_exists, is_dir, realpath,
@@ -13,22 +13,22 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::downloader::vcs_capable_downloader_interface::VcsCapableDownloaderInterface;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::package::archiver::archivable_files_finder::ArchivableFilesFinder;
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::FileDownloader;
+use crate::downloader::VcsCapableDownloaderInterface;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::package::archiver::ArchivableFilesFinder;
+use crate::package::dumper::ArrayDumper;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct PathDownloader {

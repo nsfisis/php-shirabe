@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Downloader/HgDownloader.php
 
 use crate::config::Config;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::vcs_downloader::VcsDownloaderBase;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::hg::Hg as HgUtils;
-use crate::util::process_executor::ProcessExecutor;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsDownloaderBase;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::util::Filesystem;
+use crate::util::Hg as HgUtils;
+use crate::util::ProcessExecutor;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::RuntimeException;
 
 #[derive(Debug)]

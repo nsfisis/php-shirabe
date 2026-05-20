@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Operation/OperationInterface.php
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
 
 pub trait OperationInterface: std::fmt::Debug {
     fn as_any(&self) -> &dyn std::any::Any;
@@ -31,7 +31,7 @@ pub trait OperationInterface: std::fmt::Debug {
 
     /// PHP duck-typed accessor. Only InstallOperation/UninstallOperation/MarkAlias*Operation
     /// expose this; UpdateOperation has getInitialPackage()/getTargetPackage() instead.
-    fn get_package(&self) -> &dyn crate::package::package_interface::PackageInterface {
+    fn get_package(&self) -> &dyn crate::package::PackageInterface {
         todo!("get_package is not available on this operation type")
     }
 }

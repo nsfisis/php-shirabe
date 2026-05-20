@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use std::path::Path;
 
-use crate::util::platform::Platform;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct Comparer {

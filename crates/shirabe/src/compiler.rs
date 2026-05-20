@@ -1,21 +1,21 @@
 //! ref: composer/src/Composer/Compiler.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::ca_bundle::ca_bundle::CaBundle;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::seld::phar_utils::linter::Linter;
-use shirabe_external_packages::seld::phar_utils::timestamps::Timestamps;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::spl_file_info::SplFileInfo;
+use shirabe_external_packages::composer::ca_bundle::CaBundle;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::seld::phar_utils::Linter;
+use shirabe_external_packages::seld::phar_utils::Timestamps;
+use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::component::finder::SplFileInfo;
 use shirabe_php_shim::{
     Phar, PhpMixed, RuntimeException, T_COMMENT, T_DOC_COMMENT, T_WHITESPACE,
     UnexpectedValueException, array_search, file_exists, file_get_contents, strcmp, strtr,
     strtr_array, token_get_all,
 };
 
-use crate::json::json_file::JsonFile;
-use crate::util::git::Git;
-use crate::util::process_executor::ProcessExecutor;
+use crate::json::JsonFile;
+use crate::util::Git;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct Compiler {

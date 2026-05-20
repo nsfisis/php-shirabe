@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
 
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
-use crate::advisory::security_advisory::SecurityAdvisory;
+use crate::advisory::PartialSecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
 use indexmap::IndexMap;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub enum PartialOrSecurityAdvisory {

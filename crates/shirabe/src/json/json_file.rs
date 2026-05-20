@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
 use crate::io::io_interface;
-use crate::util::silencer::Silencer;
+use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::json_schema::validator::Validator;
-use shirabe_external_packages::seld::json_lint::json_parser::JsonParser;
-use shirabe_external_packages::seld::json_lint::parsing_exception::ParsingException;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::json_schema::Validator;
+use shirabe_external_packages::seld::json_lint::JsonParser;
+use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_ERROR_CTRL_CHAR, JSON_ERROR_DEPTH, JSON_ERROR_NONE,
     JSON_ERROR_STATE_MISMATCH, JSON_ERROR_UTF8, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
@@ -17,11 +17,11 @@ use shirabe_php_shim::{
     str_repeat, strlen, strpos, usleep,
 };
 
-use crate::downloader::transport_exception::TransportException;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_validation_exception::JsonValidationException;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
+use crate::downloader::TransportException;
+use crate::io::IOInterface;
+use crate::json::JsonValidationException;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
 
 /// Reads/writes json files.
 #[derive(Debug)]
@@ -417,16 +417,12 @@ impl JsonFile {
             return Preg::replace_callback(
                 r"#^ {4,}#m",
                 move |m: &indexmap::IndexMap<
-                    shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                    shirabe_external_packages::composer::pcre::CaptureKey,
                     String,
                 >|
                       -> String {
                     let whole = m
-                        .get(
-                            &shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(
-                                0,
-                            ),
-                        )
+                        .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(0))
                         .map(|s| s.as_str())
                         .unwrap_or("");
                     str_repeat(&indent_owned, (strlen(whole) / 4) as usize)

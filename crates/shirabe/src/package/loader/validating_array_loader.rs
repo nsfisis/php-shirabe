@@ -3,24 +3,24 @@
 use chrono::TimeZone;
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, Exception, FILTER_VALIDATE_EMAIL, PHP_EOL, PhpMixed, array_intersect_key,
     array_values, filter_var, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
     is_string, json_encode, parse_url_all, php_to_string, sprintf, str_replace, strcasecmp,
     strtolower, strtotime, substr, trigger_error, trim, var_export,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_none_constraint::MatchNoneConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchNoneConstraint;
 use shirabe_semver::intervals::Intervals;
 
-use crate::package::base_package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
-use crate::package::loader::invalid_package_exception::InvalidPackageException;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::platform_repository::PlatformRepository;
+use crate::package::loader::InvalidPackageException;
+use crate::package::loader::LoaderInterface;
+use crate::package::version::VersionParser;
+use crate::package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct ValidatingArrayLoader {

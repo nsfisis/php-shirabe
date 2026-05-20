@@ -1,6 +1,9 @@
 pub mod input_argument;
 pub mod input_option;
 
+pub use input_argument::*;
+pub use input_option::*;
+
 pub enum InputDefinitionItem {
     Argument(input_argument::InputArgument),
     Option(input_option::InputOption),

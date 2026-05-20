@@ -1,4 +1,4 @@
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct CompilingMatcher;

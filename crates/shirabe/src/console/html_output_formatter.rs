@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 
 #[derive(Debug)]
 pub struct HtmlOutputFormatter {

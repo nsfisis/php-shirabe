@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::filesystem::exception::io_exception::IOException;
-use shirabe_external_packages::symfony::component::finder::finder::Finder;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
+use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, InvalidArgumentException, LogicException, PhpMixed,
     RuntimeException, UnexpectedValueException, array_pop, basename, chdir, clearstatcache,
@@ -15,9 +15,9 @@ use shirabe_php_shim::{
     substr_count, symlink, touch, unlink, usleep, var_export,
 };
 
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct Filesystem {
@@ -702,7 +702,7 @@ impl Filesystem {
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         let mut prefix_match: indexmap::IndexMap<
-            shirabe_external_packages::composer::pcre::preg::CaptureKey,
+            shirabe_external_packages::composer::pcre::CaptureKey,
             String,
         > = indexmap::IndexMap::new();
         if Preg::is_match_strict_groups3(
@@ -713,7 +713,7 @@ impl Filesystem {
         .unwrap_or(false)
         {
             prefix = prefix_match
-                .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(1))
+                .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
                 .cloned()
                 .unwrap_or_default();
             path = substr(&path, strlen(&prefix), None);
@@ -739,12 +739,12 @@ impl Filesystem {
         prefix = Preg::replace_callback(
             "{(^|://)[a-z]:$}i",
             |m: &indexmap::IndexMap<
-                shirabe_external_packages::composer::pcre::preg::CaptureKey,
+                shirabe_external_packages::composer::pcre::CaptureKey,
                 String,
             >|
              -> String {
                 let s = m
-                    .get(&shirabe_external_packages::composer::pcre::preg::CaptureKey::ByIndex(0))
+                    .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(0))
                     .cloned()
                     .unwrap_or_default();
                 strtoupper(&s)

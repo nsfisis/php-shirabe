@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Installer/InstallerEvent.php
 
 use crate::composer::Composer;
-use crate::dependency_resolver::transaction::Transaction;
-use crate::event_dispatcher::event::Event;
-use crate::io::io_interface::IOInterface;
+use crate::dependency_resolver::Transaction;
+use crate::event_dispatcher::Event;
+use crate::io::IOInterface;
 
 #[derive(Debug)]
 pub struct InstallerEvent {

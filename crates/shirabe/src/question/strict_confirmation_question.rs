@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
-use shirabe_external_packages::symfony::console::question::question::Question;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::exception::InvalidArgumentException;
+use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_php_shim::{PhpMixed, empty, is_bool};
 
 pub struct StrictConfirmationQuestion {

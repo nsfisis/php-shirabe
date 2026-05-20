@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter::OutputFormatter;
-use shirabe_external_packages::symfony::component::console::formatter::output_formatter_style::OutputFormatterStyle;
-use shirabe_external_packages::symfony::component::console::output::console_output::ConsoleOutput;
+use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::component::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::component::console::output::ConsoleOutput;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, Phar, PhpMixed, RuntimeException,
     UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive, class_exists,
@@ -13,59 +13,59 @@ use shirabe_php_shim::{
     strpos, strtr, substr, trim,
 };
 
-use crate::autoload::autoload_generator::AutoloadGenerator;
+use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::config::json_config_source::JsonConfigSource;
-use crate::downloader::download_manager::DownloadManager;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::downloader::fossil_downloader::FossilDownloader;
-use crate::downloader::git_downloader::GitDownloader;
-use crate::downloader::gzip_downloader::GzipDownloader;
-use crate::downloader::hg_downloader::HgDownloader;
-use crate::downloader::path_downloader::PathDownloader;
-use crate::downloader::perforce_downloader::PerforceDownloader;
-use crate::downloader::phar_downloader::PharDownloader;
-use crate::downloader::rar_downloader::RarDownloader;
-use crate::downloader::svn_downloader::SvnDownloader;
-use crate::downloader::tar_downloader::TarDownloader;
-use crate::downloader::transport_exception::TransportException;
-use crate::downloader::xz_downloader::XzDownloader;
-use crate::downloader::zip_downloader::ZipDownloader;
-use crate::event_dispatcher::event::Event;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::exception::no_ssl_exception::NoSslException;
-use crate::installer::binary_installer::BinaryInstaller;
-use crate::installer::installation_manager::InstallationManager;
-use crate::installer::library_installer::LibraryInstaller;
-use crate::installer::metapackage_installer::MetapackageInstaller;
-use crate::installer::plugin_installer::PluginInstaller;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::json::json_validation_exception::JsonValidationException;
-use crate::package::archiver::archive_manager::ArchiveManager;
-use crate::package::archiver::phar_archiver::PharArchiver;
-use crate::package::archiver::zip_archiver::ZipArchiver;
-use crate::package::loader::root_package_loader::RootPackageLoader;
-use crate::package::locker::Locker;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
+use crate::config::JsonConfigSource;
+use crate::downloader::DownloadManager;
+use crate::downloader::FileDownloader;
+use crate::downloader::FossilDownloader;
+use crate::downloader::GitDownloader;
+use crate::downloader::GzipDownloader;
+use crate::downloader::HgDownloader;
+use crate::downloader::PathDownloader;
+use crate::downloader::PerforceDownloader;
+use crate::downloader::PharDownloader;
+use crate::downloader::RarDownloader;
+use crate::downloader::SvnDownloader;
+use crate::downloader::TarDownloader;
+use crate::downloader::TransportException;
+use crate::downloader::XzDownloader;
+use crate::downloader::ZipDownloader;
+use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventDispatcher;
+use crate::exception::NoSslException;
+use crate::installer::BinaryInstaller;
+use crate::installer::InstallationManager;
+use crate::installer::LibraryInstaller;
+use crate::installer::MetapackageInstaller;
+use crate::installer::PluginInstaller;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::json::JsonValidationException;
+use crate::package::Locker;
+use crate::package::RootPackageInterface;
+use crate::package::archiver::ArchiveManager;
+use crate::package::archiver::PharArchiver;
+use crate::package::archiver::ZipArchiver;
+use crate::package::loader::RootPackageLoader;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
 use crate::partial_composer::PartialComposer;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::plugin::plugin_manager::PluginManager;
-use crate::repository::filesystem_repository::FilesystemRepository;
-use crate::repository::installed_filesystem_repository::InstalledFilesystemRepository;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_manager::RepositoryManager;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
+use crate::plugin::PluginEvents;
+use crate::plugin::PluginManager;
+use crate::repository::FilesystemRepository;
+use crate::repository::InstalledFilesystemRepository;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositoryManager;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use crate::util::r#loop::Loop;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
@@ -267,7 +267,7 @@ impl Factory {
                 io_ref.write_error3(
                     &format!("Loading config file {}", file.get_path()),
                     true,
-                    crate::io::io_interface::DEBUG,
+                    crate::io::DEBUG,
                 );
             }
             // TODO(phase-b): validate_json_schema takes ownership of JsonFile; recreate it
@@ -328,7 +328,7 @@ impl Factory {
                 io_ref.write_error3(
                     &format!("Loading config file {}", auth_file.get_path()),
                     true,
-                    crate::io::io_interface::DEBUG,
+                    crate::io::DEBUG,
                 );
             }
             // TODO(phase-b): validate_json_schema takes ownership; recreate JsonFile
@@ -524,7 +524,7 @@ impl Factory {
                     realpath(composer_file_path).unwrap_or_default()
                 ),
                 true,
-                crate::io::io_interface::DEBUG,
+                crate::io::DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
                 JsonFile::new(
@@ -547,7 +547,7 @@ impl Factory {
                 io.write_error3(
                     &format!("Loading config file {}", local_auth_file.get_path()),
                     true,
-                    crate::io::io_interface::DEBUG,
+                    crate::io::DEBUG,
                 );
                 // TODO(phase-b): validate_json_schema/ValidateJsonInput::File expects an owned
                 // JsonFile (PHP class semantics share refs); needs Rc<RefCell<JsonFile>> refactor.
@@ -734,7 +734,7 @@ impl Factory {
                             lock_file
                         ),
                         true,
-                        crate::io::io_interface::NORMAL,
+                        crate::io::NORMAL,
                     );
                 }
 
@@ -898,7 +898,7 @@ impl Factory {
                 io.write_error3(
                     &format!("Failed to initialize global composer: {}", e),
                     true,
-                    crate::io::io_interface::DEBUG,
+                    crate::io::DEBUG,
                 );
                 None
             }
@@ -1289,7 +1289,7 @@ impl Factory {
                 io.write_error3(
                     "<warning>You are running Composer with SSL/TLS protection disabled.</warning>",
                     true,
-                    crate::io::io_interface::NORMAL,
+                    crate::io::NORMAL,
                 );
             }
             unsafe { WARNED = true };
@@ -1347,17 +1347,17 @@ impl Factory {
                         io.write3(
                             "<error>Unable to locate a valid CA certificate file. You must set a valid 'cafile' option.</error>",
                             true,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                         io.write3(
                             "<error>A valid CA certificate file is required for SSL/TLS protection.</error>",
                             true,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                         io.write3(
                             "<error>You can disable this error, at your own risk, by setting the 'disable-tls' option to true.</error>",
                             true,
-                            crate::io::io_interface::NORMAL,
+                            crate::io::NORMAL,
                         );
                     }
                 }
@@ -1392,7 +1392,7 @@ impl Factory {
             io_ref.write_error3(
                 "Loading auth config from COMPOSER_AUTH",
                 true,
-                crate::io::io_interface::DEBUG,
+                crate::io::DEBUG,
             );
         }
         Self::validate_json_schema(
@@ -1469,11 +1469,7 @@ impl Factory {
                     implode(&format!("{} - ", PHP_EOL), jve.get_errors())
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(
-                        &format!("<warning>{}</>", msg),
-                        true,
-                        crate::io::io_interface::NORMAL,
-                    );
+                    io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);
                 } else {
                     return Err(anyhow::anyhow!(UnexpectedValueException {
                         message: msg,

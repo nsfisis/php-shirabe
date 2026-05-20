@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::config::Config;
-use crate::config::json_config_source::JsonConfigSource;
+use crate::config::JsonConfigSource;
 use crate::factory::Factory;
-use crate::json::json_file::JsonFile;
-use crate::util::platform::Platform;
-use crate::util::silencer::Silencer;
+use crate::json::JsonFile;
+use crate::util::Platform;
+use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
 
 pub trait BaseConfigCommand: BaseCommand {

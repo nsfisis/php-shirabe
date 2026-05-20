@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Loader/LoaderInterface.php
 
-use crate::package::base_package::BasePackage;
+use crate::package::BasePackage;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

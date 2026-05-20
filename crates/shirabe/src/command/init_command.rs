@@ -3,12 +3,12 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::symfony::component::console::helper::formatter_helper::FormatterHelper;
-use shirabe_external_packages::symfony::component::console::input::array_input::ArrayInput;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::component::console::helper::FormatterHelper;
+use shirabe_external_packages::symfony::component::console::input::ArrayInput;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL, InvalidArgumentException, PHP_EOL, PhpMixed,
     array_filter, array_flip, array_flip_strings, array_intersect_key, array_keys, array_map,
@@ -17,21 +17,21 @@ use shirabe_php_shim::{
     server_get, sprintf, str_replace, strpos, strtolower, trim, ucwords,
 };
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::package_discovery_trait::PackageDiscoveryTrait;
+use crate::command::PackageDiscoveryTrait;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::json::json_validation_exception::JsonValidationException;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::json::JsonValidationException;
 use crate::package::base_package::{self, BasePackage};
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::util::filesystem::Filesystem;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
+use crate::repository::CompositeRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryFactory;
+use crate::util::Filesystem;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 
 #[derive(Debug)]
 pub struct InitCommand {
@@ -48,7 +48,7 @@ impl PackageDiscoveryTrait for InitCommand {
 
     fn get_repository_sets_mut(
         &mut self,
-    ) -> &mut IndexMap<String, crate::repository::repository_set::RepositorySet> {
+    ) -> &mut IndexMap<String, crate::repository::RepositorySet> {
         todo!()
     }
 
@@ -71,7 +71,8 @@ impl PackageDiscoveryTrait for InitCommand {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Box<dyn crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface>{
+    ) -> Box<dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>
+    {
         todo!()
     }
 
@@ -450,9 +451,8 @@ impl InitCommand {
             io.load_configuration(&mut *config.borrow_mut())?;
             let mut repo_manager = RepositoryFactory::manager(io, &config, None, None, None)?;
 
-            let mut repos: Vec<
-                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-            > = vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
+            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
+                vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
                 let repo_config = RepositoryFactory::config_from_string(io, &config, repo, true)?;

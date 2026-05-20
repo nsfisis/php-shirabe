@@ -4,26 +4,26 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::alias_package::AliasPackage;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::AliasPackage;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
 use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::repository::CompositeRepository;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct FundCommand {
@@ -86,7 +86,7 @@ impl FundCommand {
         );
 
         // collect funding data from default branches
-        for package in &result.packages {
+        for (_, package) in &result.packages {
             if package.as_any().downcast_ref::<AliasPackage>().is_none() {
                 // TODO: check for CompleteAliasPackage as well
                 if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {

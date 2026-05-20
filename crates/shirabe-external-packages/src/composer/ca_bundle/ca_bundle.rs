@@ -1,4 +1,4 @@
-use crate::psr::log::logger_interface::LoggerInterface;
+use crate::psr::log::LoggerInterface;
 
 #[derive(Debug)]
 pub struct CaBundle;

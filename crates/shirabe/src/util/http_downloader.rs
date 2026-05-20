@@ -3,29 +3,29 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 
-use crate::util::silencer::Silencer;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::promise::Promise;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use crate::util::Silencer;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::react::promise::Promise;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
     extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
     rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
-use crate::exception::irrecoverable_download_exception::IrrecoverableDownloadException;
-use crate::io::io_interface::IOInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::util::http::curl_downloader::CurlDownloader;
-use crate::util::http::response::Response;
-use crate::util::platform::Platform;
-use crate::util::remote_filesystem::RemoteFilesystem;
-use crate::util::stream_context_factory::StreamContextFactory;
-use crate::util::url::Url;
+use crate::downloader::TransportException;
+use crate::exception::IrrecoverableDownloadException;
+use crate::io::IOInterface;
+use crate::package::version::VersionParser;
+use crate::util::Platform;
+use crate::util::RemoteFilesystem;
+use crate::util::StreamContextFactory;
+use crate::util::Url;
+use crate::util::http::CurlDownloader;
+use crate::util::http::Response;
 
 /// @phpstan-type Request array{url: non-empty-string, options: mixed[], copyTo: string|null}
 /// @phpstan-type Job array{id: int, status: int, request: Request, sync: bool, origin: string, resolve?: callable, reject?: callable, curl_id?: int, response?: Response, exception?: \Throwable}

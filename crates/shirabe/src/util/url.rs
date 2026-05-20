@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Util/Url.php
 
 use crate::config::Config;
-use crate::util::github::GitHub;
+use crate::util::GitHub;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array, parse_url};
 
 pub struct Url;

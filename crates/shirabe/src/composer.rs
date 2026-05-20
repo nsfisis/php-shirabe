@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/Composer.php
 
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 
-use crate::autoload::autoload_generator::AutoloadGenerator;
-use crate::downloader::download_manager::DownloadManager;
-use crate::package::archiver::archive_manager::ArchiveManager;
-use crate::package::locker::Locker;
+use crate::autoload::AutoloadGenerator;
+use crate::downloader::DownloadManager;
+use crate::package::Locker;
+use crate::package::archiver::ArchiveManager;
 use crate::partial_composer::PartialComposer;
-use crate::plugin::plugin_manager::PluginManager;
+use crate::plugin::PluginManager;
 
 #[derive(Debug)]
 pub struct Composer {
@@ -109,7 +109,7 @@ impl Composer {
         self.autoload_generator.as_mut().unwrap()
     }
 
-    pub fn get_package(&self) -> &dyn crate::package::root_package_interface::RootPackageInterface {
+    pub fn get_package(&self) -> &dyn crate::package::RootPackageInterface {
         self.inner.get_package()
     }
 
@@ -123,37 +123,28 @@ impl Composer {
         self.inner.get_config_mut()
     }
 
-    pub fn get_repository_manager(
-        &self,
-    ) -> &crate::repository::repository_manager::RepositoryManager {
+    pub fn get_repository_manager(&self) -> &crate::repository::RepositoryManager {
         self.inner.get_repository_manager()
     }
 
     pub fn set_event_dispatcher(
         &mut self,
-        dispatcher: std::rc::Rc<
-            std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>,
-        >,
+        dispatcher: std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
     ) {
         self.inner.set_event_dispatcher(dispatcher);
     }
 
     pub fn get_event_dispatcher(
         &self,
-    ) -> &std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::event_dispatcher::EventDispatcher>>
-    {
+    ) -> &std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>> {
         self.inner.get_event_dispatcher()
     }
 
-    pub fn get_installation_manager(
-        &self,
-    ) -> &crate::installer::installation_manager::InstallationManager {
+    pub fn get_installation_manager(&self) -> &crate::installer::InstallationManager {
         self.inner.get_installation_manager()
     }
 
-    pub fn get_installation_manager_mut(
-        &mut self,
-    ) -> &mut crate::installer::installation_manager::InstallationManager {
+    pub fn get_installation_manager_mut(&mut self) -> &mut crate::installer::InstallationManager {
         self.inner.get_installation_manager_mut()
     }
 
@@ -173,17 +164,11 @@ impl Composer {
         self.inner.set_global();
     }
 
-    pub fn set_repository_manager(
-        &mut self,
-        manager: crate::repository::repository_manager::RepositoryManager,
-    ) {
+    pub fn set_repository_manager(&mut self, manager: crate::repository::RepositoryManager) {
         self.inner.set_repository_manager(manager);
     }
 
-    pub fn set_installation_manager(
-        &mut self,
-        manager: crate::installer::installation_manager::InstallationManager,
-    ) {
+    pub fn set_installation_manager(&mut self, manager: crate::installer::InstallationManager) {
         self.inner.set_installation_manager(manager);
     }
 
@@ -195,10 +180,7 @@ impl Composer {
         &self.inner
     }
 
-    pub fn set_package(
-        &mut self,
-        package: Box<dyn crate::package::root_package_interface::RootPackageInterface>,
-    ) {
+    pub fn set_package(&mut self, package: Box<dyn crate::package::RootPackageInterface>) {
         self.inner.set_package(package);
     }
 }

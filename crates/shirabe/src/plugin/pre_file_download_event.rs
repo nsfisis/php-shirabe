@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::event_dispatcher::event::Event;
-use crate::util::http_downloader::HttpDownloader;
+use crate::event_dispatcher::Event;
+use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct PreFileDownloadEvent {

@@ -2,17 +2,17 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, json_encode};
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
 use crate::config::Config;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::filter_repository::FilterRepository;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::repository::FilterRepository;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::RepositoryInterface;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct RepositoryManager {
@@ -56,9 +56,7 @@ impl RepositoryManager {
         for repository in &self.repositories {
             if let Some(package) = repository.find_package(
                 name,
-                crate::repository::repository_interface::FindPackageConstraint::Constraint(
-                    constraint.clone_box(),
-                ),
+                crate::repository::FindPackageConstraint::Constraint(constraint.clone_box()),
             ) {
                 return Some(package.clone_package_box());
             }
@@ -75,11 +73,9 @@ impl RepositoryManager {
         for repository in self.get_repositories() {
             for p in repository.find_packages(
                 name,
-                Some(
-                    crate::repository::repository_interface::FindPackageConstraint::Constraint(
-                        constraint.clone_box(),
-                    ),
-                ),
+                Some(crate::repository::FindPackageConstraint::Constraint(
+                    constraint.clone_box(),
+                )),
             ) {
                 packages.push(p.clone_package_box());
             }

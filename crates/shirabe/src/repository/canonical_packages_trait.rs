@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/CanonicalPackagesTrait.php
 
-use crate::package::package_interface::PackageInterface;
+use crate::package::PackageInterface;
 use indexmap::IndexMap;
 
 /// Provides get_canonical_packages() to various repository implementations.

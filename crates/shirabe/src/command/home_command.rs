@@ -1,23 +1,23 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{FILTER_VALIDATE_URL, PhpMixed, filter_var};
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::root_package_repository::RootPackageRepository;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositoryInterface;
+use crate::repository::RootPackageRepository;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct HomeCommand {

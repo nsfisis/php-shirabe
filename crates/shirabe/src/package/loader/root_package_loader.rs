@@ -1,28 +1,28 @@
 //! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     LogicException, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
 };
 
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
-use crate::package::base_package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::loader_interface::LoaderInterface;
-use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_alias_package::RootAliasPackage;
-use crate::package::root_package::RootPackage;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_guesser::VersionGuesser;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_manager::RepositoryManager;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::RootAliasPackage;
+use crate::package::RootPackage;
+use crate::package::RootPackageInterface;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::LoaderInterface;
+use crate::package::loader::ValidatingArrayLoader;
+use crate::package::version::VersionGuesser;
+use crate::package::version::VersionParser;
+use crate::package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositoryManager;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct RootPackageLoader {

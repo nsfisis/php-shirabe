@@ -11,7 +11,7 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::version_parser::VersionParser;
 
-use crate::autoload::class_loader::ClassLoader;
+use crate::autoload::ClassLoader;
 
 /// This class is copied in every Composer installed project and available to all
 ///

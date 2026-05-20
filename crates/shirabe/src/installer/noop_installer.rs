@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Installer/NoopInstaller.php
 
-use crate::installer::installer_interface::InstallerInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use crate::installer::InstallerInterface;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepositoryInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]

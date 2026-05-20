@@ -21,10 +21,7 @@ impl JsonParser {
     }
 
     /// PHP: JsonParser::lint() — returns null on success, ParsingException on failure.
-    pub fn lint(
-        &mut self,
-        _json: &str,
-    ) -> Option<crate::seld::json_lint::parsing_exception::ParsingException> {
+    pub fn lint(&mut self, _json: &str) -> Option<crate::seld::json_lint::ParsingException> {
         todo!()
     }
 }

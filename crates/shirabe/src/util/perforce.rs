@@ -2,19 +2,19 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::process::Process;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::component::process::ExecutableFinder;
+use shirabe_external_packages::symfony::component::process::Process;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, chdir, count, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,
     strpos, strrpos, substr, time, trim,
 };
 
-use crate::io::io_interface::IOInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 
 /// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
 #[derive(Debug)]

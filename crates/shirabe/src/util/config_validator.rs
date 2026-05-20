@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/Util/ConfigValidator.php
 
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::json::json_validation_exception::JsonValidationException;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::loader::invalid_package_exception::InvalidPackageException;
-use crate::package::loader::validating_array_loader::ValidatingArrayLoader;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::json::JsonValidationException;
+use crate::package::loader::ArrayLoader;
+use crate::package::loader::InvalidPackageException;
+use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::composer::spdx_licenses::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::seld::json_lint::duplicate_key_exception::DuplicateKeyException;
-use shirabe_external_packages::seld::json_lint::json_parser::JsonParser;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::seld::json_lint::DuplicateKeyException;
+use shirabe_external_packages::seld::json_lint::JsonParser;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

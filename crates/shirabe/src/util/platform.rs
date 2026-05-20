@@ -3,7 +3,7 @@
 use std::sync::Mutex;
 
 use anyhow::Result;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, defined, env_contains_key, env_get, env_set, env_unset,
     file_exists, file_get_contents, fopen, fstat, function_exists, getcwd, getenv, in_array,
@@ -12,8 +12,8 @@ use shirabe_php_shim::{
     server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 
 /// Platform helper for uniform platform-specific tests.
 pub struct Platform;
@@ -92,7 +92,7 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        use shirabe_external_packages::composer::pcre::preg::CaptureKey;
+        use shirabe_external_packages::composer::pcre::CaptureKey;
         if Preg::is_match(r"#^~[\\/]#", path).unwrap_or(false) {
             return format!(
                 "{}{}",

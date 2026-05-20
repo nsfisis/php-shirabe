@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/LocalRepoTransaction.php
 
-use super::transaction::Transaction;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use super::Transaction;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct LocalRepoTransaction {
@@ -25,8 +25,7 @@ impl LocalRepoTransaction {
 
     pub fn get_operations(
         &self,
-    ) -> Vec<Box<dyn crate::dependency_resolver::operation::operation_interface::OperationInterface>>
-    {
+    ) -> Vec<Box<dyn crate::dependency_resolver::operation::OperationInterface>> {
         // TODO(phase-b): delegate to inner transaction once operations are typed.
         Vec::new()
     }

@@ -8,16 +8,16 @@ use shirabe_php_shim::{
     strcmp, uasort,
 };
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::mark_alias_installed_operation::MarkAliasInstalledOperation;
-use crate::dependency_resolver::operation::mark_alias_uninstalled_operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::package::alias_package::AliasPackage;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::platform_repository::PlatformRepository;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
+use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::package::AliasPackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::repository::PlatformRepository;
 
 /// @internal
 #[derive(Debug)]

@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::command::base_dependency_command::BaseDependencyCommand;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
-use crate::io::io_interface::IOInterface;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use crate::command::BaseDependencyCommand;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::io::IOInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct DependsCommand {
@@ -23,7 +23,7 @@ impl DependsCommand {
             .set_description("Shows which packages cause the given package to be installed")
             .set_definition(&[
                 InputArgument::new(
-                    crate::command::base_dependency_command::ARGUMENT_PACKAGE,
+                    crate::command::ARGUMENT_PACKAGE,
                     Some(InputArgument::REQUIRED),
                     "Package to inspect",
                     None,
@@ -31,7 +31,7 @@ impl DependsCommand {
                 .unwrap()
                 .into(),
                 InputOption::new(
-                    crate::command::base_dependency_command::OPTION_RECURSIVE,
+                    crate::command::OPTION_RECURSIVE,
                     Some(shirabe_php_shim::PhpMixed::String("r".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Recursively resolves up to the root package",
@@ -40,7 +40,7 @@ impl DependsCommand {
                 .unwrap()
                 .into(),
                 InputOption::new(
-                    crate::command::base_dependency_command::OPTION_TREE,
+                    crate::command::OPTION_TREE,
                     Some(shirabe_php_shim::PhpMixed::String("t".to_string())),
                     Some(InputOption::VALUE_NONE),
                     "Prints the results as a nested tree",

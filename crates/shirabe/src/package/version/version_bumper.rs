@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Package/Version/VersionBumper.php
 
-use crate::package::dumper::array_dumper::ArrayDumper;
-use crate::package::loader::array_loader::ArrayLoader;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::util::platform::Platform;
+use crate::package::PackageInterface;
+use crate::package::dumper::ArrayDumper;
+use crate::package::loader::ArrayLoader;
+use crate::package::version::VersionParser;
+use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_semver::constraint::ConstraintInterface;
 use shirabe_semver::intervals::Intervals;
 
 #[derive(Debug)]

@@ -1,21 +1,21 @@
 //! ref: composer/src/Composer/Repository/RepositoryFactory.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
 };
 
 use crate::config::Config;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
+use crate::event_dispatcher::EventDispatcher;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::repository::filesystem_repository::FilesystemRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::repository::repository_manager::RepositoryManager;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::repository::FilesystemRepository;
+use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryManager;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 
 pub struct RepositoryFactory;
 

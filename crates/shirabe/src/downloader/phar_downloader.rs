@@ -2,18 +2,18 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::archive_downloader::ArchiveDownloader;
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::downloader::file_downloader::FileDownloader;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::util::filesystem::Filesystem;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::downloader::ArchiveDownloader;
+use crate::downloader::DownloaderInterface;
+use crate::downloader::FileDownloader;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::util::Filesystem;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::Phar;
 
 #[derive(Debug)]

@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Installer/PackageEvent.php
 
 use crate::composer::Composer;
-use crate::dependency_resolver::operation::operation_interface::OperationInterface;
-use crate::event_dispatcher::event::Event;
-use crate::io::io_interface::IOInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::dependency_resolver::operation::OperationInterface;
+use crate::event_dispatcher::Event;
+use crate::io::IOInterface;
+use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 
 #[derive(Debug)]

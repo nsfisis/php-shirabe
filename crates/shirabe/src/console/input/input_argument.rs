@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::input_argument::InputArgument as BaseInputArgument;
+use shirabe_external_packages::symfony::console::input::InputArgument as BaseInputArgument;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

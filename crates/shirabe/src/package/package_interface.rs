@@ -4,8 +4,8 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::link::Link;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::Link;
+use crate::repository::RepositoryInterface;
 
 /// Defines the essential information a package has that is used during solving/installation
 ///
@@ -201,7 +201,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_suggests(&self) -> IndexMap<String, String>;
 
     /// PHP helper that switches on the link kind (require/require-dev/conflict/etc.).
-    fn get_links_for_type(&self, link_type: &str) -> IndexMap<String, crate::package::link::Link> {
+    fn get_links_for_type(&self, link_type: &str) -> IndexMap<String, crate::package::Link> {
         match link_type {
             "require" => self.get_requires(),
             "require-dev" => self.get_dev_requires(),
@@ -298,25 +298,21 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
         todo!()
     }
 
-    fn as_alias_package(&self) -> Option<&crate::package::alias_package::AliasPackage> {
+    fn as_alias_package(&self) -> Option<&crate::package::AliasPackage> {
         None
     }
 
     fn as_complete_package_interface(
         &self,
-    ) -> Option<&dyn crate::package::complete_package_interface::CompletePackageInterface> {
+    ) -> Option<&dyn crate::package::CompletePackageInterface> {
         None
     }
 
-    fn as_complete_package(
-        &self,
-    ) -> Option<&dyn crate::package::complete_package_interface::CompletePackageInterface> {
+    fn as_complete_package(&self) -> Option<&dyn crate::package::CompletePackageInterface> {
         None
     }
 
-    fn as_root_package_interface(
-        &self,
-    ) -> Option<&dyn crate::package::root_package_interface::RootPackageInterface> {
+    fn as_root_package_interface(&self) -> Option<&dyn crate::package::RootPackageInterface> {
         None
     }
 }

@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Installer/InstallerInterface.php
 
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepositoryInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 
 pub trait InstallerInterface: std::fmt::Debug {
     fn supports(&self, package_type: &str) -> bool;

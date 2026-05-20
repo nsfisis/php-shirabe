@@ -4,13 +4,13 @@ use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package::RootPackage;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::CompleteAliasPackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootPackage;
+use crate::package::RootPackageInterface;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct RootAliasPackage {

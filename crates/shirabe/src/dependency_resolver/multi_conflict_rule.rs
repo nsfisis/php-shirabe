@@ -2,9 +2,9 @@
 
 use shirabe_php_shim::PhpMixed;
 
-use crate::dependency_resolver::generic_rule::RuleLiterals;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule::{ReasonData, Rule, RuleBase};
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::RuleLiterals;
+use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use anyhow::Result;
 use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
 

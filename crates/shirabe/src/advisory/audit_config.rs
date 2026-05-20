@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
-use crate::advisory::auditor::Auditor;
+use crate::advisory::Auditor;
 use crate::config::Config;
 
 #[derive(Debug, Clone)]

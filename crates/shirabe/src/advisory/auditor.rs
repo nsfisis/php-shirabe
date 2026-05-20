@@ -3,24 +3,25 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
     array_keys, array_reduce, get_class, is_string, sprintf, str_starts_with,
 };
 
-use crate::advisory::ignored_security_advisory::IgnoredSecurityAdvisory;
-use crate::advisory::security_advisory::SecurityAdvisory;
-use crate::io::console_io::ConsoleIO;
-use crate::io::io_interface::IOInterface;
-use crate::json::json_file::JsonFile;
-use crate::package::base_package::{self, BasePackage};
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::advisory_provider_interface::PartialOrSecurityAdvisory;
-use crate::repository::repository_set::RepositorySet;
-use crate::util::package_info::PackageInfo;
+use crate::advisory::IgnoredSecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
+use crate::io::ConsoleIO;
+use crate::io::IOInterface;
+use crate::json::JsonFile;
+use crate::package::CompletePackageInterface;
+use crate::package::PackageInterface;
+use crate::package::base_package;
+use crate::package::base_package::BasePackage;
+use crate::repository::PartialOrSecurityAdvisory;
+use crate::repository::RepositorySet;
+use crate::util::PackageInfo;
 
 /// @internal
 #[derive(Debug)]

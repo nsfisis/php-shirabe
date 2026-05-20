@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use anyhow::bail;
 use shirabe_php_shim as php;
 
-use crate::constraint::bound::Bound;
-use crate::constraint::constraint_interface::ConstraintInterface;
+use crate::constraint::Bound;
+use crate::constraint::ConstraintInterface;
 
 #[derive(Debug)]
 pub struct Constraint {
@@ -403,7 +403,7 @@ impl ConstraintInterface for Constraint {
 
 impl std::fmt::Display for Constraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::constraint::constraint_interface::ConstraintInterface;
+        use crate::constraint::ConstraintInterface;
         write!(f, "{}", ConstraintInterface::__to_string(self))
     }
 }

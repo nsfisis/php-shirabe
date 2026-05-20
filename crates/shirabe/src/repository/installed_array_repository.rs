@@ -2,17 +2,17 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::advisory_provider_interface::AdvisoryProviderInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::repository_interface::{
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::repository::AdvisoryProviderInterface;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::WritableArrayRepository;
+use crate::repository::WritableRepositoryInterface;
+use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
-use crate::repository::writable_array_repository::WritableArrayRepository;
-use crate::repository::writable_repository_interface::WritableRepositoryInterface;
 
 #[derive(Debug)]
 pub struct InstalledArrayRepository {
@@ -49,28 +49,26 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &crate::installer::installation_manager::InstallationManager,
+        installation_manager: &crate::installer::InstallationManager,
     ) -> anyhow::Result<()> {
         todo!()
     }
 
     fn add_package(
         &mut self,
-        package: Box<dyn crate::package::package_interface::PackageInterface>,
+        package: Box<dyn crate::package::PackageInterface>,
     ) -> anyhow::Result<()> {
         todo!()
     }
 
     fn remove_package(
         &mut self,
-        package: &dyn crate::package::package_interface::PackageInterface,
+        package: &dyn crate::package::PackageInterface,
     ) -> anyhow::Result<()> {
         todo!()
     }
 
-    fn get_canonical_packages(
-        &self,
-    ) -> Vec<Box<dyn crate::package::package_interface::PackageInterface>> {
+    fn get_canonical_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
         todo!()
     }
 

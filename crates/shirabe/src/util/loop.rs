@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Util/Loop.php
 
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::process_executor::ProcessExecutor;
+use crate::util::HttpDownloader;
+use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::symfony::component::console::helper::progress_bar::ProgressBar;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::symfony::component::console::helper::ProgressBar;
 use shirabe_php_shim::microtime;
 
 pub struct Loop {

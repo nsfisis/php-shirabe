@@ -2,11 +2,11 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::component::process::ExecutableFinder;
 use shirabe_php_shim::{
     CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD,
     FILTER_VALIDATE_BOOLEAN, INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER,
@@ -18,37 +18,37 @@ use shirabe_php_shim::{
     str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::Auditor;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::downloader::transport_exception::TransportException;
+use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::buffer_io::BufferIO;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::json::json_file::JsonFile;
-use crate::json::json_validation_exception::JsonValidationException;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::locker::Locker;
-use crate::package::root_package::RootPackage;
-use crate::package::version::version_parser::VersionParser;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::composer_repository::ComposerRepository;
-use crate::repository::filesystem_repository::FilesystemRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_set::RepositorySet;
-use crate::self_update::keys::Keys;
-use crate::self_update::versions::Versions;
-use crate::util::config_validator::ConfigValidator;
-use crate::util::git::Git;
-use crate::util::http::proxy_manager::ProxyManager;
-use crate::util::http::request_proxy::RequestProxy;
-use crate::util::http_downloader::HttpDownloader;
-use crate::util::ini_helper::IniHelper;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
+use crate::io::BufferIO;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::json::JsonFile;
+use crate::json::JsonValidationException;
+use crate::package::CompletePackageInterface;
+use crate::package::Locker;
+use crate::package::RootPackage;
+use crate::package::version::VersionParser;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::ComposerRepository;
+use crate::repository::FilesystemRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositorySet;
+use crate::self_update::Keys;
+use crate::self_update::Versions;
+use crate::util::ConfigValidator;
+use crate::util::Git;
+use crate::util::HttpDownloader;
+use crate::util::IniHelper;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
+use crate::util::http::ProxyManager;
+use crate::util::http::RequestProxy;
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
@@ -164,11 +164,12 @@ impl DiagnoseCommand {
             .map(|(k, v)| (k, *v))
             .collect();
         let platform_repo = PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
-        let php_pkg = <PlatformRepository as crate::repository::repository_interface::RepositoryInterface>::find_package(
+        let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
             &platform_repo,
             "php",
-            crate::repository::repository_interface::FindPackageConstraint::String("*".to_string()),
-        ).unwrap();
+            crate::repository::FindPackageConstraint::String("*".to_string()),
+        )
+        .unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
         if let Some(cp) = php_pkg.as_complete_package_interface() {
             if str_contains(&cp.get_description().unwrap_or_default(), "overridden") {
@@ -937,9 +938,8 @@ impl DiagnoseCommand {
             self.http_downloader.clone().unwrap(),
             None,
         )?;
-        let composer_repo_as_repo: Box<
-            dyn crate::repository::repository_interface::RepositoryInterface,
-        > = todo!("ComposerRepository as RepositoryInterface");
+        let composer_repo_as_repo: Box<dyn crate::repository::RepositoryInterface> =
+            todo!("ComposerRepository as RepositoryInterface");
         repo_set.add_repository(composer_repo_as_repo)?;
 
         let mut io = BufferIO::new(String::new(), 0, None)?;

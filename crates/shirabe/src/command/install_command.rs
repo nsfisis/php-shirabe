@@ -1,19 +1,19 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
-use crate::advisory::auditor::Auditor;
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::advisory::Auditor;
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::installer::Installer;
-use crate::io::io_interface::IOInterface;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::util::http_downloader::HttpDownloader;
+use crate::io::IOInterface;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct InstallCommand {

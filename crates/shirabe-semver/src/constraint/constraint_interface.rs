@@ -1,6 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/ConstraintInterface.php
 
-use crate::constraint::bound::Bound;
+use crate::constraint::Bound;
 
 pub trait ConstraintInterface: std::fmt::Debug {
     fn matches(&self, provider: &dyn ConstraintInterface) -> bool;

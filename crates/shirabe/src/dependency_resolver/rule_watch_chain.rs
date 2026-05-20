@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchChain.php
 
-use crate::dependency_resolver::rule_watch_node::RuleWatchNode;
+use crate::dependency_resolver::RuleWatchNode;
 
 /// An extension of SplDoublyLinkedList with seek and removal of current element.
 #[derive(Debug)]

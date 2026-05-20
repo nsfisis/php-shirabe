@@ -3,19 +3,19 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
     array_reverse, array_shift, dirname, get_class, implode, in_array, preg_quote, rtrim, sprintf,
     str_replace, strtolower, usort,
 };
 
-use crate::downloader::downloader_interface::DownloaderInterface;
-use crate::exception::irrecoverable_download_exception::IrrecoverableDownloadException;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::util::filesystem::Filesystem;
+use crate::downloader::DownloaderInterface;
+use crate::exception::IrrecoverableDownloadException;
+use crate::io::IOInterface;
+use crate::package::PackageInterface;
+use crate::util::Filesystem;
 
 /// Downloaders manager.
 #[derive(Debug)]

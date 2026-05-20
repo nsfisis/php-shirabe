@@ -2,23 +2,23 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
 
-use crate::package::base_package::BasePackage;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::root_package_interface::RootPackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::{
+use crate::package::BasePackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::RootPackageInterface;
+use crate::package::version::VersionParser;
+use crate::repository::CompositeRepository;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::RootPackageRepository;
+use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
-use crate::repository::root_package_repository::RootPackageRepository;
 
 pub enum NeedleInput {
     Single(String),

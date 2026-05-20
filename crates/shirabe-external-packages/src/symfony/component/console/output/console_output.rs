@@ -1,5 +1,5 @@
-use crate::symfony::component::console::formatter::output_formatter::OutputFormatter;
-use crate::symfony::component::console::output::output_interface::OutputInterface;
+use crate::symfony::component::console::formatter::OutputFormatter;
+use crate::symfony::component::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ConsoleOutput;

@@ -4,33 +4,33 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::input_interface::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::OutputInterface;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::component::console::input::InputInterface;
+use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, get_debug_type};
 
-use crate::command::base_command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::Composer;
 use crate::config::Config;
-use crate::console::input::input_argument::InputArgument;
-use crate::console::input::input_option::InputOption;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::io_interface::IOInterface;
-use crate::package::archiver::archive_manager::ArchiveManager;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::package::version::version_selector::VersionSelector;
-use crate::plugin::command_event::CommandEvent;
-use crate::plugin::plugin_events::PluginEvents;
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::repository_factory::RepositoryFactory;
-use crate::repository::repository_set::RepositorySet;
-use crate::script::script_events::ScriptEvents;
-use crate::util::filesystem::Filesystem;
+use crate::io::IOInterface;
+use crate::package::BasePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::archiver::ArchiveManager;
+use crate::package::version::VersionParser;
+use crate::package::version::VersionSelector;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
+use crate::repository::CompositeRepository;
+use crate::repository::RepositoryFactory;
+use crate::repository::RepositorySet;
+use crate::script::ScriptEvents;
+use crate::util::Filesystem;
+use crate::util::Platform;
+use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
-use crate::util::platform::Platform;
-use crate::util::process_executor::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct ArchiveCommand {
@@ -245,9 +245,8 @@ impl ArchiveCommand {
 
         if let Some(composer) = self.try_composer(None, None) {
             let local_repo = composer.get_repository_manager().get_local_repository();
-            let mut repos: Vec<
-                Box<dyn crate::repository::repository_interface::RepositoryInterface>,
-            > = vec![local_repo.clone_box()];
+            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
+                vec![local_repo.clone_box()];
             repos.extend(
                 composer
                     .get_repository_manager()
@@ -301,12 +300,11 @@ impl ArchiveCommand {
         );
         repo_set.add_repository(Box::new(repo))?;
         let parser = VersionParser::new();
-        let constraint: Option<
-            Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>,
-        > = match version.as_deref() {
-            Some(v) => Some(parser.parse_constraints(v)?.clone_box()),
-            None => None,
-        };
+        let constraint: Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>> =
+            match version.as_deref() {
+                Some(v) => Some(parser.parse_constraints(v)?.clone_box()),
+                None => None,
+            };
         let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0);
 
         let package = if packages.len() > 1 {

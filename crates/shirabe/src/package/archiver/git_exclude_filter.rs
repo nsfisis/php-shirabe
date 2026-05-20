@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
-use crate::package::archiver::base_exclude_filter::BaseExcludeFilterBase;
-use shirabe_external_packages::composer::pcre::preg::Preg;
+use crate::package::archiver::BaseExcludeFilterBase;
+use shirabe_external_packages::composer::pcre::Preg;
 use std::path::Path;
 
 pub struct GitExcludeFilter {

@@ -2,14 +2,14 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, spl_object_hash, strtolower};
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
 
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::canonical_packages_trait::CanonicalPackagesTrait;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::repository::CanonicalPackagesTrait;
+use crate::repository::LockArrayRepository;
+use crate::repository::RepositoryInterface;
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
 pub const UPDATE_ONLY_LISTED: i64 = 0;

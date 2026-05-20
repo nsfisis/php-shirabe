@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Installer/ProjectInstaller.php
 
-use crate::downloader::download_manager::DownloadManager;
-use crate::installer::installer_interface::InstallerInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::util::filesystem::Filesystem;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use crate::downloader::DownloadManager;
+use crate::installer::InstallerInterface;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepositoryInterface;
+use crate::util::Filesystem;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]

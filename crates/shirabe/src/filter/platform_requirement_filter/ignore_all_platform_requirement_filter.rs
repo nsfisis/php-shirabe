@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreAllPlatformRequirementFilter.php
 
-use crate::filter::platform_requirement_filter::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
-use crate::repository::platform_repository::PlatformRepository;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::repository::PlatformRepository;
 
 #[derive(Debug)]
 pub struct IgnoreAllPlatformRequirementFilter;

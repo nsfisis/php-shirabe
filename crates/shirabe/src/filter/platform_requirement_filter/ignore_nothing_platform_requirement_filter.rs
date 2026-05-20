@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreNothingPlatformRequirementFilter.php
 
-use super::platform_requirement_filter_interface::PlatformRequirementFilterInterface;
+use super::PlatformRequirementFilterInterface;
 
 #[derive(Debug)]
 pub struct IgnoreNothingPlatformRequirementFilter;

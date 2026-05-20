@@ -6,18 +6,18 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort, spl_object_hash};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
 
-use crate::dependency_resolver::policy_interface::PolicyInterface;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::request::Request;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
+use crate::dependency_resolver::PolicyInterface;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Request;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
 
 /// Optimizes a given pool
 #[derive(Debug)]
@@ -379,7 +379,7 @@ impl PoolOptimizer {
     fn calculate_dependency_hash(&self, package: &dyn BasePackage) -> String {
         let mut hash = String::new();
 
-        let hash_relevant_links: Vec<(&str, Vec<crate::package::link::Link>)> = vec![
+        let hash_relevant_links: Vec<(&str, Vec<crate::package::Link>)> = vec![
             (
                 "requires",
                 package.get_requires().values().cloned().collect(),

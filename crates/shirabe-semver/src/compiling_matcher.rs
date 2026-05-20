@@ -5,8 +5,8 @@ use std::sync::OnceLock;
 
 use indexmap::IndexMap;
 
-use crate::constraint::constraint::Constraint;
-use crate::constraint::constraint_interface::ConstraintInterface;
+use crate::constraint::Constraint;
+use crate::constraint::ConstraintInterface;
 
 static COMPILED_CHECKER_CACHE: OnceLock<
     Mutex<IndexMap<String, Box<dyn Fn(String, bool) -> bool + Send + Sync>>>,

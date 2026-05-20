@@ -8,37 +8,35 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_merge, array_merge_recursive, ksort,
     strtolower,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
-use shirabe_semver::constraint::match_all_constraint::MatchAllConstraint;
-use shirabe_semver::constraint::multi_constraint::MultiConstraint;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::MultiConstraint;
 
-use crate::advisory::partial_security_advisory::PartialSecurityAdvisory;
-use crate::advisory::security_advisory::SecurityAdvisory;
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::pool_builder::PoolBuilder;
-use crate::dependency_resolver::pool_optimizer::PoolOptimizer;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::security_advisory_pool_filter::SecurityAdvisoryPoolFilter;
-use crate::downloader::transport_exception::TransportException;
-use crate::event_dispatcher::event_dispatcher::EventDispatcher;
-use crate::io::io_interface::IOInterface;
-use crate::io::null_io::NullIO;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::complete_alias_package::CompleteAliasPackage;
-use crate::package::complete_package::CompletePackage;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::stability_filter::StabilityFilter;
-use crate::repository::advisory_provider_interface::{
-    AdvisoryProviderInterface, PartialOrSecurityAdvisory,
-};
-use crate::repository::composite_repository::CompositeRepository;
-use crate::repository::installed_repository::InstalledRepository;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
-use crate::repository::lock_array_repository::LockArrayRepository;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::{FindPackageConstraint, RepositoryInterface};
+use crate::advisory::PartialSecurityAdvisory;
+use crate::advisory::SecurityAdvisory;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::PoolBuilder;
+use crate::dependency_resolver::PoolOptimizer;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::downloader::TransportException;
+use crate::event_dispatcher::EventDispatcher;
+use crate::io::IOInterface;
+use crate::io::NullIO;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::CompleteAliasPackage;
+use crate::package::CompletePackage;
+use crate::package::PackageInterface;
+use crate::package::version::StabilityFilter;
+use crate::repository::CompositeRepository;
+use crate::repository::InstalledRepository;
+use crate::repository::InstalledRepositoryInterface;
+use crate::repository::LockArrayRepository;
+use crate::repository::PlatformRepository;
+use crate::repository::{AdvisoryProviderInterface, PartialOrSecurityAdvisory};
+use crate::repository::{FindPackageConstraint, RepositoryInterface};
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {
@@ -124,7 +122,7 @@ impl RepositorySet {
 
         let mut acceptable_stabilities: IndexMap<String, i64> = IndexMap::new();
         // PHP: foreach (BasePackage::STABILITIES as $stability => $value)
-        let stabilities = crate::package::base_package::STABILITIES.clone();
+        let stabilities = crate::package::STABILITIES.clone();
         let min_value = *stabilities.get(minimum_stability).unwrap_or(&0);
         for (stability, value) in stabilities.iter() {
             if *value <= min_value {
@@ -233,7 +231,7 @@ impl RepositorySet {
                 name_map.insert(name.to_string(), constraint.as_ref().map(|c| c.clone_box()));
                 let acceptable = if ignore_stability {
                     // PHP: BasePackage::STABILITIES
-                    crate::package::base_package::STABILITIES
+                    crate::package::STABILITIES
                         .iter()
                         .map(|(k, v)| (k.to_string(), *v))
                         .collect()
@@ -252,7 +250,7 @@ impl RepositorySet {
                     IndexMap::new(),
                 );
 
-                packages.push(result.packages);
+                packages.push(result.packages.into_values().collect());
                 for name_found in result.names_found {
                     // avoid loading the same package again from other repositories once it has been found
                     if name == name_found {
@@ -419,9 +417,8 @@ impl RepositorySet {
     pub fn get_providers(
         &self,
         package_name: &str,
-    ) -> IndexMap<String, crate::repository::repository_interface::ProviderInfo> {
-        let mut providers: IndexMap<String, crate::repository::repository_interface::ProviderInfo> =
-            IndexMap::new();
+    ) -> IndexMap<String, crate::repository::ProviderInfo> {
+        let mut providers: IndexMap<String, crate::repository::ProviderInfo> = IndexMap::new();
         for repository in &self.repositories {
             let repo_providers = repository.get_providers(package_name.to_string());
             if !repo_providers.is_empty() {

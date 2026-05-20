@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/IO/BaseIO.php
 
 use crate::config::Config;
+use crate::io::IOInterface;
 use crate::io::io_interface;
-use crate::io::io_interface::IOInterface;
-use crate::util::process_executor::ProcessExecutor;
-use crate::util::silencer::Silencer;
+use crate::util::ProcessExecutor;
+use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_external_packages::composer::pcre::preg::Preg;
-use shirabe_external_packages::psr::log::log_level::LogLevel;
+use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::psr::log::LogLevel;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
     UnexpectedValueException, array_merge, in_array, json_encode_ex,

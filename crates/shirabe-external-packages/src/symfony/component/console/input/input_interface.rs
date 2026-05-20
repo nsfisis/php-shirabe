@@ -11,7 +11,7 @@ pub trait InputInterface {
     ) -> PhpMixed;
     fn bind(
         &mut self,
-        definition: &crate::symfony::component::console::input::input_definition::InputDefinition,
+        definition: &crate::symfony::component::console::input::InputDefinition,
     ) -> anyhow::Result<()>;
     fn validate(&self) -> anyhow::Result<()>;
     fn get_arguments(&self) -> indexmap::IndexMap<String, PhpMixed>;

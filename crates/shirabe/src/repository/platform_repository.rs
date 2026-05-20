@@ -4,28 +4,28 @@ use std::sync::{LazyLock, Mutex};
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::composer::xdebug_handler::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn, array_slice,
     array_slice_strs, explode, get_class, implode, in_array, is_string, sprintf, str_replace,
     str_starts_with, strpos, strtolower, var_export,
 };
-use shirabe_semver::constraint::constraint::Constraint;
+use shirabe_semver::constraint::Constraint;
 
 use crate::composer::Composer;
-use crate::package::complete_package::CompletePackage;
-use crate::package::complete_package_interface::CompletePackageInterface;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::platform::hhvm_detector::HhvmDetector;
-use crate::platform::runtime::Runtime;
-use crate::platform::version::Version;
+use crate::package::CompletePackage;
+use crate::package::CompletePackageInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
+use crate::platform::HhvmDetector;
+use crate::platform::Runtime;
+use crate::platform::Version;
 use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::repository::array_repository::ArrayRepository;
-use crate::repository::repository_interface::RepositoryInterface;
-use crate::util::silencer::Silencer;
+use crate::repository::ArrayRepository;
+use crate::repository::RepositoryInterface;
+use crate::util::Silencer;
 
 static LAST_SEEN_PLATFORM_PHP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
 
@@ -1609,9 +1609,7 @@ impl PlatformRepository {
 
             let overrider = self.inner.find_package(
                 package.get_name(),
-                crate::repository::repository_interface::FindPackageConstraint::String(
-                    "*".to_string(),
-                ),
+                crate::repository::FindPackageConstraint::String("*".to_string()),
             );
             let actual_text = if let Some(ref ov) = overrider {
                 if package.get_version() == ov.get_version() {
@@ -1879,9 +1877,9 @@ impl PlatformRepository {
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Vec<crate::repository::repository_interface::SearchResult> {
+    ) -> Vec<crate::repository::SearchResult> {
         // suppress vendor search as there are no vendors to match in platform packages
-        if mode == crate::repository::repository_interface::SEARCH_VENDOR {
+        if mode == crate::repository::SEARCH_VENDOR {
             return Vec::new();
         }
 
@@ -1936,7 +1934,7 @@ impl shirabe_php_shim::Countable for PlatformRepository {
     }
 }
 
-impl crate::repository::repository_interface::RepositoryInterface for PlatformRepository {
+impl crate::repository::RepositoryInterface for PlatformRepository {
     fn has_package(&self, package: &dyn PackageInterface) -> bool {
         self.inner.has_package(package)
     }
@@ -1944,20 +1942,20 @@ impl crate::repository::repository_interface::RepositoryInterface for PlatformRe
     fn find_package(
         &self,
         name: &str,
-        constraint: crate::repository::repository_interface::FindPackageConstraint,
-    ) -> Option<Box<dyn crate::package::base_package::BasePackage>> {
+        constraint: crate::repository::FindPackageConstraint,
+    ) -> Option<Box<dyn crate::package::BasePackage>> {
         self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
         &self,
         name: &str,
-        constraint: Option<crate::repository::repository_interface::FindPackageConstraint>,
-    ) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
+        constraint: Option<crate::repository::FindPackageConstraint>,
+    ) -> Vec<Box<dyn crate::package::BasePackage>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn crate::package::base_package::BasePackage>> {
+    fn get_packages(&self) -> Vec<Box<dyn crate::package::BasePackage>> {
         self.inner.get_packages()
     }
 
@@ -1965,12 +1963,12 @@ impl crate::repository::repository_interface::RepositoryInterface for PlatformRe
         &self,
         package_name_map: IndexMap<
             String,
-            Option<Box<dyn shirabe_semver::constraint::constraint_interface::ConstraintInterface>>,
+            Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
         >,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
-    ) -> crate::repository::repository_interface::LoadPackagesResult {
+    ) -> crate::repository::LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -1984,14 +1982,14 @@ impl crate::repository::repository_interface::RepositoryInterface for PlatformRe
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Vec<crate::repository::repository_interface::SearchResult> {
+    ) -> Vec<crate::repository::SearchResult> {
         self.inner.search(query, mode, r#type)
     }
 
     fn get_providers(
         &self,
         package_name: String,
-    ) -> IndexMap<String, crate::repository::repository_interface::ProviderInfo> {
+    ) -> IndexMap<String, crate::repository::ProviderInfo> {
         self.inner.get_providers(package_name)
     }
 

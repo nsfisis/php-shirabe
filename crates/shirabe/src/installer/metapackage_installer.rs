@@ -1,15 +1,15 @@
 //! ref: composer/src/Composer/Installer/MetapackageInstaller.php
 
-use crate::dependency_resolver::operation::install_operation::InstallOperation;
-use crate::dependency_resolver::operation::uninstall_operation::UninstallOperation;
-use crate::dependency_resolver::operation::update_operation::UpdateOperation;
-use crate::installer::installer_interface::InstallerInterface;
+use crate::dependency_resolver::operation::InstallOperation;
+use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::UpdateOperation;
+use crate::installer::InstallerInterface;
+use crate::io::IOInterface;
 use crate::io::io_interface;
-use crate::io::io_interface::IOInterface;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::installed_repository_interface::InstalledRepositoryInterface;
+use crate::package::PackageInterface;
+use crate::repository::InstalledRepositoryInterface;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
+use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]

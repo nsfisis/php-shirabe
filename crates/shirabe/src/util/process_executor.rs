@@ -5,14 +5,14 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
-use shirabe_external_packages::composer::pcre::preg::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::promise::Promise;
-use shirabe_external_packages::react::promise::promise_interface::PromiseInterface;
-use shirabe_external_packages::seld::signal::signal_handler::SignalHandler;
-use shirabe_external_packages::symfony::component::process::exception::process_signaled_exception::ProcessSignaledException;
-use shirabe_external_packages::symfony::component::process::exception::runtime_exception::RuntimeException as SymfonyProcessRuntimeException;
-use shirabe_external_packages::symfony::component::process::executable_finder::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::process::Process;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::react::promise::Promise;
+use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_external_packages::symfony::component::process::ExecutableFinder;
+use shirabe_external_packages::symfony::component::process::Process;
+use shirabe_external_packages::symfony::component::process::exception::ProcessSignaledException;
+use shirabe_external_packages::symfony::component::process::exception::RuntimeException as SymfonyProcessRuntimeException;
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
     defined, escapeshellarg, explode, implode, in_array, is_array, is_callable, is_dir, is_numeric,
@@ -20,9 +20,9 @@ use shirabe_php_shim::{
     substr_replace, trim, usleep,
 };
 
-use crate::io::io_interface::IOInterface;
-use crate::util::github::GitHub;
-use crate::util::platform::Platform;
+use crate::io::IOInterface;
+use crate::util::GitHub;
+use crate::util::Platform;
 
 static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));

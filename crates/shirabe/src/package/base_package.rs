@@ -5,10 +5,10 @@ use std::sync::LazyLock;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, UnexpectedValueException, preg_quote};
 
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_interface::RepositoryInterface;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
 
 pub struct SupportedLinkType {
     pub description: &'static str,
@@ -93,7 +93,7 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
 
     // as_alias_package / as_complete_package_interface inherited from PackageInterface.
 
-    fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::alias_package::AliasPackage> {
+    fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::AliasPackage> {
         None
     }
 

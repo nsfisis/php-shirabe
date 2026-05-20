@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Repository/Vcs/VcsDriverInterface.php
 
 use crate::config::Config;
-use crate::io::io_interface::IOInterface;
+use crate::io::IOInterface;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

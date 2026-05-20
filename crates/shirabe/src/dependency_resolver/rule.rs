@@ -8,20 +8,20 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, abs, array_filter, array_keys, array_shift, array_values, implode,
     is_object,
 };
-use shirabe_semver::constraint::constraint::Constraint;
-use shirabe_semver::constraint::constraint_interface::ConstraintInterface;
+use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::ConstraintInterface;
 
-use crate::dependency_resolver::pool::Pool;
-use crate::dependency_resolver::problem::Problem;
-use crate::dependency_resolver::request::Request;
-use crate::dependency_resolver::rule_set::RuleSet;
-use crate::package::alias_package::AliasPackage;
-use crate::package::base_package::BasePackage;
-use crate::package::link::Link;
-use crate::package::package_interface::PackageInterface;
-use crate::package::version::version_parser::VersionParser;
-use crate::repository::platform_repository::PlatformRepository;
-use crate::repository::repository_set::RepositorySet;
+use crate::dependency_resolver::Pool;
+use crate::dependency_resolver::Problem;
+use crate::dependency_resolver::Request;
+use crate::dependency_resolver::RuleSet;
+use crate::package::AliasPackage;
+use crate::package::BasePackage;
+use crate::package::Link;
+use crate::package::PackageInterface;
+use crate::package::version::VersionParser;
+use crate::repository::PlatformRepository;
+use crate::repository::RepositorySet;
 
 /// PHP: @phpstan-type ReasonData = Link|BasePackage|string|int|array{...}|array{...}
 /// We model this as an enum.
@@ -89,9 +89,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
 
     /// PHP: `$rule instanceof MultiConflictRule`. Returns a borrow of the
     /// underlying `MultiConflictRule` when this rule is one, otherwise `None`.
-    fn as_multi_conflict(
-        &self,
-    ) -> Option<&crate::dependency_resolver::multi_conflict_rule::MultiConflictRule> {
+    fn as_multi_conflict(&self) -> Option<&crate::dependency_resolver::MultiConflictRule> {
         None
     }
 
