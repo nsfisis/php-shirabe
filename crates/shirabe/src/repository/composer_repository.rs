@@ -265,7 +265,7 @@ impl ComposerRepository {
         let loader = ArrayLoader::new(Some(version_parser.clone()), true);
 
         let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-            std::rc::Rc::clone(&http_downloader),
+            http_downloader.clone(),
             None,
         )));
 
@@ -2949,7 +2949,7 @@ impl ComposerRepository {
                     let mut dispatcher = dispatcher.borrow_mut();
                     let mut pre_file_download_event = PreFileDownloadEvent::new(
                         PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                        std::rc::Rc::clone(&self.http_downloader),
+                        self.http_downloader.clone(),
                         filename.clone(),
                         "metadata".to_string(),
                         {
@@ -3144,7 +3144,7 @@ impl ComposerRepository {
                 let mut dispatcher = dispatcher.borrow_mut();
                 let mut pre_file_download_event = PreFileDownloadEvent::new(
                     PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                    std::rc::Rc::clone(&self.http_downloader),
+                    self.http_downloader.clone(),
                     filename.clone(),
                     "metadata".to_string(),
                     {
@@ -3312,7 +3312,7 @@ impl ComposerRepository {
             let mut dispatcher = dispatcher.borrow_mut();
             let mut pre_file_download_event = PreFileDownloadEvent::new(
                 PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
-                std::rc::Rc::clone(&self.http_downloader),
+                self.http_downloader.clone(),
                 filename.clone(),
                 "metadata".to_string(),
                 {

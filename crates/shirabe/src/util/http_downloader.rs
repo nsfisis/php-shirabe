@@ -124,7 +124,7 @@ impl HttpDownloader {
         let curl = if Self::is_curl_enabled() {
             Some(CurlDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
+                config.clone(),
                 options.clone(),
                 disable_tls,
             ))
@@ -134,7 +134,7 @@ impl HttpDownloader {
 
         let rfs = Some(RemoteFilesystem::new(
             io.clone_box(),
-            std::rc::Rc::clone(&config),
+            config.clone(),
             options.clone(),
             disable_tls,
             None,

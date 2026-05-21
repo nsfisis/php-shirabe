@@ -72,7 +72,7 @@ impl PathRepository {
         });
         let version_guesser = VersionGuesser::new(
             config,
-            std::rc::Rc::clone(&process),
+            process.clone(),
             VersionParser::new(),
             Some(io.clone_box()),
         );

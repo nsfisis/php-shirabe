@@ -829,7 +829,7 @@ impl Perforce {
     pub fn get_filesystem(&mut self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>> {
         if self.filesystem.is_none() {
             self.filesystem = Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
-                Some(std::rc::Rc::clone(&self.process)),
+                Some(self.process.clone()),
             ))));
         }
 

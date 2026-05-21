@@ -44,7 +44,7 @@ impl PathDownloader {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-        cache: Option<Cache>,
+        cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -389,8 +389,8 @@ impl PathDownloader {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
-            std::rc::Rc::clone(&self.inner.config),
-            std::rc::Rc::clone(&self.inner.process),
+            self.inner.config.clone(),
+            self.inner.process.clone(),
             parser.clone(),
             Some(self.inner.io.clone_box()),
         );

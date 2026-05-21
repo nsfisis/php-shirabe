@@ -387,8 +387,8 @@ impl Git {
                 if !self.io.has_authentication(&m1) {
                     let mut git_hub_util = GitHub::new(
                         self.io.clone_box(),
-                        std::rc::Rc::clone(&self.config),
-                        Some(std::rc::Rc::clone(&self.process)),
+                        self.config.clone(),
+                        Some(self.process.clone()),
                         self.http_downloader.clone(),
                     )?;
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
@@ -449,8 +449,8 @@ impl Git {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
                     self.io.clone_box(),
-                    std::rc::Rc::clone(&self.config),
-                    Some(std::rc::Rc::clone(&self.process)),
+                    self.config.clone(),
+                    Some(self.process.clone()),
                     self.http_downloader.clone(),
                     None,
                 )?;
@@ -614,8 +614,8 @@ impl Git {
                 if !self.io.has_authentication(&m2) {
                     let mut git_lab_util = GitLab::new(
                         self.io.clone_box(),
-                        std::rc::Rc::clone(&self.config),
-                        Some(std::rc::Rc::clone(&self.process)),
+                        self.config.clone(),
+                        Some(self.process.clone()),
                         self.http_downloader.clone(),
                     )?;
                     let message =
@@ -768,7 +768,7 @@ impl Git {
                         self.io
                             .set_authentication(m2.clone(), username, Some(password));
                         let mut auth_helper =
-                            AuthHelper::new(self.io.clone_box(), std::rc::Rc::clone(&self.config));
+                            AuthHelper::new(self.io.clone_box(), self.config.clone());
                         let store_auth_enum = match &store_auth {
                             PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
                             PhpMixed::Bool(b) => StoreAuth::Bool(*b),

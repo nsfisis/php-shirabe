@@ -118,8 +118,8 @@ impl GitDriver {
 
             let mut git_util = GitUtil::new(
                 self.inner.io.clone_box(),
-                std::rc::Rc::clone(&self.inner.config),
-                std::rc::Rc::clone(&self.inner.process),
+                self.inner.config.clone(),
+                self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !git_util.sync_mirror(&self.inner.url, &self.repo_dir)? {
@@ -184,8 +184,8 @@ impl GitDriver {
 
             let mut git_util = GitUtil::new(
                 self.inner.io.clone_box(),
-                std::rc::Rc::clone(&self.inner.config),
-                std::rc::Rc::clone(&self.inner.process),
+                self.inner.config.clone(),
+                self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
@@ -451,7 +451,7 @@ impl GitDriver {
         let mut git_util = GitUtil::new(
             io.clone_box(),
             todo!(),
-            std::rc::Rc::clone(&process),
+            process.clone(),
             std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
         );
         GitUtil::clean_env(&process);

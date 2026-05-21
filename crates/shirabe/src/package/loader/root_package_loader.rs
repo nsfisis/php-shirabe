@@ -46,7 +46,7 @@ impl RootPackageLoader {
             let mut process_executor = ProcessExecutor::new(io.as_deref().map(|i| i.clone_box()));
             process_executor.enable_async();
             VersionGuesser::new(
-                std::rc::Rc::clone(&config),
+                config.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(process_executor)),
                 inner.version_parser.clone(),
                 io.as_ref().map(|i| i.clone_box()),
@@ -280,7 +280,7 @@ impl RootPackageLoader {
 
         let repos = RepositoryFactory::default_repos(
             None,
-            Some(std::rc::Rc::clone(&self.config)),
+            Some(self.config.clone()),
             Some(&mut *self.manager.borrow_mut()),
         )?;
         for (_, repo) in repos {

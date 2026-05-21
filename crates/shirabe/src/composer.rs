@@ -451,9 +451,7 @@ impl PartialComposerHandle {
     /// Downcast to a full Composer handle. PHP `$composer instanceof Composer`.
     pub fn as_full(&self) -> Option<ComposerHandle> {
         if self.0.borrow().is_full() {
-            Some(ComposerHandle::from_rc_unchecked(std::rc::Rc::clone(
-                &self.0,
-            )))
+            Some(ComposerHandle::from_rc_unchecked(self.0.clone()))
         } else {
             None
         }
@@ -507,7 +505,7 @@ impl ComposerHandle {
     }
 
     pub fn upcast(&self) -> PartialComposerHandle {
-        PartialComposerHandle::from_rc(std::rc::Rc::clone(&self.0))
+        PartialComposerHandle::from_rc(self.0.clone())
     }
 
     pub fn downgrade(&self) -> ComposerWeakHandle {

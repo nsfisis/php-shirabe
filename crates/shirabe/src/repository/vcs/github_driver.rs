@@ -1016,9 +1016,9 @@ impl GitHubDriver {
             Err(e) => {
                 let mut git_hub_util = GitHub::new(
                     self.inner.io.clone_box(),
-                    std::rc::Rc::clone(&self.inner.config),
-                    Some(std::rc::Rc::clone(&self.inner.process)),
-                    Some(std::rc::Rc::clone(&self.inner.http_downloader)),
+                    self.inner.config.clone(),
+                    Some(self.inner.process.clone()),
+                    Some(self.inner.http_downloader.clone()),
                 )
                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
@@ -1296,8 +1296,8 @@ impl GitHubDriver {
             repo_config,
             self.inner.io.clone_box(),
             self.inner.config.clone(),
-            std::rc::Rc::clone(&self.inner.http_downloader),
-            std::rc::Rc::clone(&self.inner.process),
+            self.inner.http_downloader.clone(),
+            self.inner.process.clone(),
         );
         git_driver.initialize()?;
         self.git_driver = Some(git_driver);

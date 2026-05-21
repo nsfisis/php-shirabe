@@ -31,7 +31,7 @@ impl RarDownloader {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-        cache: Option<Cache>,
+        cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {

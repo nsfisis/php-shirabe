@@ -65,7 +65,7 @@ pub struct FileDownloader {
     /// @var Filesystem
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var ?Cache
-    pub(crate) cache: Option<Cache>,
+    pub(crate) cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
     /// @var ?EventDispatcher
     pub(crate) event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     /// @var ProcessExecutor
@@ -93,7 +93,7 @@ impl FileDownloader {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-        cache: Option<Cache>,
+        cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
@@ -104,7 +104,7 @@ impl FileDownloader {
         });
         let filesystem = filesystem.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
-                std::rc::Rc::clone(&process),
+                process.clone(),
             ))))
         });
 
@@ -120,10 +120,10 @@ impl FileDownloader {
             additional_cleanup_paths: IndexMap::new(),
         };
 
-        if this.cache.is_some() && this.cache.as_ref().unwrap().gc_is_necessary() {
+        if this.cache.is_some() && this.cache.as_ref().unwrap().borrow().gc_is_necessary() {
             // PHP: writeError('Running cache garbage collection', true, io_interface::VERY_VERBOSE)
             this.io.write_error("Running cache garbage collection");
-            this.cache.as_mut().unwrap().gc(
+            this.cache.as_ref().unwrap().borrow_mut().gc(
                 this.config
                     .borrow_mut()
                     .get("cache-files-ttl")
@@ -496,7 +496,7 @@ impl FileDownloader {
                 .get(package.get_name())
                 .unwrap()
                 .clone();
-            self.cache.as_mut().unwrap().remove(&key);
+            self.cache.as_ref().unwrap().borrow_mut().remove(&key);
             self.last_cache_writes.shift_remove(package.get_name());
         }
     }

@@ -728,14 +728,10 @@ impl CreateProjectCommand {
             // TODO(phase-b): default_repos needs &mut RepositoryManager but we hold &RepositoryManager.
             let _ = rm;
             repository_set.add_repository(Box::new(CompositeRepository::new(
-                RepositoryFactory::default_repos(
-                    Some(io),
-                    Some(std::rc::Rc::clone(&config)),
-                    None,
-                )?
-                .into_iter()
-                .map(|(_, v)| v)
-                .collect(),
+                RepositoryFactory::default_repos(Some(io), Some(config.clone()), None)?
+                    .into_iter()
+                    .map(|(_, v)| v)
+                    .collect(),
             )));
         } else {
             for repo in repositories.unwrap() {

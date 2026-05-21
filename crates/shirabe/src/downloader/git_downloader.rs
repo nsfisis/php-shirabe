@@ -45,9 +45,9 @@ impl GitDownloader {
         let inner = VcsDownloaderBase::new(io, config, process, fs);
         let git_util = GitUtil::new(
             inner.io.clone_box(),
-            std::rc::Rc::clone(&inner.config),
-            std::rc::Rc::clone(&inner.process),
-            std::rc::Rc::clone(&inner.filesystem),
+            inner.config.clone(),
+            inner.process.clone(),
+            inner.filesystem.clone(),
         );
         Self {
             inner,

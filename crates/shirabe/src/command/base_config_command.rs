@@ -41,7 +41,7 @@ pub trait BaseConfigCommand: BaseCommand {
         *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_config(Some(io.as_ref()), None)?,
         )));
-        let config_rc = std::rc::Rc::clone(self.config().unwrap());
+        let config_rc = self.config().unwrap().clone();
 
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
         if input.get_option("global").as_bool().unwrap_or(false) {

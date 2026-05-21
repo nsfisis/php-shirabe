@@ -184,7 +184,7 @@ impl ArchiveCommand {
             let download_manager =
                 factory.create_download_manager(io, config, &http_downloader, &process, None)?;
             let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                std::rc::Rc::clone(&http_downloader),
+                http_downloader.clone(),
                 Some(process),
             )));
             owned_archive_manager =

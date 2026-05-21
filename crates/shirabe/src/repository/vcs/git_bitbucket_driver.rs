@@ -694,9 +694,9 @@ impl GitBitbucketDriver {
                 // TODO(phase-b): only handle TransportException
                 let mut bitbucket_util = Bitbucket::new(
                     self.inner.io.clone_box(),
-                    std::rc::Rc::clone(&self.inner.config),
-                    Some(std::rc::Rc::clone(&self.inner.process)),
-                    Some(std::rc::Rc::clone(&self.inner.http_downloader)),
+                    self.inner.config.clone(),
+                    Some(self.inner.process.clone()),
+                    Some(self.inner.http_downloader.clone()),
                     None,
                 )?;
 

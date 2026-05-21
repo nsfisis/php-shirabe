@@ -135,10 +135,7 @@ impl SelfUpdateCommand {
             Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
         ));
 
-        let mut versions_util = Versions::new(
-            std::rc::Rc::clone(&config),
-            std::rc::Rc::clone(&http_downloader),
-        );
+        let mut versions_util = Versions::new(config.clone(), http_downloader.clone());
 
         // switch channel if requested
         let mut requested_channel: Option<String> = None;

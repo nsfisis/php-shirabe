@@ -447,8 +447,8 @@ pub trait VcsDownloader:
     fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
-            std::rc::Rc::clone(self.config()),
-            std::rc::Rc::clone(self.process()),
+            self.config().clone(),
+            self.process().clone(),
             parser.clone(),
             Some(self.io().clone_box()),
         );

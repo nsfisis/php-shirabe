@@ -44,7 +44,7 @@ impl RuleWatchGraph {
                 self.watch_chains
                     .get_mut(&literal)
                     .unwrap()
-                    .unshift(std::rc::Rc::clone(&node));
+                    .unshift(node.clone());
             }
         } else {
             let literals: Vec<i64> = node.borrow().get_rule().get_literals().clone();
@@ -55,7 +55,7 @@ impl RuleWatchGraph {
                 self.watch_chains
                     .get_mut(&literal)
                     .unwrap()
-                    .unshift(std::rc::Rc::clone(&node));
+                    .unshift(node.clone());
             }
         }
     }

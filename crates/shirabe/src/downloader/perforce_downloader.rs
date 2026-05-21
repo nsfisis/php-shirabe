@@ -103,7 +103,7 @@ impl PerforceDownloader {
             repo_config.unwrap_or_default(),
             url,
             path,
-            std::rc::Rc::clone(&self.inner.process),
+            self.inner.process.clone(),
             self.inner.io.clone_box(),
         ));
     }

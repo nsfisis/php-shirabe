@@ -31,7 +31,7 @@ use crate::package::BasePackage;
 #[derive(Debug)]
 pub struct Solver {
     pub(crate) policy: Box<dyn PolicyInterface>,
-    pub(crate) pool: Pool,
+    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
 
     pub(crate) rules: RuleSet,
 
@@ -55,17 +55,18 @@ impl Solver {
     const BRANCH_LITERALS: usize = 0;
     const BRANCH_LEVEL: usize = 1;
 
-    pub fn new(policy: Box<dyn PolicyInterface>, pool: Pool, io: Box<dyn IOInterface>) -> Self {
+    pub fn new(
+        policy: Box<dyn PolicyInterface>,
+        pool: std::rc::Rc<std::cell::RefCell<Pool>>,
+        io: Box<dyn IOInterface>,
+    ) -> Self {
+        let decisions = Decisions::new(pool.clone());
         Self {
             policy,
             pool,
             rules: RuleSet::new(),
             watch_graph: RuleWatchGraph::new(),
-            // TODO(phase-b): PHP shares `$pool` between Solver and Decisions by reference.
-            // Pool has no `Default`/`Clone` impl, so we leave this placeholder until the
-            // resolver is refactored to use `Rc<RefCell<Pool>>`. `solve()` rebuilds the
-            // decisions field before any access.
-            decisions: todo!("Decisions::new requires a shared Pool reference"),
+            decisions,
             fixed_map: IndexMap::new(),
             propagate_index: 0,
             branches: Vec::new(),
@@ -81,8 +82,8 @@ impl Solver {
         self.rules.count()
     }
 
-    pub fn get_pool(&self) -> &Pool {
-        &self.pool
+    pub fn get_pool(&self) -> std::rc::Rc<std::cell::RefCell<Pool>> {
+        self.pool.clone()
     }
 
     // aka solver_makeruledecisions
@@ -213,6 +214,7 @@ impl Solver {
 
             if self
                 .pool
+                .borrow_mut()
                 .what_provides(package_name, Some(active_constraint))
                 .is_empty()
             {
@@ -252,20 +254,15 @@ impl Solver {
 
         self.io
             .write_error3("Generating rules", true, crate::io::DEBUG);
-        // TODO(phase-b): Pool is a PHP class without Clone; RuleSetGenerator should hold
-        // a shared reference (Rc<RefCell<Pool>>). Using a placeholder pool until then.
-        let mut rule_set_generator = RuleSetGenerator::new(
-            self.policy.clone_box(),
-            todo!("share Pool with RuleSetGenerator"),
-        );
+        let mut rule_set_generator =
+            RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
         // TODO(phase-b): get_rules_for takes Option<Box<dyn PlatformRequirementFilterInterface>>;
         // PHP passes the filter directly. Forwarding `None` here keeps the call typecheckable.
         let _ = platform_requirement_filter.as_ref();
         self.rules = rule_set_generator.get_rules_for(request, None)?;
         drop(rule_set_generator);
         self.check_for_root_require_problems(request, platform_requirement_filter.as_ref());
-        // TODO(phase-b): Pool sharing — same as above.
-        self.decisions = Decisions::new(todo!("share Pool with Decisions"));
+        self.decisions = Decisions::new(self.pool.clone());
         self.watch_graph = RuleWatchGraph::new();
 
         // TODO(phase-b): RuleSet does not expose `iter()`; RuleWatchNode expects
@@ -306,7 +303,7 @@ impl Solver {
         // and borrows Pool/Decisions. The present/fixed maps from Request are keyed
         // by BasePackage; converting requires reworking Request.
         Ok(LockTransaction::new(
-            &self.pool,
+            &*self.pool.borrow(),
             todo!("convert request.get_present_map(false) to PackageInterface map"),
             todo!("convert request.get_fixed_packages_map() to PackageInterface map"),
             &self.decisions,
@@ -435,7 +432,7 @@ impl Solver {
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
         let mut literals = self.policy.select_preferred_packages(
-            &self.pool,
+            &*self.pool.borrow(),
             decision_queue,
             rule.get_required_package(),
         );

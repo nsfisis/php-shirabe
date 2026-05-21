@@ -206,7 +206,7 @@ impl RepositoryFactory {
 
         let mut rm = RepositoryManager::new(
             io,
-            std::rc::Rc::clone(config),
+            config.clone(),
             http_downloader,
             event_dispatcher,
             Some(process),

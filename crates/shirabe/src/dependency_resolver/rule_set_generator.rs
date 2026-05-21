@@ -24,14 +24,17 @@ use crate::package::PackageInterface;
 #[derive(Debug)]
 pub struct RuleSetGenerator {
     pub(crate) policy: Box<dyn PolicyInterface>,
-    pub(crate) pool: Pool,
+    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) rules: RuleSet,
     pub(crate) added_map: IndexMap<i64, Box<dyn PackageInterface>>,
     pub(crate) added_packages_by_names: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
 }
 
 impl RuleSetGenerator {
-    pub fn new(policy: Box<dyn PolicyInterface>, pool: Pool) -> Self {
+    pub fn new(
+        policy: Box<dyn PolicyInterface>,
+        pool: std::rc::Rc<std::cell::RefCell<Pool>>,
+    ) -> Self {
         Self {
             policy,
             pool,
@@ -221,6 +224,7 @@ impl RuleSetGenerator {
 
                 let possible_requires: Vec<Box<dyn PackageInterface>> = self
                     .pool
+                    .borrow_mut()
                     .what_provides(link.get_target(), Some(&*constraint))
                     .into_iter()
                     .map(|p| p.clone_package_box())
@@ -276,6 +280,7 @@ impl RuleSetGenerator {
 
                 let conflicts = self
                     .pool
+                    .borrow_mut()
                     .what_provides(link.get_target(), Some(&*constraint));
 
                 for conflict in &conflicts {
@@ -327,6 +332,7 @@ impl RuleSetGenerator {
                 // fixed package was not added to the pool as it did not pass the stability requirements, this is fine
                 if self
                     .pool
+                    .borrow()
                     .is_unacceptable_fixed_or_locked_package(package.as_ref())
                 {
                     continue;
@@ -373,6 +379,7 @@ impl RuleSetGenerator {
 
             let packages: Vec<Box<dyn PackageInterface>> = self
                 .pool
+                .borrow_mut()
                 .what_provides(package_name, Some(&*constraint))
                 .into_iter()
                 .map(|p| p.clone_package_box())
@@ -412,6 +419,7 @@ impl RuleSetGenerator {
     ) {
         let packages: Vec<Box<dyn BasePackage>> = self
             .pool
+            .borrow()
             .get_packages()
             .iter()
             .map(|p| p.clone_box())

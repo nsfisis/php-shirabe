@@ -76,7 +76,7 @@ impl PerforceDriver {
             repo_config.clone(),
             self.inner.url.clone(),
             repo_dir,
-            std::rc::Rc::clone(&self.inner.process),
+            self.inner.process.clone(),
             self.inner.io.clone_box(),
         ));
 

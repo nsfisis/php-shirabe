@@ -534,7 +534,7 @@ impl ForgejoDriver {
                 todo!("clone io for GitDriver setup"),
                 self.inner.config.clone(),
                 self.inner.http_downloader.clone(),
-                std::rc::Rc::clone(&self.inner.process),
+                self.inner.process.clone(),
             ),
             tags: None,
             branches: None,

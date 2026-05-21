@@ -104,7 +104,7 @@ impl StatusCommand {
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
         let mut guesser = VersionGuesser::new(
             composer.get_config(),
-            std::rc::Rc::clone(&process_executor),
+            process_executor.clone(),
             parser.clone(),
             Some(io_box.clone_box()),
         );

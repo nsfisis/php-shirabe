@@ -39,7 +39,7 @@ impl ZipDownloader {
         event_dispatcher: Option<
             std::rc::Rc<std::cell::RefCell<crate::event_dispatcher::EventDispatcher>>,
         >,
-        cache: Option<crate::cache::Cache>,
+        cache: Option<std::rc::Rc<std::cell::RefCell<crate::cache::Cache>>>,
         filesystem: std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
         process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
     ) -> Self {

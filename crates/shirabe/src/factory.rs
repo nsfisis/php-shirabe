@@ -587,7 +587,7 @@ impl Factory {
                     } else {
                         PartialOrFullComposer::new_partial()
                     };
-                    composer.set_config(std::rc::Rc::clone(&config));
+                    composer.set_config(config.clone());
                     if is_global {
                         composer.set_global();
                     }
@@ -625,8 +625,8 @@ impl Factory {
                         Some(io.clone_box()),
                     )));
                     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-                        std::rc::Rc::clone(&http_downloader),
-                        Some(std::rc::Rc::clone(&process)),
+                        http_downloader.clone(),
+                        Some(process.clone()),
                     )));
                     composer.set_loop(r#loop.clone());
 
@@ -635,20 +635,20 @@ impl Factory {
                         let mut d = EventDispatcher::new(
                             PartialComposerWeakHandle::from_weak(composer_weak.clone()),
                             io.clone_box(),
-                            Some(std::rc::Rc::clone(&process)),
+                            Some(process.clone()),
                         );
                         d.set_run_scripts(!disable_scripts);
                         std::rc::Rc::new(std::cell::RefCell::new(d))
                     };
-                    composer.set_event_dispatcher(std::rc::Rc::clone(&dispatcher));
+                    composer.set_event_dispatcher(dispatcher.clone());
 
                     // initialize repository manager
                     let rm = std::rc::Rc::new(std::cell::RefCell::new(RepositoryFactory::manager(
                         io,
                         &config,
-                        Some(std::rc::Rc::clone(&http_downloader)),
-                        Some(std::rc::Rc::clone(&dispatcher)),
-                        Some(std::rc::Rc::clone(&process)),
+                        Some(http_downloader.clone()),
+                        Some(dispatcher.clone()),
+                        Some(process.clone()),
                     )?));
 
                     // force-set the version of the global package if not defined as
@@ -661,14 +661,14 @@ impl Factory {
                     // load package
                     let parser = VersionParser::new();
                     let guesser = VersionGuesser::new(
-                        std::rc::Rc::clone(&config),
-                        std::rc::Rc::clone(&process),
+                        config.clone(),
+                        process.clone(),
                         parser.clone(),
                         Some(io.clone_box()),
                     );
                     let mut loader = self.load_root_package(
-                        std::rc::Rc::clone(&rm),
-                        std::rc::Rc::clone(&config),
+                        rm.clone(),
+                        config.clone(),
                         parser,
                         guesser,
                         io.clone_box(),
@@ -693,17 +693,17 @@ impl Factory {
                         composer.get_package(),
                         Some(&process),
                     );
-                    composer.set_repository_manager(std::rc::Rc::clone(&rm));
+                    composer.set_repository_manager(rm.clone());
 
                     // initialize installation manager
                     let im = std::rc::Rc::new(std::cell::RefCell::new(
                         self.create_installation_manager(
                             r#loop.clone(),
                             io.clone_box(),
-                            Some(std::rc::Rc::clone(&dispatcher)),
+                            Some(dispatcher.clone()),
                         ),
                     ));
-                    composer.set_installation_manager(std::rc::Rc::clone(&im));
+                    composer.set_installation_manager(im.clone());
 
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
                         // initialize download manager
@@ -717,10 +717,8 @@ impl Factory {
                         composer_full.set_download_manager(dm.clone());
 
                         // initialize autoload generator
-                        let generator = AutoloadGenerator::new(
-                            std::rc::Rc::clone(&dispatcher),
-                            Some(io.clone_box()),
-                        );
+                        let generator =
+                            AutoloadGenerator::new(dispatcher.clone(), Some(io.clone_box()));
                         composer_full.set_autoload_generator(std::rc::Rc::new(
                             std::cell::RefCell::new(generator),
                         ));
@@ -765,9 +763,9 @@ impl Factory {
                                     None,
                                     Some(io.clone_box()),
                                 )?,
-                                std::rc::Rc::clone(&im),
+                                im.clone(),
                                 &file_get_contents(composer_file_path).unwrap_or_default(),
-                                std::rc::Rc::clone(&process),
+                                process.clone(),
                             );
                             composer_full
                                 .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
@@ -788,9 +786,9 @@ impl Factory {
                                     None,
                                     Some(io.clone_box()),
                                 )?,
-                                std::rc::Rc::clone(&im),
+                                im.clone(),
                                 &lock_contents,
-                                std::rc::Rc::clone(&process),
+                                process.clone(),
                             );
                             composer_full
                                 .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
@@ -876,11 +874,8 @@ impl Factory {
         root_package: &dyn RootPackageInterface,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
-        let fs = process.map(|p| {
-            std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
-                std::rc::Rc::clone(p),
-            ))))
-        });
+        let fs = process
+            .map(|p| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(p.clone())))));
 
         rm.set_local_repository(Box::new(
             InstalledFilesystemRepository::new(
@@ -947,31 +942,36 @@ impl Factory {
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         event_dispatcher: Option<&std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<DownloadManager>>> {
-        // TODO(phase-b): cache is shared across all downloaders; PHP class semantics requires
-        // either Rc<RefCell<Cache>> (with corresponding signature changes everywhere) or
-        // making Cache cloneable. For now we don't construct a cache and pass None below.
-        let _cache: Option<Cache> = None;
-        if config
+        let cache_files_ttl = config
             .borrow_mut()
             .get("cache-files-ttl")
             .and_then(|v| v.as_int())
-            .unwrap_or(0)
-            > 0
-        {
-            let _ = Cache::new(
+            .unwrap_or(0);
+        let cache = if cache_files_ttl > 0 {
+            let mut cache = Cache::new(
                 io.clone_box(),
                 &config.borrow_mut().get_str("cache-files-dir")?,
                 Some("a-z0-9_./"),
                 None,
                 false,
             );
-        }
+            cache.set_read_only(
+                config
+                    .borrow_mut()
+                    .get("cache-read-only")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+            );
+            Some(std::rc::Rc::new(std::cell::RefCell::new(cache)))
+        } else {
+            None
+        };
 
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(
-            std::rc::Rc::clone(process),
+            process.clone(),
         ))));
 
-        let mut dm = DownloadManager::new(io.clone_box(), false, Some(std::rc::Rc::clone(&fs)));
+        let mut dm = DownloadManager::new(io.clone_box(), false, Some(fs.clone()));
         let preferred = config.borrow_mut().get("preferred-install");
         match preferred.as_string() {
             Some("dist") => {
@@ -1006,141 +1006,141 @@ impl Factory {
             "git",
             Box::new(GitDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                Some(std::rc::Rc::clone(&process)),
-                Some(std::rc::Rc::clone(&fs)),
+                config.clone(),
+                Some(process.clone()),
+                Some(fs.clone()),
             )),
         );
         dm.set_downloader(
             "svn",
             Box::new(SvnDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(&process),
-                std::rc::Rc::clone(&fs),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
             )),
         );
         dm.set_downloader(
             "fossil",
             Box::new(FossilDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(&process),
-                std::rc::Rc::clone(&fs),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
             )),
         );
         dm.set_downloader(
             "hg",
             Box::new(HgDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(&process),
-                std::rc::Rc::clone(&fs),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
             )),
         );
         dm.set_downloader(
             "perforce",
             Box::new(PerforceDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(&process),
-                std::rc::Rc::clone(&fs),
+                config.clone(),
+                process.clone(),
+                fs.clone(),
             )),
         );
         dm.set_downloader(
             "zip",
             Box::new(ZipDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "rar",
             Box::new(RarDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "tar",
             Box::new(TarDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "gzip",
             Box::new(GzipDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "xz",
             Box::new(XzDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "phar",
             Box::new(PharDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
         dm.set_downloader(
             "file",
             Box::new(FileDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                Some(std::rc::Rc::clone(&fs)),
-                Some(std::rc::Rc::clone(&process)),
+                cache.clone(),
+                Some(fs.clone()),
+                Some(process.clone()),
             )),
         );
         dm.set_downloader(
             "path",
             Box::new(PathDownloader::new(
                 io.clone_box(),
-                std::rc::Rc::clone(&config),
-                std::rc::Rc::clone(http_downloader),
+                config.clone(),
+                http_downloader.clone(),
                 event_dispatcher.cloned(),
-                None, // TODO(phase-b): shared Cache requires Rc<RefCell<Cache>>; see _cache
-                std::rc::Rc::clone(&fs),
-                std::rc::Rc::clone(&process),
+                cache.clone(),
+                fs.clone(),
+                process.clone(),
             )),
         );
 
@@ -1223,7 +1223,7 @@ impl Factory {
             io.clone_box(),
             bin_dir.clone(),
             bin_compat.clone(),
-            Some(std::rc::Rc::clone(&fs)),
+            Some(fs.clone()),
             Some(vendor_dir.clone()),
         );
 
@@ -1367,7 +1367,7 @@ impl Factory {
         }
         let http_downloader_result: anyhow::Result<HttpDownloader> = Ok(HttpDownloader::new(
             io.clone_box(),
-            std::rc::Rc::clone(config),
+            config.clone(),
             http_downloader_options,
             disable_tls,
         ));

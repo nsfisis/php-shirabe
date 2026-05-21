@@ -856,10 +856,8 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        let mut versions_util = Versions::new(
-            std::rc::Rc::clone(config),
-            self.http_downloader.clone().unwrap(),
-        );
+        let mut versions_util =
+            Versions::new(config.clone(), self.http_downloader.clone().unwrap());
         let latest = match versions_util.get_latest(None) {
             Ok(Ok(l)) => l,
             Ok(Err(e)) => {

@@ -8,7 +8,7 @@ use shirabe_php_shim::LogicException;
 use std::fmt;
 
 pub struct Decisions {
-    pub(crate) pool: Pool,
+    pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) decision_map: IndexMap<i64, i64>,
     pub(crate) decision_queue: Vec<(i64, Box<dyn Rule>)>,
     iterator_cursor: Option<usize>,
@@ -27,7 +27,7 @@ impl Decisions {
     pub const DECISION_LITERAL: usize = 0;
     pub const DECISION_REASON: usize = 1;
 
-    pub fn new(pool: Pool) -> Self {
+    pub fn new(pool: std::rc::Rc<std::cell::RefCell<Pool>>) -> Self {
         Self {
             pool,
             decision_map: IndexMap::new(),
@@ -187,10 +187,9 @@ impl Decisions {
 
         let previous_decision = self.decision_map.get(&package_id).copied().unwrap_or(0);
         if previous_decision != 0 {
-            let literal_string = self
-                .pool
-                .literal_to_pretty_string(literal, &IndexMap::new());
-            let package = self.pool.literal_to_package(literal);
+            let pool = self.pool.borrow();
+            let literal_string = pool.literal_to_pretty_string(literal, &IndexMap::new());
+            let package = pool.literal_to_package(literal);
             panic!(
                 "{}",
                 SolverBugException::new(format!(

@@ -47,8 +47,8 @@ impl SvnDownloader {
         let mut util = SvnUtil::new(
             url.to_string(),
             self.inner.io.clone_box(),
-            std::rc::Rc::clone(&self.inner.config),
-            Some(std::rc::Rc::clone(&self.inner.process)),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
         );
         if util.binary_version().is_none() {
             return Err(RuntimeException {
@@ -129,8 +129,8 @@ impl SvnDownloader {
         let mut util = SvnUtil::new(
             url.to_string(),
             self.inner.io.clone_box(),
-            std::rc::Rc::clone(&self.inner.config),
-            Some(std::rc::Rc::clone(&self.inner.process)),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
         );
         let mut flags: Vec<String> = vec![];
         if version_compare(&util.binary_version().unwrap_or_default(), "1.7.0", ">=") {
@@ -189,8 +189,8 @@ impl SvnDownloader {
         let mut util = SvnUtil::new(
             base_url.to_string(),
             self.inner.io.clone_box(),
-            std::rc::Rc::clone(&self.inner.config),
-            Some(std::rc::Rc::clone(&self.inner.process)),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
         );
         util.set_cache_credentials(self.cache_credentials);
         util.execute(command, url, cwd, path, self.inner.io.is_verbose())
@@ -384,8 +384,8 @@ impl SvnDownloader {
             let mut util = SvnUtil::new(
                 base_url,
                 self.inner.io.clone_box(),
-                std::rc::Rc::clone(&self.inner.config),
-                Some(std::rc::Rc::clone(&self.inner.process)),
+                self.inner.config.clone(),
+                Some(self.inner.process.clone()),
             );
             util.set_cache_credentials(self.cache_credentials);
             util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())

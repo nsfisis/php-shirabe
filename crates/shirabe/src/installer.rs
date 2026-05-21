@@ -420,7 +420,7 @@ impl Installer {
 
         if self.install && self.execute_operations {
             // force binaries re-generation in case they are missing
-            let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+            let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages() {
                 self.installation_manager
@@ -440,7 +440,7 @@ impl Installer {
 
         if show_funding {
             let mut funding_count: i64 = 0;
-            let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+            let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages() {
                 if let Some(cp) = package.as_complete_package_interface() {
@@ -507,7 +507,7 @@ impl Installer {
                     IndexMap::new(),
                     IndexMap::new(),
                 );
-                let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+                let repository_manager = self.repository_manager.clone();
                 let repository_manager = repository_manager.borrow();
                 for repo in repository_manager.get_repositories() {
                     repo_set.add_repository(repo.clone_box())?;
@@ -612,7 +612,7 @@ impl Installer {
         // creating repository set
         let policy = self.create_policy(true, locked_repository.as_ref());
         let mut repository_set = self.create_repository_set(true, &platform_repo, &aliases, None);
-        let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+        let repository_manager = self.repository_manager.clone();
         let repository_manager = repository_manager.borrow();
         let repositories = repository_manager.get_repositories();
         for repository in repositories {
