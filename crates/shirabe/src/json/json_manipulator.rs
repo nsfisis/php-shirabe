@@ -269,7 +269,7 @@ impl JsonManipulator {
             .and_then(|o| o.to_array().get("repositories").cloned());
         let is_std_class = repositories_value
             .as_ref()
-            .map(|v| v.as_any().is::<StdClass>())
+            .map(|v| (&**v as &dyn std::any::Any).is::<StdClass>())
             .unwrap_or(false);
 
         if is_std_class {
@@ -290,7 +290,7 @@ impl JsonManipulator {
 
             // re-add in order
             for (repository_name, repository) in &repos_arr {
-                let is_obj = repository.as_any().is::<StdClass>();
+                let is_obj = (&**repository as &dyn std::any::Any).is::<StdClass>();
                 if !is_obj {
                     let mut m: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
@@ -515,7 +515,7 @@ impl JsonManipulator {
             .and_then(|o| o.to_array().get("repositories").cloned());
         let is_assoc = repositories_value
             .as_ref()
-            .map(|v| v.as_any().is::<StdClass>())
+            .map(|v| (&**v as &dyn std::any::Any).is::<StdClass>())
             .unwrap_or(false);
 
         let repos: IndexMap<String, Box<PhpMixed>> = repositories_value
@@ -1689,7 +1689,9 @@ impl JsonManipulator {
     pub fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
         let mut data = data.clone();
         let mut was_object = was_object;
-        if data.as_any().is::<StdClass>() || data.as_any().is::<ArrayObject>() {
+        if (&data as &dyn std::any::Any).is::<StdClass>()
+            || (&data as &dyn std::any::Any).is::<ArrayObject>()
+        {
             // PHP: (array) $data — coerce to array
             if let Some(obj) = data.as_object() {
                 data = PhpMixed::Array(obj.to_array());
@@ -1761,7 +1763,9 @@ impl ManipulatorFormatter {
     fn format(&self, data: &PhpMixed, depth: i64, was_object: bool) -> anyhow::Result<String> {
         let mut data = data.clone();
         let mut was_object = was_object;
-        if data.as_any().is::<StdClass>() || data.as_any().is::<ArrayObject>() {
+        if (&data as &dyn std::any::Any).is::<StdClass>()
+            || (&data as &dyn std::any::Any).is::<ArrayObject>()
+        {
             if let Some(obj) = data.as_object() {
                 data = PhpMixed::Array(obj.to_array());
             }

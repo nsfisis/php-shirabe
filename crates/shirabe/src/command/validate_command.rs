@@ -114,7 +114,7 @@ impl ValidateCommand {
     ) -> Result<i64> {
         let file = input
             .get_argument("file")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .map(Ok)
             .unwrap_or_else(Factory::get_composer_file)?;

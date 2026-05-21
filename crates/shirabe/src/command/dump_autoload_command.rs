@@ -94,7 +94,7 @@ impl DumpAutoloadCommand {
                 .unwrap_or(false);
         let apcu_prefix = input
             .get_option("apcu-prefix")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input.get_option("apcu").as_bool().unwrap_or(false)

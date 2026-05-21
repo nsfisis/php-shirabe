@@ -108,7 +108,7 @@ pub trait BaseConfigCommand: BaseCommand {
         } else {
             input
                 .get_option("file")
-                .as_string_opt()
+                .as_string()
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default())
         }

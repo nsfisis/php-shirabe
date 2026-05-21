@@ -419,7 +419,7 @@ impl Filesystem {
                     if str_contains(&e.message, "Bad address") {
                         let source_handle = fopen(source, "r");
                         let target_handle = fopen(&target, "w");
-                        if source_handle.is_none() || target_handle.is_none() {
+                        if source_handle.is_null() || target_handle.is_null() {
                             return Err(e.into());
                         }
                         while !feof(source_handle.clone()) {
@@ -1035,14 +1035,14 @@ impl Filesystem {
     pub fn safe_copy(&self, source: &str, target: &str) -> anyhow::Result<()> {
         if !file_exists(target) || !file_exists(source) || !self.files_are_equal(source, target) {
             let source_handle = fopen(source, "r");
-            if source_handle.is_none() {
+            if source_handle.is_null() {
                 return Err(anyhow::anyhow!(
                     "Could not open \"{}\" for reading.",
                     source
                 ));
             }
             let target_handle = fopen(target, "w+");
-            if target_handle.is_none() {
+            if target_handle.is_null() {
                 return Err(anyhow::anyhow!(
                     "Could not open \"{}\" for writing.",
                     target
@@ -1070,11 +1070,11 @@ impl Filesystem {
 
         // Check if content is different
         let a_handle = fopen(a, "rb");
-        if a_handle.is_none() {
+        if a_handle.is_null() {
             return false;
         }
         let b_handle = fopen(b, "rb");
-        if b_handle.is_none() {
+        if b_handle.is_null() {
             return false;
         }
 

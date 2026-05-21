@@ -86,7 +86,7 @@ impl AuditCommand {
 
         let abandoned = input
             .get_option("abandoned")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string());
         if abandoned.is_some()
             && !in_array(

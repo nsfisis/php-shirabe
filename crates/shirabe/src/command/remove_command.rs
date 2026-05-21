@@ -477,7 +477,7 @@ impl RemoveCommand {
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
         let removed_plugins: Vec<String> =
-            if let Some(allow_map) = allow_plugins.as_ref().and_then(|v| v.as_array()) {
+            if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
                     .iter()
                     .filter(|p| allow_map.contains_key(p.as_str()))
@@ -488,11 +488,11 @@ impl RemoveCommand {
             };
 
         if !dry_run
-            && allow_plugins.as_ref().and_then(|v| v.as_array()).is_some()
+            && allow_plugins.as_opt().and_then(|v| v.as_array()).is_some()
             && !removed_plugins.is_empty()
         {
             let allow_map_len = allow_plugins
-                .as_ref()
+                .as_opt()
                 .and_then(|v| v.as_array())
                 .map(|m| m.len())
                 .unwrap_or(0);

@@ -51,7 +51,7 @@ impl SearchCommand {
 
         let format = input
             .get_option("format")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| "text".to_string());
         if !in_array(
@@ -114,10 +114,7 @@ impl SearchCommand {
             mode = repository_interface::SEARCH_VENDOR;
         }
 
-        let r#type = input
-            .get_option("type")
-            .as_string_opt()
-            .map(|s| s.to_string());
+        let r#type = input.get_option("type").as_string().map(|s| s.to_string());
 
         let tokens_arg = input.get_argument("tokens");
         let token_strings: Vec<String> = tokens_arg

@@ -77,25 +77,8 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_str(&self) -> Option<&str> {
-        self.as_string()
-    }
-
     pub fn is_null(&self) -> bool {
         matches!(self, PhpMixed::Null)
-    }
-
-    /// Treats PhpMixed::Null as None, everything else as Some.
-    pub fn is_none(&self) -> bool {
-        self.is_null()
-    }
-
-    pub fn is_some(&self) -> bool {
-        !self.is_null()
-    }
-
-    pub fn as_string_opt(&self) -> Option<&str> {
-        self.as_string()
     }
 
     pub fn get(&self, key: &str) -> Option<&PhpMixed> {
@@ -122,18 +105,9 @@ impl PhpMixed {
         self
     }
 
-    pub fn as_ref(&self) -> Option<&PhpMixed> {
-        self.as_opt()
-    }
-
     /// Treats PhpMixed::Null as None and applies the function for chaining.
     pub fn and_then<U, F: FnOnce(&PhpMixed) -> Option<U>>(&self, f: F) -> Option<U> {
         self.as_opt().and_then(f)
-    }
-
-    /// Counterpart to `Any::as_any` for trait-object call sites that downcast.
-    pub fn as_any(&self) -> &dyn std::any::Any {
-        self
     }
 
     /// Treats `Null` and `Bool(false)` as the falsy case, anything else as Some.

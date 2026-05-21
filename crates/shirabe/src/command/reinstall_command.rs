@@ -255,7 +255,7 @@ impl ReinstallCommand {
                     .unwrap_or(false);
             let apcu_prefix = input
                 .get_option("apcu-autoloader-prefix")
-                .as_string_opt()
+                .as_string()
                 .map(|s| s.to_string());
             let apcu = apcu_prefix.is_some()
                 || input

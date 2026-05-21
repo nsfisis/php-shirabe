@@ -122,7 +122,7 @@ impl RunScriptCommand {
             return Ok(());
         }
 
-        if input.get_argument("script").as_string_opt().is_some()
+        if input.get_argument("script").as_string().is_some()
             || input.get_option("list").as_bool().unwrap_or(false)
         {
             return Ok(());
@@ -160,7 +160,7 @@ impl RunScriptCommand {
             return self.list_scripts(output);
         }
 
-        let script = match input.get_argument("script").as_string_opt() {
+        let script = match input.get_argument("script").as_string() {
             None => {
                 return Err(RuntimeException {
                     message: "Missing required argument \"script\"".to_string(),
@@ -209,7 +209,7 @@ impl RunScriptCommand {
             })
             .unwrap_or_default();
 
-        if let Some(timeout_val) = input.get_option("timeout").as_string_opt() {
+        if let Some(timeout_val) = input.get_option("timeout").as_string() {
             let timeout_str = timeout_val.to_string();
             if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
                 return Err(RuntimeException {

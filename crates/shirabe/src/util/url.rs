@@ -11,7 +11,7 @@ pub struct Url;
 impl Url {
     pub fn update_dist_reference(config: &Config, mut url: String, r#ref: &str) -> String {
         let host = parse_url(&url, PHP_URL_HOST)
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .unwrap_or_default();
 
@@ -128,7 +128,7 @@ impl Url {
         }
 
         let mut origin = parse_url(url, PHP_URL_HOST)
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .unwrap_or_default();
         if let Some(port) = parse_url(url, PHP_URL_PORT).as_int() {

@@ -90,7 +90,7 @@ impl ArchiveCommand {
 
         let format = input
             .get_option("format")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 config
@@ -103,7 +103,7 @@ impl ArchiveCommand {
 
         let dir = input
             .get_option("dir")
-            .as_string_opt()
+            .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 config
@@ -121,18 +121,15 @@ impl ArchiveCommand {
             &config,
             input
                 .get_argument("package")
-                .as_string_opt()
+                .as_string()
                 .map(|s| s.to_string()),
             input
                 .get_argument("version")
-                .as_string_opt()
+                .as_string()
                 .map(|s| s.to_string()),
             &format,
             &dir,
-            input
-                .get_option("file")
-                .as_string_opt()
-                .map(|s| s.to_string()),
+            input.get_option("file").as_string().map(|s| s.to_string()),
             input
                 .get_option("ignore-filters")
                 .as_bool()

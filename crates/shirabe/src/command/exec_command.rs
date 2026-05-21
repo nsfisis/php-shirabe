@@ -48,7 +48,7 @@ impl ExecCommand {
             return Ok(());
         }
 
-        if input.get_argument("binary").as_string_opt().is_some()
+        if input.get_argument("binary").as_string().is_some()
             || input.get_option("list").as_bool().unwrap_or(false)
         {
             return Ok(());
@@ -82,7 +82,7 @@ impl ExecCommand {
         let composer = self.require_composer(None, None)?;
 
         if input.get_option("list").as_bool().unwrap_or(false)
-            || input.get_argument("binary").as_string_opt().is_none()
+            || input.get_argument("binary").as_string().is_none()
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
