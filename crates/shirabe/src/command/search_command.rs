@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
@@ -77,21 +76,27 @@ impl SearchCommand {
             let io_box = self.get_io().clone_box();
             self.create_composer_instance(input, io_box.as_ref(), None, false, None)?
         };
+        let composer_ref = crate::command::composer_full(&composer);
         // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface but we need Box<dyn RepositoryInterface>
         let local_repo: Box<dyn RepositoryInterface> =
             todo!("share local_repo as RepositoryInterface");
         let installed_repo = CompositeRepository::new(vec![local_repo, Box::new(platform_repo)]);
         let mut all_repos: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(installed_repo)];
         // TODO(phase-b): get_repositories returns &Vec<Box<...>>; needs ownership reshape
-        for r in composer.get_repository_manager().get_repositories() {
+        for r in composer_ref
+            .get_repository_manager()
+            .borrow()
+            .get_repositories()
+        {
             all_repos.push(r.clone_box());
         }
         let repos = CompositeRepository::new(all_repos);
 
         // TODO(plugin): dispatch CommandEvent for search command
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "search", input, output);
-        composer
-            .get_event_dispatcher()
+        let dispatcher = composer_ref.get_event_dispatcher().clone();
+        drop(composer_ref);
+        dispatcher
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 

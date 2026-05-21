@@ -9,7 +9,8 @@ use shirabe_php_shim::{
     php_uname, stream_context_create, stripos, uasort,
 };
 
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
@@ -203,7 +204,7 @@ impl StreamContextFactory {
             let platform_php_version = PlatformRepository::get_platform_php_version();
             let user_agent = format!(
                 "User-Agent: Composer/{} ({os}; {release}; {php_version}; {http_version}{platform}{ci})",
-                Composer::get_version(),
+                composer::get_version(),
                 os = if function_exists("php_uname") {
                     php_uname("s")
                 } else {

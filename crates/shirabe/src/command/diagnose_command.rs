@@ -20,7 +20,8 @@ use shirabe_php_shim::{
 
 use crate::advisory::Auditor;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
@@ -81,6 +82,7 @@ impl DiagnoseCommand {
 
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref mut c) = composer {
+            let c = crate::command::composer_full(c);
             config = c.get_config().clone();
 
             let command_event = CommandEvent::new6(
@@ -146,7 +148,7 @@ impl DiagnoseCommand {
 
         io.write(&format!(
             "Composer version: <comment>{}</comment>",
-            Composer::get_version()
+            composer::get_version()
         ));
 
         io.write_no_newline("Checking Composer and its dependencies for vulnerabilities: ");
@@ -244,18 +246,24 @@ impl DiagnoseCommand {
         ));
 
         if let Some(ref mut c) = composer {
+            let mut c = crate::command::composer_full_mut(c);
             io.write(&format!(
                 "Active plugins: {}",
-                implode(", ", &c.get_plugin_manager().get_registered_plugins())
+                implode(
+                    ", ",
+                    &c.get_plugin_manager().borrow().get_registered_plugins()
+                )
             ));
 
             io.write_no_newline("Checking composer.json: ");
             let r = self.check_composer_schema()?;
             self.output_result(r);
 
-            if c.get_locker_mut().is_locked() {
+            if c.get_locker().borrow_mut().is_locked() {
                 io.write_no_newline("Checking composer.lock: ");
-                let r = self.check_composer_lock_schema(c.get_locker_mut())?;
+                let locker = c.get_locker().clone();
+                let locker = locker.borrow();
+                let r = self.check_composer_lock_schema(&locker)?;
                 self.output_result(r);
             }
         }
@@ -874,11 +882,11 @@ impl DiagnoseCommand {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if Composer::VERSION != latest_version && Composer::VERSION != "@package_version@" {
+        if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
             return Ok(PhpMixed::String(format!(
                 "<comment>You are not running the latest {} version, run `composer self-update` to update ({} => {})</comment>",
                 versions_util.get_channel()?,
-                Composer::VERSION,
+                composer::VERSION,
                 latest_version
             )));
         }
@@ -912,7 +920,7 @@ impl DiagnoseCommand {
         }
 
         let local_repo = FilesystemRepository::new(installed_json, false, None, None)?;
-        let version = Composer::get_version();
+        let version = composer::get_version();
         let mut packages = local_repo.inner.get_canonical_packages();
         if version != "@package_version@" {
             let version_parser = VersionParser::new();

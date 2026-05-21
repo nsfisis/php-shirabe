@@ -17,7 +17,7 @@ use shirabe_php_shim::{
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::SelfUpdateCommand;
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::Application;
 use crate::console::input::InputArgument;
@@ -160,23 +160,23 @@ pub trait BaseCommand {
         required: bool,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Result<Option<Composer>>;
+    ) -> Result<Option<PartialComposerHandle>>;
 
     /// Retrieves the default Composer\Composer instance or throws
     fn require_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Result<Composer>;
+    ) -> Result<PartialComposerHandle>;
 
     /// Retrieves the default Composer\Composer instance or null
     fn try_composer(
         &mut self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Option<Composer>;
+    ) -> Option<PartialComposerHandle>;
 
-    fn set_composer(&mut self, composer: Composer);
+    fn set_composer(&mut self, composer: PartialComposerHandle);
 
     /// Removes the cached composer instance
     fn reset_composer(&mut self) -> Result<()>;
@@ -205,7 +205,7 @@ pub trait BaseCommand {
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
-    ) -> Result<Composer>;
+    ) -> Result<PartialComposerHandle>;
 
     /// Returns preferSource and preferDist values based on the configuration.
     fn get_preferred_install_options(
@@ -253,7 +253,7 @@ pub trait BaseCommand {
 
 #[derive(Debug)]
 pub struct BaseCommandData {
-    pub(crate) composer: Option<Composer>,
+    pub(crate) composer: Option<PartialComposerHandle>,
     pub(crate) io: Option<Box<dyn IOInterface>>,
 }
 
@@ -261,11 +261,11 @@ pub trait HasBaseCommandData {
     fn base_command_data(&self) -> &BaseCommandData;
     fn base_command_data_mut(&mut self) -> &mut BaseCommandData;
 
-    fn composer(&self) -> Option<&Composer> {
-        self.base_command_data().composer.as_ref()
+    fn composer(&self) -> Option<PartialComposerHandle> {
+        self.base_command_data().composer.clone()
     }
 
-    fn composer_mut(&mut self) -> &mut Option<Composer> {
+    fn composer_mut(&mut self) -> &mut Option<PartialComposerHandle> {
         &mut self.base_command_data_mut().composer
     }
 
@@ -289,7 +289,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         required: bool,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Result<Option<Composer>> {
+    ) -> Result<Option<PartialComposerHandle>> {
         if required {
             return Ok(Some(
                 self.require_composer(disable_plugins, disable_scripts)?,
@@ -303,27 +303,25 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         &mut self,
         _disable_plugins: Option<bool>,
         _disable_scripts: Option<bool>,
-    ) -> Result<Composer> {
-        // TODO(phase-b): Composer is a PHP class (shared by reference). Returning owned
-        // `Composer` and the Application::get_composer -> &Composer mismatch require a
-        // shared-ownership wrapper (Rc<RefCell<Composer>>) before this can be wired up.
+    ) -> Result<PartialComposerHandle> {
+        // TODO(phase-b): depends on Application::get_composer, which is still stubbed.
         let _ = RuntimeException {
             message: String::new(),
             code: 0,
         };
-        todo!("require_composer pending Composer shared-ownership refactor")
+        todo!("require_composer pending Application::get_composer")
     }
 
     fn try_composer(
         &mut self,
         _disable_plugins: Option<bool>,
         _disable_scripts: Option<bool>,
-    ) -> Option<Composer> {
-        // TODO(phase-b): same shared-ownership refactor as require_composer.
-        todo!("try_composer pending Composer shared-ownership refactor")
+    ) -> Option<PartialComposerHandle> {
+        // TODO(phase-b): depends on Application::get_composer, which is still stubbed.
+        todo!("try_composer pending Application::get_composer")
     }
 
-    fn set_composer(&mut self, composer: Composer) {
+    fn set_composer(&mut self, composer: PartialComposerHandle) {
         *self.composer_mut() = Some(composer);
     }
 
@@ -389,7 +387,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             );
             // TODO(phase-b): event_dispatcher.dispatch expects Option<Event>; need wrapper from
             // PreCommandRunEvent.
-            let _ = composer.get_event_dispatcher();
+            let _ = composer.borrow_partial().get_event_dispatcher();
             let _ = pre_command_run_event.get_name();
         }
 
@@ -482,7 +480,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
-    ) -> Result<Composer> {
+    ) -> Result<PartialComposerHandle> {
         let disable_plugins =
             disable_plugins || input.has_parameter_option(&["--no-plugins"], false);
         let disable_scripts = disable_scripts.unwrap_or(false)

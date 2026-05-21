@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::installer::SuggestedPackagesReporter;
@@ -45,15 +44,19 @@ impl SuggestsCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
 
         let mut installed_repos: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(
             RootPackageRepository::new(composer.get_package().clone_box()),
         )];
 
-        if composer.get_locker_mut().is_locked() {
+        if composer.get_locker().borrow_mut().is_locked() {
             // TODO(phase-b): get_platform_overrides returns IndexMap<String, String>; PlatformRepository::new expects IndexMap<String, PhpMixed>
-            let _platform_overrides = composer.get_locker_mut().get_platform_overrides()?;
+            let _platform_overrides = composer
+                .get_locker()
+                .borrow_mut()
+                .get_platform_overrides()?;
             let platform_overrides: IndexMap<String, PhpMixed> =
                 todo!("convert IndexMap<String, String> to IndexMap<String, PhpMixed>");
             installed_repos.push(Box::new(PlatformRepository::new(
@@ -61,7 +64,8 @@ impl SuggestsCommand {
                 platform_overrides,
             )?));
             let locked_repo = composer
-                .get_locker_mut()
+                .get_locker()
+                .borrow_mut()
                 .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
             installed_repos.push(Box::new(locked_repo));
         } else {
@@ -76,6 +80,7 @@ impl SuggestsCommand {
             installed_repos.push(
                 composer
                     .get_repository_manager()
+                    .borrow()
                     .get_local_repository()
                     .clone_box(),
             );

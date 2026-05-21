@@ -3,7 +3,8 @@
 use crate::command::BaseCommand;
 use crate::command::BaseCommandData;
 use crate::command::HasBaseCommandData;
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::io::IOInterface;
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
@@ -21,7 +22,7 @@ impl AboutCommand {
     }
 
     pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
-        let composer_version = Composer::get_version();
+        let composer_version = composer::get_version();
         let _ = (input, output);
 
         self.get_io().write(&format!(

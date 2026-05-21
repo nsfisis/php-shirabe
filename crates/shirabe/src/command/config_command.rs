@@ -19,7 +19,6 @@ use shirabe_php_shim::{
 use crate::advisory::Auditor;
 use crate::command::BaseConfigCommand;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;

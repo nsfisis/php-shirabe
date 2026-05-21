@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Script/Event.php
 
-use crate::composer::Composer;
+use crate::composer::ComposerWeakHandle;
 use crate::event_dispatcher::Event as BaseEvent;
 use crate::io::IOInterface;
 use indexmap::IndexMap;
@@ -9,7 +9,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug)]
 pub struct Event {
     inner: BaseEvent,
-    composer: Composer,
+    composer: ComposerWeakHandle,
     io: Box<dyn IOInterface>,
     dev_mode: bool,
     originating_event: Option<Box<BaseEvent>>,
@@ -18,7 +18,7 @@ pub struct Event {
 impl Event {
     pub fn new(
         name: String,
-        composer: Composer,
+        composer: ComposerWeakHandle,
         io: Box<dyn IOInterface>,
         dev_mode: bool,
         args: Vec<String>,
@@ -33,7 +33,7 @@ impl Event {
         }
     }
 
-    pub fn get_composer(&self) -> &Composer {
+    pub fn get_composer(&self) -> &ComposerWeakHandle {
         &self.composer
     }
 

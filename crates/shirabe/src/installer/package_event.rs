@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/PackageEvent.php
 
-use crate::composer::Composer;
+use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::event_dispatcher::Event;
 use crate::io::IOInterface;
@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 #[derive(Debug)]
 pub struct PackageEvent {
     inner: Event,
-    composer: Composer,
+    composer: ComposerWeakHandle,
     io: Box<dyn IOInterface>,
     dev_mode: bool,
     local_repo: Box<dyn RepositoryInterface>,
@@ -21,7 +21,7 @@ pub struct PackageEvent {
 impl PackageEvent {
     pub fn new(
         event_name: String,
-        composer: Composer,
+        composer: ComposerWeakHandle,
         io: Box<dyn IOInterface>,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
@@ -43,7 +43,7 @@ impl PackageEvent {
         self.inner.get_name()
     }
 
-    pub fn get_composer(&self) -> &Composer {
+    pub fn get_composer(&self) -> &ComposerWeakHandle {
         &self.composer
     }
 

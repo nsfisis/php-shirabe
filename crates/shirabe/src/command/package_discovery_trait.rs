@@ -15,7 +15,7 @@ use shirabe_php_shim::{
     trim,
 };
 
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
@@ -41,12 +41,12 @@ pub trait PackageDiscoveryTrait {
 
     // PHP: trait dependencies (provided by BaseCommand)
     fn get_io(&self) -> &dyn IOInterface;
-    fn try_composer(&self) -> Option<Composer>;
+    fn try_composer(&self) -> Option<PartialComposerHandle>;
     fn require_composer(
         &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Composer;
+    ) -> PartialComposerHandle;
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
@@ -219,10 +219,14 @@ pub trait PackageDiscoveryTrait {
 
         // Collect existing packages
         let composer = self.try_composer();
-        let mut installed_repo: Option<_> = None;
-        if let Some(c) = &composer {
-            installed_repo = Some(c.get_repository_manager().get_local_repository());
-        }
+        let composer_ref = composer.as_ref().map(|c| c.borrow_partial());
+        let repository_manager = composer_ref
+            .as_ref()
+            .map(|c| c.get_repository_manager().clone());
+        let repository_manager_ref = repository_manager.as_ref().map(|rm| rm.borrow());
+        let installed_repo = repository_manager_ref
+            .as_ref()
+            .map(|rm| rm.get_local_repository());
         let mut existing_packages: Vec<String> = vec![];
         if let Some(repo) = &installed_repo {
             for package in repo.get_packages() {
@@ -231,6 +235,9 @@ pub trait PackageDiscoveryTrait {
         }
         // PHP: unset($composer, $installedRepo);
         drop(installed_repo);
+        drop(repository_manager_ref);
+        drop(repository_manager);
+        drop(composer_ref);
         drop(composer);
 
         let io = self.get_io();
@@ -804,9 +811,10 @@ pub trait PackageDiscoveryTrait {
         let mut similar_packages: IndexMap<String, i64> = IndexMap::new();
 
         let composer_for_installed = self.require_composer(None, None);
-        let installed_repo = composer_for_installed
-            .get_repository_manager()
-            .get_local_repository();
+        let composer_for_installed = composer_for_installed.borrow_partial();
+        let repository_manager = composer_for_installed.get_repository_manager().clone();
+        let repository_manager = repository_manager.borrow();
+        let installed_repo = repository_manager.get_local_repository();
 
         for result in &results {
             // TODO(phase-b): installed_repo.find_package signature mismatch with FindPackageConstraint

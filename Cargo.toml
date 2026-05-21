@@ -25,6 +25,4 @@ url = "2.5.8"
 zip = "8.6.0"
 
 [workspace.lints.rust]
-dead_code = "allow"
-unreachable_code = "allow"
-unused = "allow"
+warnings = "allow"

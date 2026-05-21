@@ -15,7 +15,7 @@ use shirabe_php_shim::{
 
 use crate::advisory::Auditor;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
@@ -279,21 +279,21 @@ impl CreateProjectCommand {
             unlink("composer.lock");
         }
 
-        let mut composer =
+        let mut composer_handle =
             self.create_composer_instance(input, io, None, disable_plugins, Some(disable_scripts))?;
 
         // add the repository to the composer.json and use it for the install run later
         if let Some(repos) = repositories.as_ref() {
             if add_repository {
                 for (index, repo) in repos.iter().enumerate() {
-                    let repo_config = RepositoryFactory::config_from_string(
-                        io,
-                        composer.get_config(),
-                        repo,
-                        true,
-                    )?;
+                    let config = crate::command::composer_full(&composer_handle).get_config();
+                    let repo_config =
+                        RepositoryFactory::config_from_string(io, &config, repo, true)?;
                     let composer_json_repositories_config =
-                        composer.get_config().borrow().get_repositories();
+                        crate::command::composer_full(&composer_handle)
+                            .get_config()
+                            .borrow()
+                            .get_repositories();
                     // TODO(phase-b): generate_repository_name expects existing repos as
                     // IndexMap<String, Box<dyn RepositoryInterface>>; pass empty placeholder.
                     let _ = &composer_json_repositories_config;
@@ -333,11 +333,13 @@ impl CreateProjectCommand {
                         );
                     }
 
-                    composer =
+                    composer_handle =
                         self.create_composer_instance(input, io, None, disable_plugins, None)?;
                 }
             }
         }
+
+        let mut composer = crate::command::composer_full_mut(&composer_handle);
 
         let process = composer
             .get_loop()
@@ -358,7 +360,7 @@ impl CreateProjectCommand {
             );
 
         // use the new config including the newly installed project
-        let config = std::rc::Rc::clone(composer.get_config());
+        let config = composer.get_config();
         let (ps, pd) = self.get_preferred_install_options(&*config.borrow(), input, false)?;
         prefer_source = ps;
         prefer_dist = pd;
@@ -366,10 +368,11 @@ impl CreateProjectCommand {
         // install dependencies of the created project
         if no_install == false {
             composer
-                .get_installation_manager_mut()
+                .get_installation_manager()
+                .borrow_mut()
                 .set_output_progress(!no_progress);
 
-            let mut installer = Installer::create(io.clone_box(), &composer);
+            let mut installer = Installer::create(io.clone_box(), &composer_handle);
             // TODO(phase-b): set_suggested_packages_reporter takes by value but PHP class
             // means shared ownership; needs Rc<SuggestedPackagesReporter> for proper sharing.
             installer
@@ -402,7 +405,7 @@ impl CreateProjectCommand {
                 )
                 .set_audit_config(self.create_audit_config(&mut *config.borrow_mut(), input)?);
 
-            if !composer.get_locker_mut().is_locked() {
+            if !composer.get_locker().borrow_mut().is_locked() {
                 installer.set_update(true);
             }
 
@@ -700,13 +703,14 @@ impl CreateProjectCommand {
             .into());
         }
 
-        let composer = self.create_composer_instance(
+        let composer_handle = self.create_composer_instance(
             input,
             io,
             Some(config.borrow_mut().all(0)?),
             disable_plugins,
             Some(disable_scripts),
         )?;
+        let composer = crate::command::composer_full(&composer_handle);
         let config = composer.get_config();
         // set the base dir here again on the new config instance, as otherwise in case the vendor dir is defined in an env var for example it would still override the value set above by $config->all()
         config.borrow_mut().set_base_dir(Some(directory.clone()));
@@ -910,7 +914,8 @@ impl CreateProjectCommand {
             .set_prefer_dist(prefer_dist);
 
         let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs.clone());
-        let im = composer.get_installation_manager();
+        let installation_manager = composer.get_installation_manager().clone();
+        let mut im = installation_manager.borrow_mut();
         im.set_output_progress(!no_progress);
         im.add_installer(Box::new(project_installer));
         let mut installed_repo = InstalledArrayRepository::new()?;
@@ -959,7 +964,7 @@ impl CreateProjectCommand {
         config: Option<indexmap::IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
-    ) -> Result<Composer> {
+    ) -> Result<PartialComposerHandle> {
         self.create_composer_instance(input, io, config, disable_plugins, disable_scripts)
     }
 

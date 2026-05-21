@@ -6,7 +6,6 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::package::dumper::ArrayDumper;
@@ -44,42 +43,49 @@ impl StatusCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let composer = self.require_composer(None, None)?;
+        let composer_rc = self.require_composer(None, None)?;
+        {
+            let composer = crate::command::composer_full(&composer_rc);
 
-        // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "status", input, output);
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch(Some(command_event.get_name()), None);
+            // TODO(plugin): dispatch CommandEvent
+            let command_event = CommandEvent::new(PluginEvents::COMMAND, "status", input, output);
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch(Some(command_event.get_name()), None);
 
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch_script(
-                ScriptEvents::PRE_STATUS_CMD,
-                true,
-                vec![],
-                indexmap::IndexMap::new(),
-            );
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::PRE_STATUS_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
+        }
 
         let exit_code = self.do_execute(input)?;
 
-        composer
-            .get_event_dispatcher()
-            .borrow_mut()
-            .dispatch_script(
-                ScriptEvents::POST_STATUS_CMD,
-                true,
-                vec![],
-                indexmap::IndexMap::new(),
-            );
+        {
+            let composer = crate::command::composer_full(&composer_rc);
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::POST_STATUS_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
+        }
 
         Ok(exit_code)
     }
 
     fn do_execute(&mut self, input: &dyn InputInterface) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
         // TODO(phase-b): release the &mut self borrow held by get_io via clone_box.
         let io_box = self.get_io().clone_box();
         let io: &dyn IOInterface = io_box.as_ref();
@@ -97,7 +103,7 @@ impl StatusCommand {
             .map(std::rc::Rc::clone)
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
         let mut guesser = VersionGuesser::new(
-            std::rc::Rc::clone(composer.get_config()),
+            composer.get_config(),
             std::rc::Rc::clone(&process_executor),
             parser.clone(),
             Some(io_box.clone_box()),
@@ -107,11 +113,13 @@ impl StatusCommand {
         let dm = composer.get_download_manager().clone();
         let packages: Vec<_> = composer
             .get_repository_manager()
+            .borrow()
             .get_local_repository()
             .get_canonical_packages();
         for package in packages {
             let target_dir = composer
-                .get_installation_manager_mut()
+                .get_installation_manager()
+                .borrow_mut()
                 .get_install_path(package.as_ref());
             let target_dir = match target_dir {
                 Some(d) => d,

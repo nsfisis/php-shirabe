@@ -12,7 +12,6 @@ use shirabe_external_packages::symfony::console::style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
@@ -80,7 +79,8 @@ impl LicensesCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
 
         // TODO(plugin): dispatch COMMAND event for plugin hooks
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "licenses", input, output);
@@ -95,7 +95,8 @@ impl LicensesCommand {
         let root_licenses_snap = composer.get_package().get_license().clone();
 
         let packages = if input.get_option("locked").as_bool().unwrap_or(false) {
-            let locker = composer.get_locker_mut();
+            let locker = composer.get_locker().clone();
+            let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
                 return Err(UnexpectedValueException {
                     message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),
@@ -106,7 +107,9 @@ impl LicensesCommand {
             let repo = locker.get_locked_repository(!no_dev)?;
             <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&repo)
         } else {
-            let repo = composer.get_repository_manager().get_local_repository();
+            let repository_manager = composer.get_repository_manager().clone();
+            let repository_manager = repository_manager.borrow();
+            let repo = repository_manager.get_local_repository();
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 RepositoryUtils::filter_required_packages(
                     &repo.get_packages(),

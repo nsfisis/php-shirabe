@@ -45,7 +45,7 @@ use shirabe_semver;
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::autoload::AutoloadGenerator;
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::GithubActionError;
 use crate::dependency_resolver::DefaultPolicy;
@@ -108,11 +108,11 @@ pub struct Installer {
     // TODO can we get rid of the below and just use the package itself?
     pub(crate) fixed_root_package: Box<dyn RootPackageInterface>,
     pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-    pub(crate) repository_manager: RepositoryManager,
-    pub(crate) locker: Locker,
-    pub(crate) installation_manager: InstallationManager,
+    pub(crate) repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
+    pub(crate) locker: std::rc::Rc<std::cell::RefCell<Locker>>,
+    pub(crate) installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
     pub(crate) event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-    pub(crate) autoload_generator: AutoloadGenerator,
+    pub(crate) autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     pub(crate) prefer_source: bool,
     pub(crate) prefer_dist: bool,
     pub(crate) optimize_autoloader: bool,
@@ -163,11 +163,11 @@ impl Installer {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         package: Box<dyn RootPackageInterface>,
         download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
-        repository_manager: RepositoryManager,
-        locker: Locker,
-        installation_manager: InstallationManager,
+        repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
+        locker: std::rc::Rc<std::cell::RefCell<Locker>>,
+        installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
         event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-        autoload_generator: AutoloadGenerator,
+        autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     ) -> Self {
         let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone_box());
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
@@ -235,10 +235,14 @@ impl Installer {
             }.into());
         }
 
-        let is_fresh_install = self.repository_manager.get_local_repository().is_fresh();
+        let is_fresh_install = self
+            .repository_manager
+            .borrow()
+            .get_local_repository()
+            .is_fresh();
 
         // Force update if there is no lock file present
-        if !self.update && !self.locker.is_locked() {
+        if !self.update && !self.locker.borrow_mut().is_locked() {
             self.io.write_error("<warning>No composer.lock file present. Updating dependencies to latest instead of installing from lock file. See https://getcomposer.org/install for more information.</warning>");
             self.update = true;
         }
@@ -289,6 +293,7 @@ impl Installer {
 
         let local_repo_box = self
             .repository_manager
+            .borrow()
             .get_local_repository()
             .clone_installed_repository_box();
 
@@ -316,7 +321,9 @@ impl Installer {
                         .as_bool()
                         .unwrap_or(false)
                 {
-                    self.installation_manager.notify_installs(&*self.io);
+                    self.installation_manager
+                        .borrow_mut()
+                        .notify_installs(&*self.io);
                 }
                 return Err(e);
             }
@@ -332,14 +339,19 @@ impl Installer {
                 .as_bool()
                 .unwrap_or(false)
         {
-            self.installation_manager.notify_installs(&*self.io);
+            self.installation_manager
+                .borrow_mut()
+                .notify_installs(&*self.io);
         }
 
         if self.update {
+            let locked_repository_box = self
+                .locker
+                .borrow_mut()
+                .get_locked_repository(self.dev_mode)?
+                .clone_box();
             let installed_repo = InstalledRepository::new(vec![
-                self.locker
-                    .get_locked_repository(self.dev_mode)?
-                    .clone_box(),
+                locked_repository_box,
                 Box::new(self.create_platform_repo(false)),
                 Box::new(RootPackageRepository::new(self.package.clone_box())),
             ]);
@@ -352,7 +364,7 @@ impl Installer {
         }
 
         // Find abandoned packages and warn user
-        let locked_repository = self.locker.get_locked_repository(true)?;
+        let locked_repository = self.locker.borrow_mut().get_locked_repository(true)?;
         for package in CanonicalPackagesTrait::get_packages(&locked_repository) {
             let complete = match package.as_complete_package() {
                 Some(p) if p.is_abandoned() => p,
@@ -382,33 +394,37 @@ impl Installer {
             }
 
             self.autoload_generator
+                .borrow_mut()
                 .set_class_map_authoritative(self.class_map_authoritative);
             self.autoload_generator
+                .borrow_mut()
                 .set_apcu(self.apcu_autoloader, self.apcu_autoloader_prefix.clone());
-            self.autoload_generator.set_run_scripts(self.run_scripts);
             self.autoload_generator
+                .borrow_mut()
+                .set_run_scripts(self.run_scripts);
+            self.autoload_generator
+                .borrow_mut()
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone_box());
-            self.autoload_generator.dump(
+            self.autoload_generator.borrow_mut().dump(
                 &*self.config.borrow(),
-                self.repository_manager.get_local_repository(),
+                self.repository_manager.borrow().get_local_repository(),
                 &*self.package,
-                &mut self.installation_manager,
+                &mut *self.installation_manager.borrow_mut(),
                 "composer",
                 self.optimize_autoloader,
                 None,
-                Some(&mut self.locker),
+                Some(&mut *self.locker.borrow_mut()),
                 false,
             )?;
         }
 
         if self.install && self.execute_operations {
             // force binaries re-generation in case they are missing
-            for package in self
-                .repository_manager
-                .get_local_repository()
-                .get_packages()
-            {
+            let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+            let repository_manager = repository_manager.borrow();
+            for package in repository_manager.get_local_repository().get_packages() {
                 self.installation_manager
+                    .borrow_mut()
                     .ensure_binaries_presence(&*package);
             }
         }
@@ -424,11 +440,9 @@ impl Installer {
 
         if show_funding {
             let mut funding_count: i64 = 0;
-            for package in self
-                .repository_manager
-                .get_local_repository()
-                .get_packages()
-            {
+            let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+            let repository_manager = repository_manager.borrow();
+            for package in repository_manager.get_local_repository().get_packages() {
                 if let Some(cp) = package.as_complete_package_interface() {
                     if package.as_alias_package().is_none() && !cp.get_funding().is_empty() {
                         funding_count += 1;
@@ -477,6 +491,7 @@ impl Installer {
             } else {
                 (
                     self.repository_manager
+                        .borrow()
                         .get_local_repository()
                         .get_canonical_packages(),
                     "installed",
@@ -492,7 +507,9 @@ impl Installer {
                     IndexMap::new(),
                     IndexMap::new(),
                 );
-                for repo in self.repository_manager.get_repositories() {
+                let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+                let repository_manager = repository_manager.borrow();
+                for repo in repository_manager.get_repositories() {
                     repo_set.add_repository(repo.clone_box())?;
                 }
 
@@ -546,8 +563,8 @@ impl Installer {
 
         let mut try_load_locked =
             || -> anyhow::Result<Result<Option<LockArrayRepository>, ParsingException>> {
-                if self.locker.is_locked() {
-                    match self.locker.get_locked_repository(true) {
+                if self.locker.borrow_mut().is_locked() {
+                    match self.locker.borrow_mut().get_locked_repository(true) {
                         Ok(r) => Ok(Ok(Some(r))),
                         Err(e) => match e.downcast::<ParsingException>() {
                             Ok(p) => Ok(Err(p)),
@@ -595,7 +612,9 @@ impl Installer {
         // creating repository set
         let policy = self.create_policy(true, locked_repository.as_ref());
         let mut repository_set = self.create_repository_set(true, &platform_repo, &aliases, None);
-        let repositories = self.repository_manager.get_repositories();
+        let repository_manager = std::rc::Rc::clone(&self.repository_manager);
+        let repository_manager = repository_manager.borrow();
+        let repositories = repository_manager.get_repositories();
         for repository in repositories {
             repository_set.add_repository(repository.clone_box())?;
         }
@@ -674,7 +693,7 @@ impl Installer {
 
             if self.minimal_update
                 && self.update_allow_list.is_none()
-                && self.locker.is_fresh().unwrap_or(false)
+                && self.locker.borrow_mut().is_fresh().unwrap_or(false)
             {
                 self.io.write_error("<warning>The --minimal-changes option should be used with package arguments or after modifying composer.json requirements, otherwise it will likely not yield any dependency changes.</warning>");
             }
@@ -852,7 +871,7 @@ impl Installer {
             .into_iter()
             .map(|(k, v)| (k, *v))
             .collect();
-        let updated_lock = self.locker.set_lock_data(
+        let updated_lock = self.locker.borrow_mut().set_lock_data(
             lock_transaction.get_new_lock_packages(false, self.update_mirrors),
             Some(lock_transaction.get_new_lock_packages(true, self.update_mirrors)),
             platform_reqs,
@@ -961,7 +980,10 @@ impl Installer {
             ));
         }
 
-        let locked_repository = self.locker.get_locked_repository(self.dev_mode)?;
+        let locked_repository = self
+            .locker
+            .borrow_mut()
+            .get_locked_repository(self.dev_mode)?;
 
         // verify that the lock file works with the current platform repository
         // we can skip this part if we're doing this as the second step after an update
@@ -989,7 +1011,7 @@ impl Installer {
                 Some(&locked_repository),
             );
 
-            if !self.locker.is_fresh()? {
+            if !self.locker.borrow_mut().is_fresh()? {
                 self.io.write_error3(
                     "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.</warning>",
                     true,
@@ -999,6 +1021,7 @@ impl Installer {
 
             let missing_requirement_info = self
                 .locker
+                .borrow_mut()
                 .get_missing_requirement_info(&*self.package, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
                 self.io.write_error(&missing_requirement_info.join("\n"));
@@ -1031,7 +1054,11 @@ impl Installer {
                 }
             }
 
-            for link in self.locker.get_platform_requirements(self.dev_mode)? {
+            for link in self
+                .locker
+                .borrow_mut()
+                .get_platform_requirements(self.dev_mode)?
+            {
                 if !root_requires.contains_key(link.get_target()) {
                     request
                         .require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
@@ -1148,8 +1175,8 @@ impl Installer {
         }
 
         if self.execute_operations {
-            local_repo.set_dev_package_names(self.locker.get_dev_package_names()?);
-            self.installation_manager.execute(
+            local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
+            self.installation_manager.borrow_mut().execute(
                 &mut *local_repo,
                 local_repo_transaction.get_operations(),
                 self.dev_mode,
@@ -1199,6 +1226,7 @@ impl Installer {
                 .collect()
         } else {
             self.locker
+                .borrow_mut()
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
@@ -1243,11 +1271,13 @@ impl Installer {
         } else {
             minimum_stability = self
                 .locker
+                .borrow_mut()
                 .get_minimum_stability()
                 .unwrap_or_else(|_| String::new());
             // TODO(phase-b): locker.get_stability_flags returns IndexMap<String, String>; convert to i64
             stability_flags = self
                 .locker
+                .borrow_mut()
                 .get_stability_flags()
                 .map(|m| {
                     m.into_iter()
@@ -1356,8 +1386,8 @@ impl Installer {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
         if !for_update {
-            prefer_stable = self.locker.get_prefer_stable().unwrap_or(None);
-            prefer_lowest = self.locker.get_prefer_lowest().unwrap_or(None);
+            prefer_stable = self.locker.borrow_mut().get_prefer_stable().unwrap_or(None);
+            prefer_lowest = self.locker.borrow_mut().get_prefer_lowest().unwrap_or(None);
         }
         // old lock file without prefer stable/lowest will return null
         // so in this case we use the composer.json info
@@ -1458,7 +1488,11 @@ impl Installer {
         if self.update_mirrors {
             let excluded_packages: IndexMap<String, i64> = if !include_dev_requires {
                 // TODO(phase-b): locker.get_dev_package_names returns Result<Vec<String>>
-                let names = self.locker.get_dev_package_names().unwrap_or_default();
+                let names = self
+                    .locker
+                    .borrow_mut()
+                    .get_dev_package_names()
+                    .unwrap_or_default();
                 names
                     .into_iter()
                     .enumerate()
@@ -1501,7 +1535,7 @@ impl Installer {
         if for_update {
             self.package.get_aliases().to_vec()
         } else {
-            self.locker.get_aliases().unwrap_or_default()
+            self.locker.borrow_mut().get_aliases().unwrap_or_default()
         }
     }
 
@@ -1600,12 +1634,19 @@ impl Installer {
     }
 
     /// Create Installer
-    pub fn create(io: Box<dyn IOInterface>, composer: &Composer) -> Self {
-        // TODO(phase-b): Installer::new takes owned manager/locker/etc., but Composer holds them
-        // by value without Clone (correct for PHP class semantics). Requires refactoring
-        // Installer to hold &/Rc references or moving ownership out of Composer.
-        let _ = (io, composer);
-        todo!()
+    pub fn create(io: Box<dyn IOInterface>, composer: &PartialComposerHandle) -> Self {
+        let composer = crate::composer::composer_full(composer);
+        Self::new(
+            io,
+            composer.get_config(),
+            composer.get_package().clone_box(),
+            composer.get_download_manager(),
+            composer.get_repository_manager(),
+            composer.get_locker(),
+            composer.get_installation_manager(),
+            composer.get_event_dispatcher(),
+            composer.get_autoload_generator(),
+        )
     }
 
     /// Packages of those types are ignored, by default php-ext and php-ext-zend are ignored
@@ -1928,7 +1969,7 @@ impl Installer {
     /// custom third-party installers.
     pub fn disable_plugins(&mut self) -> &mut Self {
         // TODO(plugin): plugin disabling is part of the plugin API
-        self.installation_manager.disable_plugins();
+        self.installation_manager.borrow_mut().disable_plugins();
 
         self
     }

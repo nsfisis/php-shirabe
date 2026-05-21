@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;

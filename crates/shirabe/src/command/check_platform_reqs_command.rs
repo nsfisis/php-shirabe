@@ -9,7 +9,6 @@ use shirabe_semver::constraint::Constraint;
 use shirabe_semver::constraint::ConstraintInterface;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
@@ -54,7 +53,8 @@ impl CheckPlatformReqsCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io();
 
         let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
@@ -71,16 +71,27 @@ impl CheckPlatformReqsCommand {
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            Box::new(composer.get_locker_mut().get_locked_repository(!no_dev)?)
+            Box::new(
+                composer
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(!no_dev)?,
+            )
         } else {
-            let local_repo = composer.get_repository_manager().get_local_repository();
+            let repository_manager = composer.get_repository_manager().clone();
+            let repository_manager = repository_manager.borrow();
+            let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages().is_empty() {
                 io.write_error(&format!(
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                Box::new(composer.get_locker_mut().get_locked_repository(!no_dev)?)
-                    as Box<dyn crate::repository::RepositoryInterface>
+                Box::new(
+                    composer
+                        .get_locker()
+                        .borrow_mut()
+                        .get_locked_repository(!no_dev)?,
+                ) as Box<dyn crate::repository::RepositoryInterface>
             } else {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names().clone();

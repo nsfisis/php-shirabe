@@ -37,6 +37,8 @@ pub mod suggests_command;
 pub mod update_command;
 pub mod validate_command;
 
+pub(crate) use crate::composer::{composer_full, composer_full_mut};
+
 pub use about_command::*;
 pub use archive_command::*;
 pub use audit_command::*;

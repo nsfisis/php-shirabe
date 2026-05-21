@@ -14,7 +14,8 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::Constraint;
 
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
@@ -595,7 +596,7 @@ impl HttpDownloader {
                         .parse_constraints(versions_value.as_string().unwrap_or(""))?;
                     let composer_constraint = Constraint::new(
                         "==",
-                        &version_parser.normalize(&Composer::get_version(), None)?,
+                        &version_parser.normalize(&composer::get_version(), None)?,
                     );
                     if !constraint.matches(&composer_constraint) {
                         continue;
@@ -633,7 +634,7 @@ impl HttpDownloader {
                         )?;
                         let composer_constraint = Constraint::new(
                             "==",
-                            &version_parser.normalize(&Composer::get_version(), None)?,
+                            &version_parser.normalize(&composer::get_version(), None)?,
                         );
                         if !constraint.matches(&composer_constraint) {
                             continue;

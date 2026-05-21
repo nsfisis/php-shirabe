@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Command/ClearCacheCommand.php
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::factory::Factory;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
@@ -32,7 +33,7 @@ impl ClearCacheCommand {
         _output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
         // TODO(phase-b): port full execute logic once Config sharing model is settled
-        let _ = Composer::VERSION;
+        let _ = composer::VERSION;
         let _: IndexMap<String, String> = IndexMap::new();
         let _ = Factory::create_config(None, None);
         todo!("phase-b: ClearCacheCommand::execute requires Config sharing strategy")

@@ -5,7 +5,6 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
@@ -157,7 +156,8 @@ impl ValidateCommand {
             validator.validate(&file, check_all, check_version);
 
         let mut lock_errors: Vec<String> = vec![];
-        let mut composer = self.create_composer_instance(input, io, None, false, None)?;
+        let composer = self.create_composer_instance(input, io, None, false, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
         let check_lock = (check_lock
             && composer
                 .get_config()
@@ -169,7 +169,8 @@ impl ValidateCommand {
         // TODO(phase-b): get_missing_requirement_info needs &package from composer while
         // locker holds &mut composer; cloning lock state isn't trivial. Use todo!() for the
         // package-arg subexpression below.
-        let locker = composer.get_locker_mut();
+        let locker = composer.get_locker().clone();
+        let mut locker = locker.borrow_mut();
         if locker.is_locked() && !locker.is_fresh()? {
             lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `composer update` or `composer update <package name>`.".to_string());
         }
@@ -208,11 +209,13 @@ impl ValidateCommand {
         {
             let packages = composer
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .get_packages();
             for package in packages {
                 let path = composer
-                    .get_installation_manager_mut()
+                    .get_installation_manager()
+                    .borrow_mut()
                     .get_install_path(package.as_ref());
                 let path = match path {
                     Some(p) => p,

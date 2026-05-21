@@ -9,14 +9,13 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, is_link, preg_quote, realpath, rmdir, rtrim, strpos,
 };
 
-use crate::composer::Composer;
+use crate::composer::PartialComposerWeakHandle;
 use crate::downloader::DownloadManager;
 use crate::installer::BinaryInstaller;
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
-use crate::partial_composer::PartialComposer;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
@@ -25,7 +24,7 @@ use crate::util::Silencer;
 /// Package installation manager.
 #[derive(Debug)]
 pub struct LibraryInstaller {
-    pub(crate) composer: PartialComposer,
+    pub(crate) composer: PartialComposerWeakHandle,
     pub(crate) vendor_dir: String,
     pub(crate) download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
     pub(crate) io: Box<dyn IOInterface>,
@@ -38,26 +37,26 @@ impl LibraryInstaller {
     /// Initializes library installer.
     pub fn new(
         io: Box<dyn IOInterface>,
-        composer: PartialComposer,
+        composer: PartialComposerWeakHandle,
         r#type: Option<String>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
-        // PHP: $this->downloadManager = $composer instanceof Composer ? $composer->getDownloadManager() : null;
-        // TODO(phase-b): PartialComposer cannot downcast to Composer in this Rust port.
-        let download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>> =
-            if let Some(_full_composer) = composer.as_any().downcast_ref::<Composer>() {
-                // TODO(phase-b): clone or borrow the DownloadManager from the full Composer
-                Some(todo!("composer.get_download_manager() as DownloadManager"))
-            } else {
-                None
-            };
+        let composer_rc = composer
+            .upgrade()
+            .expect("LibraryInstaller must lives longer than Composer");
+
+        let download_manager = composer_rc
+            .as_full()
+            .map(|full| full.borrow().get_download_manager());
+
+        let composer_ref = composer_rc.borrow_partial();
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = rtrim(
             // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
-            &composer
+            &composer_ref
                 .get_config()
                 .borrow_mut()
                 .get_str("vendor-dir")
@@ -69,7 +68,7 @@ impl LibraryInstaller {
                 // TODO(phase-b): pass io by reference/clone
                 todo!("io reference"),
                 rtrim(
-                    &composer
+                    &composer_ref
                         .get_config()
                         .borrow_mut()
                         .get_str("bin-dir")
@@ -77,7 +76,7 @@ impl LibraryInstaller {
                     Some("/"),
                 ),
                 // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
-                composer
+                composer_ref
                     .get_config()
                     .borrow_mut()
                     .get_str("bin-compat")

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/InstallerEvent.php
 
-use crate::composer::Composer;
+use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
 use crate::event_dispatcher::Event;
 use crate::io::IOInterface;
@@ -8,7 +8,7 @@ use crate::io::IOInterface;
 #[derive(Debug)]
 pub struct InstallerEvent {
     inner: Event,
-    composer: Composer,
+    composer: ComposerWeakHandle,
     io: Box<dyn IOInterface>,
     dev_mode: bool,
     execute_operations: bool,
@@ -18,7 +18,7 @@ pub struct InstallerEvent {
 impl InstallerEvent {
     pub fn new(
         event_name: String,
-        composer: Composer,
+        composer: ComposerWeakHandle,
         io: Box<dyn IOInterface>,
         dev_mode: bool,
         execute_operations: bool,
@@ -35,7 +35,7 @@ impl InstallerEvent {
         }
     }
 
-    pub fn get_composer(&self) -> &Composer {
+    pub fn get_composer(&self) -> &ComposerWeakHandle {
         &self.composer
     }
 

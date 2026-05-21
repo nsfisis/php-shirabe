@@ -7,7 +7,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
@@ -184,6 +183,9 @@ impl RunScriptCommand {
         }
 
         let composer = self.require_composer(None, None)?;
+        let dispatcher = crate::command::composer_full(&composer)
+            .get_event_dispatcher()
+            .clone();
         let dev_mode = input.get_option("dev").as_bool().unwrap_or(false)
             || !input.get_option("no-dev").as_bool().unwrap_or(false);
         // TODO(phase-b): ScriptEvent::new takes Composer/IOInterface by value; placeholder construction.
@@ -224,8 +226,7 @@ impl RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        Ok(composer
-            .get_event_dispatcher()
+        Ok(dispatcher
             .borrow_mut()
             .dispatch_script(&script, dev_mode, args, IndexMap::new())?)
     }
@@ -254,10 +255,11 @@ impl RunScriptCommand {
     }
 
     fn get_scripts(&mut self) -> Result<Vec<(String, String)>> {
-        let scripts = self
-            .require_composer(None, None)?
+        let composer = self.require_composer(None, None)?;
+        let scripts = crate::command::composer_full(&composer)
             .get_package()
             .get_scripts();
+        drop(composer);
         if scripts.is_empty() {
             return Ok(vec![]);
         }

@@ -100,9 +100,10 @@ impl InstallCommand {
             return Ok(1);
         }
 
-        let mut composer = self.require_composer(None, None)?;
+        let composer_handle = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer_handle);
 
-        if !composer.get_locker_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
+        if !composer.get_locker().borrow_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
             io.write_error("<warning>Composer is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
         }
 
@@ -113,9 +114,9 @@ impl InstallCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let mut install = Installer::create(io.clone_box(), &composer);
+        let mut install = Installer::create(io.clone_box(), &composer_handle);
 
-        let config = std::rc::Rc::clone(composer.get_config());
+        let config = composer.get_config();
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
@@ -153,7 +154,8 @@ impl InstallCommand {
                 .unwrap_or(false);
 
         composer
-            .get_installation_manager_mut()
+            .get_installation_manager()
+            .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
         install

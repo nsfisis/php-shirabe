@@ -10,7 +10,7 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{LogicException, get_debug_type};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
@@ -68,13 +68,12 @@ impl ArchiveCommand {
         output: &dyn OutputInterface,
     ) -> Result<i64> {
         let composer = self.try_composer(None, None);
-        let mut config: Option<std::rc::Rc<std::cell::RefCell<Config>>> = None;
 
-        if let Some(ref composer) = composer {
-            config = Some(std::rc::Rc::clone(composer.get_config()));
+        let config = if let Some(ref composer) = composer {
+            let config = composer.borrow_partial().get_config();
             // TODO(plugin): dispatch CommandEvent
             let command_event = CommandEvent::new(PluginEvents::COMMAND, "archive", input, output);
-            let event_dispatcher = composer.get_event_dispatcher();
+            let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
             event_dispatcher
                 .borrow_mut()
                 .dispatch(Some(command_event.get_name()), None);
@@ -84,11 +83,9 @@ impl ArchiveCommand {
                 vec![],
                 indexmap::IndexMap::new(),
             );
-        }
-
-        let config = match config {
-            Some(c) => c,
-            None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
+            config
+        } else {
+            std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?))
         };
 
         let format = input
@@ -143,18 +140,19 @@ impl ArchiveCommand {
             composer.as_ref(),
         )?;
 
-        if return_code == 0 {
-            if let Some(ref composer) = composer {
-                composer
-                    .get_event_dispatcher()
-                    .borrow_mut()
-                    .dispatch_script(
-                        ScriptEvents::POST_ARCHIVE_CMD,
-                        true,
-                        vec![],
-                        indexmap::IndexMap::new(),
-                    );
-            }
+        if return_code == 0
+            && let Some(ref composer) = composer
+        {
+            composer
+                .borrow_partial()
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::POST_ARCHIVE_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
         }
 
         Ok(return_code)
@@ -170,11 +168,16 @@ impl ArchiveCommand {
         dest: &str,
         file_name: Option<String>,
         ignore_filters: bool,
-        composer: Option<&Composer>,
+        composer: Option<&PartialComposerHandle>,
     ) -> Result<i64> {
+        let composer_guard = composer.map(crate::command::composer_full);
         let owned_archive_manager;
-        let archive_manager: &ArchiveManager = if let Some(composer) = composer {
-            composer.get_archive_manager()
+        let composer_archive_manager;
+        let composer_archive_manager_ref;
+        let archive_manager: &ArchiveManager = if let Some(composer) = &composer_guard {
+            composer_archive_manager = composer.get_archive_manager().clone();
+            composer_archive_manager_ref = composer_archive_manager.borrow();
+            &composer_archive_manager_ref
         } else {
             let factory = Factory;
             let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())));
@@ -198,7 +201,10 @@ impl ArchiveCommand {
                 None => return Ok(1),
             }
         } else {
-            self.require_composer(None, None)?.get_package().clone_box()
+            let _rc = self.require_composer(None, None)?;
+            crate::command::composer_full(&_rc)
+                .get_package()
+                .clone_box()
         };
 
         io.write_error(&format!(
@@ -244,12 +250,14 @@ impl ArchiveCommand {
         let repo;
 
         if let Some(composer) = self.try_composer(None, None) {
-            let local_repo = composer.get_repository_manager().get_local_repository();
+            let composer = crate::command::composer_full(&composer);
+            let repository_manager = composer.get_repository_manager().clone();
+            let repository_manager = repository_manager.borrow();
+            let local_repo = repository_manager.get_local_repository();
             let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
                 vec![local_repo.clone_box()];
             repos.extend(
-                composer
-                    .get_repository_manager()
+                repository_manager
                     .get_repositories()
                     .iter()
                     .map(|r| r.clone_box()),

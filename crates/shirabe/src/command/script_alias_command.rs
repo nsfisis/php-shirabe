@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
@@ -98,6 +97,9 @@ impl ScriptAliasCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
+        let dispatcher = crate::command::composer_full(&composer)
+            .get_event_dispatcher()
+            .clone();
 
         let args = input.get_arguments();
 
@@ -136,8 +138,7 @@ impl ScriptAliasCommand {
             })
             .unwrap_or_default();
 
-        Ok(composer
-            .get_event_dispatcher()
+        Ok(dispatcher
             .borrow_mut()
             .dispatch_script(&self.script, dev_mode, args_value, flags)?)
     }

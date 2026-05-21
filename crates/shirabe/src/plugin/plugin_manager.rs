@@ -15,7 +15,8 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::Constraint;
 
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
+use crate::composer::{ComposerHandle, ComposerWeakHandle};
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
@@ -26,7 +27,6 @@ use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::version::VersionParser;
-use crate::partial_composer::PartialComposer;
 use crate::plugin::Capable;
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
@@ -48,9 +48,9 @@ pub enum DisablePlugins {
 
 #[derive(Debug)]
 pub struct PluginManager {
-    pub(crate) composer: Composer,
+    pub(crate) composer: ComposerWeakHandle,
     pub(crate) io: Box<dyn IOInterface>,
-    pub(crate) global_composer: Option<PartialComposer>,
+    pub(crate) global_composer: Option<PartialComposerHandle>,
     pub(crate) version_parser: VersionParser,
     pub(crate) disable_plugins: DisablePlugins,
     pub(crate) plugins: Vec<Box<dyn PluginInterface>>,
@@ -71,17 +71,34 @@ static mut CLASS_COUNTER: i64 = 0;
 impl PluginManager {
     pub fn new(
         io: Box<dyn IOInterface>,
-        mut composer: Composer,
-        global_composer: Option<PartialComposer>,
+        composer: ComposerWeakHandle,
+        global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
     ) -> Self {
-        let allow_plugins_config = composer.get_config().borrow().get("allow-plugins").clone();
+        let composer_rc = composer
+            .upgrade()
+            .expect("PluginManager must not outlive Composer");
+        let allow_plugins_config = composer_rc
+            .borrow()
+            .get_config()
+            .borrow()
+            .get("allow-plugins")
+            .clone();
+        let locker = composer_rc.borrow().get_locker().clone();
+        let mut locker = locker.borrow_mut();
         let allow_plugin_rules =
-            Self::parse_allowed_plugins(allow_plugins_config, Some(composer.get_locker_mut()));
+            Self::parse_allowed_plugins(allow_plugins_config, Some(&mut *locker));
+        drop(locker);
         let allow_global_plugin_rules = Self::parse_allowed_plugins(
             global_composer
                 .as_ref()
-                .map(|gc| gc.get_config().borrow_mut().get("allow-plugins").clone())
+                .map(|gc| {
+                    gc.borrow_partial()
+                        .get_config()
+                        .borrow_mut()
+                        .get("allow-plugins")
+                        .clone()
+                })
                 .unwrap_or(PhpMixed::Bool(false)),
             None,
         );
@@ -103,6 +120,14 @@ impl PluginManager {
         self.running_in_global_dir = running_in_global_dir;
     }
 
+    /// Upgrades the weak Composer back-reference to a full handle. PHP holds a strong
+    /// `Composer`; the Rust port keeps it weak to break the Composer/PluginManager cycle.
+    fn composer_full(&self) -> ComposerHandle {
+        self.composer
+            .upgrade()
+            .expect("PluginManager must not outlive Composer")
+    }
+
     /// Loads all plugins from currently installed plugin packages
     pub fn load_installed_plugins(&mut self) -> anyhow::Result<()> {
         // TODO(plugin): plugin loading is part of the plugin API
@@ -111,13 +136,15 @@ impl PluginManager {
             // box here to side-step a borrow conflict between `&self.composer` and
             // `&mut self`. The Rust port should eventually share via Rc<RefCell<_>>.
             let repo: Box<dyn RepositoryInterface> = self
-                .composer
+                .composer_full()
+                .borrow()
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box();
             // The root package borrow is also tied to `self.composer`; clone the package box
             // for the same reason as above.
-            let root_package = self.composer.get_package().clone_box();
+            let root_package = self.composer_full().borrow().get_package().clone_box();
             self.load_repository(&*repo, false, Some(&*root_package))?;
         }
 
@@ -126,7 +153,9 @@ impl PluginManager {
                 .global_composer
                 .as_ref()
                 .unwrap()
+                .borrow_partial()
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box();
             self.load_repository(&*repo, true, None)?;
@@ -139,8 +168,10 @@ impl PluginManager {
         // TODO(plugin): deactivation is part of the plugin API
         if !self.are_plugins_disabled("local") {
             let repo: Box<dyn RepositoryInterface> = self
-                .composer
+                .composer_full()
+                .borrow()
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box();
             self.deactivate_repository(&*repo, false);
@@ -151,7 +182,9 @@ impl PluginManager {
                 .global_composer
                 .as_ref()
                 .unwrap()
+                .borrow_partial()
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box();
             self.deactivate_repository(&*repo, true);
@@ -171,7 +204,7 @@ impl PluginManager {
     }
 
     /// Gets global composer or null when main composer is not fully loaded
-    pub fn get_global_composer(&self) -> Option<&PartialComposer> {
+    pub fn get_global_composer(&self) -> Option<&PartialComposerHandle> {
         self.global_composer.as_ref()
     }
 
@@ -329,8 +362,10 @@ impl PluginManager {
         for plugin in plugins {
             match plugin {
                 PluginOrInstaller::Installer(inst) => {
-                    self.composer
-                        .get_installation_manager_mut()
+                    self.composer_full()
+                        .borrow()
+                        .get_installation_manager()
+                        .borrow_mut()
                         .remove_installer(&*inst);
                 }
                 PluginOrInstaller::Plugin(p) => {
@@ -354,8 +389,10 @@ impl PluginManager {
         for plugin in plugins {
             match plugin {
                 PluginOrInstaller::Installer(inst) => {
-                    self.composer
-                        .get_installation_manager_mut()
+                    self.composer_full()
+                        .borrow()
+                        .get_installation_manager()
+                        .borrow_mut()
                         .remove_installer(&*inst);
                 }
                 PluginOrInstaller::Plugin(mut p) => {
@@ -426,7 +463,7 @@ impl PluginManager {
                 String::new()
             }
         ));
-        plugin.activate(&self.composer, &*self.io);
+        plugin.activate(&self.composer_full(), &*self.io);
 
         // TODO(plugin): if plugin is EventSubscriberInterface, hook into the event dispatcher
         // The PHP code calls $this->composer->getEventDispatcher()->addSubscriber($plugin);
@@ -453,7 +490,7 @@ impl PluginManager {
         self.io
             .write_error(&format!("Unloading plugin {}", get_class_obj(plugin)));
         let mut removed = self.plugins.remove(index);
-        removed.deactivate(&self.composer, &*self.io);
+        removed.deactivate(&self.composer_full(), &*self.io);
 
         // TODO(plugin): remove_listener accepts any callable/object in PHP; here we have
         // a plugin instance and need to translate to a Callable, which is not portable
@@ -466,7 +503,7 @@ impl PluginManager {
         // TODO(plugin): plugin uninstall hook
         self.io
             .write_error(&format!("Uninstalling plugin {}", get_class_obj(plugin)));
-        plugin.uninstall(&self.composer, &*self.io);
+        plugin.uninstall(&self.composer_full(), &*self.io);
     }
 
     fn load_repository(
@@ -605,16 +642,20 @@ impl PluginManager {
     fn get_install_path(&mut self, package: &dyn PackageInterface, global: bool) -> Option<String> {
         if !global {
             return self
-                .composer
-                .get_installation_manager_mut()
+                .composer_full()
+                .borrow()
+                .get_installation_manager()
+                .borrow_mut()
                 .get_install_path(package);
         }
 
         // PHP: assert(null !== $this->globalComposer);
         self.global_composer
-            .as_mut()
+            .as_ref()
             .unwrap()
-            .get_installation_manager_mut()
+            .borrow_partial()
+            .get_installation_manager()
+            .borrow_mut()
             .get_install_path(package)
     }
 
@@ -821,13 +862,17 @@ impl PluginManager {
         }
 
         if self.io.is_interactive() && prompt {
-            // TODO(plugin): interactive consent flow — preserved as a stub
-            let composer_ref: &Composer = if is_global_plugin && self.global_composer.is_some() {
-                // PHP allows PartialComposer here; treat as the same dispatch surface in the stub.
-                &self.composer
-            } else {
-                &self.composer
-            };
+            // TODO(plugin): interactive consent flow — preserved as a stub. PHP picks
+            // $this->globalComposer's config when is_global_plugin; the stub uses the
+            // local composer's config in both cases. Access the `composer` field directly
+            // (not via `composer_full()`) so the borrow stays disjoint from `rules`.
+            let config = self
+                .composer
+                .upgrade()
+                .expect("PluginManager must not outlive Composer")
+                .borrow()
+                .get_config()
+                .clone();
 
             self.io.write_error(&format!("<warning>{}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>",
                 package,
@@ -860,17 +905,13 @@ impl PluginManager {
 
                         // persist answer in composer.json if it wasn't simply discarded
                         if answer_str == "y" || answer_str == "n" {
-                            let allow_plugins_value = composer_ref
-                                .get_config()
-                                .borrow_mut()
-                                .get("allow-plugins")
-                                .clone();
+                            let allow_plugins_value =
+                                config.borrow_mut().get("allow-plugins").clone();
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
                                 allow_plugins
                                     .insert(package.to_string(), Box::new(PhpMixed::Bool(allow)));
-                                if composer_ref
-                                    .get_config()
+                                if config
                                     .borrow_mut()
                                     .get("sort-packages")
                                     .as_bool()
@@ -878,8 +919,7 @@ impl PluginManager {
                                 {
                                     ksort(&mut allow_plugins);
                                 }
-                                composer_ref
-                                    .get_config()
+                                config
                                     .borrow_mut()
                                     .get_config_source_mut()
                                     .add_config_setting(

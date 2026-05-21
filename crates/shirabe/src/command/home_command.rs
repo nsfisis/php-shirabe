@@ -6,7 +6,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{FILTER_VALIDATE_URL, PhpMixed, filter_var};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
@@ -90,12 +89,9 @@ impl HomeCommand {
 
         let packages = if packages.is_empty() {
             io.write_error("No package specified, opening homepage for the root package");
-            vec![
-                self.require_composer(None, None)?
-                    .get_package()
-                    .get_name()
-                    .to_string(),
-            ]
+            let composer_rc = self.require_composer(None, None)?;
+            let composer_ref = crate::command::composer_full(&composer_rc);
+            vec![composer_ref.get_package().get_name().to_string()]
         } else {
             packages
         };
@@ -209,6 +205,7 @@ impl HomeCommand {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
+            let composer = crate::command::composer_full(&composer);
             let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
             repos.push(Box::new(RootPackageRepository::new(
                 composer.get_package().clone_box(),

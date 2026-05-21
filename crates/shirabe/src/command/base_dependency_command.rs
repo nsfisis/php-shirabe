@@ -47,7 +47,8 @@ pub trait BaseDependencyCommand: BaseCommand {
         output: &dyn OutputInterface,
         inverted: bool,
     ) -> anyhow::Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
@@ -56,7 +57,8 @@ pub trait BaseDependencyCommand: BaseCommand {
         )));
 
         if input.get_option("locked").as_bool().unwrap_or(false) {
-            let locker = composer.get_locker_mut();
+            let locker = composer.get_locker().clone();
+            let mut locker = locker.borrow_mut();
 
             if !locker.is_locked() {
                 return Err(anyhow::anyhow!(UnexpectedValueException {
@@ -78,7 +80,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 platform_overrides,
             )?));
         } else {
-            let local_repo = composer.get_repository_manager().get_local_repository();
+            let repository_manager = composer.get_repository_manager().clone();
+            let repository_manager = repository_manager.borrow();
+            let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 
             if local_repo.get_packages().len() == 0
@@ -142,7 +146,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let default_repos = CompositeRepository::new(
                 RepositoryFactory::default_repos(
                     Some(self.get_io()),
-                    Some(std::rc::Rc::clone(composer.get_config())),
+                    Some(composer.get_config()),
                     // TODO(phase-b): get_repository_manager returns &; default_repos needs &mut
                     Some(todo!("share repository_manager as &mut")),
                 )?

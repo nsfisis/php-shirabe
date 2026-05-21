@@ -13,7 +13,8 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::Constraint;
 
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
@@ -153,7 +154,7 @@ impl PlatformRepository {
             }
         }
 
-        let mut pretty_version = Composer::get_version();
+        let mut pretty_version = composer::get_version();
         let mut version = self
             .version_parser
             .as_ref()
@@ -181,7 +182,7 @@ impl PlatformRepository {
         composer_plugin_api.set_description("The Composer Plugin API".to_string());
         self.add_package(Box::new(composer_plugin_api))?;
 
-        pretty_version = Composer::RUNTIME_API_VERSION.to_string();
+        pretty_version = composer::RUNTIME_API_VERSION.to_string();
         version = self
             .version_parser
             .as_ref()

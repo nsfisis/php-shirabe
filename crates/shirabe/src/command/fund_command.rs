@@ -13,7 +13,6 @@ use shirabe_semver::constraint::ConstraintInterface;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
@@ -51,11 +50,13 @@ impl FundCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
+        let composer = crate::command::composer_full(&composer);
 
-        let repo = composer.get_repository_manager().get_local_repository();
+        let repository_manager = composer.get_repository_manager().clone();
+        let repository_manager = repository_manager.borrow();
+        let repo = repository_manager.get_local_repository();
         let remote_repos = CompositeRepository::new(
-            composer
-                .get_repository_manager()
+            repository_manager
                 .get_repositories()
                 .iter()
                 .map(|r| r.clone_box())

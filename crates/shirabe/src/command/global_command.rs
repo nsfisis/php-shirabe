@@ -10,7 +10,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::io::IOInterface;

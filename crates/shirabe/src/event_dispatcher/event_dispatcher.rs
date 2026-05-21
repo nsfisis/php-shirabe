@@ -19,7 +19,8 @@ use shirabe_php_shim::{
 };
 
 use crate::autoload::ClassLoader;
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
+use crate::composer::PartialComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::event_dispatcher::Event;
@@ -31,7 +32,6 @@ use crate::installer::PackageEvent;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
-use crate::partial_composer::PartialComposer;
 use crate::plugin::CommandEvent;
 use crate::plugin::PreCommandRunEvent;
 use crate::repository::RepositoryInterface;
@@ -62,7 +62,7 @@ pub enum Callable {
 ///     `$dispatcher->dispatch(ScriptEvents::POST_INSTALL_CMD);`
 #[derive(Debug)]
 pub struct EventDispatcher {
-    pub(crate) composer: Box<PartialComposer>,
+    pub(crate) composer: PartialComposerWeakHandle,
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) loader: Option<ClassLoader>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -76,7 +76,7 @@ pub struct EventDispatcher {
 
 impl EventDispatcher {
     pub fn new(
-        composer: PartialComposer,
+        composer: PartialComposerWeakHandle,
         io: Box<dyn IOInterface>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
@@ -92,7 +92,7 @@ impl EventDispatcher {
             .filter(|val| val != "")
             .collect();
         Self {
-            composer: Box::new(composer),
+            composer,
             io,
             loader: None,
             process,
@@ -144,10 +144,15 @@ impl EventDispatcher {
         additional_args: Vec<String>,
         flags: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<i64> {
-        let composer = self.composer_as_full_or_panic();
+        let composer = self.composer();
+        assert!(
+            composer.is_full(),
+            "This should only be reached with a fully loaded Composer"
+        );
+
         let event = ScriptEvent::new(
             event_name.to_string(),
-            composer,
+            composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
             additional_args,
@@ -165,10 +170,15 @@ impl EventDispatcher {
         operations: Vec<Box<dyn OperationInterface>>,
         operation: Box<dyn OperationInterface>,
     ) -> anyhow::Result<i64> {
-        let composer = self.composer_as_full_or_panic();
+        let composer = self.composer();
+        assert!(
+            composer.is_full(),
+            "This should only be reached with a fully loaded Composer"
+        );
+
         let event = PackageEvent::new(
             event_name.to_string(),
-            composer,
+            composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
             local_repo,
@@ -186,10 +196,15 @@ impl EventDispatcher {
         execute_operations: bool,
         transaction: Transaction,
     ) -> anyhow::Result<i64> {
-        let composer = self.composer_as_full_or_panic();
+        let composer = self.composer();
+        assert!(
+            composer.is_full(),
+            "This should only be reached with a fully loaded Composer"
+        );
+
         let event = InstallerEvent::new(
             event_name.to_string(),
-            composer,
+            composer.as_full().expect("checked above").downgrade(),
             self.io_clone(),
             dev_mode,
             execute_operations,
@@ -438,10 +453,14 @@ impl EventDispatcher {
                                 ), true, crate::io::QUIET);
                             }
 
-                            let composer_full = self.composer_as_full_or_panic();
+                            // TODO(plugin): reached only with a fully loaded Composer (script dispatch asserts full upstream).
+                            let composer = self.composer();
                             let mut script_event = ScriptEvent::new(
                                 script_name.clone(),
-                                composer_full,
+                                composer
+                                    .as_full()
+                                    .expect("script dispatch requires a fully loaded Composer")
+                                    .downgrade(),
                                 self.io_clone(),
                                 // event.isDevMode() is only on InstallerEvent/ScriptEvent/PackageEvent
                                 // TODO(plugin): proper dev_mode propagation when polymorphic event is supported
@@ -678,7 +697,13 @@ impl EventDispatcher {
                             );
                         }
 
-                        let possible_local_binaries = self.composer.get_package().get_binaries();
+                        let possible_local_binaries = self
+                            .composer
+                            .upgrade()
+                            .expect("Composer was dropped before EventDispatcher use")
+                            .borrow_partial()
+                            .get_package()
+                            .get_binaries();
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
                                 if Preg::is_match(
@@ -1052,7 +1077,9 @@ impl EventDispatcher {
 
     /// Finds all listeners defined as scripts in the package
     fn get_script_listeners(&self, event: &Event) -> Vec<Callable> {
-        let package = self.composer.get_package();
+        let composer = self.composer();
+        let composer = composer.borrow_partial();
+        let package = composer.get_package();
         let scripts = package.get_scripts();
 
         // TODO(phase-b): RootPackage::get_scripts() returns Vec<String> per event;
@@ -1132,7 +1159,8 @@ impl EventDispatcher {
 
         // add the bin dir to the PATH to make local binaries of deps usable in scripts
         let bin_dir = self
-            .composer
+            .composer()
+            .borrow_partial()
             .get_config()
             .borrow_mut()
             .get("bin-dir")
@@ -1198,15 +1226,12 @@ impl EventDispatcher {
     }
 
     fn make_autoloader(&mut self, event: &Event, callable: &Callable) {
+        let composer = self.composer();
         // TODO(plugin): full autoloader rebuild on plugin-supplied callables — currently a stub.
-        // TODO(phase-b): composer_as_full() returns Option<&Composer> borrowed from &self,
-        // which conflicts with &mut self updates further down (previous_listeners,
-        // previous_hash, loader). Resolve when Composer ownership is shared. For now,
-        // short-circuit before any mutable use and fabricate the rest via todo!().
-        if self.composer_as_full().is_none() {
+        let Some(composer) = composer.as_full() else {
             return;
-        }
-        let composer: &Composer = todo!("composer_as_full borrows &self; needs shared ownership");
+        };
+        let composer = composer.borrow_mut();
 
         let callable_key = match callable {
             Callable::ArrayCallable(first, method) => {
@@ -1228,9 +1253,11 @@ impl EventDispatcher {
         let package = composer.get_package();
         let packages = composer
             .get_repository_manager()
+            .borrow()
             .get_local_repository()
             .get_canonical_packages();
-        let mut generator = composer.get_autoload_generator();
+        let generator = composer.get_autoload_generator().clone();
+        let generator = generator.borrow();
         let mut hash_input = packages
             .iter()
             .map(|p: &Box<dyn PackageInterface>| format!("{}/{}", p.get_name(), p.get_version()))
@@ -1249,7 +1276,7 @@ impl EventDispatcher {
 
         // TODO(phase-b): build_package_map needs &mut InstallationManager and returns Result;
         // Composer is &Composer here so we cannot take a mut borrow. Defer until shared ownership.
-        let _ = generator;
+        let _ = &generator;
         let _ = packages;
         let package_map: Vec<(Box<dyn PackageInterface>, Option<String>)> =
             todo!("build_package_map requires &mut InstallationManager");
@@ -1280,22 +1307,10 @@ impl EventDispatcher {
         todo!("clone Box<dyn IOInterface>")
     }
 
-    fn composer_as_full(&self) -> Option<&Composer> {
-        // TODO(phase-b): PartialComposer ↔ Composer downcasting requires Phase B design.
-        None
-    }
-
-    fn composer_as_full_or_panic(&self) -> Composer {
-        // assert($this->composer instanceof Composer, ...)
-        assert!(
-            self.composer_as_full().is_some(),
-            "This should only be reached with a fully loaded Composer"
-        );
-        let _ = LogicException {
-            message: "This should only be reached with a fully loaded Composer".to_string(),
-            code: 0,
-        };
-        todo!("clone Composer out of PartialComposer in Phase B")
+    fn composer(&self) -> PartialComposerHandle {
+        self.composer
+            .upgrade()
+            .expect("EventDispatcher must lives longer than Composer")
     }
 
     fn is_empty_value(value: &PhpMixed) -> bool {

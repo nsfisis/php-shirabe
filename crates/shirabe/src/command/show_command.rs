@@ -16,7 +16,7 @@ use shirabe_php_shim::{
 use shirabe_semver::constraint::ConstraintInterface;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
@@ -179,6 +179,7 @@ impl ShowCommand {
         // init repos
         let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
+            let composer = crate::command::composer_full(composer);
             if let Some(p) = composer
                 .get_config()
                 .borrow()
@@ -208,7 +209,10 @@ impl ShowCommand {
             && input.get_option("installed").as_bool() != Some(true)
             && input.get_option("locked").as_bool() != Some(true)
         {
-            let package = self.require_composer(None, None)?.get_package().clone_box();
+            let _rc = self.require_composer(None, None)?;
+            let package = crate::command::composer_full(&_rc)
+                .get_package()
+                .clone_box();
             if input.get_option("name-only").as_bool() == Some(true) {
                 self.get_io().write(package.get_name());
 
@@ -239,9 +243,11 @@ impl ShowCommand {
         } else if input.get_option("available").as_bool() == Some(true) {
             let mut ir = InstalledRepository::new(vec![Box::new(make_platform_repo()?)]);
             if let Some(ref composer) = composer {
+                let composer = crate::command::composer_full(composer);
                 repos = Box::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
+                        .borrow()
                         .get_repositories()
                         .iter()
                         .map(|r| r.clone_box())
@@ -250,6 +256,7 @@ impl ShowCommand {
                 ir.add_repository(
                     composer
                         .get_repository_manager()
+                        .borrow()
                         .get_local_repository()
                         .clone_box(),
                 );
@@ -268,12 +275,14 @@ impl ShowCommand {
                 installed_repo = Box::new(ir);
             }
         } else if input.get_option("all").as_bool() == Some(true) && composer.is_some() {
-            let composer_ref = composer.as_mut().unwrap();
+            let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let local_repo_cloned = composer_ref
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box();
-            let locker = composer_ref.get_locker_mut();
+            let locker_rc = composer_ref.get_locker().clone();
+            let mut locker = locker_rc.borrow_mut();
             if locker.is_locked() {
                 let lr = locker.get_locked_repository(true)?;
                 installed_repo = Box::new(InstalledRepository::new(vec![
@@ -297,7 +306,11 @@ impl ShowCommand {
                     m
                 })?,
             )];
-            for r in composer_ref.get_repository_manager().get_repositories() {
+            for r in composer_ref
+                .get_repository_manager()
+                .borrow()
+                .get_repositories()
+            {
                 composite_input.push(r.clone_box());
             }
             repos = Box::new(CompositeRepository::new(composite_input));
@@ -319,15 +332,21 @@ impl ShowCommand {
             }
             repos = Box::new(CompositeRepository::new(composite_input));
         } else if input.get_option("locked").as_bool() == Some(true) {
-            if composer.is_none() || !composer.as_mut().unwrap().get_locker_mut().is_locked() {
+            if composer.is_none()
+                || !crate::command::composer_full_mut(composer.as_ref().unwrap())
+                    .get_locker()
+                    .borrow_mut()
+                    .is_locked()
+            {
                 return Err(UnexpectedValueException {
                     message: "A valid composer.json and composer.lock files is required to run this command with --locked".to_string(),
                     code: 0,
                 }
                 .into());
             }
-            let composer_ref = composer.as_mut().unwrap();
-            let locker = composer_ref.get_locker_mut();
+            let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
+            let locker_rc = composer_ref.get_locker().clone();
+            let mut locker = locker_rc.borrow_mut();
             let mut lr =
                 locker.get_locked_repository(input.get_option("no-dev").as_bool() != Some(true))?;
             if input.get_option("self").as_bool() == Some(true) {
@@ -346,11 +365,17 @@ impl ShowCommand {
             // can't clone Composer, so we re-fetch via require_composer when missing
             // but otherwise borrow the existing Option.
             let composer_local_owned;
-            let composer_local: &Composer = match composer.as_ref() {
-                Some(c) => c,
+            // Borrow guards that keep the Ref alive for the duration of the block.
+            let _guard_from_existing;
+            let composer_local = match composer.as_ref() {
+                Some(c) => {
+                    _guard_from_existing = crate::command::composer_full(c);
+                    &*_guard_from_existing
+                }
                 None => {
                     composer_local_owned = self.require_composer(None, None)?;
-                    &composer_local_owned
+                    _guard_from_existing = crate::command::composer_full(&composer_local_owned);
+                    &*_guard_from_existing
                 }
             };
             let root_pkg = composer_local.get_package();
@@ -364,6 +389,7 @@ impl ShowCommand {
             if input.get_option("no-dev").as_bool() == Some(true) {
                 let local_packages = composer_local
                     .get_repository_manager()
+                    .borrow()
                     .get_local_repository()
                     .get_packages();
                 let packages = RepositoryUtils::filter_required_packages(
@@ -385,9 +411,9 @@ impl ShowCommand {
                     Box::new(InstalledArrayRepository::new_with_packages(Vec::new())?),
                 ]));
             } else {
-                let lr = composer_local
-                    .get_repository_manager()
-                    .get_local_repository();
+                let repository_manager = composer_local.get_repository_manager().clone();
+                let repository_manager = repository_manager.borrow();
+                let lr = repository_manager.get_local_repository();
                 installed_repo = Box::new(InstalledRepository::new(vec![
                     root_repo.clone_box(),
                     lr.clone_box(),
@@ -412,6 +438,7 @@ impl ShowCommand {
         }
 
         if let Some(ref composer) = composer {
+            let composer = crate::command::composer_full(composer);
             let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
@@ -1418,11 +1445,12 @@ impl ShowCommand {
     }
 
     pub(crate) fn get_root_requires(&mut self) -> Vec<String> {
-        let composer = self.try_composer(None, None);
-        let composer = match composer {
+        let composer_rc = self.try_composer(None, None);
+        let composer_rc = match composer_rc {
             None => return vec![],
             Some(c) => c,
         };
+        let composer = crate::command::composer_full(&composer_rc);
 
         let root_package = composer.get_package();
 
@@ -2522,7 +2550,7 @@ impl ShowCommand {
     fn find_latest_package(
         &mut self,
         package: &dyn PackageInterface,
-        composer: &Composer,
+        composer: &PartialComposerHandle,
         platform_repo: &PlatformRepository,
         major_only: bool,
         minor_only: bool,
@@ -2534,17 +2562,21 @@ impl ShowCommand {
         // TODO(phase-b): VersionSelector::new wants RepositorySet by value, but get_repository_set
         // returns &mut RepositorySet. Constructing a placeholder set keeps compile clean.
         let _ = self.get_repository_set(composer)?;
+        let composer_ref = crate::command::composer_full(composer);
         let placeholder_rs = RepositorySet::new(
-            composer.get_package().get_minimum_stability(),
-            composer.get_package().get_stability_flags().clone(),
+            composer_ref.get_package().get_minimum_stability(),
+            composer_ref.get_package().get_stability_flags().clone(),
             Vec::new(),
             IndexMap::new(),
             IndexMap::new(),
             IndexMap::new(),
         );
         let mut version_selector = VersionSelector::new(placeholder_rs, Some(platform_repo))?;
-        let mut stability = composer.get_package().get_minimum_stability().to_string();
-        let flags = composer.get_package().get_stability_flags();
+        let mut stability = composer_ref
+            .get_package()
+            .get_minimum_stability()
+            .to_string();
+        let flags = composer_ref.get_package().get_stability_flags();
         if let Some(flag_value) = flags.get(name) {
             let key_map: IndexMap<String, String> = base_package::STABILITIES
                 .iter()
@@ -2557,7 +2589,7 @@ impl ShowCommand {
         }
 
         let mut best_stability = stability.clone();
-        if composer.get_package().get_prefer_stable() {
+        if composer_ref.get_package().get_prefer_stable() {
             best_stability = package.get_stability().to_string();
         }
 
@@ -2654,7 +2686,11 @@ impl ShowCommand {
         Ok(candidate)
     }
 
-    fn get_repository_set(&mut self, composer: &Composer) -> anyhow::Result<&mut RepositorySet> {
+    fn get_repository_set(
+        &mut self,
+        composer: &PartialComposerHandle,
+    ) -> anyhow::Result<&mut RepositorySet> {
+        let composer = crate::command::composer_full(composer);
         if self.repository_set.is_none() {
             // TODO(phase-b): RepositorySet::with_stability_and_flags — using new() placeholder.
             let mut rs = RepositorySet::new(
@@ -2668,6 +2704,7 @@ impl ShowCommand {
             rs.add_repository(Box::new(CompositeRepository::new(
                 composer
                     .get_repository_manager()
+                    .borrow()
                     .get_repositories()
                     .iter()
                     .map(|r| r.clone_box())

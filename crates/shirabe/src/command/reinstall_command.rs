@@ -9,7 +9,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::InvalidArgumentException;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputDefinitionItem;
 use crate::console::input::InputOption;
@@ -68,9 +67,12 @@ impl ReinstallCommand {
         output: &dyn OutputInterface,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
+        let composer = crate::command::composer_full(&composer);
         let io = self.get_io();
 
-        let local_repo = composer.get_repository_manager().get_local_repository();
+        let repository_manager = composer.get_repository_manager().clone();
+        let repository_manager = repository_manager.borrow();
+        let local_repo = repository_manager.get_local_repository();
         let mut packages_to_reinstall: Vec<Box<dyn crate::package::PackageInterface>> = vec![];
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
@@ -193,11 +195,11 @@ impl ReinstallCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let config = std::rc::Rc::clone(composer.get_config());
+        let config = composer.get_config();
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
-        let installation_manager = composer.get_installation_manager();
+        let installation_manager = composer.get_installation_manager().clone();
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 

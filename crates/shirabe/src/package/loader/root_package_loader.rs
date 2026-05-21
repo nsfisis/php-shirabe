@@ -27,7 +27,7 @@ use crate::util::ProcessExecutor;
 #[derive(Debug)]
 pub struct RootPackageLoader {
     inner: ArrayLoader,
-    manager: RepositoryManager,
+    manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     version_guesser: VersionGuesser,
     io: Option<Box<dyn IOInterface>>,
@@ -35,7 +35,7 @@ pub struct RootPackageLoader {
 
 impl RootPackageLoader {
     pub fn new(
-        manager: RepositoryManager,
+        manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: Option<VersionParser>,
         version_guesser: Option<VersionGuesser>,
@@ -281,10 +281,10 @@ impl RootPackageLoader {
         let repos = RepositoryFactory::default_repos(
             None,
             Some(std::rc::Rc::clone(&self.config)),
-            Some(&mut self.manager),
+            Some(&mut *self.manager.borrow_mut()),
         )?;
         for (_, repo) in repos {
-            self.manager.add_repository(repo);
+            self.manager.borrow_mut().add_repository(repo);
         }
         // TODO(phase-b): Config::get_repositories returns IndexMap<String, PhpMixed>, but
         // set_repositories expects Vec<IndexMap<String, PhpMixed>>; pass empty placeholder.

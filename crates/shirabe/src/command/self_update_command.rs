@@ -20,7 +20,8 @@ use shirabe_php_shim::{
 };
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
 use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
@@ -280,7 +281,7 @@ impl SelfUpdateCommand {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| latest_version.clone());
-        let current_major_version = Preg::replace(r"{^(\d+).*}", "$1", &Composer::get_version())?;
+        let current_major_version = Preg::replace(r"{^(\d+).*}", "$1", &composer::get_version())?;
         let update_major_version = Preg::replace(r"{^(\d+).*}", "$1", &update_version)?;
         let preview_major_version = Preg::replace(
             r"{^(\d+).*}",
@@ -382,7 +383,7 @@ impl SelfUpdateCommand {
             channel_string.push_str(".x");
         }
 
-        if Composer::VERSION == update_version.as_str() {
+        if composer::VERSION == update_version.as_str() {
             io.write_error3(
                 &sprintf(
                     "<info>You are already using the latest available Composer version %s (%s channel).</info>",
@@ -414,11 +415,11 @@ impl SelfUpdateCommand {
             "%s/%s-%s%s",
             &[
                 PhpMixed::String(rollback_dir.clone()),
-                PhpMixed::String(strtr(Composer::RELEASE_DATE, " :", "_-")),
+                PhpMixed::String(strtr(composer::RELEASE_DATE, " :", "_-")),
                 PhpMixed::String(Preg::replace(
                     r"{^([0-9a-f]{7})[0-9a-f]{33}$}",
                     "$1",
-                    &Composer::VERSION,
+                    &composer::VERSION,
                 )?),
                 PhpMixed::String(Self::OLD_INSTALL_EXT.to_string()),
             ],
@@ -637,7 +638,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             io.write_error3(
                 &sprintf(
                     "Use <info>composer self-update --rollback</info> to return to version <comment>%s</comment>",
-                    &[PhpMixed::String(Composer::VERSION.to_string())],
+                    &[PhpMixed::String(composer::VERSION.to_string())],
                 ),
                 true,
                 io_interface::NORMAL,

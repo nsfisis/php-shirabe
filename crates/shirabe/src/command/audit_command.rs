@@ -3,7 +3,7 @@
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
@@ -51,14 +51,15 @@ impl AuditCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
-        let packages = self.get_packages(&mut composer, input)?;
+        let composer = self.require_composer(None, None)?;
+        let packages = self.get_packages(&composer, input)?;
 
         if packages.is_empty() {
             self.get_io().write_error("No packages - skipping audit.");
             return Ok(0);
         }
 
+        let composer = crate::command::composer_full(&composer);
         let auditor = Auditor;
         let mut repo_set = RepositorySet::new(
             "stable",
@@ -68,7 +69,11 @@ impl AuditCommand {
             indexmap::IndexMap::new(),
             indexmap::IndexMap::new(),
         );
-        for repo in composer.get_repository_manager().get_repositories() {
+        for repo in composer
+            .get_repository_manager()
+            .borrow()
+            .get_repositories()
+        {
             // TODO(phase-b): repositories are shared (PHP class semantics); needs Rc wrapper
             repo_set.add_repository(repo.clone_box())?;
         }
@@ -139,11 +144,13 @@ impl AuditCommand {
 
     fn get_packages(
         &self,
-        composer: &mut Composer,
+        composer: &PartialComposerHandle,
         input: &dyn InputInterface,
     ) -> Result<Vec<Box<dyn PackageInterface>>> {
+        let mut composer = crate::command::composer_full_mut(composer);
         if input.get_option("locked").as_bool().unwrap_or(false) {
-            let locker = composer.get_locker_mut();
+            let locker = composer.get_locker().clone();
+            let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
                 return Err(UnexpectedValueException {
                     message: "Valid composer.json and composer.lock files are required to run this command with --locked".to_string(),

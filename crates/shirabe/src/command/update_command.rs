@@ -18,7 +18,7 @@ use shirabe_semver::intervals::Intervals;
 use crate::advisory::Auditor;
 use crate::command::BumpCommand;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
@@ -95,7 +95,8 @@ impl UpdateCommand {
             );
         }
 
-        let composer = self.require_composer(None, None)?;
+        let composer_handle = self.require_composer(None, None)?;
+        let composer = crate::command::composer_full(&composer_handle);
 
         if !HttpDownloader::is_curl_enabled() {
             io.write_error3(
@@ -205,7 +206,7 @@ impl UpdateCommand {
         }
 
         if input.get_option("patch-only").as_bool().unwrap_or(false) {
-            if !composer.get_locker().is_locked() {
+            if !composer.get_locker().borrow_mut().is_locked() {
                 return Err(InvalidArgumentException {
                     message: "patch-only can only be used with a lock file present".to_string(),
                     code: 0,
@@ -214,6 +215,7 @@ impl UpdateCommand {
             }
             for package in composer
                 .get_locker()
+                .borrow_mut()
                 .get_locked_repository(true)?
                 .get_canonical_packages()
             {
@@ -249,7 +251,8 @@ impl UpdateCommand {
         }
 
         if input.get_option("interactive").as_bool().unwrap_or(false) {
-            packages = self.get_packages_interactively(io, input, output, &composer, packages)?;
+            packages =
+                self.get_packages_interactively(io, input, output, &composer_handle, packages)?;
         }
 
         if input.get_option("root-reqs").as_bool().unwrap_or(false) {
@@ -309,11 +312,12 @@ impl UpdateCommand {
 
         composer
             .get_installation_manager()
+            .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        let mut install = Installer::create(io.clone_box(), &composer);
+        let mut install = Installer::create(io.clone_box(), &composer_handle);
 
-        let config = std::rc::Rc::clone(composer.get_config());
+        let config = composer.get_config();
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
@@ -428,7 +432,7 @@ impl UpdateCommand {
                 );
                 let mut bump_command = BumpCommand::new(None);
                 // TODO(phase-b): Composer is a PHP class shared by reference; calling
-                // set_composer here requires Rc<RefCell<Composer>> shared-ownership.
+                // set_composer here requires a shared PartialComposer handle.
                 // bump_command.set_composer(composer);
                 result = bump_command.do_bump(
                     io,
@@ -459,7 +463,7 @@ impl UpdateCommand {
         io: &dyn IOInterface,
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
-        composer: &Composer,
+        composer: &PartialComposerHandle,
         packages: Vec<String>,
     ) -> Result<Vec<String>> {
         if !input.is_interactive() {
@@ -470,8 +474,9 @@ impl UpdateCommand {
             .into());
         }
 
+        let composer_ref = crate::command::composer_full(composer);
         let platform_req_filter = self.get_platform_requirement_filter(input);
-        let stability_flags = composer.get_package().get_stability_flags();
+        let stability_flags = composer_ref.get_package().get_stability_flags();
         let requires = array_merge(
             // TODO(phase-b): array_merge for IndexMap<String, Link>
             todo!("composer.get_package().get_requires() as PhpMixed"),
@@ -495,13 +500,17 @@ impl UpdateCommand {
         // Vec<Box<dyn PackageInterface>> while RepositoryInterface::get_packages
         // returns Vec<Box<dyn BasePackage>>. Use only the locker branch for now.
         let installed_packages: Vec<Box<dyn crate::package::PackageInterface>> =
-            if composer.get_locker().is_locked() {
+            if composer_ref.get_locker().borrow_mut().is_locked() {
                 CanonicalPackagesTrait::get_packages(
-                    &composer.get_locker().get_locked_repository(true)?,
+                    &composer_ref
+                        .get_locker()
+                        .borrow_mut()
+                        .get_locked_repository(true)?,
                 )
             } else {
-                let _ = composer
+                let _ = composer_ref
                     .get_repository_manager()
+                    .borrow()
                     .get_local_repository()
                     .get_packages();
                 Vec::new()
@@ -613,7 +622,8 @@ impl UpdateCommand {
         .into())
     }
 
-    fn create_version_selector(&self, composer: &Composer) -> Result<VersionSelector> {
+    fn create_version_selector(&self, composer: &PartialComposerHandle) -> Result<VersionSelector> {
+        let composer = crate::command::composer_full(composer);
         let mut repository_set = RepositorySet::new(
             composer.get_package().get_minimum_stability(),
             composer.get_package().get_stability_flags().clone(),
@@ -625,7 +635,10 @@ impl UpdateCommand {
         );
         // TODO(phase-b): array_filter requires Clone on Box<dyn RepositoryInterface>
         // which PHP classes must not implement. Skipping the repo filter for now.
-        let _ = &composer.get_repository_manager().get_repositories();
+        let _ = &composer
+            .get_repository_manager()
+            .borrow()
+            .get_repositories();
         let _ = |repository: &Box<dyn RepositoryInterface>| -> bool {
             repository
                 .as_any()

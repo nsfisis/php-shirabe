@@ -40,7 +40,7 @@ pub struct Locker {
     /// @var JsonFile
     lock_file: JsonFile,
     /// @var InstallationManager
-    installation_manager: InstallationManager,
+    installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
     /// @var string
     hash: String,
     /// @var string
@@ -62,7 +62,7 @@ impl Locker {
     pub fn new(
         io: Box<dyn IOInterface>,
         lock_file: JsonFile,
-        installation_manager: InstallationManager,
+        installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
         composer_file_contents: &str,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -824,7 +824,10 @@ impl Locker {
             return Ok(None);
         }
 
-        let path = self.installation_manager.get_install_path(package);
+        let path = self
+            .installation_manager
+            .borrow_mut()
+            .get_install_path(package);
         if path.is_none() {
             return Ok(None);
         }

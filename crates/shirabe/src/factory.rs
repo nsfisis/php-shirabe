@@ -15,7 +15,8 @@ use shirabe_php_shim::{
 
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;
-use crate::composer::Composer;
+use crate::composer::{ComposerWeakHandle, PartialOrFullComposer};
+use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};
 use crate::config::Config;
 use crate::config::JsonConfigSource;
 use crate::downloader::DownloadManager;
@@ -52,7 +53,6 @@ use crate::package::archiver::ZipArchiver;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
-use crate::partial_composer::PartialComposer;
 use crate::plugin::PluginEvents;
 use crate::plugin::PluginManager;
 use crate::repository::FilesystemRepository;
@@ -438,7 +438,7 @@ impl Factory {
         cwd: Option<&str>,
         full_load: bool,
         disable_scripts: bool,
-    ) -> anyhow::Result<PartialComposerOrComposer> {
+    ) -> anyhow::Result<PartialComposerHandle> {
         // if a custom composer.json path is given, we change the default cwd to be that file's directory
         let mut local_config = local_config;
         let mut cwd = cwd.map(|s| s.to_string());
@@ -573,162 +573,178 @@ impl Factory {
         let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
         // initialize composer
-        let mut composer: PartialComposerOrComposer = if full_load {
-            PartialComposerOrComposer::Full(Composer::new())
-        } else {
-            PartialComposerOrComposer::Partial(PartialComposer::default())
-        };
-        composer.set_config(std::rc::Rc::clone(&config));
-        if is_global {
-            composer.set_global();
-        }
+        //
+        // Phase C: build the whole Composer graph at once with Rc::new_cyclic so that
+        // back-references (the EventDispatcher's composer, etc.) can hold a
+        // PartialComposerWeak (Weak<RefCell<InnerComposer>>). The closure cannot return a
+        // Result, so construction errors are surfaced through `build_error`.
+        let mut build_error: Option<anyhow::Error> = None;
+        let composer = std::rc::Rc::new_cyclic(
+            |composer_weak: &std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>| {
+                let mut build = || -> anyhow::Result<PartialOrFullComposer> {
+                    let mut composer: PartialOrFullComposer = if full_load {
+                        PartialOrFullComposer::new_full()
+                    } else {
+                        PartialOrFullComposer::new_partial()
+                    };
+                    composer.set_config(std::rc::Rc::clone(&config));
+                    if is_global {
+                        composer.set_global();
+                    }
 
-        if full_load {
-            // load auth configs into the IO instance
-            // TODO(phase-b): load_configuration requires &mut IOInterface; create_composer takes &dyn IOInterface
-            // io.load_configuration(&mut *config.borrow_mut())?;
+                    if full_load {
+                        // load auth configs into the IO instance
+                        // TODO(phase-b): load_configuration requires &mut IOInterface; create_composer takes &dyn IOInterface
+                        // io.load_configuration(&mut *config.borrow_mut())?;
 
-            // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
-            // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
-            let installed_versions_path = format!(
-                "{}/composer/installed.php",
-                config.borrow_mut().get_str("vendor-dir")?
-            );
-            if !disable_plugins.is_disabled_at_all()
-                && !disable_scripts
-                && !class_exists("Composer\\InstalledVersions")
-                && file_exists(&installed_versions_path)
-            {
-                // force loading the class at this point so it is loaded from the composer phar and not from the vendor dir
-                // as we cannot guarantee integrity of that file
-                if class_exists("Composer\\InstalledVersions") {
-                    FilesystemRepository::safely_load_installed_versions(&installed_versions_path);
-                }
-            }
-        }
+                        // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
+                        // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once
+                        let installed_versions_path = format!(
+                            "{}/composer/installed.php",
+                            config.borrow_mut().get_str("vendor-dir")?
+                        );
+                        if !disable_plugins.is_disabled_at_all()
+                            && !disable_scripts
+                            && !class_exists("Composer\\InstalledVersions")
+                            && file_exists(&installed_versions_path)
+                        {
+                            // force loading the class at this point so it is loaded from the composer phar and not from the vendor dir
+                            // as we cannot guarantee integrity of that file
+                            if class_exists("Composer\\InstalledVersions") {
+                                FilesystemRepository::safely_load_installed_versions(
+                                    &installed_versions_path,
+                                );
+                            }
+                        }
+                    }
 
-        let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-            Self::create_http_downloader(io, &config, IndexMap::new())?,
-        ));
-        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-            io.clone_box(),
-        ))));
-        let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
-            std::rc::Rc::clone(&http_downloader),
-            Some(std::rc::Rc::clone(&process)),
-        )));
-        composer.set_loop(r#loop.clone());
+                    let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
+                        Self::create_http_downloader(io, &config, IndexMap::new())?,
+                    ));
+                    let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(
+                        Some(io.clone_box()),
+                    )));
+                    let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
+                        std::rc::Rc::clone(&http_downloader),
+                        Some(std::rc::Rc::clone(&process)),
+                    )));
+                    composer.set_loop(r#loop.clone());
 
-        // initialize event dispatcher
-        let dispatcher = {
-            let mut d = EventDispatcher::new(
-                composer.as_partial(),
-                io.clone_box(),
-                Some(std::rc::Rc::clone(&process)),
-            );
-            d.set_run_scripts(!disable_scripts);
-            std::rc::Rc::new(std::cell::RefCell::new(d))
-        };
-        composer.set_event_dispatcher(std::rc::Rc::clone(&dispatcher));
+                    // initialize event dispatcher with the Composer back-reference
+                    let dispatcher = {
+                        let mut d = EventDispatcher::new(
+                            PartialComposerWeakHandle::from_weak(composer_weak.clone()),
+                            io.clone_box(),
+                            Some(std::rc::Rc::clone(&process)),
+                        );
+                        d.set_run_scripts(!disable_scripts);
+                        std::rc::Rc::new(std::cell::RefCell::new(d))
+                    };
+                    composer.set_event_dispatcher(std::rc::Rc::clone(&dispatcher));
 
-        // initialize repository manager
-        let mut rm = RepositoryFactory::manager(
-            io,
-            &config,
-            Some(std::rc::Rc::clone(&http_downloader)),
-            Some(std::rc::Rc::clone(&dispatcher)),
-            Some(std::rc::Rc::clone(&process)),
-        )?;
+                    // initialize repository manager
+                    let rm = std::rc::Rc::new(std::cell::RefCell::new(RepositoryFactory::manager(
+                        io,
+                        &config,
+                        Some(std::rc::Rc::clone(&http_downloader)),
+                        Some(std::rc::Rc::clone(&dispatcher)),
+                        Some(std::rc::Rc::clone(&process)),
+                    )?));
 
-        // force-set the version of the global package if not defined as
-        // guessing it adds no value and only takes time
-        if !full_load && !local_config_data.contains_key("version") {
-            local_config_data.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
-        }
+                    // force-set the version of the global package if not defined as
+                    // guessing it adds no value and only takes time
+                    if !full_load && !local_config_data.contains_key("version") {
+                        local_config_data
+                            .insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+                    }
 
-        // load package
-        let parser = VersionParser::new();
-        let guesser = VersionGuesser::new(
-            std::rc::Rc::clone(&config),
-            std::rc::Rc::clone(&process),
-            parser.clone(),
-            Some(io.clone_box()),
-        );
-        // TODO(phase-b): RepositoryManager is a PHP class — both composer.set_repository_manager()
-        // and self.load_root_package() want ownership. Use a placeholder rm for the loader.
-        let mut loader = self.load_root_package(
-            todo!("share RepositoryManager via Rc<RefCell<>>"),
-            std::rc::Rc::clone(&config),
-            parser,
-            guesser,
-            io.clone_box(),
-        );
-        let package = loader.load(
-            local_config_data
-                .iter()
-                .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                .collect(),
-            "Composer\\Package\\RootPackage",
-            Some(&cwd),
-        )?;
-        // TODO(phase-b): set_package expects RootPackageInterface; loader returns BasePackage
-        // composer.set_package(package);
-        let _ = package;
+                    // load package
+                    let parser = VersionParser::new();
+                    let guesser = VersionGuesser::new(
+                        std::rc::Rc::clone(&config),
+                        std::rc::Rc::clone(&process),
+                        parser.clone(),
+                        Some(io.clone_box()),
+                    );
+                    let mut loader = self.load_root_package(
+                        std::rc::Rc::clone(&rm),
+                        std::rc::Rc::clone(&config),
+                        parser,
+                        guesser,
+                        io.clone_box(),
+                    );
+                    let package = loader.load(
+                        local_config_data
+                            .iter()
+                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                            .collect(),
+                        "Composer\\Package\\RootPackage",
+                        Some(&cwd),
+                    )?;
+                    // TODO(phase-b): set_package expects RootPackageInterface; loader returns BasePackage
+                    // composer.set_package(package);
+                    let _ = package;
 
-        // load local repository
-        self.add_local_repository(
-            io,
-            &mut rm,
-            &vendor_dir,
-            composer.get_package(),
-            Some(&process),
-        );
-        composer.set_repository_manager(rm);
+                    // load local repository
+                    self.add_local_repository(
+                        io,
+                        &mut rm.borrow_mut(),
+                        &vendor_dir,
+                        composer.get_package(),
+                        Some(&process),
+                    );
+                    composer.set_repository_manager(std::rc::Rc::clone(&rm));
 
-        // initialize installation manager
-        let im = self.create_installation_manager(
-            r#loop.clone(),
-            io.clone_box(),
-            Some(std::rc::Rc::clone(&dispatcher)),
-        );
-        // TODO(phase-b): set_installation_manager takes ownership; im needs sharing for create_default_installers
-        composer.set_installation_manager(im);
+                    // initialize installation manager
+                    let im = std::rc::Rc::new(std::cell::RefCell::new(
+                        self.create_installation_manager(
+                            r#loop.clone(),
+                            io.clone_box(),
+                            Some(std::rc::Rc::clone(&dispatcher)),
+                        ),
+                    ));
+                    composer.set_installation_manager(std::rc::Rc::clone(&im));
 
-        if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
-            // initialize download manager
-            let dm = self.create_download_manager(
-                io,
-                &config,
-                &http_downloader,
-                &process,
-                Some(&dispatcher),
-            )?;
-            composer_full.set_download_manager(dm.clone());
+                    if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
+                        // initialize download manager
+                        let dm = self.create_download_manager(
+                            io,
+                            &config,
+                            &http_downloader,
+                            &process,
+                            Some(&dispatcher),
+                        )?;
+                        composer_full.set_download_manager(dm.clone());
 
-            // initialize autoload generator
-            let generator =
-                AutoloadGenerator::new(std::rc::Rc::clone(&dispatcher), Some(io.clone_box()));
-            composer_full.set_autoload_generator(generator);
+                        // initialize autoload generator
+                        let generator = AutoloadGenerator::new(
+                            std::rc::Rc::clone(&dispatcher),
+                            Some(io.clone_box()),
+                        );
+                        composer_full.set_autoload_generator(std::rc::Rc::new(
+                            std::cell::RefCell::new(generator),
+                        ));
 
-            // initialize archive manager
-            let am = self.create_archive_manager(&*config.borrow(), &dm, &r#loop)?;
-            composer_full.set_archive_manager(am);
-        }
+                        // initialize archive manager
+                        let am = self.create_archive_manager(&*config.borrow(), &dm, &r#loop)?;
+                        composer_full
+                            .set_archive_manager(std::rc::Rc::new(std::cell::RefCell::new(am)));
+                    }
 
-        // add installers to the manager (must happen after download manager is created since they read it out of $composer)
-        self.create_default_installers(&im, &composer, io, Some(&process));
+                    // add installers to the manager (must happen after download manager is created since they read it out of $composer)
+                    self.create_default_installers(&im, &composer, io, Some(&process));
 
-        // init locker if possible
-        if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
-            if let Some(ref composer_file_path) = composer_file {
-                let lock_file = Self::get_lock_file(composer_file_path);
-                let lock_enabled = config
-                    .borrow_mut()
-                    .get("lock")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
-                if !lock_enabled && file_exists(&lock_file) {
-                    io.write_error3(
+                    // init locker if possible
+                    if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
+                        if let Some(ref composer_file_path) = composer_file {
+                            let lock_file = Self::get_lock_file(composer_file_path);
+                            let lock_enabled = config
+                                .borrow_mut()
+                                .get("lock")
+                                .and_then(|v| v.as_bool())
+                                .unwrap_or(true);
+                            if !lock_enabled && file_exists(&lock_file) {
+                                io.write_error3(
                         &format!(
                             "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
                             lock_file
@@ -736,79 +752,101 @@ impl Factory {
                         true,
                         crate::io::NORMAL,
                     );
-                }
+                            }
 
-                // TODO(phase-b): InstallationManager is a PHP class — needs Rc<RefCell<>> sharing
-                let locker = Locker::new(
-                    io.clone_box(),
-                    JsonFile::new(
-                        if lock_enabled {
-                            lock_file
+                            let locker = Locker::new(
+                                io.clone_box(),
+                                JsonFile::new(
+                                    if lock_enabled {
+                                        lock_file
+                                    } else {
+                                        Platform::get_dev_null()
+                                    },
+                                    None,
+                                    Some(io.clone_box()),
+                                )?,
+                                std::rc::Rc::clone(&im),
+                                &file_get_contents(composer_file_path).unwrap_or_default(),
+                                std::rc::Rc::clone(&process),
+                            );
+                            composer_full
+                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
                         } else {
-                            Platform::get_dev_null()
-                        },
-                        None,
-                        Some(io.clone_box()),
-                    )?,
-                    todo!("InstallationManager clone"),
-                    &file_get_contents(composer_file_path).unwrap_or_default(),
-                    std::rc::Rc::clone(&process),
-                );
-                composer_full.set_locker(locker);
-            } else {
-                let lock_contents = JsonFile::encode(
-                    &PhpMixed::Array(
-                        local_config_data
-                            .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
-                    ),
-                    448,
-                );
-                // TODO(phase-b): InstallationManager is a PHP class — needs Rc<RefCell<>> sharing
-                let locker = Locker::new(
-                    io.clone_box(),
-                    JsonFile::new(Platform::get_dev_null(), None, Some(io.clone_box()))?,
-                    todo!("InstallationManager clone"),
-                    &lock_contents,
-                    std::rc::Rc::clone(&process),
-                );
-                composer_full.set_locker(locker);
-            }
-        }
+                            let lock_contents = JsonFile::encode(
+                                &PhpMixed::Array(
+                                    local_config_data
+                                        .iter()
+                                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                        .collect(),
+                                ),
+                                448,
+                            );
+                            let locker = Locker::new(
+                                io.clone_box(),
+                                JsonFile::new(
+                                    Platform::get_dev_null(),
+                                    None,
+                                    Some(io.clone_box()),
+                                )?,
+                                std::rc::Rc::clone(&im),
+                                &lock_contents,
+                                std::rc::Rc::clone(&process),
+                            );
+                            composer_full
+                                .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
+                        }
+                    }
 
-        if let PartialComposerOrComposer::Full(ref mut composer_full) = composer {
-            let mut global_composer: Option<PartialComposer> = None;
-            if !composer_full.is_global() {
-                global_composer = self.create_global_composer(
-                    io,
-                    &*config.borrow(),
-                    disable_plugins,
-                    disable_scripts,
-                    false,
-                );
-            }
+                    if let Some(full_composer) = composer.as_full_mut() {
+                        let global_composer = if !full_composer.is_global() {
+                            self.create_global_composer(
+                                io,
+                                &*config.borrow(),
+                                disable_plugins,
+                                disable_scripts,
+                                false,
+                            )
+                        } else {
+                            None
+                        };
+                        let mut pm = self.create_plugin_manager(
+                            io,
+                            ComposerWeakHandle::from_weak(composer_weak.clone()),
+                            global_composer,
+                            disable_plugins,
+                        );
+                        if full_composer.is_global() {
+                            pm.set_running_in_global_dir(true);
+                        }
+                        pm.load_installed_plugins();
+                        full_composer
+                            .set_plugin_manager(std::rc::Rc::new(std::cell::RefCell::new(pm)));
+                    }
 
-            let mut pm = self.create_plugin_manager(
-                io,
-                composer_full,
-                global_composer.as_ref(),
-                disable_plugins,
-            );
-            // TODO(phase-b): PluginManager is a PHP class; sharing pm before transferring requires Rc<RefCell<>>
-            if composer_full.is_global() {
-                pm.set_running_in_global_dir(true);
-            }
-            pm.load_installed_plugins();
-            composer_full.set_plugin_manager(pm);
+                    Ok(composer)
+                };
+                match build() {
+                    Ok(composer) => std::cell::RefCell::new(composer),
+                    Err(e) => {
+                        build_error = Some(e);
+                        std::cell::RefCell::new(PartialOrFullComposer::new_partial())
+                    }
+                }
+            },
+        );
+        if let Some(e) = build_error {
+            return Err(e);
         }
 
         if full_load {
+            // The back-reference is now upgradeable, so dispatching the INIT event (which may read
+            // the Composer through the dispatcher) is safe only after the Rc has been constructed.
             let init_event = Event::from_name(PluginEvents::INIT.to_string());
-            composer
-                .get_event_dispatcher()
+            let init_event_name = init_event.get_name().to_string();
+            let dispatcher = composer.borrow().get_event_dispatcher();
+            dispatcher
                 .borrow_mut()
-                .dispatch(Some(init_event.get_name()), Some(init_event))?;
+                .dispatch(Some(&init_event_name), Some(init_event))?;
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
@@ -816,22 +854,18 @@ impl Factory {
             // self.purge_packages(rm.get_local_repository(), &mut im)?;
         }
 
-        Ok(composer)
+        Ok(PartialComposerHandle::from_rc(composer))
     }
 
     pub fn create_global(
         io: &dyn IOInterface,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
-    ) -> Option<Composer> {
+    ) -> Option<PartialComposerHandle> {
         let factory = Self;
 
         let config = Self::create_config(Some(io), None).ok()?;
-        factory
-            .create_global_composer(io, &config, disable_plugins, disable_scripts, true)
-            .and_then(|pc| match pc {
-                _ => None, // TODO(phase-b): downcast PartialComposer to Composer when fullLoad=true
-            })
+        factory.create_global_composer(io, &config, disable_plugins, disable_scripts, true)
     }
 
     fn add_local_repository(
@@ -871,7 +905,7 @@ impl Factory {
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
         full_load: bool,
-    ) -> Option<PartialComposer> {
+    ) -> Option<PartialComposerHandle> {
         // make sure if disable plugins was 'local' it is now turned off
         let disable_plugins = if matches!(
             disable_plugins,
@@ -882,7 +916,7 @@ impl Factory {
             DisablePlugins::None
         };
 
-        let composer = match self.create_composer(
+        match self.create_composer(
             io,
             Some(LocalConfigInput::Path(format!(
                 "{}/composer.json",
@@ -893,7 +927,7 @@ impl Factory {
             full_load,
             disable_scripts,
         ) {
-            Ok(c) => Some(c.into_partial()),
+            Ok(c) => Some(c),
             Err(e) => {
                 io.write_error3(
                     &format!("Failed to initialize global composer: {}", e),
@@ -902,9 +936,7 @@ impl Factory {
                 );
                 None
             }
-        };
-
-        composer
+        }
     }
 
     pub fn create_download_manager(
@@ -1135,8 +1167,8 @@ impl Factory {
     fn create_plugin_manager(
         &self,
         io: &dyn IOInterface,
-        composer: &Composer,
-        global_composer: Option<&PartialComposer>,
+        composer: ComposerWeakHandle,
+        global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
     ) -> PluginManager {
         // TODO(phase-b): PluginManager::new takes ownership of Composer/PartialComposer; PHP
@@ -1156,8 +1188,8 @@ impl Factory {
 
     fn create_default_installers(
         &self,
-        im: &InstallationManager,
-        composer: &PartialComposerOrComposer,
+        im: &std::rc::Rc<std::cell::RefCell<InstallationManager>>,
+        composer: &PartialOrFullComposer,
         io: &dyn IOInterface,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
@@ -1215,7 +1247,7 @@ impl Factory {
 
     fn load_root_package(
         &self,
-        rm: RepositoryManager,
+        rm: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: VersionParser,
         guesser: VersionGuesser,
@@ -1229,7 +1261,7 @@ impl Factory {
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
-    ) -> anyhow::Result<Composer> {
+    ) -> anyhow::Result<PartialComposerHandle> {
         let factory = Self;
 
         // for BC reasons, if a config is passed in either as array or a path that is not the default composer.json path
@@ -1250,16 +1282,16 @@ impl Factory {
             disable_plugins
         };
 
-        match factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)? {
-            PartialComposerOrComposer::Full(c) => Ok(c),
-            PartialComposerOrComposer::Partial(_) => {
-                // TODO(phase-b): unreachable when fullLoad=true; downcasting needs design.
-                Err(anyhow::anyhow!(RuntimeException {
-                    message: "Composer expected with fullLoad=true".to_string(),
-                    code: 0,
-                }))
-            }
+        let composer =
+            factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
+        if !composer.is_full() {
+            // TODO(phase-b): unreachable when fullLoad=true; downcasting needs design.
+            return Err(anyhow::anyhow!(RuntimeException {
+                message: "Composer expected with fullLoad=true".to_string(),
+                code: 0,
+            }));
         }
+        Ok(composer)
     }
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`
@@ -1487,87 +1519,4 @@ impl Factory {
 enum ValidateJsonInput {
     File(JsonFile),
     Data(PhpMixed),
-}
-
-/// `Factory::createComposer` returns either a `Composer` (`$fullLoad=true`) or a `PartialComposer`.
-pub enum PartialComposerOrComposer {
-    Full(Composer),
-    Partial(PartialComposer),
-}
-
-impl PartialComposerOrComposer {
-    fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
-        match self {
-            Self::Full(c) => c.set_config(config),
-            Self::Partial(p) => p.set_config(config),
-        }
-    }
-    fn set_global(&mut self) {
-        match self {
-            Self::Full(c) => c.set_global(),
-            Self::Partial(p) => p.set_global(),
-        }
-    }
-    fn set_loop(&mut self, r#loop: std::rc::Rc<std::cell::RefCell<Loop>>) {
-        match self {
-            Self::Full(c) => c.set_loop(r#loop),
-            Self::Partial(p) => p.set_loop(r#loop),
-        }
-    }
-    fn set_event_dispatcher(
-        &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-    ) {
-        match self {
-            Self::Full(c) => c.set_event_dispatcher(dispatcher),
-            Self::Partial(p) => p.set_event_dispatcher(dispatcher),
-        }
-    }
-    fn set_repository_manager(&mut self, rm: RepositoryManager) {
-        match self {
-            Self::Full(c) => c.set_repository_manager(rm),
-            Self::Partial(p) => p.set_repository_manager(rm),
-        }
-    }
-    fn set_installation_manager(&mut self, im: InstallationManager) {
-        match self {
-            Self::Full(c) => c.set_installation_manager(im),
-            Self::Partial(p) => p.set_installation_manager(im),
-        }
-    }
-    fn set_package(&mut self, package: Box<dyn RootPackageInterface>) {
-        match self {
-            Self::Full(c) => c.set_package(package),
-            Self::Partial(p) => p.set_package(package),
-        }
-    }
-    fn get_package(&self) -> &dyn RootPackageInterface {
-        match self {
-            Self::Full(c) => c.get_package(),
-            Self::Partial(p) => p.get_package(),
-        }
-    }
-    fn get_config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
-        match self {
-            Self::Full(c) => c.get_config(),
-            Self::Partial(p) => p.get_config(),
-        }
-    }
-    fn get_event_dispatcher(&self) -> &std::rc::Rc<std::cell::RefCell<EventDispatcher>> {
-        match self {
-            Self::Full(c) => c.get_event_dispatcher(),
-            Self::Partial(p) => p.get_event_dispatcher(),
-        }
-    }
-    fn as_partial(&self) -> PartialComposer {
-        // TODO(phase-b): PHP class semantics requires sharing PartialComposer by reference;
-        // currently returning a fresh default since PartialComposer is not Clone.
-        PartialComposer::default()
-    }
-    fn into_partial(self) -> PartialComposer {
-        match self {
-            Self::Full(_) => PartialComposer::default(),
-            Self::Partial(p) => p,
-        }
-    }
 }

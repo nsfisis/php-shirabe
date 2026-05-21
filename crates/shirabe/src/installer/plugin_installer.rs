@@ -1,11 +1,11 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php
 
+use crate::composer::PartialComposerWeakHandle;
 use crate::installer::BinaryInstaller;
 use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
-use crate::partial_composer::PartialComposer;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
@@ -22,7 +22,7 @@ pub struct PluginInstaller {
 impl PluginInstaller {
     pub fn new(
         io: Box<dyn IOInterface>,
-        composer: PartialComposer,
+        composer: PartialComposerWeakHandle,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<BinaryInstaller>,
     ) -> Self {
@@ -39,7 +39,7 @@ impl PluginInstaller {
 
     pub fn disable_plugins(&mut self) {
         // TODO(plugin): disable plugins via plugin manager
-        self.get_plugin_manager_mut().disable_plugins();
+        self.get_plugin_manager().borrow_mut().disable_plugins();
     }
 
     fn rollback_install(
@@ -56,14 +56,9 @@ impl PluginInstaller {
         Err(e)
     }
 
-    fn get_plugin_manager(&self) -> &PluginManager {
+    fn get_plugin_manager(&self) -> std::rc::Rc<std::cell::RefCell<PluginManager>> {
         // TODO(plugin): PartialComposer does not expose PluginManager; revisit when wiring plugin support
         todo!("PartialComposer.get_plugin_manager")
-    }
-
-    fn get_plugin_manager_mut(&mut self) -> &mut PluginManager {
-        // TODO(plugin): return mutable plugin manager from composer
-        todo!()
     }
 }
 
@@ -87,7 +82,10 @@ impl InstallerInterface for PluginInstaller {
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         if (r#type == "install" || r#type == "update")
-            && !self.get_plugin_manager().are_plugins_disabled("local")
+            && !self
+                .get_plugin_manager()
+                .borrow()
+                .are_plugins_disabled("local")
         {
             let plugin_optional = package
                 .get_extra()
@@ -176,7 +174,9 @@ impl InstallerInterface for PluginInstaller {
         package: &dyn PackageInterface,
     ) -> Result<Option<Box<dyn PromiseInterface>>> {
         // TODO(plugin): uninstall package from plugin manager
-        self.get_plugin_manager_mut().uninstall_package(package);
+        self.get_plugin_manager()
+            .borrow_mut()
+            .uninstall_package(package);
 
         self.inner.uninstall(repo, package)
     }

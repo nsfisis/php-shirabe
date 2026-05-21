@@ -19,7 +19,7 @@ use shirabe_php_shim::{
 
 use crate::command::PackageDiscoveryTrait;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
@@ -56,7 +56,7 @@ impl PackageDiscoveryTrait for InitCommand {
         todo!()
     }
 
-    fn try_composer(&self) -> Option<Composer> {
+    fn try_composer(&self) -> Option<PartialComposerHandle> {
         todo!()
     }
 
@@ -64,7 +64,7 @@ impl PackageDiscoveryTrait for InitCommand {
         &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Composer {
+    ) -> PartialComposerHandle {
         todo!()
     }
 

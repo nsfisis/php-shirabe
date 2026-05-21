@@ -66,7 +66,9 @@ use crate::command::StatusCommand;
 use crate::command::SuggestsCommand;
 use crate::command::UpdateCommand;
 use crate::command::ValidateCommand;
-use crate::composer::Composer;
+use crate::composer;
+use crate::composer::ComposerHandle;
+use crate::composer::PartialComposerHandle;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::ScriptExecutionException;
@@ -86,7 +88,7 @@ use crate::util::Silencer;
 #[derive(Debug)]
 pub struct Application {
     inner: BaseApplication,
-    pub(crate) composer: Option<Composer>,
+    pub(crate) composer: Option<PartialComposerHandle>,
     pub(crate) io: Box<dyn IOInterface>,
     has_plugin_commands: bool,
     disable_plugins_by_default: bool,
@@ -108,7 +110,7 @@ impl Application {
         // PHP: static $shutdownRegistered = false; — register only once globally
         static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
         if version == "" {
-            version = Composer::get_version();
+            version = composer::get_version();
         }
         if function_exists("ini_set") && extension_loaded("xdebug") {
             ini_set("xdebug.show_exception_trace", "0");
@@ -495,8 +497,8 @@ impl Application {
                 &sprintf(
                     "Running %s (%s) with %s on %s",
                     &[
-                        Composer::get_version().into(),
-                        Composer::RELEASE_DATE.into(),
+                        composer::get_version().into(),
+                        composer::RELEASE_DATE.into(),
                         (if defined("HHVM_VERSION") {
                             format!("HHVM {}", shirabe_php_shim::HHVM_VERSION.unwrap_or(""))
                         } else {
@@ -629,8 +631,10 @@ impl Application {
                                         .unwrap_or_default();
 
                                     if let Some(composer) = self.get_composer(false, None, None)? {
+                                        let composer = crate::command::composer_full(&composer);
                                         let root_package = composer.get_package();
-                                        let generator = composer.get_autoload_generator();
+                                        let generator = composer.get_autoload_generator().clone();
+                                        let generator = generator.borrow();
 
                                         // TODO(phase-b): build_package_map needs &mut InstallationManager
                                         // but get_composer returns &Composer; skip until shared ownership is settled.
@@ -848,6 +852,7 @@ impl Application {
             let composer = self.get_composer(false, Some(true), None)?;
             if composer.is_some() && function_exists("disk_free_space") {
                 let composer = composer.unwrap();
+                let composer = composer.borrow_partial();
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
@@ -979,7 +984,7 @@ impl Application {
         required: bool,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> anyhow::Result<Option<&Composer>> {
+    ) -> anyhow::Result<Option<PartialComposerHandle>> {
         let disable_plugins = disable_plugins.unwrap_or(self.disable_plugins_by_default);
         let disable_scripts = disable_scripts.unwrap_or(self.disable_scripts_by_default);
 
@@ -1020,7 +1025,7 @@ impl Application {
             }
         }
 
-        Ok(self.composer.as_ref())
+        Ok(self.composer.clone())
     }
 
     /// Removes the cached composer instance
@@ -1065,12 +1070,12 @@ impl Application {
 
     pub fn get_long_version(&self) -> String {
         let mut branch_alias_string = String::new();
-        if !Composer::BRANCH_ALIAS_VERSION.is_empty()
-            && Composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
+        if !composer::BRANCH_ALIAS_VERSION.is_empty()
+            && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
         {
             branch_alias_string = sprintf(
                 " (%s)",
-                &[Composer::BRANCH_ALIAS_VERSION.to_string().into()],
+                &[composer::BRANCH_ALIAS_VERSION.to_string().into()],
             );
         }
 
@@ -1080,7 +1085,7 @@ impl Application {
                 self.inner.get_name().into(),
                 self.inner.get_version().into(),
                 branch_alias_string.into(),
-                Composer::RELEASE_DATE.into(),
+                composer::RELEASE_DATE.into(),
             ],
         )
     }

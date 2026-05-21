@@ -6,7 +6,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
@@ -80,15 +79,15 @@ impl ExecCommand {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
 
         if input.get_option("list").as_bool().unwrap_or(false)
             || input.get_argument("binary").as_string_opt().is_none()
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = composer
-                    .get_config_mut()
+                let bin_dir = crate::command::composer_full_mut(&composer)
+                    .get_config()
                     .borrow_mut()
                     .get("bin-dir")
                     .as_string()
@@ -119,9 +118,11 @@ impl ExecCommand {
             .unwrap_or("")
             .to_string();
 
-        let dispatcher = composer.get_event_dispatcher();
+        let dispatcher = crate::command::composer_full(&composer)
+            .get_event_dispatcher()
+            .clone();
         // TODO(phase-b): add_listener takes a Callable; wiring binary as callable not yet ported
-        let _ = (dispatcher, &binary);
+        let _ = &binary;
 
         let initial_working_directory = self.get_application()?.get_initial_working_directory();
         if let Some(ref iwd) = initial_working_directory {
@@ -152,16 +153,17 @@ impl ExecCommand {
     }
 
     fn get_binaries(&mut self, for_display: bool) -> Result<Vec<String>> {
-        let mut composer = self.require_composer(None, None)?;
-        let bin_dir = composer
-            .get_config_mut()
+        let composer = self.require_composer(None, None)?;
+        let composer_ref = crate::command::composer_full_mut(&composer);
+        let bin_dir = composer_ref
+            .get_config()
             .borrow_mut()
             .get("bin-dir")
             .as_string()
             .unwrap_or("")
             .to_string();
         let bins = glob(&format!("{}/*", bin_dir));
-        let local_bins_raw: Vec<String> = composer.get_package().get_binaries();
+        let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
         let local_bins: Vec<String> = if for_display {
             local_bins_raw
                 .into_iter()

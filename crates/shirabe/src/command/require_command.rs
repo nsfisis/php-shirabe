@@ -17,7 +17,7 @@ use shirabe_php_shim::{
 use crate::advisory::Auditor;
 use crate::command::PackageDiscoveryTrait;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
+use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Request;
@@ -74,7 +74,7 @@ impl PackageDiscoveryTrait for RequireCommand {
         todo!()
     }
 
-    fn try_composer(&self) -> Option<Composer> {
+    fn try_composer(&self) -> Option<PartialComposerHandle> {
         todo!()
     }
 
@@ -82,7 +82,7 @@ impl PackageDiscoveryTrait for RequireCommand {
         &self,
         disable_plugins: Option<bool>,
         disable_scripts: Option<bool>,
-    ) -> Composer {
+    ) -> PartialComposerHandle {
         todo!()
     }
 
@@ -251,7 +251,10 @@ impl RequireCommand {
         }
 
         let composer = self.require_composer(None, None)?;
-        let repos = composer.get_repository_manager().get_repositories();
+        let composer = crate::command::composer_full(&composer);
+        let repository_manager = composer.get_repository_manager().clone();
+        let repository_manager = repository_manager.borrow();
+        let repos = repository_manager.get_repositories();
 
         let platform_overrides = composer.get_config().borrow_mut().get("platform");
         let platform_overrides_map: IndexMap<String, PhpMixed> = platform_overrides
@@ -545,7 +548,10 @@ impl RequireCommand {
             return Ok(0);
         }
 
-        composer.get_plugin_manager().deactivate_installed_plugins();
+        composer
+            .get_plugin_manager()
+            .borrow_mut()
+            .deactivate_installed_plugins();
 
         // try/catch/finally
         // TODO(phase-b): do_update borrows io from self while also needing &mut self for state
@@ -683,7 +689,8 @@ impl RequireCommand {
     ) -> Result<i64> {
         // Update packages
         self.reset_composer()?;
-        let mut composer = self.require_composer(None, None)?;
+        let composer_handle = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer_handle);
 
         self.dependency_resolution_completed = false;
         // TODO(phase-b): add_listener expects a Callable enum; PHP closure should set
@@ -837,12 +844,14 @@ impl RequireCommand {
             .dispatch(Some(command_event.get_name()), None);
 
         composer
-            .get_installation_manager_mut()
+            .get_installation_manager()
+            .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
         // TODO(phase-b): Installer::create takes Box<dyn IOInterface> for ownership but io is a
         // borrowed &dyn here; needs Rc<dyn IOInterface> for proper sharing.
-        let mut install = Installer::create(todo!("share io as Box<dyn IOInterface>"), &composer);
+        let mut install =
+            Installer::create(todo!("share io as Box<dyn IOInterface>"), &composer_handle);
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*composer.get_config().borrow(), input, false)?;
@@ -871,7 +880,7 @@ impl RequireCommand {
 
         // if no lock is present, or the file is brand new, we do not do a
         // partial update as this is not supported by the Installer
-        if !self.first_require && composer.get_locker().is_locked() {
+        if !self.first_require && composer.get_locker().borrow_mut().is_locked() {
             install.set_update_allow_list(
                 array_keys(requirements)
                     .into_iter()
@@ -920,8 +929,9 @@ impl RequireCommand {
         dry_run: bool,
         fixed: bool,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
-        let locker_is_locked = composer.get_locker_mut().is_locked();
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
+        let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
         let mut requirements: IndexMap<String, String> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
             RepositorySet::new(
@@ -939,7 +949,10 @@ impl RequireCommand {
         // interface for find_package.
         let locked_repo;
         let repo: &dyn RepositoryInterface = if locker_is_locked {
-            locked_repo = composer.get_locker_mut().get_locked_repository(true)?;
+            locked_repo = composer
+                .get_locker()
+                .borrow_mut()
+                .get_locked_repository(true)?;
             &locked_repo
         } else {
             todo!("convert &dyn InstalledRepositoryInterface to &dyn RepositoryInterface")

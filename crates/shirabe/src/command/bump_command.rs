@@ -9,7 +9,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
@@ -134,7 +133,8 @@ impl BumpCommand {
             return Ok(Self::ERROR_GENERIC);
         }
 
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
         let has_lock_file_disabled = !composer.get_config().borrow().has("lock")
             || composer
                 .get_config()
@@ -143,9 +143,14 @@ impl BumpCommand {
                 .as_bool()
                 .unwrap_or(true);
         let repo: Box<dyn crate::repository::RepositoryInterface> = if !has_lock_file_disabled {
-            Box::new(composer.get_locker_mut().get_locked_repository(true)?)
-        } else if composer.get_locker_mut().is_locked() {
-            if !composer.get_locker_mut().is_fresh()? {
+            Box::new(
+                composer
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(true)?,
+            )
+        } else if composer.get_locker().borrow_mut().is_locked() {
+            if !composer.get_locker().borrow_mut().is_fresh()? {
                 io.write_error3(
                     "<error>The lock file is not up to date with the latest changes in composer.json. Run the appropriate `update` to fix that before you use the `bump` command.</error>",
                     true,
@@ -153,12 +158,18 @@ impl BumpCommand {
                 );
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
-            Box::new(composer.get_locker_mut().get_locked_repository(true)?)
+            Box::new(
+                composer
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(true)?,
+            )
         } else {
             // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
             // cloning into an owned Box requires clone_box on that trait.
             composer
                 .get_repository_manager()
+                .borrow()
                 .get_local_repository()
                 .clone_box()
         };
@@ -253,7 +264,7 @@ impl BumpCommand {
                 }
 
                 updates
-                    .entry(key)
+                    .entry(*key)
                     .or_default()
                     .insert(pkg_name.clone(), bumped);
             }
@@ -306,7 +317,7 @@ impl BumpCommand {
         }
 
         if !dry_run
-            && composer.get_locker_mut().is_locked()
+            && composer.get_locker().borrow_mut().is_locked()
             && composer
                 .get_config()
                 .borrow_mut()
@@ -316,7 +327,8 @@ impl BumpCommand {
             && change_count > 0
         {
             composer
-                .get_locker_mut()
+                .get_locker()
+                .borrow_mut()
                 .update_hash(&composer_json, None::<fn(_) -> _>)?;
         }
 

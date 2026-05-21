@@ -6,7 +6,6 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use crate::plugin::CommandEvent;
@@ -47,7 +46,8 @@ impl DumpAutoloadCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        let mut composer = self.require_composer(None, None)?;
+        let composer = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer);
 
         // TODO(plugin): dispatch CommandEvent
         let command_event =
@@ -58,11 +58,13 @@ impl DumpAutoloadCommand {
             .dispatch(Some(command_event.get_name()), None);
 
         // Clone the Rc<RefCell<Config>> so we can take mutable borrows of composer later
-        let config = std::rc::Rc::clone(composer.get_config());
+        let config = composer.get_config();
 
         let mut missing_dependencies = false;
         {
-            let local_repo = composer.get_repository_manager().get_local_repository();
+            let repository_manager = composer.get_repository_manager().clone();
+            let repository_manager = repository_manager.borrow();
+            let local_repo = repository_manager.get_local_repository();
             for local_pkg in local_repo.get_canonical_packages() {
                 // TODO(phase-b): get_install_path takes &mut self on installation_manager which conflicts with the &local_repo borrow held by this loop; needs shared-ownership refactor
                 let install_path: Option<String> =
@@ -137,10 +139,16 @@ impl DumpAutoloadCommand {
 
         let platform_requirement_filter = self.get_platform_requirement_filter(input)?;
         if input.get_option("dry-run").as_bool().unwrap_or(false) {
-            composer.get_autoload_generator_mut().set_dry_run(true);
+            composer
+                .get_autoload_generator()
+                .borrow_mut()
+                .set_dry_run(true);
         }
         if input.get_option("no-dev").as_bool().unwrap_or(false) {
-            composer.get_autoload_generator_mut().set_dev_mode(false);
+            composer
+                .get_autoload_generator()
+                .borrow_mut()
+                .set_dev_mode(false);
         }
         if input.get_option("dev").as_bool().unwrap_or(false) {
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
@@ -152,17 +160,26 @@ impl DumpAutoloadCommand {
                 }
                 .into());
             }
-            composer.get_autoload_generator_mut().set_dev_mode(true);
+            composer
+                .get_autoload_generator()
+                .borrow_mut()
+                .set_dev_mode(true);
         }
         composer
-            .get_autoload_generator_mut()
+            .get_autoload_generator()
+            .borrow_mut()
             .set_class_map_authoritative(authoritative);
-        composer.get_autoload_generator_mut().set_run_scripts(true);
         composer
-            .get_autoload_generator_mut()
+            .get_autoload_generator()
+            .borrow_mut()
+            .set_run_scripts(true);
+        composer
+            .get_autoload_generator()
+            .borrow_mut()
             .set_apcu(apcu, apcu_prefix);
         composer
-            .get_autoload_generator_mut()
+            .get_autoload_generator()
+            .borrow_mut()
             .set_platform_requirement_filter(platform_requirement_filter);
         // TODO(phase-b): dump requires multiple borrows of composer simultaneously (autoload generator mut, repository, package, installation manager, locker); needs shared-ownership refactor
         let class_map: shirabe_class_map_generator::class_map::ClassMap =

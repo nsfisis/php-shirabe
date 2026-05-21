@@ -9,7 +9,6 @@ use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower
 
 use crate::advisory::Auditor;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::composer::Composer;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
@@ -183,9 +182,11 @@ impl RemoveCommand {
             .unwrap_or_default();
 
         if input.get_option("unused").as_bool().unwrap_or(false) {
-            let mut composer = self.require_composer(None, None)?;
+            let composer = self.require_composer(None, None)?;
+            let mut composer = crate::command::composer_full_mut(&composer);
             {
-                let locker = composer.get_locker_mut();
+                let locker = composer.get_locker().clone();
+                let mut locker = locker.borrow_mut();
                 if !locker.is_locked() {
                     return Err(anyhow::anyhow!(UnexpectedValueException {
                         message:
@@ -197,7 +198,8 @@ impl RemoveCommand {
             }
 
             let locked_packages = composer
-                .get_locker_mut()
+                .get_locker()
+                .borrow_mut()
                 .get_locked_repository(true)?
                 .get_packages();
 
@@ -426,14 +428,17 @@ impl RemoveCommand {
         }
 
         // TODO(plugin): deactivate installed plugins
-        if let Some(mut composer_opt) = self.try_composer(None, None) {
+        if let Some(composer_opt) = self.try_composer(None, None) {
+            let mut composer_opt = crate::command::composer_full_mut(&composer_opt);
             composer_opt
-                .get_plugin_manager_mut()
+                .get_plugin_manager()
+                .borrow_mut()
                 .deactivate_installed_plugins();
         }
 
         self.reset_composer();
-        let mut composer = self.require_composer(None, None)?;
+        let composer_handle = self.require_composer(None, None)?;
+        let mut composer = crate::command::composer_full_mut(&composer_handle);
 
         if dry_run {
             // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; set_requires/set_dev_requires need &mut self; needs shared-ownership refactor
@@ -501,12 +506,13 @@ impl RemoveCommand {
         }
 
         composer
-            .get_installation_manager_mut()
+            .get_installation_manager()
+            .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
         // TODO(phase-b): Installer::create expects Box<dyn IOInterface>; io here is &mut dyn IOInterface
         let io_box: Box<dyn IOInterface> = todo!("share IOInterface as Box<dyn IOInterface>");
-        let mut install = Installer::create(io_box, &composer);
+        let mut install = Installer::create(io_box, &composer_handle);
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
         let optimize = input
@@ -601,7 +607,7 @@ impl RemoveCommand {
 
         // if no lock is present, we do not do a partial update as
         // this is not supported by the Installer
-        if composer.get_locker_mut().is_locked() {
+        if composer.get_locker().borrow_mut().is_locked() {
             install.set_update_allow_list(packages.clone());
         }
 
@@ -618,6 +624,7 @@ impl RemoveCommand {
             for package in &packages {
                 if !composer
                     .get_repository_manager()
+                    .borrow()
                     .get_local_repository()
                     .find_packages(package, None)
                     .is_empty()
