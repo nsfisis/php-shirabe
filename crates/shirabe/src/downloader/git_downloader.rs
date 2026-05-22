@@ -66,7 +66,7 @@ impl GitDownloader {
     ) -> Result<Option<PhpMixed>> {
         // Do not create an extra local cache when repository is already local
         if Filesystem::is_local_path(url) {
-            return Ok(promise::resolve(None));
+            return Ok(None);
         }
 
         GitUtil::clean_env(&self.inner.process);
@@ -129,7 +129,7 @@ impl GitDownloader {
             .into());
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_install(
@@ -282,7 +282,7 @@ impl GitDownloader {
             let _ = new_ref;
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_update(
@@ -448,7 +448,7 @@ impl GitDownloader {
             self.update_origin_url(&path, target.get_source_url().unwrap());
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub fn get_local_changes(&self, _package: &dyn PackageInterface, path: &str) -> Option<String> {
@@ -717,23 +717,23 @@ impl GitDownloader {
 
         let changes = match self.get_local_changes(package, &path) {
             Some(c) => c,
-            None => return Ok(promise::resolve(None)),
+            None => return Ok(None),
         };
 
         if !self.inner.io.is_interactive() {
             let discard_changes = self.inner.config.borrow_mut().get("discard-changes");
             if discard_changes.as_bool() == Some(true) {
-                return self.discard_changes(&path);
+                return self.discard_changes(&path).await;
             }
             if discard_changes.as_string() == Some("stash") {
                 if !update {
-                    return self.inner.clean_changes(package, &path, update);
+                    return self.inner.clean_changes(package, &path, update).await;
                 }
 
-                return self.stash_changes(&path);
+                return self.stash_changes(&path).await;
             }
 
-            return self.inner.clean_changes(package, &path, update);
+            return self.inner.clean_changes(package, &path, update).await;
         }
 
         let changes: Vec<String> = array_map(
@@ -780,7 +780,7 @@ impl GitDownloader {
             let mut do_help = false;
             match answer.as_deref() {
                 Some("y") => {
-                    self.discard_changes(&path)?;
+                    self.discard_changes(&path).await?;
                     break 'outer;
                 }
                 Some("s") => {
@@ -788,7 +788,7 @@ impl GitDownloader {
                         // goto help;
                         do_help = true;
                     } else {
-                        self.stash_changes(&path)?;
+                        self.stash_changes(&path).await?;
                         break 'outer;
                     }
                 }
@@ -847,7 +847,7 @@ impl GitDownloader {
             }
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) fn reapply_changes(&mut self, path: &str) -> Result<()> {
@@ -1254,7 +1254,7 @@ impl GitDownloader {
 
         self.has_discarded_changes.insert(path, true);
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     /// @phpstan-return PromiseInterface<void|null>
@@ -1281,7 +1281,7 @@ impl GitDownloader {
 
         self.has_stashed_changes.insert(path, true);
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     /// @throws \RuntimeException

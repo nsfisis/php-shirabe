@@ -214,7 +214,7 @@ impl DownloadManager {
             let source = match array_shift(&mut sources) {
                 Some(s) => s,
                 None => {
-                    return Ok(shirabe_external_packages::react::promise::resolve(None));
+                    return Ok(None);
                 }
             };
             if retry_state {
@@ -233,12 +233,15 @@ impl DownloadManager {
             let downloader = match self.get_downloader_for_package(package)? {
                 Some(d) => d,
                 None => {
-                    return Ok(shirabe_external_packages::react::promise::resolve(None));
+                    return Ok(None);
                 }
             };
 
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let result = match downloader.download3(package, &target_dir, prev_package) {
+            let result = match downloader
+                .download3(package, &target_dir, prev_package)
+                .await
+            {
                 Ok(r) => r,
                 Err(e) => {
                     // PHP closure handleError: rethrow if not RuntimeException or if IrrecoverableDownloadException
@@ -271,15 +274,8 @@ impl DownloadManager {
             };
 
             // PHP: $result->then(static fn ($res) => $res, $handleError);
-            // TODO(phase-b): chain $handleError as the rejection handler on the promise
-            let res = result.then(
-                Some(Box::new(move |res: Option<PhpMixed>| -> Option<PhpMixed> {
-                    res
-                })),
-                None,
-            );
-
-            return Ok(res);
+            // The rejection handler ($handleError) is already applied via the try/catch (the Err arm above).
+            return Ok(result);
         }
     }
 
@@ -299,10 +295,12 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.prepare(r#type, package, &target_dir, prev_package);
+            return downloader
+                .prepare(r#type, package, &target_dir, prev_package)
+                .await;
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     /// Installs package into target dir.
@@ -320,10 +318,10 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.install2(package, &target_dir);
+            return downloader.install2(package, &target_dir).await;
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     /// Updates package from initial to target version.
@@ -346,19 +344,26 @@ impl DownloadManager {
 
         // no downloaders present means update from metapackage to metapackage, nothing to do
         if initial_downloader.is_none() && downloader.is_none() {
-            return Ok(shirabe_external_packages::react::promise::resolve(None));
+            return Ok(None);
         }
 
         // if we have a downloader present before, but not after, the package became a metapackage and its files should be removed
         if downloader.is_none() {
-            return initial_downloader.unwrap().remove2(initial, &target_dir);
+            return initial_downloader
+                .unwrap()
+                .remove2(initial, &target_dir)
+                .await;
         }
 
         let initial_type = self.get_downloader_type(initial_downloader.unwrap());
         let target_type = self.get_downloader_type(downloader.unwrap());
         if initial_type == target_type {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            match downloader.unwrap().update(initial, target, &target_dir) {
+            match downloader
+                .unwrap()
+                .update(initial, target, &target_dir)
+                .await
+            {
                 Ok(p) => return Ok(p),
                 Err(e) => {
                     // TODO(phase-b): downcast to RuntimeException
@@ -383,18 +388,12 @@ impl DownloadManager {
 
         // if downloader type changed, or update failed and user asks for reinstall,
         // we wipe the dir and do a new install instead of updating it
-        let promise = initial_downloader.unwrap().remove2(initial, &target_dir)?;
-
-        let target_dir_owned = target_dir.clone();
-        // TODO(phase-b): capture self and target into the closure; type mismatch with then signature.
-        let _ = target_dir_owned;
-        Ok(promise.then(
-            Some(Box::new(move |res: Option<PhpMixed>| -> Option<PhpMixed> {
-                let _ = res;
-                todo!("self.install(target, &target_dir_owned)")
-            })),
-            None,
-        ))
+        // PHP: return $promise->then(fn () => $this->install($target, $targetDir));
+        let _ = initial_downloader
+            .unwrap()
+            .remove2(initial, &target_dir)
+            .await?;
+        self.install(target, &target_dir).await
     }
 
     /// Removes package from target dir.
@@ -409,10 +408,10 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.remove2(package, &target_dir);
+            return downloader.remove2(package, &target_dir).await;
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     /// Cleans up a failed operation
@@ -431,10 +430,12 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
-            return downloader.cleanup(r#type, package, &target_dir, prev_package);
+            return downloader
+                .cleanup(r#type, package, &target_dir, prev_package)
+                .await;
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     /// Determines the install preference of a package

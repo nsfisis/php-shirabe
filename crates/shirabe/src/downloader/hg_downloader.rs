@@ -43,7 +43,7 @@ impl HgDownloader {
             .into());
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_install(
@@ -97,7 +97,7 @@ impl HgDownloader {
             .into());
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_update(
@@ -148,7 +148,7 @@ impl HgDownloader {
         };
         hg_utils.run_command(up_command, url, Some(path));
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub fn get_local_changes(

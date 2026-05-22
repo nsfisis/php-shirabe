@@ -26,9 +26,7 @@ impl InstallerInterface for NoopInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn prepare(
@@ -37,9 +35,7 @@ impl InstallerInterface for NoopInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn cleanup(
@@ -48,9 +44,7 @@ impl InstallerInterface for NoopInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn install(
@@ -62,9 +56,7 @@ impl InstallerInterface for NoopInstaller {
             repo.add_package(package.clone_package_box());
         }
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn update(
@@ -86,9 +78,7 @@ impl InstallerInterface for NoopInstaller {
             repo.add_package(target.clone_package_box());
         }
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn uninstall(
@@ -105,9 +95,7 @@ impl InstallerInterface for NoopInstaller {
         }
         repo.remove_package(package);
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {

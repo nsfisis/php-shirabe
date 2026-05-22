@@ -57,7 +57,7 @@ impl SvnDownloader {
             .into());
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_install(
@@ -101,7 +101,7 @@ impl SvnDownloader {
             Some(path),
         )?;
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_update(
@@ -152,7 +152,7 @@ impl SvnDownloader {
             None,
         )?;
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub fn get_local_changes(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
@@ -210,7 +210,7 @@ impl SvnDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let changes = self.get_local_changes(package, path);
         if changes.is_none() {
-            return Ok(promise::resolve(None));
+            return Ok(None);
         }
 
         if !self.inner.io.is_interactive() {
@@ -222,10 +222,10 @@ impl SvnDownloader {
                 .as_bool()
                 == Some(true)
             {
-                return self.discard_changes(path);
+                return self.discard_changes(path).await;
             }
 
-            return self.inner.clean_changes(package, path, update);
+            return self.inner.clean_changes(package, path, update).await;
         }
 
         let changes_str = changes.unwrap();
@@ -273,7 +273,7 @@ impl SvnDownloader {
                 .as_string()
             {
                 Some("y") => {
-                    self.discard_changes(path)?;
+                    self.discard_changes(path).await?;
                     break;
                 }
                 Some("n") => {
@@ -310,7 +310,7 @@ impl SvnDownloader {
             }
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) fn get_commit_logs(
@@ -421,7 +421,7 @@ impl SvnDownloader {
             .into());
         }
 
-        Ok(promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {

@@ -1103,6 +1103,9 @@ impl ComposerRepository {
             .map_or(false, |c| c.metadata)
             && (allow_partial_advisories || api_url.is_none())
         {
+            // TODO(phase-c-promise): collects start_cached_async_download().then_boxed() promises and
+            // drives them via Loop::wait; rewrite to await the collected futures once the async Loop
+            // boundary lands.
             let mut promises: Vec<Box<dyn PromiseInterface>> = Vec::new();
             let names: Vec<String> = package_constraint_map.keys().cloned().collect();
             for name in names {
@@ -1848,6 +1851,9 @@ impl ComposerRepository {
 
         let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
+        // TODO(phase-c-promise): collects start_cached_async_download().then_boxed() promises and
+        // drives them via Loop::wait; rewrite to await the collected futures once the async Loop
+        // boundary lands.
         let mut promises: Vec<Box<dyn PromiseInterface>> = Vec::new();
 
         if self.lazy_providers_url.is_none() {
@@ -2131,62 +2137,43 @@ impl ComposerRepository {
             contents_opt = None;
         }
 
-        let promise = self.async_fetch_file(&url, &cache_key, last_modified.as_deref())?;
-        let url_owned = url.clone();
-        let cache_key_owned = cache_key.clone();
-        let contents = contents_opt;
-        // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
-        // not anyhow::Result<PhpMixed>; needs structural reshape
-        Ok(promise.then_boxed(
-            Some(Box::new(
-                move |response: PhpMixed| -> Box<dyn PromiseInterface> {
-                    let _result: anyhow::Result<PhpMixed> = (|| -> anyhow::Result<PhpMixed> {
-                        let mut packages_source =
-                            format!("downloaded file ({})", Url::sanitize(url_owned.clone()));
+        // PHP: return $this->asyncFetchFile(...)->then(function ($response) use (...): array { ... });
+        let response = self
+            .async_fetch_file(&url, &cache_key, last_modified.as_deref())
+            .await?;
 
-                        let response_data = if response.as_bool() == Some(true) {
-                            packages_source = format!(
-                                "cached file ({} originating from {})",
-                                cache_key_owned,
-                                Url::sanitize(url_owned.clone())
-                            );
-                            contents
-                                .clone()
-                                .map(|m| {
-                                    PhpMixed::Array(
-                                        m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                    )
-                                })
-                                .unwrap_or(PhpMixed::Null)
-                        } else {
-                            response
-                        };
+        let mut packages_source = format!("downloaded file ({})", Url::sanitize(url.clone()));
 
-                        let response_arr = response_data.as_array();
-                        let has_pkg = response_arr
-                            .and_then(|a| a.get("packages"))
-                            .and_then(|v| v.as_array())
-                            .map_or(false, |a| a.contains_key(&package_name));
-                        let has_advisories =
-                            response_arr.map_or(false, |a| a.contains_key("security-advisories"));
-                        if !has_pkg && !has_advisories {
-                            return Ok(PhpMixed::List(vec![
-                                Box::new(PhpMixed::Null),
-                                Box::new(PhpMixed::String(packages_source)),
-                            ]));
-                        }
+        let response_data = if response.as_bool() == Some(true) {
+            packages_source = format!(
+                "cached file ({} originating from {})",
+                cache_key,
+                Url::sanitize(url.clone())
+            );
+            contents_opt
+                .map(|m| PhpMixed::Array(m.into_iter().map(|(k, v)| (k, Box::new(v))).collect()))
+                .unwrap_or(PhpMixed::Null)
+        } else {
+            response
+        };
 
-                        Ok(PhpMixed::List(vec![
-                            Box::new(response_data),
-                            Box::new(PhpMixed::String(packages_source)),
-                        ]))
-                    })();
-                    // TODO(phase-b): return a real PromiseInterface
-                    todo!("return real PromiseInterface")
-                },
-            )),
-            None,
-        ))
+        let response_arr = response_data.as_array();
+        let has_pkg = response_arr
+            .and_then(|a| a.get("packages"))
+            .and_then(|v| v.as_array())
+            .map_or(false, |a| a.contains_key(&package_name));
+        let has_advisories = response_arr.map_or(false, |a| a.contains_key("security-advisories"));
+        if !has_pkg && !has_advisories {
+            return Ok(PhpMixed::List(vec![
+                Box::new(PhpMixed::Null),
+                Box::new(PhpMixed::String(packages_source)),
+            ]));
+        }
+
+        Ok(PhpMixed::List(vec![
+            Box::new(response_data),
+            Box::new(PhpMixed::String(packages_source)),
+        ]))
     }
 
     /// @param name package name (must be lowercased already)
@@ -3293,18 +3280,20 @@ impl ComposerRepository {
         if self.packagesNotFoundCache.contains_key(filename) {
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
             empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
-            return Ok(react_promise_resolve(PhpMixed::Array(
+            return Ok(PhpMixed::Array(
                 empty.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-            )));
+            ));
         }
 
         if self.freshMetadataUrls.contains_key(filename) && last_modified_time.is_some() {
             // make it look like we got a 304 response
-            let promise = react_promise_resolve(PhpMixed::Bool(true));
-
-            return Ok(promise);
+            return Ok(PhpMixed::Bool(true));
         }
 
+        // TODO(phase-c-promise): the live fetch path builds accept/reject closures (with raw-pointer
+        // shared state) and returns http_downloader.add(...).then_with_reject_boxed(accept, reject).
+        // Rewrite as an async fetch + inline accept/reject handling once the HttpDownloader async
+        // boundary lands.
         let mut filename = filename.to_string();
         let mut options = self.options.clone();
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {

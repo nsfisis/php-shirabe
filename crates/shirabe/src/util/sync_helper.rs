@@ -20,8 +20,8 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.download3(package, path, prev_package),
-            Self::Manager(d) => d.borrow().download(package, path, prev_package),
+            Self::Interface(d) => d.download3(package, path, prev_package).await,
+            Self::Manager(d) => d.borrow().download(package, path, prev_package).await,
         }
     }
 
@@ -33,8 +33,12 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.prepare(r#type, package, path, prev_package),
-            Self::Manager(d) => d.borrow().prepare(r#type, package, path, prev_package),
+            Self::Interface(d) => d.prepare(r#type, package, path, prev_package).await,
+            Self::Manager(d) => {
+                d.borrow()
+                    .prepare(r#type, package, path, prev_package)
+                    .await
+            }
         }
     }
 
@@ -44,8 +48,8 @@ impl<'a> DownloaderOrManager<'a> {
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.install2(package, path),
-            Self::Manager(d) => d.borrow().install(package, path),
+            Self::Interface(d) => d.install2(package, path).await,
+            Self::Manager(d) => d.borrow().install(package, path).await,
         }
     }
 
@@ -56,8 +60,8 @@ impl<'a> DownloaderOrManager<'a> {
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.update(package, prev_package, path),
-            Self::Manager(d) => d.borrow().update(package, prev_package, path),
+            Self::Interface(d) => d.update(package, prev_package, path).await,
+            Self::Manager(d) => d.borrow().update(package, prev_package, path).await,
         }
     }
 
@@ -69,8 +73,12 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.cleanup(r#type, package, path, prev_package),
-            Self::Manager(d) => d.borrow().cleanup(r#type, package, path, prev_package),
+            Self::Interface(d) => d.cleanup(r#type, package, path, prev_package).await,
+            Self::Manager(d) => {
+                d.borrow()
+                    .cleanup(r#type, package, path, prev_package)
+                    .await
+            }
         }
     }
 }
@@ -78,6 +86,7 @@ impl<'a> DownloaderOrManager<'a> {
 pub struct SyncHelper;
 
 impl SyncHelper {
+    // TODO(phase-c-promise): synchronous wrapper driving now-async downloader calls via Self::await (loop.wait); needs async/loop boundary design.
     pub fn download_and_install_package_sync(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         downloader: DownloaderOrManager<'_>,
@@ -125,6 +134,7 @@ impl SyncHelper {
         Ok(())
     }
 
+    // TODO(phase-c-promise): loop-pump synchronous wait over a promise; driving mechanism needs design.
     pub fn r#await(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         promise: Option<Box<dyn PromiseInterface>>,

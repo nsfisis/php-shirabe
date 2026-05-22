@@ -199,6 +199,7 @@ impl DownloaderInterface for FileDownloader {
             .borrow_mut()
             .ensure_directory_exists(&dir_of_file)?;
 
+        // TODO(phase-c-promise): rewrite the accept/reject/retry promise orchestration as an async loop.
         // TODO(plugin): inline closures rely on captured $accept/$reject/$urls/$retries. In Rust
         // we'd need a struct holding shared state — left as a phase-b refactor.
         let _ = (output, &urls, &mut retries, cache_key_generator, &file_name);
@@ -218,7 +219,7 @@ impl DownloaderInterface for FileDownloader {
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(react_promise_resolve(Some(PhpMixed::Null)))
+        Ok(Some(PhpMixed::Null))
     }
 
     /// @inheritDoc
@@ -273,7 +274,7 @@ impl DownloaderInterface for FileDownloader {
             }
         }
 
-        Ok(react_promise_resolve(Some(PhpMixed::Null)))
+        Ok(Some(PhpMixed::Null))
     }
 
     /// @inheritDoc
@@ -333,7 +334,7 @@ impl DownloaderInterface for FileDownloader {
             }
         }
 
-        Ok(react_promise_resolve(Some(PhpMixed::Null)))
+        Ok(Some(PhpMixed::Null))
     }
 
     /// @inheritDoc
@@ -349,10 +350,9 @@ impl DownloaderInterface for FileDownloader {
             self.get_install_operation_appendix(target, path)
         ));
 
-        let _promise = self.remove(initial, path, false)?;
-        // TODO(phase-b): chain `.then(|| self.install(target, path, false))`
-        let _ = (initial, target, path);
-        todo!("phase-b: chain promise.then(|| self.install(target, path, false))")
+        // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
+        let _ = self.remove(initial, path, false).await?;
+        self.install(target, path, false).await
     }
 
     /// @inheritDoc
@@ -368,11 +368,20 @@ impl DownloaderInterface for FileDownloader {
                 UninstallOperation::format(package, false)
             ));
         }
-        let _promise = self.filesystem.borrow_mut().remove_directory_async(path)?;
+        let result = self
+            .filesystem
+            .borrow_mut()
+            .remove_directory_async(path)
+            .await?;
+        if !result {
+            return Err(RuntimeException {
+                message: format!("Could not completely delete {}, aborting.", path),
+                code: 0,
+            }
+            .into());
+        }
 
-        // TODO(phase-b): chain `.then(|result| if !result { throw RuntimeException })`
-        let _ = path;
-        todo!("phase-b: chain promise.then(|result| {{ if !result {{ throw RuntimeException }} }})")
+        Ok(None)
     }
 }
 
@@ -384,6 +393,8 @@ impl ChangeReportInterface for FileDownloader {
         package: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<String>> {
+        // TODO(phase-c-promise): get_local_changes drives promises via http_downloader/process wait();
+        // converting requires deciding whether ChangeReportInterface::get_local_changes becomes async. Left as-is.
         // TODO(phase-b): swap self.io to NullIO and restore — needs a take/swap helper
 
         let mut null_io = NullIO::new();

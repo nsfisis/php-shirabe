@@ -90,12 +90,12 @@ impl GzipDownloader {
                 (),
             )? == 0
             {
-                return Ok(shirabe_external_packages::react::promise::resolve(None));
+                return Ok(None);
             }
 
             if extension_loaded("zlib") {
                 self.extract_using_ext(file, &target_filepath);
-                return Ok(shirabe_external_packages::react::promise::resolve(None));
+                return Ok(None);
             }
 
             let process_error = format!(
@@ -111,7 +111,7 @@ impl GzipDownloader {
 
         self.extract_using_ext(file, &target_filepath);
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     fn extract_using_ext(&self, file: &str, target_filepath: &str) {
@@ -141,7 +141,9 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.download(package, path, prev_package, output)
+        self.inner
+            .download(package, path, prev_package, output)
+            .await
     }
 
     async fn prepare(
@@ -151,7 +153,9 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.prepare(r#type, package, path, prev_package)
+        self.inner
+            .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn install(
@@ -160,7 +164,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output)
+        self.inner.install(package, path, output).await
     }
 
     async fn update(
@@ -169,7 +173,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         target: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path)
+        self.inner.update(initial, target, path).await
     }
 
     async fn remove(
@@ -178,7 +182,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output)
+        self.inner.remove(package, path, output).await
     }
 
     async fn cleanup(
@@ -188,6 +192,8 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.cleanup(r#type, package, path, prev_package)
+        self.inner
+            .cleanup(r#type, package, path, prev_package)
+            .await
     }
 }

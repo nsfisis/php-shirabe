@@ -135,9 +135,7 @@ impl Filesystem {
     pub async fn remove_directory_async(&mut self, directory: &str) -> anyhow::Result<bool> {
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
-            return Ok(shirabe_external_packages::react::promise::resolve(Some(
-                PhpMixed::Bool(r),
-            )));
+            return Ok(r);
         }
 
         let cmd: Vec<String> = if Platform::is_windows() {
@@ -151,6 +149,9 @@ impl Filesystem {
             vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
         };
 
+        // TODO(phase-c-promise): execute_async is now async fn -> Result<Process>; the .then_boxed continuation that
+        // inspects the process result and flattens into a recursive removeDirectoryPhp fallback needs job-machine
+        // boundary design before it can become a flat await chain.
         let promise = self.get_process().execute_async(
             PhpMixed::List(
                 cmd.iter()

@@ -93,7 +93,7 @@ impl PathDownloader {
         let real_url = real_url.unwrap();
 
         if realpath(&path).as_deref() == Some(&real_url) {
-            return Ok(shirabe_external_packages::react::promise::resolve(None));
+            return Ok(None);
         }
 
         if format!(
@@ -119,7 +119,7 @@ impl PathDownloader {
             .into());
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub async fn install(
@@ -155,7 +155,7 @@ impl PathDownloader {
                 );
             }
 
-            return Ok(shirabe_external_packages::react::promise::resolve(None));
+            return Ok(None);
         }
 
         // Get the transport options with default values
@@ -290,7 +290,7 @@ impl PathDownloader {
             self.inner.io.write_error3("", true, io_interface::NORMAL);
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub async fn remove(
@@ -339,7 +339,7 @@ impl PathDownloader {
                 .into());
             }
 
-            return Ok(shirabe_external_packages::react::promise::resolve(None));
+            return Ok(None);
         }
 
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
@@ -378,10 +378,10 @@ impl PathDownloader {
                 );
             }
 
-            return Ok(shirabe_external_packages::react::promise::resolve(None));
+            return Ok(None);
         }
 
-        self.inner.remove(package, &path, output)
+        self.inner.remove(package, &path, output).await
     }
 
     pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
@@ -549,7 +549,9 @@ impl DownloaderInterface for PathDownloader {
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.download(package, path, prev_package, output)
+        self.inner
+            .download(package, path, prev_package, output)
+            .await
     }
 
     async fn prepare(
@@ -559,7 +561,9 @@ impl DownloaderInterface for PathDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.prepare(r#type, package, path, prev_package)
+        self.inner
+            .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn install(
@@ -568,7 +572,7 @@ impl DownloaderInterface for PathDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output)
+        self.inner.install(package, path, output).await
     }
 
     async fn update(
@@ -577,7 +581,7 @@ impl DownloaderInterface for PathDownloader {
         target: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path)
+        self.inner.update(initial, target, path).await
     }
 
     async fn remove(
@@ -586,7 +590,7 @@ impl DownloaderInterface for PathDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output)
+        self.inner.remove(package, path, output).await
     }
 
     async fn cleanup(
@@ -596,6 +600,8 @@ impl DownloaderInterface for PathDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.cleanup(r#type, package, path, prev_package)
+        self.inner
+            .cleanup(r#type, package, path, prev_package)
+            .await
     }
 }

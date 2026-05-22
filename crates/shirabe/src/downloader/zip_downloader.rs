@@ -192,7 +192,9 @@ impl ZipDownloader {
             }
         }
 
-        self.inner.download(package, path, prev_package, output)
+        self.inner
+            .download(package, path, prev_package, output)
+            .await
     }
 
     async fn extract_with_system_unzip(
@@ -211,7 +213,7 @@ impl ZipDownloader {
             .as_ref()
             .map_or(true, |v| v.is_empty());
         if unzip_commands_empty {
-            return self.extract_with_zip_archive(package, file, path);
+            return self.extract_with_zip_archive(package, file, path).await;
         }
 
         let command_spec = UNZIP_COMMANDS.lock().unwrap().as_ref().unwrap()[0].clone();
@@ -268,6 +270,8 @@ impl ZipDownloader {
             }
         }
 
+        // TODO(phase-c-promise): execute_async + .then fallback closure captures &mut self/io;
+        // recursive promise flattening, not a mechanical await chain.
         // TODO(phase-b): full try_fallback closure deferred — PHP captures `$io`, `$self`
         // and several locals by reference, conflicting with Rust's borrow checker because
         // `extract_with_zip_archive` later needs `&mut self`. Restructure once the
@@ -350,7 +354,7 @@ impl ZipDownloader {
 
                 if extract_result {
                     zip_archive.close();
-                    return Ok(shirabe_external_packages::react::promise::resolve(None));
+                    return Ok(None);
                 }
 
                 return Err(RuntimeException {
@@ -392,7 +396,7 @@ impl ZipDownloader {
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.extract_with_system_unzip(package, file, path)
+        self.extract_with_system_unzip(package, file, path).await
     }
 
     pub fn get_error_message(&self, retval: i64, file: &str) -> String {
@@ -433,7 +437,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.download(package, path, prev_package, output)
+        self.inner
+            .download(package, path, prev_package, output)
+            .await
     }
 
     async fn prepare(
@@ -443,7 +449,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.prepare(r#type, package, path, prev_package)
+        self.inner
+            .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn install(
@@ -452,7 +460,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output)
+        self.inner.install(package, path, output).await
     }
 
     async fn update(
@@ -461,7 +469,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         target: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path)
+        self.inner.update(initial, target, path).await
     }
 
     async fn remove(
@@ -470,7 +478,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output)
+        self.inner.remove(package, path, output).await
     }
 
     async fn cleanup(
@@ -480,6 +488,8 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.cleanup(r#type, package, path, prev_package)
+        self.inner
+            .cleanup(r#type, package, path, prev_package)
+            .await
     }
 }

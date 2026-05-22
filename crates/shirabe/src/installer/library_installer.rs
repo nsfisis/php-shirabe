@@ -137,11 +137,10 @@ impl LibraryInstaller {
     ) -> Result<Option<PhpMixed>> {
         let download_path = self.get_install_path(package).unwrap();
 
-        Ok(Some(
-            self.get_download_manager()
-                .borrow()
-                .install(package, &download_path)?,
-        ))
+        self.get_download_manager()
+            .borrow()
+            .install(package, &download_path)
+            .await
     }
 
     /// @return PromiseInterface|null
@@ -159,19 +158,9 @@ impl LibraryInstaller {
             if strpos(&initial_download_path, &target_download_path) == Some(0)
                 || strpos(&target_download_path, &initial_download_path) == Some(0)
             {
-                let promise = self.remove_code(initial)?;
-                let promise = match promise {
-                    Some(p) => p,
-                    None => shirabe_external_packages::react::promise::resolve(None),
-                };
-
-                // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
-                // arguments. Translating the original PHP closure (which captures &self and target)
-                // requires restructuring; tracked separately.
-                let _ = promise;
-                return Ok(Some(todo!(
-                    "promise.then(...) chain to install_code(target)"
-                )));
+                // PHP: return $this->removeCode($initial)->then(fn () => $this->installCode($target));
+                let _ = self.remove_code(initial).await?;
+                return self.install_code(target).await;
             }
 
             self.filesystem
@@ -179,11 +168,10 @@ impl LibraryInstaller {
                 .rename(&initial_download_path, &target_download_path);
         }
 
-        Ok(Some(self.get_download_manager().borrow().update(
-            initial,
-            target,
-            &target_download_path,
-        )?))
+        self.get_download_manager()
+            .borrow()
+            .update(initial, target, &target_download_path)
+            .await
     }
 
     /// @return PromiseInterface|null
@@ -194,11 +182,10 @@ impl LibraryInstaller {
     ) -> Result<Option<PhpMixed>> {
         let download_path = self.get_package_base_path(package);
 
-        Ok(Some(
-            self.get_download_manager()
-                .borrow()
-                .remove(package, &download_path)?,
-        ))
+        self.get_download_manager()
+            .borrow()
+            .remove(package, &download_path)
+            .await
     }
 
     pub(crate) fn initialize_vendor_dir(&mut self) {
@@ -275,11 +262,10 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        Ok(Some(self.get_download_manager().borrow().download(
-            package,
-            &download_path,
-            prev_package,
-        )?))
+        self.get_download_manager()
+            .borrow()
+            .download(package, &download_path, prev_package)
+            .await
     }
 
     async fn prepare(
@@ -292,12 +278,10 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        Ok(Some(self.get_download_manager().borrow().prepare(
-            r#type,
-            package,
-            &download_path,
-            prev_package,
-        )?))
+        self.get_download_manager()
+            .borrow()
+            .prepare(r#type, package, &download_path, prev_package)
+            .await
     }
 
     async fn cleanup(
@@ -310,12 +294,10 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
 
-        Ok(Some(self.get_download_manager().borrow().cleanup(
-            r#type,
-            package,
-            &download_path,
-            prev_package,
-        )?))
+        self.get_download_manager()
+            .borrow()
+            .cleanup(r#type, package, &download_path, prev_package)
+            .await
     }
 
     async fn install(
@@ -332,6 +314,7 @@ impl InstallerInterface for LibraryInstaller {
             self.binary_installer.remove_binaries(package);
         }
 
+        // TODO(phase-c-promise): rewrite install_code().then(installBinaries + repo.addPackage) as an await sequence.
         let promise = self.install_code(package)?;
         let promise = match promise {
             Some(p) => p,
@@ -365,6 +348,7 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
 
         self.binary_installer.remove_binaries(initial);
+        // TODO(phase-c-promise): rewrite update_code().then(installBinaries + repo updates) as an await sequence.
         let promise = self.update_code(initial, target)?;
         let promise = match promise {
             Some(p) => p,
@@ -393,6 +377,7 @@ impl InstallerInterface for LibraryInstaller {
             .into());
         }
 
+        // TODO(phase-c-promise): rewrite remove_code().then(remove_binaries/remove_package/rmdir) as an await sequence.
         let promise = self.remove_code(package)?;
         let promise = match promise {
             Some(p) => p,

@@ -35,7 +35,7 @@ impl FossilDownloader {
         _url: String,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_install(
@@ -95,7 +95,7 @@ impl FossilDownloader {
             &mut output,
         )?;
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub(crate) async fn do_update(
@@ -147,7 +147,7 @@ impl FossilDownloader {
             &mut output,
         )?;
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub fn get_local_changes(

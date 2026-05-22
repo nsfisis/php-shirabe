@@ -40,7 +40,7 @@ impl PerforceDownloader {
         _url: String,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     pub async fn do_install(
@@ -70,7 +70,7 @@ impl PerforceDownloader {
             .sync_code_base(label.as_deref());
         self.perforce.as_mut().unwrap().cleanup_client_spec();
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     fn get_label_from_source_reference(&self, source_ref: String) -> Option<String> {
@@ -118,7 +118,7 @@ impl PerforceDownloader {
         path: String,
         url: String,
     ) -> Result<Option<PhpMixed>> {
-        self.do_install(target, path, url)
+        self.do_install(target, path, url).await
     }
 
     pub fn get_local_changes(

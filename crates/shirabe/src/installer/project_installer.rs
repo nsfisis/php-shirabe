@@ -64,7 +64,7 @@ impl InstallerInterface for ProjectInstaller {
         self.download_manager
             .borrow()
             .download(package, install_path, prev_package)
-            .map(Some)
+            .await
     }
 
     async fn prepare(
@@ -76,7 +76,7 @@ impl InstallerInterface for ProjectInstaller {
         self.download_manager
             .borrow()
             .prepare(r#type, package, &self.install_path, prev_package)
-            .map(Some)
+            .await
     }
 
     async fn cleanup(
@@ -88,7 +88,7 @@ impl InstallerInterface for ProjectInstaller {
         self.download_manager
             .borrow()
             .cleanup(r#type, package, &self.install_path, prev_package)
-            .map(Some)
+            .await
     }
 
     async fn install(
@@ -96,11 +96,10 @@ impl InstallerInterface for ProjectInstaller {
         _repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        Ok(Some(
-            self.download_manager
-                .borrow()
-                .install(package, &self.install_path)?,
-        ))
+        self.download_manager
+            .borrow()
+            .install(package, &self.install_path)
+            .await
     }
 
     async fn update(

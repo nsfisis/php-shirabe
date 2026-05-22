@@ -518,6 +518,10 @@ impl VersionGuesser {
                 strnatcasecmp(b, a)
             });
 
+            // TODO(phase-c-promise): execute_async is now async; the .then continuation captures and mutates shared
+            // state (last_index, length, version, pretty_version, promises) and cancels sibling promises, while the
+            // loop is driven by process.wait(). This concurrent job/cancellation machinery needs design before it can
+            // become an await-based form, so the promise body (including the inner todo!()) is left as-is.
             let mut promises: Vec<
                 Box<dyn shirabe_external_packages::react::promise::PromiseInterface>,
             > = vec![];

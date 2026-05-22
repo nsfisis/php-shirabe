@@ -285,6 +285,8 @@ impl InstallationManager {
         download_only: bool,
         all_operations: Vec<Box<dyn OperationInterface>>,
     ) -> Result<()> {
+        // TODO(phase-c-promise): Loop::wait-driven batch orchestration (download/cleanup promises);
+        // rewrite to await collected futures once the async Loop boundary lands.
         let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
 
         for (index, operation) in &operations {
@@ -401,6 +403,8 @@ impl InstallationManager {
         run_scripts: bool,
         all_operations: &[Box<dyn OperationInterface>],
     ) -> Result<()> {
+        // TODO(phase-c-promise): Loop::wait-driven batch orchestration (prepare/install promises);
+        // rewrite to await collected futures once the async Loop boundary lands.
         let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
         let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
 
@@ -513,6 +517,7 @@ impl InstallationManager {
 
     /// @param array<PromiseInterface<void|null>> $promises
     fn wait_on_promises(&mut self, promises: Vec<Box<dyn PromiseInterface>>) {
+        // TODO(phase-c-promise): thin wrapper over Loop::wait (the async boundary owned separately).
         let mut progress: Option<()> = None;
         // TODO(phase-b): self.io instanceof ConsoleIO downcast
         let io_is_console = false;
@@ -541,7 +546,7 @@ impl InstallationManager {
     /// @phpstan-return PromiseInterface<void|null>|null
     pub async fn download(&mut self, package: &dyn PackageInterface) -> Option<PhpMixed> {
         let installer = self.get_installer(package.get_type()).ok()?;
-        let promise = installer.cleanup("install", package, None).ok()?;
+        let promise = installer.cleanup("install", package, None).await.ok()?;
 
         promise
     }
@@ -556,7 +561,7 @@ impl InstallationManager {
     ) -> Option<PhpMixed> {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
-        let promise = installer.install(repo, package).ok()?;
+        let promise = installer.install(repo, package).await.ok()?;
         self.mark_for_notification(package);
 
         promise
@@ -578,24 +583,19 @@ impl InstallationManager {
 
         let promise = if initial_type == target_type {
             let installer = self.get_installer(initial_type).ok()?;
-            let promise = installer.update(repo, initial, target).ok()?;
+            let promise = installer.update(repo, initial, target).await.ok()?;
             self.mark_for_notification(target);
             promise
         } else {
-            let promise = self
+            // PHP: uninstall initial, then install target via the target-type installer.
+            let _ = self
                 .get_installer(initial_type)
                 .ok()?
                 .uninstall(repo, initial)
+                .await
                 .ok()?;
-            let promise = match promise {
-                Some(p) => p,
-                None => promise::resolve(None),
-            };
-
-            let target_type = target_type.to_string();
-            // TODO(phase-b): promise.then(closure capturing self/installer)
-            let _ = target_type;
-            Some(promise)
+            let installer = self.get_installer(target_type).ok()?;
+            installer.install(repo, target).await.ok()?
         };
 
         promise
@@ -612,7 +612,7 @@ impl InstallationManager {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
 
-        installer.uninstall(repo, package).ok()?
+        installer.uninstall(repo, package).await.ok()?
     }
 
     /// Executes markAliasInstalled operation.
@@ -653,6 +653,8 @@ impl InstallationManager {
     }
 
     pub fn notify_installs(&mut self, _io: &dyn IOInterface) {
+        // TODO(phase-c-promise): collects http_downloader.add() promises and drives them via Loop::wait;
+        // rewrite to await the collected futures once the async Loop boundary lands.
         let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
 
         let result: Result<()> = (|| -> Result<()> {
@@ -802,6 +804,8 @@ impl InstallationManager {
         &mut self,
         cleanup_promises: &IndexMap<i64, Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>>,
     ) {
+        // TODO(phase-c-promise): runs cleanup closures and drives them via Loop::wait;
+        // rewrite once the async Loop boundary and async cleanup closures land.
         let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
 
         self.loop_.borrow().abort_jobs();

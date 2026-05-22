@@ -40,9 +40,7 @@ impl InstallerInterface for MetapackageInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn prepare(
@@ -51,9 +49,7 @@ impl InstallerInterface for MetapackageInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn cleanup(
@@ -62,9 +58,7 @@ impl InstallerInterface for MetapackageInstaller {
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn install(
@@ -80,9 +74,7 @@ impl InstallerInterface for MetapackageInstaller {
 
         repo.add_package(package.clone_package_box());
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn update(
@@ -108,9 +100,7 @@ impl InstallerInterface for MetapackageInstaller {
         repo.remove_package(initial);
         repo.add_package(target.clone_package_box());
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     async fn uninstall(
@@ -134,9 +124,7 @@ impl InstallerInterface for MetapackageInstaller {
 
         repo.remove_package(package);
 
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
+        Ok(None)
     }
 
     fn get_install_path(&self, _package: &dyn PackageInterface) -> Option<String> {

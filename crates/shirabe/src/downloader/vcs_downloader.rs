@@ -65,7 +65,7 @@ impl VcsDownloaderBase {
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): parent::cleanChanges() rechecks getLocalChanges via dynamic dispatch.
         // Callers in subclasses must do that check themselves (they already have).
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 }
 
@@ -142,7 +142,7 @@ pub trait VcsDownloader:
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<Option<PhpMixed>> =
-                self.do_download(package, path, &url, prev_package);
+                self.do_download(package, path, &url, prev_package).await;
             match attempt {
                 Ok(promise) => return Ok(promise),
                 Err(e) => {
@@ -182,7 +182,7 @@ pub trait VcsDownloader:
             }
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     async fn prepare(
@@ -193,7 +193,8 @@ pub trait VcsDownloader:
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
         if r#type == "update" {
-            self.clean_changes(prev_package.unwrap(), path, true)?;
+            self.clean_changes(prev_package.unwrap(), path, true)
+                .await?;
             self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
@@ -201,10 +202,10 @@ pub trait VcsDownloader:
                 .borrow_mut()
                 .empty_directory(path, true)?;
         } else if r#type == "uninstall" {
-            self.clean_changes(package, path, false)?;
+            self.clean_changes(package, path, false).await?;
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     async fn cleanup(
@@ -227,7 +228,7 @@ pub trait VcsDownloader:
                 .shift_remove(&prev_package.unwrap().get_unique_name());
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     async fn install(
@@ -255,7 +256,7 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Option<PhpMixed>> = self.do_install(package, path, &url);
+            let attempt: Result<Option<PhpMixed>> = self.do_install(package, path, &url).await;
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
@@ -295,7 +296,7 @@ pub trait VcsDownloader:
             }
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     async fn update(
@@ -326,7 +327,8 @@ pub trait VcsDownloader:
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Option<PhpMixed>> = self.do_update(initial, target, path, &url);
+            let attempt: Result<Option<PhpMixed>> =
+                self.do_update(initial, target, path, &url).await;
             match attempt {
                 Ok(_) => {
                     exception = None;
@@ -404,7 +406,7 @@ pub trait VcsDownloader:
             }
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     async fn remove(
@@ -418,28 +420,20 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let promise = self
+        let result = self
             .filesystem_mut()
             .borrow_mut()
-            .remove_directory_async(path)?;
+            .remove_directory_async(path)
+            .await?;
+        if !result {
+            return Err(RuntimeException {
+                message: format!("Could not completely delete {}, aborting.", path),
+                code: 0,
+            }
+            .into());
+        }
 
-        let path = path.to_string();
-        // TODO(phase-b): closure return type mismatches PromiseInterface::then signature.
-        Ok(promise.then(
-            Some(Box::new(
-                move |result: Option<PhpMixed>| -> Option<PhpMixed> {
-                    let result_bool = result.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
-                    if !result_bool {
-                        let _: RuntimeException = RuntimeException {
-                            message: format!("Could not completely delete {}, aborting.", path),
-                            code: 0,
-                        };
-                    }
-                    None
-                },
-            )),
-            None,
-        ))
+        Ok(None)
     }
 
     fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
@@ -480,7 +474,7 @@ pub trait VcsDownloader:
             .into());
         }
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)

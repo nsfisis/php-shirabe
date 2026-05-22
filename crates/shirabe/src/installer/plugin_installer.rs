@@ -96,7 +96,7 @@ impl InstallerInterface for PluginInstaller {
             let _ = plugin_optional;
         }
 
-        self.inner.prepare(r#type, package, prev_package)
+        self.inner.prepare(r#type, package, prev_package).await
     }
 
     async fn download(
@@ -116,7 +116,7 @@ impl InstallerInterface for PluginInstaller {
             }.into());
         }
 
-        self.inner.download(package, prev_package)
+        self.inner.download(package, prev_package).await
     }
 
     async fn install(
@@ -124,22 +124,13 @@ impl InstallerInterface for PluginInstaller {
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
     ) -> Result<Option<PhpMixed>> {
-        let promise = self.inner.install(repo, package)?;
-        let promise = match promise {
-            Some(p) => p,
-            None => shirabe_external_packages::react::promise::resolve(None),
-        };
+        self.inner.install(repo, package).await?;
 
         // TODO(plugin): register package in plugin manager after install, rollback on failure
-        Ok(Some(promise.then(
-            Some(Box::new(move |_v| -> Option<PhpMixed> {
-                Platform::workaround_filesystem_issues();
-                // self.get_plugin_manager().register_package(package, true)?;
-                // On error: self.rollback_install(e, repo, package)?;
-                None
-            })),
-            None,
-        )))
+        Platform::workaround_filesystem_issues();
+        // self.get_plugin_manager().register_package(package, true)?;
+        // On error: self.rollback_install(e, repo, package)?;
+        Ok(None)
     }
 
     async fn update(
@@ -148,23 +139,14 @@ impl InstallerInterface for PluginInstaller {
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
     ) -> Result<Option<PhpMixed>> {
-        let promise = self.inner.update(repo, initial, target)?;
-        let promise = match promise {
-            Some(p) => p,
-            None => shirabe_external_packages::react::promise::resolve(None),
-        };
+        self.inner.update(repo, initial, target).await?;
 
         // TODO(plugin): deactivate initial and register target in plugin manager after update, rollback on failure
-        Ok(Some(promise.then(
-            Some(Box::new(move |_v| -> Option<PhpMixed> {
-                Platform::workaround_filesystem_issues();
-                // self.get_plugin_manager().deactivate_package(initial);
-                // self.get_plugin_manager().register_package(target, true)?;
-                // On error: self.rollback_install(e, repo, target)?;
-                None
-            })),
-            None,
-        )))
+        Platform::workaround_filesystem_issues();
+        // self.get_plugin_manager().deactivate_package(initial);
+        // self.get_plugin_manager().register_package(target, true)?;
+        // On error: self.rollback_install(e, repo, target)?;
+        Ok(None)
     }
 
     async fn uninstall(
@@ -177,7 +159,7 @@ impl InstallerInterface for PluginInstaller {
             .borrow_mut()
             .uninstall_package(package);
 
-        self.inner.uninstall(repo, package)
+        self.inner.uninstall(repo, package).await
     }
 
     async fn cleanup(
@@ -186,7 +168,7 @@ impl InstallerInterface for PluginInstaller {
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.cleanup(r#type, package, prev_package)
+        self.inner.cleanup(r#type, package, prev_package).await
     }
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {

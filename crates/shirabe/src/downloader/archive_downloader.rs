@@ -36,6 +36,7 @@ pub trait ArchiveDownloader {
         self.cleanup_executed_mut().remove(package.get_name());
         self.inner_mut()
             .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn cleanup(
@@ -49,6 +50,7 @@ pub trait ArchiveDownloader {
             .insert(package.get_name().to_string(), true);
         self.inner_mut()
             .cleanup(r#type, package, path, prev_package)
+            .await
     }
 
     /// @inheritDoc
@@ -122,6 +124,7 @@ pub trait ArchiveDownloader {
 
         let _ = file_name;
 
+        // TODO(phase-c-promise): rewrite extract().then(onFulfilled/onRejected) + renameRecursively chain as an await sequence
         let promise = self.extract(package, "", &temporary_dir)?;
 
         // TODO(phase-b): the original PHP chains React promise `.then(onFulfilled, onRejected)`

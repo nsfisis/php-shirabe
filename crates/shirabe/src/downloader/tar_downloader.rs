@@ -54,7 +54,7 @@ impl TarDownloader {
         let archive = PharData::new(file.to_string());
         archive.extract_to(path, None, true);
 
-        Ok(shirabe_external_packages::react::promise::resolve(None))
+        Ok(None)
     }
 }
 
@@ -70,7 +70,9 @@ impl DownloaderInterface for TarDownloader {
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.download(package, path, prev_package, output)
+        self.inner
+            .download(package, path, prev_package, output)
+            .await
     }
 
     async fn prepare(
@@ -80,7 +82,9 @@ impl DownloaderInterface for TarDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.prepare(r#type, package, path, prev_package)
+        self.inner
+            .prepare(r#type, package, path, prev_package)
+            .await
     }
 
     async fn install(
@@ -89,7 +93,7 @@ impl DownloaderInterface for TarDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output)
+        self.inner.install(package, path, output).await
     }
 
     async fn update(
@@ -98,7 +102,7 @@ impl DownloaderInterface for TarDownloader {
         target: &dyn PackageInterface,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path)
+        self.inner.update(initial, target, path).await
     }
 
     async fn remove(
@@ -107,7 +111,7 @@ impl DownloaderInterface for TarDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output)
+        self.inner.remove(package, path, output).await
     }
 
     async fn cleanup(
@@ -117,6 +121,8 @@ impl DownloaderInterface for TarDownloader {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.cleanup(r#type, package, path, prev_package)
+        self.inner
+            .cleanup(r#type, package, path, prev_package)
+            .await
     }
 }
