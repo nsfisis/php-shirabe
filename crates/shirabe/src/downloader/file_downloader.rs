@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use crate::util::Silencer;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::react::promise::resolve as react_promise_resolve;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION,
@@ -148,13 +147,13 @@ impl DownloaderInterface for FileDownloader {
     }
 
     /// @inheritDoc
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
             return Err(InvalidArgumentException {
                 message: "The given package is missing url information".to_string(),
@@ -212,24 +211,24 @@ impl DownloaderInterface for FileDownloader {
     }
 
     /// @inheritDoc
-    fn prepare(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         Ok(react_promise_resolve(Some(PhpMixed::Null)))
     }
 
     /// @inheritDoc
-    fn cleanup(
+    async fn cleanup(
         &self,
         _type: &str,
         package: &dyn PackageInterface,
         path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let file_name = self.get_file_name(package, path);
         if file_exists(&file_name) {
             self.filesystem.borrow_mut().unlink(&file_name)?;
@@ -278,12 +277,12 @@ impl DownloaderInterface for FileDownloader {
     }
 
     /// @inheritDoc
-    fn install(
+    async fn install(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if output {
             self.io
                 .write_error(&format!("  - {}", InstallOperation::format(package, false)));
@@ -338,12 +337,12 @@ impl DownloaderInterface for FileDownloader {
     }
 
     /// @inheritDoc
-    fn update(
+    async fn update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.io.write_error(&format!(
             "  - {}{}",
             UpdateOperation::format(initial, target, false),
@@ -357,12 +356,12 @@ impl DownloaderInterface for FileDownloader {
     }
 
     /// @inheritDoc
-    fn remove(
+    async fn remove(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if output {
             self.io.write_error(&format!(
                 "  - {}",

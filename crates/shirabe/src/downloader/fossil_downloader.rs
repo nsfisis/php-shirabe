@@ -9,8 +9,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -29,22 +28,22 @@ impl FossilDownloader {
         }
     }
 
-    pub(crate) fn do_download(
+    pub(crate) async fn do_download(
         &self,
         _package: &dyn PackageInterface,
         _path: String,
         _url: String,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub(crate) fn do_install(
+    pub(crate) async fn do_install(
         &self,
         package: &dyn PackageInterface,
         path: String,
         url: String,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
             Some(self.inner.io.as_ref()),
@@ -99,13 +98,13 @@ impl FossilDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub(crate) fn do_update(
+    pub(crate) async fn do_update(
         &self,
         _initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: String,
         url: String,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
             Some(self.inner.io.as_ref()),
@@ -256,60 +255,60 @@ impl DownloaderInterface for FossilDownloader {
         todo!()
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn install(
+    async fn install(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn update(
+    async fn update(
         &self,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
         _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn remove(
+    async fn remove(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 }

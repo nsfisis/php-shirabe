@@ -5,7 +5,7 @@ use crate::downloader::DownloaderInterface;
 use crate::package::PackageInterface;
 use crate::util::r#loop::Loop;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
     Interface(&'a dyn DownloaderInterface),
@@ -13,61 +13,61 @@ pub enum DownloaderOrManager<'a> {
 }
 
 impl<'a> DownloaderOrManager<'a> {
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.download3(package, path, prev_package),
             Self::Manager(d) => d.borrow().download(package, path, prev_package),
         }
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.prepare(r#type, package, path, prev_package),
             Self::Manager(d) => d.borrow().prepare(r#type, package, path, prev_package),
         }
     }
 
-    fn install(
+    async fn install(
         &self,
         package: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.install2(package, path),
             Self::Manager(d) => d.borrow().install(package, path),
         }
     }
 
-    fn update(
+    async fn update(
         &self,
         package: &dyn PackageInterface,
         prev_package: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.update(package, prev_package, path),
             Self::Manager(d) => d.borrow().update(package, prev_package, path),
         }
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.cleanup(r#type, package, path, prev_package),
             Self::Manager(d) => d.borrow().cleanup(r#type, package, path, prev_package),

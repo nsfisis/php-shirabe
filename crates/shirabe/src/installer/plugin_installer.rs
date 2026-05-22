@@ -11,7 +11,6 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{LogicException, PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
@@ -75,12 +74,12 @@ impl InstallerInterface for PluginInstaller {
         self.inner.is_installed(repo, package)
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         if (r#type == "install" || r#type == "update")
             && !self
                 .get_plugin_manager()
@@ -100,11 +99,11 @@ impl InstallerInterface for PluginInstaller {
         self.inner.prepare(r#type, package, prev_package)
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let extra = package.get_extra();
         let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
@@ -120,11 +119,11 @@ impl InstallerInterface for PluginInstaller {
         self.inner.download(package, prev_package)
     }
 
-    fn install(
+    async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let promise = self.inner.install(repo, package)?;
         let promise = match promise {
             Some(p) => p,
@@ -143,12 +142,12 @@ impl InstallerInterface for PluginInstaller {
         )))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let promise = self.inner.update(repo, initial, target)?;
         let promise = match promise {
             Some(p) => p,
@@ -168,11 +167,11 @@ impl InstallerInterface for PluginInstaller {
         )))
     }
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager()
             .borrow_mut()
@@ -181,12 +180,12 @@ impl InstallerInterface for PluginInstaller {
         self.inner.uninstall(repo, package)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, prev_package)
     }
 

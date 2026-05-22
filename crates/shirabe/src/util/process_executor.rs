@@ -6,8 +6,6 @@ use indexmap::IndexMap;
 use std::sync::{LazyLock, Mutex};
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::Promise;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_external_packages::symfony::component::process::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::Process;
@@ -375,7 +373,7 @@ impl ProcessExecutor {
     }
 
     /// starts a process on the commandline in async mode
-    pub fn execute_async<C, W>(&mut self, command: C, cwd: W) -> Result<Box<dyn PromiseInterface>>
+    pub async fn execute_async<C, W>(&mut self, command: C, cwd: W) -> Result<Process>
     where
         C: IntoExecCommand,
         W: IntoExecCwd,

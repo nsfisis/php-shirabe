@@ -9,8 +9,7 @@ use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 #[derive(Debug)]
 pub struct HgDownloader {
@@ -29,13 +28,13 @@ impl HgDownloader {
         }
     }
 
-    pub(crate) fn do_download(
+    pub(crate) async fn do_download(
         &self,
         package: &dyn PackageInterface,
         path: String,
         url: String,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process).is_none() {
             return Err(RuntimeException {
                 message: "hg was not found in your PATH, skipping source download".to_string(),
@@ -47,12 +46,12 @@ impl HgDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub(crate) fn do_install(
+    pub(crate) async fn do_install(
         &self,
         package: &dyn PackageInterface,
         path: String,
         url: String,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             &*self.inner.io,
             &*self.inner.config.borrow(),
@@ -101,13 +100,13 @@ impl HgDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub(crate) fn do_update(
+    pub(crate) async fn do_update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: String,
         url: String,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             &*self.inner.io,
             &*self.inner.config.borrow(),
@@ -226,60 +225,60 @@ impl DownloaderInterface for HgDownloader {
         todo!()
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn install(
+    async fn install(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn update(
+    async fn update(
         &self,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
         _path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn remove(
+    async fn remove(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 }

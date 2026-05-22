@@ -4,7 +4,6 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 use crate::config::Config;
@@ -36,13 +35,13 @@ impl SvnDownloader {
         }
     }
 
-    pub(crate) fn do_download(
+    pub(crate) async fn do_download(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         url: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
             url.to_string(),
@@ -61,12 +60,12 @@ impl SvnDownloader {
         Ok(promise::resolve(None))
     }
 
-    pub(crate) fn do_install(
+    pub(crate) async fn do_install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = package.get_source_reference();
 
@@ -105,13 +104,13 @@ impl SvnDownloader {
         Ok(promise::resolve(None))
     }
 
-    pub(crate) fn do_update(
+    pub(crate) async fn do_update(
         &mut self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = target.get_source_reference();
 
@@ -203,12 +202,12 @@ impl SvnDownloader {
             })
     }
 
-    pub(crate) fn clean_changes(
+    pub(crate) async fn clean_changes(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         update: bool,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let changes = self.get_local_changes(package, path);
         if changes.is_none() {
             return Ok(promise::resolve(None));
@@ -404,7 +403,7 @@ impl SvnDownloader {
         }
     }
 
-    pub(crate) fn discard_changes(&self, path: &str) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
             &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
@@ -438,60 +437,60 @@ impl DownloaderInterface for SvnDownloader {
         todo!()
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn install(
+    async fn install(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn update(
+    async fn update(
         &self,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
         _path: &str,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn remove(
+    async fn remove(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 }

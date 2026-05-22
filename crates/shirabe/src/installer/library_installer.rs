@@ -4,7 +4,6 @@ use std::any::Any;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, is_link, preg_quote, realpath, rmdir, rtrim, strpos,
 };
@@ -132,10 +131,10 @@ impl LibraryInstaller {
 
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub(crate) fn install_code(
+    pub(crate) async fn install_code(
         &self,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let download_path = self.get_install_path(package).unwrap();
 
         Ok(Some(
@@ -147,11 +146,11 @@ impl LibraryInstaller {
 
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub(crate) fn update_code(
+    pub(crate) async fn update_code(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let initial_download_path = self.get_install_path(initial).unwrap();
         let target_download_path = self.get_install_path(target).unwrap();
         if target_download_path != initial_download_path {
@@ -189,10 +188,10 @@ impl LibraryInstaller {
 
     /// @return PromiseInterface|null
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub(crate) fn remove_code(
+    pub(crate) async fn remove_code(
         &self,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         let download_path = self.get_package_base_path(package);
 
         Ok(Some(
@@ -267,11 +266,11 @@ impl InstallerInterface for LibraryInstaller {
         false
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
@@ -283,12 +282,12 @@ impl InstallerInterface for LibraryInstaller {
         )?))
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
@@ -301,12 +300,12 @@ impl InstallerInterface for LibraryInstaller {
         )?))
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
@@ -319,11 +318,11 @@ impl InstallerInterface for LibraryInstaller {
         )?))
     }
 
-    fn install(
+    async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
         let download_path = self.get_install_path(package).unwrap();
@@ -348,12 +347,12 @@ impl InstallerInterface for LibraryInstaller {
         )))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         if !repo.has_package(initial) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -381,11 +380,11 @@ impl InstallerInterface for LibraryInstaller {
         )))
     }
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         if !repo.has_package(package) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

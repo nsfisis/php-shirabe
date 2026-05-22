@@ -2,7 +2,7 @@
 
 use crate::package::PackageInterface;
 use crate::repository::InstalledRepositoryInterface;
-use shirabe_external_packages::react::promise::PromiseInterface;
+use shirabe_php_shim::PhpMixed;
 
 pub trait InstallerInterface: std::fmt::Debug {
     fn supports(&self, package_type: &str) -> bool;
@@ -13,44 +13,44 @@ pub trait InstallerInterface: std::fmt::Debug {
         package: &dyn PackageInterface,
     ) -> bool;
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn install(
+    async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn update(
+    async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>>;
+    ) -> anyhow::Result<Option<PhpMixed>>;
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String>;
 

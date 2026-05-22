@@ -3,7 +3,6 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_map, array_shift, count, explode,
     get_class, get_class_err, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
@@ -58,12 +57,12 @@ impl VcsDownloaderBase {
     /// call this when they need to invoke the base behavior. Since this lives on the data struct,
     /// it cannot consult subclass-specific `get_local_changes`; it assumes any callers have
     /// already verified that no local changes exist.
-    pub fn clean_changes(
+    pub async fn clean_changes(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _update: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): parent::cleanChanges() rechecks getLocalChanges via dynamic dispatch.
         // Callers in subclasses must do that check themselves (they already have).
         Ok(shirabe_external_packages::react::promise::resolve(None))
@@ -85,30 +84,30 @@ pub trait VcsDownloader:
     fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool>;
 
     /// Downloads data needed to run an install/update later
-    fn do_download(
+    async fn do_download(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         url: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>>;
+    ) -> Result<Option<PhpMixed>>;
 
     /// Downloads specific package into specific folder.
-    fn do_install(
+    async fn do_install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> Result<Box<dyn PromiseInterface>>;
+    ) -> Result<Option<PhpMixed>>;
 
     /// Updates specific package in specific folder from initial to target version.
-    fn do_update(
+    async fn do_update(
         &mut self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> Result<Box<dyn PromiseInterface>>;
+    ) -> Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
     fn get_commit_logs(&self, from_reference: &str, to_reference: &str, path: &str) -> String;
@@ -121,12 +120,12 @@ pub trait VcsDownloader:
         "source".to_string()
     }
 
-    fn download(
+    async fn download(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -142,7 +141,7 @@ pub trait VcsDownloader:
 
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Box<dyn PromiseInterface>> =
+            let attempt: Result<Option<PhpMixed>> =
                 self.do_download(package, path, &url, prev_package);
             match attempt {
                 Ok(promise) => return Ok(promise),
@@ -186,13 +185,13 @@ pub trait VcsDownloader:
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    fn prepare(
+    async fn prepare(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if r#type == "update" {
             self.clean_changes(prev_package.unwrap(), path, true)?;
             self.has_cleaned_changes_mut()
@@ -208,13 +207,13 @@ pub trait VcsDownloader:
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    fn cleanup(
+    async fn cleanup(
         &mut self,
         r#type: &str,
         _package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if r#type == "update"
             && prev_package
                 .map(|p| {
@@ -231,11 +230,11 @@ pub trait VcsDownloader:
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    fn install(
+    async fn install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -256,7 +255,7 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Box<dyn PromiseInterface>> = self.do_install(package, path, &url);
+            let attempt: Result<Option<PhpMixed>> = self.do_install(package, path, &url);
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
@@ -299,12 +298,12 @@ pub trait VcsDownloader:
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -327,8 +326,7 @@ pub trait VcsDownloader:
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Box<dyn PromiseInterface>> =
-                self.do_update(initial, target, path, &url);
+            let attempt: Result<Option<PhpMixed>> = self.do_update(initial, target, path, &url);
             match attempt {
                 Ok(_) => {
                     exception = None;
@@ -409,11 +407,11 @@ pub trait VcsDownloader:
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    fn remove(
+    async fn remove(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.io_mut().write_error3(
             &format!("  - {}", UninstallOperation::format(package, false)),
             true,
@@ -467,12 +465,12 @@ pub trait VcsDownloader:
     ///
     /// @param  bool $update  if true (update) the changes can be stashed and reapplied after an update,
     ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
-    fn clean_changes(
+    async fn clean_changes(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         _update: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path)?.is_some() {
             return Err(RuntimeException {

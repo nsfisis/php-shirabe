@@ -9,8 +9,7 @@ use crate::io::io_interface;
 use crate::package::PackageInterface;
 use crate::repository::InstalledRepositoryInterface;
 use anyhow::Result;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
@@ -36,43 +35,43 @@ impl InstallerInterface for MetapackageInstaller {
         repo.has_package(package)
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
         )))
     }
 
-    fn prepare(
-        &self,
-        _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
-    }
-
-    fn cleanup(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
         )))
     }
 
-    fn install(
+    async fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> Result<Option<PhpMixed>> {
+        Ok(Some(shirabe_external_packages::react::promise::resolve(
+            None,
+        )))
+    }
+
+    async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         self.io.write_error3(
             &format!("  - {}", InstallOperation::format(package, false)),
             true,
@@ -86,12 +85,12 @@ impl InstallerInterface for MetapackageInstaller {
         )))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         if !repo.has_package(initial) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -114,11 +113,11 @@ impl InstallerInterface for MetapackageInstaller {
         )))
     }
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> Result<Option<PhpMixed>> {
         if !repo.has_package(package) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

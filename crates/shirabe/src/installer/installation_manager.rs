@@ -4,7 +4,6 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_search_mixed, array_splice, array_unshift, count,
@@ -540,10 +539,7 @@ impl InstallationManager {
     /// Executes download operation.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub fn download(
-        &mut self,
-        package: &dyn PackageInterface,
-    ) -> Option<Box<dyn PromiseInterface>> {
+    pub async fn download(&mut self, package: &dyn PackageInterface) -> Option<PhpMixed> {
         let installer = self.get_installer(package.get_type()).ok()?;
         let promise = installer.cleanup("install", package, None).ok()?;
 
@@ -553,11 +549,11 @@ impl InstallationManager {
     /// Executes install operation.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub fn install(
+    pub async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &InstallOperation,
-    ) -> Option<Box<dyn PromiseInterface>> {
+    ) -> Option<PhpMixed> {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
         let promise = installer.install(repo, package).ok()?;
@@ -569,11 +565,11 @@ impl InstallationManager {
     /// Executes update operation.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub fn update(
+    pub async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UpdateOperation,
-    ) -> Option<Box<dyn PromiseInterface>> {
+    ) -> Option<PhpMixed> {
         let initial = operation.get_initial_package();
         let target = operation.get_target_package();
 
@@ -608,11 +604,11 @@ impl InstallationManager {
     /// Uninstalls package.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub fn uninstall(
+    pub async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UninstallOperation,
-    ) -> Option<Box<dyn PromiseInterface>> {
+    ) -> Option<PhpMixed> {
         let package = operation.get_package();
         let installer = self.get_installer(package.get_type()).ok()?;
 

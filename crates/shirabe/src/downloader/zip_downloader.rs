@@ -9,13 +9,12 @@ use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::symfony::component::process::ExecutableFinder;
 use shirabe_external_packages::symfony::component::process::Process;
 use shirabe_php_shim::{
-    DIRECTORY_SEPARATOR, ErrorException, RuntimeException, UnexpectedValueException, ZipArchive,
-    bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
-    is_file, json_encode, random_int, version_compare,
+    DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
+    ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
+    hash_file, is_file, json_encode, random_int, version_compare,
 };
 use std::sync::Mutex;
 
@@ -58,13 +57,13 @@ impl ZipDownloader {
         }
     }
 
-    pub fn download(
+    pub async fn download(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         {
             let mut unzip_commands = UNZIP_COMMANDS.lock().unwrap();
             if unzip_commands.is_none() {
@@ -196,12 +195,12 @@ impl ZipDownloader {
         self.inner.download(package, path, prev_package, output)
     }
 
-    fn extract_with_system_unzip(
+    async fn extract_with_system_unzip(
         &mut self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         static WARNED_7ZIP_LINUX: Mutex<bool> = Mutex::new(false);
 
         let is_last_chance = !HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
@@ -288,18 +287,18 @@ impl ZipDownloader {
         }
     }
 
-    fn extract_with_zip_archive(
+    async fn extract_with_zip_archive(
         &mut self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let mut zip_archive = self
             .zip_archive_object
             .take()
             .unwrap_or_else(ZipArchive::new);
 
-        let result: Result<Box<dyn PromiseInterface>> = (|| {
+        let result: Result<Option<PhpMixed>> = (|| {
             let retval = if !file_exists(file) || filesize(file).map_or(true, |s| s == 0) {
                 Err(-1i64)
             } else {
@@ -387,12 +386,12 @@ impl ZipDownloader {
         })
     }
 
-    pub(crate) fn extract(
+    pub(crate) async fn extract(
         &mut self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.extract_with_system_unzip(package, file, path)
     }
 
@@ -427,60 +426,60 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         self.inner.get_installation_source()
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.download(package, path, prev_package, output)
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.prepare(r#type, package, path, prev_package)
     }
 
-    fn install(
+    async fn install(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.install(package, path, output)
     }
 
-    fn update(
+    async fn update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path)
     }
 
-    fn remove(
+    async fn remove(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
 use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
@@ -133,10 +132,7 @@ impl Filesystem {
     ///
     /// Uses the process component if proc_open is enabled on the PHP
     /// installation.
-    pub fn remove_directory_async(
-        &mut self,
-        directory: &str,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    pub async fn remove_directory_async(&mut self, directory: &str) -> anyhow::Result<bool> {
         let edge_case_result = self.remove_edge_cases(directory, true)?;
         if let Some(r) = edge_case_result {
             return Ok(shirabe_external_packages::react::promise::resolve(Some(

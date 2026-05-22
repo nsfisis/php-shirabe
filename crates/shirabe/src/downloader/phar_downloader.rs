@@ -13,8 +13,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::Phar;
+use shirabe_php_shim::{Phar, PhpMixed};
 
 #[derive(Debug)]
 pub struct PharDownloader {
@@ -46,12 +45,12 @@ impl PharDownloader {
         }
     }
 
-    pub(crate) fn extract(
+    pub(crate) async fn extract(
         &self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         // Can throw an UnexpectedValueException
         let archive = Phar::new(file.to_string());
         archive.extract_to(path, None, true);
@@ -69,60 +68,60 @@ impl DownloaderInterface for PharDownloader {
         self.inner.get_installation_source()
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.download(package, path, prev_package, output)
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.prepare(r#type, package, path, prev_package)
     }
 
-    fn install(
+    async fn install(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.install(package, path, output)
     }
 
-    fn update(
+    async fn update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path)
     }
 
-    fn remove(
+    async fn remove(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

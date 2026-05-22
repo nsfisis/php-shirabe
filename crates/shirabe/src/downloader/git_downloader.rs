@@ -5,7 +5,6 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::react::promise;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
     preg_quote, realpath, rtrim, sprintf, strlen, strpos, substr, trim, version_compare,
@@ -58,13 +57,13 @@ impl GitDownloader {
         }
     }
 
-    pub(crate) fn do_download(
+    pub(crate) async fn do_download(
         &mut self,
         package: &dyn PackageInterface,
         _path: &str,
         url: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         // Do not create an extra local cache when repository is already local
         if Filesystem::is_local_path(url) {
             return Ok(promise::resolve(None));
@@ -133,12 +132,12 @@ impl GitDownloader {
         Ok(promise::resolve(None))
     }
 
-    pub(crate) fn do_install(
+    pub(crate) async fn do_install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         let cache_path = format!(
@@ -286,13 +285,13 @@ impl GitDownloader {
         Ok(promise::resolve(None))
     }
 
-    pub(crate) fn do_update(
+    pub(crate) async fn do_update(
         &mut self,
         _initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
         url: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
@@ -685,12 +684,12 @@ impl GitDownloader {
         unpushed_changes
     }
 
-    pub(crate) fn clean_changes(
+    pub(crate) async fn clean_changes(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         update: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
 
@@ -1224,7 +1223,7 @@ impl GitDownloader {
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) fn discard_changes(&mut self, path: &str) -> Result<Box<dyn PromiseInterface>> {
+    pub(crate) async fn discard_changes(&mut self, path: &str) -> Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -1260,7 +1259,7 @@ impl GitDownloader {
 
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
-    pub(crate) fn stash_changes(&mut self, path: &str) -> Result<Box<dyn PromiseInterface>> {
+    pub(crate) async fn stash_changes(&mut self, path: &str) -> Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -1365,60 +1364,60 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         todo!()
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn install(
+    async fn install(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn update(
+    async fn update(
         &self,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
         _path: &str,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn remove(
+    async fn remove(
         &self,
         _package: &dyn PackageInterface,
         _path: &str,
         _output: bool,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _path: &str,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Box<dyn shirabe_external_packages::react::promise::PromiseInterface>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 }

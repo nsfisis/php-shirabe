@@ -5,8 +5,7 @@ use crate::installer::InstallerInterface;
 use crate::package::PackageInterface;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
 pub struct ProjectInstaller {
@@ -43,11 +42,11 @@ impl InstallerInterface for ProjectInstaller {
         false
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         let install_path = &self.install_path;
         if std::path::Path::new(install_path).exists()
             && !self.filesystem.borrow().is_dir_empty(install_path)
@@ -68,35 +67,35 @@ impl InstallerInterface for ProjectInstaller {
             .map(Some)
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
             .prepare(r#type, package, &self.install_path, prev_package)
             .map(Some)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
             .cleanup(r#type, package, &self.install_path, prev_package)
             .map(Some)
     }
 
-    fn install(
+    async fn install(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(
             self.download_manager
                 .borrow()
@@ -104,12 +103,12 @@ impl InstallerInterface for ProjectInstaller {
         ))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _initial: &dyn PackageInterface,
         _target: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),
             code: 0,
@@ -117,11 +116,11 @@ impl InstallerInterface for ProjectInstaller {
         .into())
     }
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
         _package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),
             code: 0,

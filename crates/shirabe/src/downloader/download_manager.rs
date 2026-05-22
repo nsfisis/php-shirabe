@@ -4,7 +4,6 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
     array_reverse, array_shift, dirname, get_class, implode, in_array, preg_quote, rtrim, sprintf,
@@ -195,12 +194,12 @@ impl DownloadManager {
     ///
     /// @throws \InvalidArgumentException if package have no urls to download from
     /// @throws \RuntimeException
-    pub fn download(
+    pub async fn download(
         &self,
         package: &dyn PackageInterface,
         target_dir: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
@@ -291,13 +290,13 @@ impl DownloadManager {
     /// @param string                $targetDir   target dir
     /// @param PackageInterface|null $prevPackage previous package instance in case of updates
     /// @phpstan-return PromiseInterface<void|null>
-    pub fn prepare(
+    pub async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         target_dir: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
             return downloader.prepare(r#type, package, &target_dir, prev_package);
@@ -314,11 +313,11 @@ impl DownloadManager {
     ///
     /// @throws \InvalidArgumentException if package have no urls to download from
     /// @throws \RuntimeException
-    pub fn install(
+    pub async fn install(
         &self,
         package: &dyn PackageInterface,
         target_dir: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
             return downloader.install2(package, &target_dir);
@@ -335,12 +334,12 @@ impl DownloadManager {
     /// @phpstan-return PromiseInterface<void|null>
     ///
     /// @throws \InvalidArgumentException if initial package is not installed
-    pub fn update(
+    pub async fn update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         target_dir: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         let downloader = self.get_downloader_for_package(target)?;
         let initial_downloader = self.get_downloader_for_package(initial)?;
@@ -403,11 +402,11 @@ impl DownloadManager {
     /// @param PackageInterface $package   package instance
     /// @param string           $targetDir target dir
     /// @phpstan-return PromiseInterface<void|null>
-    pub fn remove(
+    pub async fn remove(
         &self,
         package: &dyn PackageInterface,
         target_dir: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
             return downloader.remove2(package, &target_dir);
@@ -423,13 +422,13 @@ impl DownloadManager {
     /// @param string                $targetDir   target dir
     /// @param PackageInterface|null $prevPackage previous package instance in case of updates
     /// @phpstan-return PromiseInterface<void|null>
-    pub fn cleanup(
+    pub async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         target_dir: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package)? {
             return downloader.cleanup(r#type, package, &target_dir, prev_package);

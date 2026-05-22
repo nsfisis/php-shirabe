@@ -3,8 +3,7 @@
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterface;
 use crate::repository::InstalledRepositoryInterface;
-use shirabe_external_packages::react::promise::PromiseInterface;
-use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
 pub struct NoopInstaller;
@@ -22,43 +21,43 @@ impl InstallerInterface for NoopInstaller {
         repo.has_package(package)
     }
 
-    fn download(
+    async fn download(
         &self,
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
         )))
     }
 
-    fn prepare(
-        &self,
-        _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
-        Ok(Some(shirabe_external_packages::react::promise::resolve(
-            None,
-        )))
-    }
-
-    fn cleanup(
+    async fn prepare(
         &self,
         _type: &str,
         _package: &dyn PackageInterface,
         _prev_package: Option<&dyn PackageInterface>,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(shirabe_external_packages::react::promise::resolve(
             None,
         )))
     }
 
-    fn install(
+    async fn cleanup(
+        &self,
+        _type: &str,
+        _package: &dyn PackageInterface,
+        _prev_package: Option<&dyn PackageInterface>,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        Ok(Some(shirabe_external_packages::react::promise::resolve(
+            None,
+        )))
+    }
+
+    async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(package) {
             repo.add_package(package.clone_package_box());
         }
@@ -68,12 +67,12 @@ impl InstallerInterface for NoopInstaller {
         )))
     }
 
-    fn update(
+    async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(initial) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
@@ -92,11 +91,11 @@ impl InstallerInterface for NoopInstaller {
         )))
     }
 
-    fn uninstall(
+    async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         package: &dyn PackageInterface,
-    ) -> anyhow::Result<Option<Box<dyn PromiseInterface>>> {
+    ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(package) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),

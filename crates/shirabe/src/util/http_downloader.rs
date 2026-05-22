@@ -5,8 +5,6 @@ use indexmap::IndexMap;
 
 use crate::util::Silencer;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::Promise;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, chr,
     extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
@@ -203,11 +201,11 @@ impl HttpDownloader {
     }
 
     /// Create an async download operation
-    pub fn add(
+    pub async fn add(
         &mut self,
         url: &str,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Response> {
         if "" == url {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -255,12 +253,12 @@ impl HttpDownloader {
     }
 
     /// Create an async copy operation
-    pub fn add_copy(
+    pub async fn add_copy(
         &mut self,
         url: &str,
         to: &str,
         options: IndexMap<String, PhpMixed>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Response> {
         if "" == url {
             return Err(InvalidArgumentException {
                 message: "$url must not be an empty string".to_string(),
@@ -292,11 +290,7 @@ impl HttpDownloader {
 
     /// @phpstan-param Request $request
     /// @return array{Job, PromiseInterface}
-    fn add_job(
-        &mut self,
-        mut request: Request,
-        sync: bool,
-    ) -> Result<(JobHandle, Box<dyn PromiseInterface>)> {
+    async fn add_job(&mut self, mut request: Request, sync: bool) -> Result<(JobHandle, Response)> {
         request.options = array_replace_recursive(self.options.clone(), request.options);
 
         let id = self.id_gen;

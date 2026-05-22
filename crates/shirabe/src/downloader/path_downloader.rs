@@ -3,7 +3,6 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::symfony::component::filesystem::Filesystem as SymfonyFilesystem;
 use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
 use shirabe_php_shim::{
@@ -61,13 +60,13 @@ impl PathDownloader {
         }
     }
 
-    pub fn download(
+    pub async fn download(
         &mut self,
         package: &dyn PackageInterface,
         path: String,
         _prev_package: Option<&dyn PackageInterface>,
         _output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(&path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
@@ -123,12 +122,12 @@ impl PathDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn install(
+    pub async fn install(
         &mut self,
         package: &dyn PackageInterface,
         path: String,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(&path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
@@ -294,12 +293,12 @@ impl PathDownloader {
         Ok(shirabe_external_packages::react::promise::resolve(None))
     }
 
-    pub fn remove(
+    pub async fn remove(
         &mut self,
         package: &dyn PackageInterface,
         path: String,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(&path);
         // realpath() may resolve Windows junctions to the source path, so we'll check for a junction
         // first to prevent a false positive when checking if the dist and install paths are the same.
@@ -543,60 +542,60 @@ impl DownloaderInterface for PathDownloader {
         self.inner.get_installation_source()
     }
 
-    fn download(
+    async fn download(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.download(package, path, prev_package, output)
     }
 
-    fn prepare(
+    async fn prepare(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.prepare(r#type, package, path, prev_package)
     }
 
-    fn install(
+    async fn install(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.install(package, path, output)
     }
 
-    fn update(
+    async fn update(
         &self,
         initial: &dyn PackageInterface,
         target: &dyn PackageInterface,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path)
     }
 
-    fn remove(
+    async fn remove(
         &self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, path, prev_package)
     }
 }

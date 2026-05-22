@@ -3,7 +3,6 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::metadata_minifier::MetadataMinifier;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_php_shim::{
     Countable, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     LogicException, PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -2087,11 +2086,11 @@ impl ComposerRepository {
         })
     }
 
-    fn start_cached_async_download(
+    async fn start_cached_async_download(
         &mut self,
         file_name: &str,
         package_name: Option<&str>,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<PhpMixed> {
         if self.lazy_providers_url.is_none() {
             return Err(LogicException {
                 message: "startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url".to_string(),
@@ -3277,12 +3276,12 @@ impl ComposerRepository {
         }
     }
 
-    fn async_fetch_file(
+    async fn async_fetch_file(
         &mut self,
         filename: &str,
         cache_key: &str,
         last_modified_time: Option<&str>,
-    ) -> anyhow::Result<Box<dyn PromiseInterface>> {
+    ) -> anyhow::Result<PhpMixed> {
         if filename.is_empty() {
             return Err(InvalidArgumentException {
                 message: "$filename should not be an empty string".to_string(),

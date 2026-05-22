@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise::PromiseInterface;
 use shirabe_external_packages::symfony::component::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
@@ -20,32 +19,32 @@ pub trait ArchiveDownloader {
     fn cleanup_executed(&self) -> &IndexMap<String, bool>;
     fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool>;
 
-    fn extract(
+    async fn extract(
         &self,
         package: &dyn PackageInterface,
         file: &str,
         path: &str,
-    ) -> Result<Box<dyn PromiseInterface>>;
+    ) -> Result<Option<PhpMixed>>;
 
-    fn prepare(
+    async fn prepare(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.cleanup_executed_mut().remove(package.get_name());
         self.inner_mut()
             .prepare(r#type, package, path, prev_package)
     }
 
-    fn cleanup(
+    async fn cleanup(
         &mut self,
         r#type: &str,
         package: &dyn PackageInterface,
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         self.cleanup_executed_mut()
             .insert(package.get_name().to_string(), true);
         self.inner_mut()
@@ -56,12 +55,12 @@ pub trait ArchiveDownloader {
     ///
     /// @throws \RuntimeException
     /// @throws \UnexpectedValueException
-    fn install(
+    async fn install(
         &mut self,
         package: &dyn PackageInterface,
         path: &str,
         output: bool,
-    ) -> Result<Box<dyn PromiseInterface>> {
+    ) -> Result<Option<PhpMixed>> {
         if output {
             self.inner().io.write_error(&format!(
                 "  - {}{}",
