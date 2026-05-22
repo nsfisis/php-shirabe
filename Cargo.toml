@@ -13,6 +13,7 @@ shirabe-external-packages = { path = "crates/shirabe-external-packages" }
 shirabe-php-shim = { path = "crates/shirabe-php-shim" }
 shirabe-semver = { path = "crates/shirabe-semver" }
 anyhow = "1.0.102"
+async-trait = "0.1.89"
 base64 = "0.22.1"
 chrono = { version = "0.4.44", features = ["serde"] }
 indexmap = { version = "2.14.0", features = ["serde"] }
@@ -21,6 +22,7 @@ regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.149", features = ["preserve_order"] }
 sha1 = "0.10.6"
+tokio = "1.52.3"
 url = "2.5.8"
 zip = "8.6.0"
 

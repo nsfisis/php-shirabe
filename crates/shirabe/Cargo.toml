@@ -9,6 +9,7 @@ shirabe-external-packages.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-semver.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 base64.workspace = true
 chrono.workspace = true
 indexmap.workspace = true
@@ -17,6 +18,7 @@ regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true
+tokio.workspace = true
 url.workspace = true
 
 [lints]
