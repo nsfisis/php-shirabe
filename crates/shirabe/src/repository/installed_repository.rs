@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackage;
 use crate::package::Link;
@@ -56,7 +56,7 @@ impl InstalledRepository {
     ) -> Vec<Box<dyn BasePackage>> {
         let name = name.to_lowercase();
 
-        let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
+        let constraint: Option<AnyConstraint> = match constraint {
             None => None,
             Some(FindPackageConstraint::Constraint(c)) => Some(c),
             Some(FindPackageConstraint::String(s)) => {
@@ -70,10 +70,14 @@ impl InstalledRepository {
             'candidates: for candidate in repo.get_packages() {
                 if name == candidate.get_name() {
                     if constraint.is_none()
-                        || constraint
-                            .as_ref()
-                            .unwrap()
-                            .matches(&Constraint::new("==", candidate.get_version()))
+                        || constraint.as_ref().unwrap().matches(
+                            &SimpleConstraint::new(
+                                "==".to_string(),
+                                candidate.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        )
                     {
                         matches.push(candidate);
                     }
@@ -107,7 +111,7 @@ impl InstalledRepository {
     pub fn get_dependents(
         &self,
         needle: NeedleInput,
-        constraint: Option<Box<dyn ConstraintInterface>>,
+        constraint: Option<AnyConstraint>,
         invert: bool,
         recurse: bool,
         packages_found: Option<Vec<String>>,
@@ -142,9 +146,7 @@ impl InstalledRepository {
                     for needle in &needles_snapshot {
                         if link.get_source() == needle.as_str() {
                             if constraint.is_none()
-                                || link
-                                    .get_constraint()
-                                    .matches(constraint.as_ref().unwrap().as_ref())
+                                || link.get_constraint().matches(constraint.as_ref().unwrap())
                             {
                                 if packages_in_tree.contains(&link.get_target().to_string()) {
                                     results.push(DependentsEntry(
@@ -187,9 +189,9 @@ impl InstalledRepository {
             for link in links.values() {
                 for needle in &needles {
                     if link.get_target() == needle.as_str() {
-                        let matches_constraint = constraint.as_ref().map_or(true, |c| {
-                            link.get_constraint().matches(c.as_ref()) == !invert
-                        });
+                        let matches_constraint = constraint
+                            .as_ref()
+                            .map_or(true, |c| link.get_constraint().matches(c) == !invert);
                         if constraint.is_none() || matches_constraint {
                             if packages_in_tree.contains(&link.get_source().to_string()) {
                                 results.push(DependentsEntry(
@@ -224,8 +226,12 @@ impl InstalledRepository {
             if invert && needles.contains(&package.get_name().to_string()) {
                 for link in package.get_conflicts().values() {
                     for pkg in self.find_packages(link.get_target(), None) {
-                        let version = Constraint::new("=", pkg.get_version());
-                        if link.get_constraint().matches(&version) == invert {
+                        let version = SimpleConstraint::new(
+                            "=".to_string(),
+                            pkg.get_version().to_string(),
+                            None,
+                        );
+                        if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone_box(), link.clone(), None));
                         }
                     }
@@ -235,8 +241,12 @@ impl InstalledRepository {
             for link in package.get_conflicts().values() {
                 if needles.contains(&link.get_target().to_string()) {
                     for pkg in self.find_packages(link.get_target(), None) {
-                        let version = Constraint::new("=", pkg.get_version());
-                        if link.get_constraint().matches(&version) == invert {
+                        let version = SimpleConstraint::new(
+                            "=".to_string(),
+                            pkg.get_version().to_string(),
+                            None,
+                        );
+                        if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone_box(), link.clone(), None));
                         }
                     }
@@ -246,19 +256,21 @@ impl InstalledRepository {
             if invert
                 && constraint.is_some()
                 && needles.contains(&package.get_name().to_string())
-                && constraint
-                    .as_ref()
-                    .unwrap()
-                    .matches(&Constraint::new("=", package.get_version()))
+                && constraint.as_ref().unwrap().matches(
+                    &SimpleConstraint::new(
+                        "=".to_string(),
+                        package.get_version().to_string(),
+                        None,
+                    )
+                    .into(),
+                )
             {
                 'requires: for link in package.get_requires().values() {
                     if PlatformRepository::is_platform_package(link.get_target()) {
                         if self
                             .find_package(
                                 link.get_target(),
-                                FindPackageConstraint::Constraint(
-                                    link.get_constraint().clone_box(),
-                                ),
+                                FindPackageConstraint::Constraint(link.get_constraint().clone()),
                             )
                             .is_some()
                         {
@@ -278,7 +290,7 @@ impl InstalledRepository {
                             Link::new(
                                 package.get_name().to_string(),
                                 link.get_target().to_string(),
-                                Box::new(MatchAllConstraint::new()),
+                                MatchAllConstraint::new(None).into(),
                                 Some(Link::TYPE_REQUIRE.to_string()),
                                 Some(format!(
                                     "{} {}",
@@ -297,8 +309,12 @@ impl InstalledRepository {
                             continue;
                         }
 
-                        let mut version: Box<dyn ConstraintInterface> =
-                            Box::new(Constraint::new("=", pkg.get_version()));
+                        let mut version: AnyConstraint = SimpleConstraint::new(
+                            "=".to_string(),
+                            pkg.get_version().to_string(),
+                            None,
+                        )
+                        .into();
 
                         if link.get_target() != pkg.get_name() {
                             let mut replaces_and_provides: IndexMap<String, Link> =
@@ -308,13 +324,13 @@ impl InstalledRepository {
                             }
                             for prov in replaces_and_provides.values() {
                                 if link.get_target() == prov.get_target() {
-                                    version = prov.get_constraint().clone_box();
+                                    version = prov.get_constraint().clone();
                                     break;
                                 }
                             }
                         }
 
-                        if !link.get_constraint().matches(version.as_ref()) {
+                        if !link.get_constraint().matches(&version) {
                             if let Some(root_pkg) = root_package.as_ref() {
                                 let mut root_reqs: IndexMap<String, Link> = root_pkg.get_requires();
                                 for (k, v) in root_pkg.get_dev_requires() {
@@ -350,7 +366,7 @@ impl InstalledRepository {
                                     Link::new(
                                         root_pkg.get_name().to_string(),
                                         link.get_target().to_string(),
-                                        Box::new(MatchAllConstraint::new()),
+                                        MatchAllConstraint::new(None).into(),
                                         Some(Link::TYPE_DOES_NOT_REQUIRE.to_string()),
                                         Some(format!(
                                             "but {} is installed",
@@ -446,7 +462,7 @@ impl RepositoryInterface for InstalledRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

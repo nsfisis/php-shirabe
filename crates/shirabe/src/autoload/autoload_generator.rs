@@ -14,8 +14,8 @@ use shirabe_php_shim::{
     sprintf, str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr,
     substr_count, trigger_error, trim, unlink, var_export,
 };
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
-use shirabe_semver::constraint::ConstraintInterface;
 
 use crate::autoload::ClassLoader;
 use crate::config::Config;
@@ -1092,7 +1092,7 @@ impl AutoloadGenerator {
         let mut required_extensions: IndexMap<String, String> = IndexMap::new();
         let mut extension_providers: IndexMap<
             String,
-            Vec<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
+            Vec<shirabe_semver::constraint::AnyConstraint>,
         > = IndexMap::new();
 
         for item in package_map {
@@ -1110,7 +1110,7 @@ impl AutoloadGenerator {
                         extension_providers
                             .entry(ext)
                             .or_insert_with(Vec::new)
-                            .push(link.get_constraint().clone_box());
+                            .push(link.get_constraint().clone());
                     }
                 }
             }

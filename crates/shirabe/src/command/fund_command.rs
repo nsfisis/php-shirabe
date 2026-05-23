@@ -9,7 +9,7 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -64,8 +64,7 @@ impl FundCommand {
         );
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
 
-        let mut packages_to_load: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
-            IndexMap::new();
+        let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
         let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
         for package in repo.get_packages() {
             if package.as_any().downcast_ref::<AliasPackage>().is_some() {
@@ -73,7 +72,7 @@ impl FundCommand {
             }
             packages_to_load.insert(
                 package.get_name().to_string(),
-                Some(Box::new(MatchAllConstraint::new())),
+                Some(MatchAllConstraint::new(None).into()),
             );
             packages_to_load_names.insert(package.get_name().to_string());
         }

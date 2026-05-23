@@ -8,7 +8,8 @@ use crate::dependency_resolver::Request;
 use crate::package::PackageInterface;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct SecurityAdvisoryPoolFilter {
@@ -64,7 +65,9 @@ impl SecurityAdvisoryPoolFilter {
                 continue;
             }
 
-            let package_constraint = Constraint::new("==", package.get_version());
+            let package_constraint =
+                SimpleConstraint::new("==".to_string(), package.get_version().to_string(), None)
+                    .into();
             for advisory in &advisory_map[&package_name] {
                 // advisory is PartialSecurityAdvisory or SecurityAdvisory; both have affected_versions: Box<dyn ConstraintInterface>
                 if advisory.affected_versions.matches(&package_constraint) {

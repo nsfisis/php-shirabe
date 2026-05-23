@@ -5,18 +5,18 @@ use crate::package::PackageInterface;
 use crate::repository::AdvisoryProviderInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 pub enum FindPackageConstraint {
     String(String),
-    Constraint(Box<dyn ConstraintInterface>),
+    Constraint(AnyConstraint),
 }
 
 impl Clone for FindPackageConstraint {
     fn clone(&self) -> Self {
         match self {
             Self::String(s) => Self::String(s.clone()),
-            Self::Constraint(c) => Self::Constraint(c.clone_box()),
+            Self::Constraint(c) => Self::Constraint(c.clone()),
         }
     }
 }
@@ -71,7 +71,7 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

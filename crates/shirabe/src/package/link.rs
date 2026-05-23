@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Package/Link.php
 
 use shirabe_php_shim::UnexpectedValueException;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::PackageInterface;
 
 pub struct Link {
     pub(crate) source: String,
     pub(crate) target: String,
-    pub(crate) constraint: Box<dyn ConstraintInterface>,
+    pub(crate) constraint: AnyConstraint,
     pub(crate) description: String,
     pub(crate) pretty_constraint: Option<String>,
 }
@@ -20,7 +20,7 @@ impl Clone for Link {
         Self {
             source: self.source.clone(),
             target: self.target.clone(),
-            constraint: self.constraint.clone_box(),
+            constraint: self.constraint.clone(),
             description: self.description.clone(),
             pretty_constraint: self.pretty_constraint.clone(),
         }
@@ -63,7 +63,7 @@ impl Link {
     pub fn new(
         source: String,
         target: String,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: AnyConstraint,
         description: Option<String>,
         pretty_constraint: Option<String>,
     ) -> Self {
@@ -94,8 +94,8 @@ impl Link {
         &self.target
     }
 
-    pub fn get_constraint(&self) -> &dyn ConstraintInterface {
-        &*self.constraint
+    pub fn get_constraint(&self) -> &AnyConstraint {
+        &self.constraint
     }
 
     pub fn get_pretty_constraint(&self) -> anyhow::Result<&str> {
@@ -117,7 +117,7 @@ impl Link {
             self.source,
             self.description,
             self.target,
-            self.constraint.__to_string(),
+            self.constraint.to_string(),
         )
     }
 

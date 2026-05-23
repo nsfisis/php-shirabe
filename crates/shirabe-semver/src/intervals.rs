@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
 
-use crate::constraint::Constraint;
-use crate::constraint::ConstraintInterface;
+use crate::constraint::AnyConstraint;
 use crate::constraint::MatchAllConstraint;
 use crate::constraint::MatchNoneConstraint;
 use crate::constraint::MultiConstraint;
+use crate::constraint::SimpleConstraint;
 use crate::interval::{DevConstraintSet, Interval};
 use shirabe_php_shim as php;
 
@@ -42,31 +42,19 @@ impl Intervals {
     }
 
     pub fn is_subset_of(
-        candidate: &dyn ConstraintInterface,
-        constraint: &dyn ConstraintInterface,
+        candidate: &AnyConstraint,
+        constraint: &AnyConstraint,
     ) -> anyhow::Result<bool> {
-        if constraint
-            .as_any()
-            .downcast_ref::<MatchAllConstraint>()
-            .is_some()
-        {
+        if constraint.is_match_all() {
             return Ok(true);
         }
 
-        if candidate
-            .as_any()
-            .downcast_ref::<MatchNoneConstraint>()
-            .is_some()
-            || constraint
-                .as_any()
-                .downcast_ref::<MatchNoneConstraint>()
-                .is_some()
-        {
+        if candidate.is_match_none() || constraint.is_match_none() {
             return Ok(false);
         }
 
-        // Phase B: ConstraintInterface needs clone_box() to create owned copies from references.
-        let multi = MultiConstraint::new(vec![candidate.clone_box(), constraint.clone_box()], true);
+        let multi =
+            MultiConstraint::new(vec![candidate.clone(), constraint.clone()], true, None).into();
         let intersection_intervals = Self::get(&multi)?;
         let candidate_intervals = Self::get(candidate)?;
 
@@ -79,14 +67,14 @@ impl Intervals {
                 return Ok(false);
             }
 
-            if candidate_intervals.numeric[index].get_start().__to_string()
-                != interval.get_start().__to_string()
+            if candidate_intervals.numeric[index].get_start().to_string()
+                != interval.get_start().to_string()
             {
                 return Ok(false);
             }
 
-            if candidate_intervals.numeric[index].get_end().__to_string()
-                != interval.get_end().__to_string()
+            if candidate_intervals.numeric[index].get_end().to_string()
+                != interval.get_end().to_string()
             {
                 return Ok(false);
             }
@@ -107,24 +95,16 @@ impl Intervals {
         Ok(true)
     }
 
-    pub fn have_intersections(
-        a: &dyn ConstraintInterface,
-        b: &dyn ConstraintInterface,
-    ) -> anyhow::Result<bool> {
-        if a.as_any().downcast_ref::<MatchAllConstraint>().is_some()
-            || b.as_any().downcast_ref::<MatchAllConstraint>().is_some()
-        {
+    pub fn have_intersections(a: &AnyConstraint, b: &AnyConstraint) -> anyhow::Result<bool> {
+        if a.is_match_all() || b.is_match_all() {
             return Ok(true);
         }
 
-        if a.as_any().downcast_ref::<MatchNoneConstraint>().is_some()
-            || b.as_any().downcast_ref::<MatchNoneConstraint>().is_some()
-        {
+        if a.is_match_none() || b.is_match_none() {
             return Ok(false);
         }
 
-        // Phase B: ConstraintInterface needs clone_box().
-        let multi = MultiConstraint::new(vec![a.clone_box(), b.clone_box()], true);
+        let multi = MultiConstraint::new(vec![a.clone(), b.clone()], true, None).into();
         let intersection_intervals = Self::generate_intervals(&multi, true)?;
 
         Ok(!intersection_intervals.numeric.is_empty()
@@ -132,30 +112,24 @@ impl Intervals {
             || !intersection_intervals.branches.names.is_empty())
     }
 
-    pub fn compact_constraint(
-        constraint: &dyn ConstraintInterface,
-    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
-        if constraint
-            .as_any()
-            .downcast_ref::<MultiConstraint>()
-            .is_none()
-        {
-            return Ok(constraint.clone_box());
+    pub fn compact_constraint(constraint: &AnyConstraint) -> anyhow::Result<AnyConstraint> {
+        if constraint.as_multi_constraint().is_none() {
+            return Ok(constraint.clone());
         }
 
         let intervals = Self::generate_intervals(constraint, false)?;
-        let mut constraints: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+        let mut constraints: Vec<AnyConstraint> = Vec::new();
         let mut has_numeric_match_all = false;
 
         if intervals.numeric.len() == 1
-            && intervals.numeric[0].get_start().__to_string() == Interval::from_zero().__to_string()
-            && intervals.numeric[0].get_end().__to_string()
-                == Interval::until_positive_infinity().__to_string()
+            && intervals.numeric[0].get_start().to_string() == Interval::from_zero().to_string()
+            && intervals.numeric[0].get_end().to_string()
+                == Interval::until_positive_infinity().to_string()
         {
-            constraints.push(Box::new(intervals.numeric[0].get_start().clone()));
+            constraints.push(intervals.numeric[0].get_start().clone().into());
             has_numeric_match_all = true;
         } else {
-            let mut un_equal_constraints: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+            let mut un_equal_constraints: Vec<AnyConstraint> = Vec::new();
             let count = intervals.numeric.len();
             let mut i = 0;
             while i < count {
@@ -176,15 +150,18 @@ impl Intervals {
                         // unEqualConstraints currently contains [>=M, !=N] already and we only
                         // want to add !=P right now
                         if un_equal_constraints.is_empty()
-                            && interval.get_start().__to_string()
-                                != Interval::from_zero().__to_string()
+                            && interval.get_start().to_string() != Interval::from_zero().to_string()
                         {
-                            un_equal_constraints.push(Box::new(interval.get_start().clone()));
+                            un_equal_constraints.push(interval.get_start().clone().into());
                         }
-                        un_equal_constraints.push(Box::new(Constraint::new(
-                            "!=".to_string(),
-                            interval.get_end().get_version().to_string(),
-                        )));
+                        un_equal_constraints.push(
+                            SimpleConstraint::new(
+                                "!=".to_string(),
+                                interval.get_end().get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        );
                         i += 1;
                         continue;
                     }
@@ -192,16 +169,16 @@ impl Intervals {
 
                 if !un_equal_constraints.is_empty() {
                     // this is where the end of the following interval of a != constraint is added
-                    if interval.get_end().__to_string()
-                        != Interval::until_positive_infinity().__to_string()
+                    if interval.get_end().to_string()
+                        != Interval::until_positive_infinity().to_string()
                     {
-                        un_equal_constraints.push(Box::new(interval.get_end().clone()));
+                        un_equal_constraints.push(interval.get_end().clone().into());
                     }
 
                     // count is 1 if entire constraint is just one != expression
                     if un_equal_constraints.len() > 1 {
                         constraints
-                            .push(Box::new(MultiConstraint::new(un_equal_constraints, true)));
+                            .push(MultiConstraint::new(un_equal_constraints, true, None).into());
                     } else {
                         constraints.push(un_equal_constraints.into_iter().next().unwrap());
                     }
@@ -216,55 +193,59 @@ impl Intervals {
                     && interval.get_start().get_operator() == ">="
                     && interval.get_end().get_operator() == "<="
                 {
-                    constraints.push(Box::new(Constraint::new(
-                        "==".to_string(),
-                        interval.get_start().get_version().to_string(),
-                    )));
+                    constraints.push(
+                        SimpleConstraint::new(
+                            "==".to_string(),
+                            interval.get_start().get_version().to_string(),
+                            None,
+                        )
+                        .into(),
+                    );
                     i += 1;
                     continue;
                 }
 
-                if interval.get_start().__to_string() == Interval::from_zero().__to_string() {
-                    constraints.push(Box::new(interval.get_end().clone()));
-                } else if interval.get_end().__to_string()
-                    == Interval::until_positive_infinity().__to_string()
+                if interval.get_start().to_string() == Interval::from_zero().to_string() {
+                    constraints.push(interval.get_end().clone().into());
+                } else if interval.get_end().to_string()
+                    == Interval::until_positive_infinity().to_string()
                 {
-                    constraints.push(Box::new(interval.get_start().clone()));
+                    constraints.push(interval.get_start().clone().into());
                 } else {
-                    constraints.push(Box::new(MultiConstraint::new(
-                        vec![
-                            Box::new(interval.get_start().clone()),
-                            Box::new(interval.get_end().clone()),
-                        ],
-                        true,
-                    )));
+                    constraints.push(
+                        MultiConstraint::new(
+                            vec![
+                                AnyConstraint::Simple(interval.get_start().clone()),
+                                AnyConstraint::Simple(interval.get_end().clone()),
+                            ],
+                            true,
+                            None,
+                        )
+                        .into(),
+                    );
                 }
 
                 i += 1;
             }
         }
 
-        let mut dev_constraints: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+        let mut dev_constraints: Vec<AnyConstraint> = Vec::new();
 
         if intervals.branches.names.is_empty() {
             if intervals.branches.exclude && has_numeric_match_all {
-                return Ok(Box::new(MatchAllConstraint {
-                    pretty_string: None,
-                }));
+                return Ok(MatchAllConstraint::new(None).into());
                 // otherwise constraint should contain a != operator and already cover this
             }
         } else {
             for branch_name in &intervals.branches.names {
                 if intervals.branches.exclude {
-                    dev_constraints.push(Box::new(Constraint::new(
-                        "!=".to_string(),
-                        branch_name.clone(),
-                    )));
+                    dev_constraints.push(
+                        SimpleConstraint::new("!=".to_string(), branch_name.clone(), None).into(),
+                    );
                 } else {
-                    dev_constraints.push(Box::new(Constraint::new(
-                        "==".to_string(),
-                        branch_name.clone(),
-                    )));
+                    dev_constraints.push(
+                        SimpleConstraint::new("==".to_string(), branch_name.clone(), None).into(),
+                    );
                 }
             }
 
@@ -272,26 +253,25 @@ impl Intervals {
             // > 2.0 != dev-foo must return a conjunctive constraint
             if intervals.branches.exclude {
                 if constraints.len() > 1 {
-                    let merged: Vec<Box<dyn ConstraintInterface>> =
-                        std::iter::once(Box::new(MultiConstraint::new(constraints, false))
-                            as Box<dyn ConstraintInterface>)
-                        .chain(dev_constraints)
-                        .collect();
-                    return Ok(Box::new(MultiConstraint::new(merged, true)));
+                    let merged: Vec<AnyConstraint> =
+                        std::iter::once(MultiConstraint::new(constraints, false, None).into())
+                            .chain(dev_constraints)
+                            .collect();
+                    return Ok(MultiConstraint::new(merged, true, None).into());
                 }
 
                 if constraints.len() == 1
-                    && constraints[0].__to_string() == Interval::from_zero().__to_string()
+                    && constraints[0].to_string() == Interval::from_zero().to_string()
                 {
                     if dev_constraints.len() > 1 {
-                        return Ok(Box::new(MultiConstraint::new(dev_constraints, true)));
+                        return Ok(MultiConstraint::new(dev_constraints, true, None).into());
                     }
                     return Ok(dev_constraints.into_iter().next().unwrap());
                 }
 
-                let merged: Vec<Box<dyn ConstraintInterface>> =
+                let merged: Vec<AnyConstraint> =
                     constraints.into_iter().chain(dev_constraints).collect();
-                return Ok(Box::new(MultiConstraint::new(merged, true)));
+                return Ok(MultiConstraint::new(merged, true, None).into());
             }
 
             // otherwise devConstraints contains a list of == operators for branches which are
@@ -300,20 +280,18 @@ impl Intervals {
         }
 
         if constraints.len() > 1 {
-            return Ok(Box::new(MultiConstraint::new(constraints, false)));
+            return Ok(MultiConstraint::new(constraints, false, None).into());
         }
 
         if constraints.len() == 1 {
             return Ok(constraints.into_iter().next().unwrap());
         }
 
-        Ok(Box::new(MatchNoneConstraint {
-            pretty_string: None,
-        }))
+        Ok(MatchNoneConstraint::new(None).into())
     }
 
-    pub fn get(constraint: &dyn ConstraintInterface) -> anyhow::Result<IntervalCollection> {
-        let key = constraint.__to_string();
+    pub fn get(constraint: &AnyConstraint) -> anyhow::Result<IntervalCollection> {
+        let key = constraint.to_string();
 
         {
             let cache = intervals_cache().lock().unwrap();
@@ -333,14 +311,10 @@ impl Intervals {
     }
 
     fn generate_intervals(
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
         stop_on_first_valid_interval: bool,
     ) -> anyhow::Result<IntervalCollection> {
-        if constraint
-            .as_any()
-            .downcast_ref::<MatchAllConstraint>()
-            .is_some()
-        {
+        if constraint.is_match_all() {
             return Ok(IntervalCollection {
                 numeric: vec![Interval::new(
                     Interval::from_zero().clone(),
@@ -350,37 +324,30 @@ impl Intervals {
             });
         }
 
-        if constraint
-            .as_any()
-            .downcast_ref::<MatchNoneConstraint>()
-            .is_some()
-        {
+        if constraint.is_match_none() {
             return Ok(IntervalCollection {
                 numeric: vec![],
                 branches: Interval::no_dev(),
             });
         }
 
-        if let Some(c) = constraint.as_any().downcast_ref::<Constraint>() {
+        if let Some(c) = constraint.as_constraint() {
             return Self::generate_single_constraint_intervals(c);
         }
 
-        let multi = constraint
-            .as_any()
-            .downcast_ref::<MultiConstraint>()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "The constraint passed in should be an MatchAllConstraint, Constraint or \
+        let multi = constraint.as_multi_constraint().ok_or_else(|| {
+            anyhow::anyhow!(
+                "The constraint passed in should be an MatchAllConstraint, Constraint or \
                     MultiConstraint instance, got an unknown type."
-                )
-            })?;
+            )
+        })?;
 
         let sub_constraints = multi.get_constraints();
 
         let mut numeric_groups: Vec<Vec<Interval>> = Vec::new();
         let mut constraint_branches: Vec<DevConstraintSet> = Vec::new();
         for c in sub_constraints {
-            let res = Self::get(c.as_ref())?;
+            let res = Self::get(c)?;
             numeric_groups.push(res.numeric);
             constraint_branches.push(res.branches);
         }
@@ -494,7 +461,7 @@ impl Intervals {
         } else {
             1
         };
-        let mut start: Option<Constraint> = None;
+        let mut start: Option<SimpleConstraint> = None;
 
         for (version, operator, is_start) in &borders {
             if *is_start {
@@ -504,7 +471,11 @@ impl Intervals {
             }
 
             if start.is_none() && active_intervals >= activation_threshold {
-                start = Some(Constraint::new(operator.clone(), version.clone()));
+                start = Some(SimpleConstraint::new(
+                    operator.clone(),
+                    version.clone(),
+                    None,
+                ));
             } else if start.is_some() && active_intervals < activation_threshold {
                 let start_c = start.take().unwrap();
                 // filter out invalid intervals like > x - <= x, or >= x - < x
@@ -516,7 +487,7 @@ impl Intervals {
                 } else {
                     intervals.push(Interval::new(
                         start_c,
-                        Constraint::new(operator.clone(), version.clone()),
+                        SimpleConstraint::new(operator.clone(), version.clone(), None),
                     ));
 
                     if stop_on_first_valid_interval {
@@ -533,7 +504,7 @@ impl Intervals {
     }
 
     fn generate_single_constraint_intervals(
-        constraint: &Constraint,
+        constraint: &SimpleConstraint,
     ) -> anyhow::Result<IntervalCollection> {
         let op = constraint.get_operator();
 
@@ -589,10 +560,18 @@ impl Intervals {
                 numeric: vec![
                     Interval::new(
                         Interval::from_zero().clone(),
-                        Constraint::new("<".to_string(), constraint.get_version().to_string()),
+                        SimpleConstraint::new(
+                            "<".to_string(),
+                            constraint.get_version().to_string(),
+                            None,
+                        ),
                     ),
                     Interval::new(
-                        Constraint::new(">".to_string(), constraint.get_version().to_string()),
+                        SimpleConstraint::new(
+                            ">".to_string(),
+                            constraint.get_version().to_string(),
+                            None,
+                        ),
                         Interval::until_positive_infinity().clone(),
                     ),
                 ],
@@ -603,8 +582,8 @@ impl Intervals {
         // convert ==x to an interval of >=x - <=x
         Ok(IntervalCollection {
             numeric: vec![Interval::new(
-                Constraint::new(">=".to_string(), constraint.get_version().to_string()),
-                Constraint::new("<=".to_string(), constraint.get_version().to_string()),
+                SimpleConstraint::new(">=".to_string(), constraint.get_version().to_string(), None),
+                SimpleConstraint::new("<=".to_string(), constraint.get_version().to_string(), None),
             )],
             branches: Interval::no_dev(),
         })

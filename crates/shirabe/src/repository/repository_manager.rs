@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, json_encode};
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
@@ -51,12 +51,12 @@ impl RepositoryManager {
     pub fn find_package(
         &self,
         name: &str,
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
     ) -> Option<Box<dyn PackageInterface>> {
         for repository in &self.repositories {
             if let Some(package) = repository.find_package(
                 name,
-                crate::repository::FindPackageConstraint::Constraint(constraint.clone_box()),
+                crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
             ) {
                 return Some(package.clone_package_box());
             }
@@ -67,14 +67,14 @@ impl RepositoryManager {
     pub fn find_packages(
         &self,
         name: &str,
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
     ) -> Vec<Box<dyn PackageInterface>> {
         let mut packages: Vec<Box<dyn PackageInterface>> = vec![];
         for repository in self.get_repositories() {
             for p in repository.find_packages(
                 name,
                 Some(crate::repository::FindPackageConstraint::Constraint(
-                    constraint.clone_box(),
+                    constraint.clone(),
                 )),
             ) {
                 packages.push(p.clone_package_box());

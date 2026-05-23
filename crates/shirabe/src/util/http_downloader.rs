@@ -10,7 +10,8 @@ use shirabe_php_shim::{
     extension_loaded, file_get_contents, function_exists, implode, is_numeric, max, min,
     rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer;
 use crate::composer::ComposerHandle;
@@ -715,11 +716,14 @@ impl HttpDownloader {
                     let version_parser: VersionParser = todo!("VersionParser::new()");
                     let constraint = version_parser
                         .parse_constraints(versions_value.as_string().unwrap_or(""))?;
-                    let composer_constraint = Constraint::new(
-                        "==",
-                        &version_parser.normalize(&composer::get_version(), None)?,
+                    let composer_constraint = SimpleConstraint::new(
+                        "==".to_string(),
+                        version_parser
+                            .normalize(&composer::get_version(), None)?
+                            .to_string(),
+                        None,
                     );
-                    if !constraint.matches(&composer_constraint) {
+                    if !constraint.matches(&composer_constraint.into()) {
                         continue;
                     }
                 }
@@ -753,11 +757,14 @@ impl HttpDownloader {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or(""),
                         )?;
-                        let composer_constraint = Constraint::new(
-                            "==",
-                            &version_parser.normalize(&composer::get_version(), None)?,
+                        let composer_constraint = SimpleConstraint::new(
+                            "==".to_string(),
+                            version_parser
+                                .normalize(&composer::get_version(), None)?
+                                .to_string(),
+                            None,
                         );
-                        if !constraint.matches(&composer_constraint) {
+                        if !constraint.matches(&composer_constraint.into()) {
                             continue;
                         }
 

@@ -178,9 +178,7 @@ impl UpdateCommand {
         for (package, constraint) in &reqs {
             let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
-            // TODO(phase-b): clone_box because Box<dyn ConstraintInterface> isn't Clone.
-            temporary_constraints.insert(package.clone(), parsed_constraint.clone_box());
-            let _ = parsed_constraint;
+            temporary_constraints.insert(package.clone(), parsed_constraint);
             // TODO(phase-b): access root_requirements[package].getConstraint()
             let intersected: bool = todo!("Intervals::haveIntersections check");
             if let Some(_root_req) = todo!("root_requirements.get(&package)") as Option<PhpMixed> {
@@ -234,10 +232,9 @@ impl UpdateCommand {
                     matches.get(1).cloned().unwrap_or_default()
                 ))?;
                 if temporary_constraints.contains_key(package.get_name()) {
-                    // TODO(phase-b): Box<dyn ConstraintInterface> isn't Clone; clone_box workaround.
                     let existing = temporary_constraints
                         .get(package.get_name())
-                        .map(|c| c.clone_box())
+                        .map(|c| c.clone())
                         .unwrap();
                     temporary_constraints.insert(
                         package.get_name().to_string(),

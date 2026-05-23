@@ -1,30 +1,22 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php
 
-use std::cell::RefCell;
-
+use crate::constraint::AnyConstraint;
 use crate::constraint::Bound;
-use crate::constraint::ConstraintInterface;
 use crate::constraint::MatchAllConstraint;
 
+#[derive(Debug, Clone)]
 pub struct MultiConstraint {
-    pub(crate) constraints: Vec<Box<dyn ConstraintInterface>>,
+    pub(crate) constraints: Vec<AnyConstraint>,
     pub(crate) pretty_string: Option<String>,
-    string: RefCell<Option<String>>,
     pub(crate) conjunctive: bool,
-    lower_bound: RefCell<Option<Bound>>,
-    upper_bound: RefCell<Option<Bound>>,
-}
-
-impl std::fmt::Debug for MultiConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MultiConstraint")
-            .field("conjunctive", &self.conjunctive)
-            .finish()
-    }
 }
 
 impl MultiConstraint {
-    pub fn new(constraints: Vec<Box<dyn ConstraintInterface>>, conjunctive: bool) -> Self {
+    pub fn new(
+        constraints: Vec<AnyConstraint>,
+        conjunctive: bool,
+        pretty_string: Option<String>,
+    ) -> Self {
         assert!(
             constraints.len() >= 2,
             "Must provide at least two constraints for a MultiConstraint. Use \
@@ -34,15 +26,12 @@ impl MultiConstraint {
 
         Self {
             constraints,
-            pretty_string: None,
-            string: RefCell::new(None),
+            pretty_string,
             conjunctive,
-            lower_bound: RefCell::new(None),
-            upper_bound: RefCell::new(None),
         }
     }
 
-    pub fn get_constraints(&self) -> &[Box<dyn ConstraintInterface>] {
+    pub fn get_constraints(&self) -> &[AnyConstraint] {
         &self.constraints
     }
 
@@ -54,11 +43,9 @@ impl MultiConstraint {
         !self.conjunctive
     }
 
-    fn extract_bounds(&self) {
-        if self.lower_bound.borrow().is_some() {
-            return;
-        }
-
+    /// Composer memoizes the result; this port recomputes on every call. It is not heavy
+    /// calculation so caching is a premature optimization.
+    fn extract_bounds(&self) -> (Bound, Bound) {
         let mut current_lower: Option<Bound> = None;
         let mut current_upper: Option<Bound> = None;
 
@@ -93,52 +80,61 @@ impl MultiConstraint {
             }
         }
 
-        *self.lower_bound.borrow_mut() = current_lower;
-        *self.upper_bound.borrow_mut() = current_upper;
+        (
+            current_lower.expect("MultiConstraint always has at least two constraints"),
+            current_upper.expect("MultiConstraint always has at least two constraints"),
+        )
     }
 
     pub fn create(
-        constraints: Vec<Box<dyn ConstraintInterface>>,
+        constraints: Vec<AnyConstraint>,
         conjunctive: bool,
-    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
+        pretty_string: Option<String>,
+    ) -> anyhow::Result<AnyConstraint> {
         if constraints.is_empty() {
-            return Ok(Box::new(MatchAllConstraint {
-                pretty_string: None,
-            }));
+            return Ok(MatchAllConstraint::new(pretty_string).into());
         }
 
         if constraints.len() == 1 {
-            return Ok(constraints.into_iter().next().unwrap());
+            let mut single = constraints.into_iter().next().unwrap();
+            if pretty_string.is_some() {
+                single.set_pretty_string(pretty_string);
+            }
+            return Ok(single);
         }
 
         let (constraints, conjunctive) = Self::optimize_constraints(constraints, conjunctive);
 
         if constraints.len() == 1 {
-            return Ok(constraints.into_iter().next().unwrap());
+            let mut single = constraints.into_iter().next().unwrap();
+            if pretty_string.is_some() {
+                single.set_pretty_string(pretty_string);
+            }
+            return Ok(single);
         }
 
-        Ok(Box::new(MultiConstraint::new(constraints, conjunctive)))
+        Ok(MultiConstraint::new(constraints, conjunctive, pretty_string).into())
     }
 
     // Returns the (possibly optimized) constraints and the effective conjunctive flag.
     // Always returns the constraints vector (consuming it), whether or not optimization was applied.
     // The PHP version returns null for no optimization; here we return the original values unchanged.
     fn optimize_constraints(
-        constraints: Vec<Box<dyn ConstraintInterface>>,
+        constraints: Vec<AnyConstraint>,
         conjunctive: bool,
-    ) -> (Vec<Box<dyn ConstraintInterface>>, bool) {
+    ) -> (Vec<AnyConstraint>, bool) {
         // Parse the two OR groups and if they are contiguous collapse into one constraint.
         // [>= 1 < 2] || [>= 2 < 3] || [>= 3 < 4] => [>= 1 < 4]
         if !conjunctive {
             let mut iter = constraints.into_iter();
-            let mut left: Box<dyn ConstraintInterface> = iter.next().unwrap();
-            let mut merged_constraints: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+            let mut left: AnyConstraint = iter.next().unwrap();
+            let mut merged_constraints: Vec<AnyConstraint> = Vec::new();
             let mut optimized = false;
 
             for right in iter {
-                let merged: Option<Box<dyn ConstraintInterface>> = {
-                    let maybe_l_mc = left.as_any().downcast_ref::<MultiConstraint>();
-                    let maybe_r_mc = right.as_any().downcast_ref::<MultiConstraint>();
+                let merged: Option<AnyConstraint> = {
+                    let maybe_l_mc = left.as_multi_constraint();
+                    let maybe_r_mc = right.as_multi_constraint();
 
                     if let (Some(l_mc), Some(r_mc)) = (maybe_l_mc, maybe_r_mc) {
                         if l_mc.conjunctive
@@ -146,10 +142,10 @@ impl MultiConstraint {
                             && l_mc.constraints.len() == 2
                             && r_mc.constraints.len() == 2
                         {
-                            let left0 = l_mc.constraints[0].__to_string();
-                            let left1 = l_mc.constraints[1].__to_string();
-                            let right0 = r_mc.constraints[0].__to_string();
-                            let right1 = r_mc.constraints[1].__to_string();
+                            let left0 = l_mc.constraints[0].to_string();
+                            let left1 = l_mc.constraints[1].to_string();
+                            let right0 = r_mc.constraints[0].to_string();
+                            let right1 = r_mc.constraints[1].to_string();
 
                             if left0.starts_with(">=")
                                 && left1.starts_with('<')
@@ -157,14 +153,17 @@ impl MultiConstraint {
                                 && right1.starts_with('<')
                                 && left1.get(2..) == right0.get(3..)
                             {
-                                Some(Box::new(MultiConstraint::new(
-                                    vec![
-                                        l_mc.constraints[0].clone_box(),
-                                        r_mc.constraints[1].clone_box(),
-                                    ],
-                                    true,
-                                ))
-                                    as Box<dyn ConstraintInterface>)
+                                Some(
+                                    MultiConstraint::new(
+                                        vec![
+                                            l_mc.constraints[0].clone(),
+                                            r_mc.constraints[1].clone(),
+                                        ],
+                                        true,
+                                        None,
+                                    )
+                                    .into(),
+                                )
                             } else {
                                 None
                             }
@@ -198,10 +197,8 @@ impl MultiConstraint {
 
         (constraints, conjunctive)
     }
-}
 
-impl ConstraintInterface for MultiConstraint {
-    fn compile(&self, other_operator: i64) -> String {
+    pub fn compile(&self, other_operator: i64) -> String {
         let mut parts = Vec::new();
         for constraint in &self.constraints {
             let code = constraint.compile(other_operator);
@@ -233,87 +230,28 @@ impl ConstraintInterface for MultiConstraint {
         }
     }
 
-    fn matches(&self, provider: &dyn ConstraintInterface) -> bool {
-        if !self.conjunctive {
-            for constraint in &self.constraints {
-                if provider.matches(constraint.as_ref()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        if provider.is_disjunctive() {
-            return provider.matches(self);
-        }
-
-        for constraint in &self.constraints {
-            if !provider.matches(constraint.as_ref()) {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    fn set_pretty_string(&mut self, pretty_string: Option<String>) {
-        self.pretty_string = pretty_string;
-    }
-
-    fn get_pretty_string(&self) -> String {
+    pub fn get_pretty_string(&self) -> String {
         if let Some(ref s) = self.pretty_string
             && !s.is_empty()
         {
             return s.clone();
         }
-        self.__to_string()
+        self.to_string()
     }
 
-    fn __to_string(&self) -> String {
-        if let Some(ref s) = *self.string.borrow() {
-            return s.clone();
-        }
+    pub fn get_lower_bound(&self) -> Bound {
+        self.extract_bounds().0
+    }
 
-        let parts: Vec<String> = self.constraints.iter().map(|c| c.__to_string()).collect();
+    pub fn get_upper_bound(&self) -> Bound {
+        self.extract_bounds().1
+    }
+}
+
+impl std::fmt::Display for MultiConstraint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let parts: Vec<String> = self.constraints.iter().map(|c| c.to_string()).collect();
         let sep = if self.conjunctive { " " } else { " || " };
-        let result = format!("[{}]", parts.join(sep));
-
-        *self.string.borrow_mut() = Some(result.clone());
-        result
-    }
-
-    fn get_lower_bound(&self) -> Bound {
-        self.extract_bounds();
-        self.lower_bound
-            .borrow()
-            .clone()
-            .expect("extractBounds should have populated the lowerBound property")
-    }
-
-    fn get_upper_bound(&self) -> Bound {
-        self.extract_bounds();
-        self.upper_bound
-            .borrow()
-            .clone()
-            .expect("extractBounds should have populated the upperBound property")
-    }
-
-    fn is_disjunctive(&self) -> bool {
-        !self.conjunctive
-    }
-
-    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
-        Box::new(MultiConstraint {
-            constraints: self.constraints.iter().map(|c| c.clone_box()).collect(),
-            pretty_string: self.pretty_string.clone(),
-            string: RefCell::new(self.string.borrow().clone()),
-            conjunctive: self.conjunctive,
-            lower_bound: RefCell::new(self.lower_bound.borrow().clone()),
-            upper_bound: RefCell::new(self.upper_bound.borrow().clone()),
-        })
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
+        write!(f, "[{}]", parts.join(sep))
     }
 }

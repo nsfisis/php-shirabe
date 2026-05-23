@@ -3,7 +3,7 @@
 use crate::advisory::PartialSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use indexmap::IndexMap;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub enum PartialOrSecurityAdvisory {
@@ -31,7 +31,7 @@ pub trait AdvisoryProviderInterface {
 
     fn get_security_advisories(
         &self,
-        package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult>;
 }

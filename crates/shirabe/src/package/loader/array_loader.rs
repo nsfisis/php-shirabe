@@ -764,12 +764,10 @@ impl ArrayLoader {
             }
         };
 
-        // TODO(phase-b): Link::new expects Box<dyn ConstraintInterface>; we have Arc<dyn ConstraintInterface + Send + Sync>
-        let _ = parsed_constraint;
         Ok(Link::new(
             source.to_string(),
             target.to_string(),
-            todo!("phase-b: convert Arc<dyn ConstraintInterface> to Box<dyn ConstraintInterface>"),
+            parsed_constraint,
             Some(description.to_string()),
             Some(pretty_constraint.to_string()),
         ))

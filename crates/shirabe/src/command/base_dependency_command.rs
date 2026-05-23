@@ -6,8 +6,8 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
-use shirabe_semver::constraint::ConstraintInterface;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::package::CompletePackageInterface;
@@ -225,13 +225,9 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
 
         let has_constraint = text_constraint != "*";
-        let constraint: Option<Box<dyn ConstraintInterface>> = if has_constraint {
+        let constraint: Option<AnyConstraint> = if has_constraint {
             let version_parser = VersionParser::new();
-            Some(
-                version_parser
-                    .parse_constraints(&text_constraint)?
-                    .clone_box(),
-            )
+            Some(version_parser.parse_constraints(&text_constraint)?.clone())
         } else {
             None
         };

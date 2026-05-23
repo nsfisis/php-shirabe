@@ -6,9 +6,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort, spl_object_hash};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_semver::intervals::Intervals;
 
 use crate::dependency_resolver::PolicyInterface;
@@ -29,12 +29,10 @@ pub struct PoolOptimizer {
     irremovable_packages: IndexMap<i64, bool>,
 
     /// @var array<string, array<string, ConstraintInterface>>
-    require_constraints_per_package:
-        IndexMap<String, IndexMap<String, Box<dyn ConstraintInterface>>>,
+    require_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
 
     /// @var array<string, array<string, ConstraintInterface>>
-    conflict_constraints_per_package:
-        IndexMap<String, IndexMap<String, Box<dyn ConstraintInterface>>>,
+    conflict_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
 
     /// @var array<int, true>
     packages_to_remove: IndexMap<i64, bool>,
@@ -90,23 +88,27 @@ impl PoolOptimizer {
     }
 
     fn prepare(&mut self, request: &Request, pool: &Pool) {
-        let mut irremovable_package_constraint_groups: IndexMap<
-            String,
-            Vec<Box<dyn ConstraintInterface>>,
-        > = IndexMap::new();
+        let mut irremovable_package_constraint_groups: IndexMap<String, Vec<AnyConstraint>> =
+            IndexMap::new();
 
         // Mark fixed or locked packages as irremovable
         for (_, package) in request.get_fixed_or_locked_packages() {
             irremovable_package_constraint_groups
                 .entry(PackageInterface::get_name(package.as_ref()).to_string())
                 .or_insert_with(Vec::new)
-                .push(Box::new(Constraint::new("==", package.get_version())));
+                .push(
+                    SimpleConstraint::new(
+                        "==".to_string(),
+                        package.get_version().to_string(),
+                        None,
+                    )
+                    .into(),
+                );
         }
 
         // Extract requested package requirements
         for (require, constraint) in request.get_requires() {
-            // TODO(phase-b): clone Box<dyn ConstraintInterface>
-            self.extract_require_constraints_per_package(require, todo!("constraint.clone_box()"));
+            self.extract_require_constraints_per_package(require, constraint.clone());
         }
 
         // First pass over all packages to extract information and mark package constraints irremovable
@@ -115,16 +117,14 @@ impl PoolOptimizer {
             for link in package.get_requires().values() {
                 self.extract_require_constraints_per_package(
                     link.get_target(),
-                    // TODO(phase-b): clone constraint
-                    todo!("link.get_constraint().clone_box()"),
+                    link.get_constraint().clone(),
                 );
             }
             // Extract package conflicts
             for link in package.get_conflicts().values() {
                 self.extract_conflict_constraints_per_package(
                     link.get_target(),
-                    // TODO(phase-b): clone constraint
-                    todo!("link.get_constraint().clone_box()"),
+                    link.get_constraint().clone(),
                 );
             }
 
@@ -138,16 +138,14 @@ impl PoolOptimizer {
             }
         }
 
-        let mut irremovable_package_constraints: IndexMap<String, Box<dyn ConstraintInterface>> =
-            IndexMap::new();
+        let mut irremovable_package_constraints: IndexMap<String, AnyConstraint> = IndexMap::new();
         for (package_name, constraints) in irremovable_package_constraint_groups {
-            // TODO(phase-b): MultiConstraint::new signature; move ownership of constraints vec
             irremovable_package_constraints.insert(
                 package_name,
                 if 1 == constraints.len() {
-                    todo!("constraints[0] moved out")
+                    constraints.into_iter().next().unwrap()
                 } else {
-                    Box::new(MultiConstraint::new(constraints, false))
+                    MultiConstraint::new(constraints, false, None).into()
                 },
             );
         }
@@ -165,8 +163,8 @@ impl PoolOptimizer {
                 .get(PackageInterface::get_name(package.as_ref()))
                 .unwrap();
             if CompilingMatcher::r#match(
-                constraint.as_ref(),
-                Constraint::OP_EQ,
+                constraint,
+                SimpleConstraint::OP_EQ,
                 package.get_version().to_string(),
             ) {
                 self.mark_package_irremovable(package.as_ref());
@@ -262,8 +260,8 @@ impl PoolOptimizer {
                     let mut group_hash_parts: Vec<String> = vec![];
 
                     if CompilingMatcher::r#match(
-                        require_constraint.as_ref(),
-                        Constraint::OP_EQ,
+                        require_constraint,
+                        SimpleConstraint::OP_EQ,
                         package.get_version().to_string(),
                     ) {
                         group_hash_parts.push(format!(
@@ -276,7 +274,7 @@ impl PoolOptimizer {
                         for (_, link) in package.get_replaces() {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
-                                Constraint::OP_EQ,
+                                SimpleConstraint::OP_EQ,
                                 package.get_version().to_string(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
@@ -293,8 +291,8 @@ impl PoolOptimizer {
                     {
                         for (_, conflict_constraint) in conflict_constraints {
                             if CompilingMatcher::r#match(
-                                conflict_constraint.as_ref(),
-                                Constraint::OP_EQ,
+                                conflict_constraint,
+                                SimpleConstraint::OP_EQ,
                                 package.get_version().to_string(),
                             ) {
                                 group_hash_parts.push(format!(
@@ -415,7 +413,7 @@ impl PoolOptimizer {
                 // performance more than the additional few packages that could be filtered out would benefit the process.
                 subhash.insert(
                     link.get_target().to_string(),
-                    link.get_constraint().__to_string(),
+                    link.get_constraint().to_string(),
                 );
             }
 
@@ -638,7 +636,7 @@ impl PoolOptimizer {
                         if false
                             == CompilingMatcher::r#match(
                                 link_constraint,
-                                Constraint::OP_EQ,
+                                SimpleConstraint::OP_EQ,
                                 version_str,
                             )
                         {
@@ -662,13 +660,13 @@ impl PoolOptimizer {
     fn extract_require_constraints_per_package(
         &mut self,
         package: &str,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.require_constraints_per_package
                 .entry(package.to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(expanded.__to_string(), expanded);
+                .insert(expanded.to_string(), expanded);
         }
     }
 
@@ -680,32 +678,28 @@ impl PoolOptimizer {
     fn extract_conflict_constraints_per_package(
         &mut self,
         package: &str,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: AnyConstraint,
     ) {
         for expanded in self.expand_disjunctive_multi_constraints(constraint) {
             self.conflict_constraints_per_package
                 .entry(package.to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(expanded.__to_string(), expanded);
+                .insert(expanded.to_string(), expanded);
         }
     }
 
     /// @return ConstraintInterface[]
     fn expand_disjunctive_multi_constraints(
         &self,
-        constraint: Box<dyn ConstraintInterface>,
-    ) -> Vec<Box<dyn ConstraintInterface>> {
-        let constraint = Intervals::compact_constraint(&*constraint).unwrap_or(constraint);
+        constraint: AnyConstraint,
+    ) -> Vec<AnyConstraint> {
+        let constraint = Intervals::compact_constraint(&constraint).unwrap_or(constraint);
 
-        if let Some(multi) = constraint.as_any().downcast_ref::<MultiConstraint>() {
-            if multi.is_disjunctive() {
+        if let Some(multi) = constraint.as_multi_constraint() {
+            if multi.is_disjunctive_mc() {
                 // No need to call ourselves recursively here because Intervals::compactConstraint() ensures that there
                 // are no nested disjunctive MultiConstraint instances possible
-                return multi
-                    .get_constraints()
-                    .iter()
-                    .map(|c| c.clone_box())
-                    .collect();
+                return multi.get_constraints().iter().map(|c| c.clone()).collect();
             }
         }
 

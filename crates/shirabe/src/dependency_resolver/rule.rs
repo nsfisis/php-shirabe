@@ -10,8 +10,8 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, abs, array_filter, array_keys, array_shift,
     array_values, implode, is_object,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::dependency_resolver::GenericRule;
 use crate::dependency_resolver::MultiConflictRule;
@@ -36,7 +36,7 @@ pub enum ReasonData {
     Int(i64),
     RootRequire {
         package_name: String,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: AnyConstraint,
     },
     Fixed {
         package: Box<dyn BasePackage>,
@@ -238,10 +238,14 @@ impl Rule {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
                             }
-                            if !link
-                                .get_constraint()
-                                .matches(&Constraint::new("=", p.get_version()))
-                            {
+                            if !link.get_constraint().matches(
+                                &SimpleConstraint::new(
+                                    "=".to_string(),
+                                    p.get_version().to_string(),
+                                    None,
+                                )
+                                .into(),
+                            ) {
                                 return true;
                             }
                             // required package was locked but has been unlocked and still matches
@@ -275,7 +279,14 @@ impl Rule {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
                             }
-                            if !constraint.matches(&Constraint::new("=", p.get_version())) {
+                            if !constraint.matches(
+                                &SimpleConstraint::new(
+                                    "=".to_string(),
+                                    p.get_version().to_string(),
+                                    None,
+                                )
+                                .into(),
+                            ) {
                                 return true;
                             }
                             break;
@@ -345,12 +356,11 @@ impl Rule {
         match self.get_reason() {
             r if r == RULE_ROOT_REQUIRE => {
                 let reason_data = self.get_reason_data();
-                let (package_name, constraint): (&str, &dyn ConstraintInterface) = match reason_data
-                {
+                let (package_name, constraint): (&str, &AnyConstraint) = match reason_data {
                     ReasonData::RootRequire {
                         package_name,
                         constraint,
-                    } => (package_name.as_str(), constraint.as_ref()),
+                    } => (package_name.as_str(), constraint),
                     _ => return String::new(),
                 };
 
@@ -712,7 +722,7 @@ impl Rule {
         pool: &Pool,
         packages: Vec<Box<dyn BasePackage>>,
         is_verbose: bool,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
     ) -> String {
         Problem::get_package_list(
@@ -730,7 +740,7 @@ impl Rule {
         pool: &Pool,
         literals: &[i64],
         is_verbose: bool,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
     ) -> String {
         let mut packages: Vec<Box<dyn BasePackage>> = vec![];

@@ -11,7 +11,8 @@ use shirabe_php_shim::{
     array_slice_strs, explode, get_class, implode, in_array, is_string, sprintf, str_replace,
     str_starts_with, strpos, strtolower, var_export,
 };
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer;
 use crate::composer::ComposerHandle;
@@ -1759,7 +1760,7 @@ impl PlatformRepository {
                 Link::new(
                     "ext-uuid".to_string(),
                     "lib-uuid".to_string(),
-                    Box::new(Constraint::new("=", &version)),
+                    SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_REPLACE.to_string()),
                     Some(ext.get_pretty_version().to_string()),
                 ),
@@ -1824,7 +1825,7 @@ impl PlatformRepository {
                 Link::new(
                     format!("lib-{}", name),
                     format!("lib-{}", replace_lower),
-                    Box::new(Constraint::new("=", &version)),
+                    SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_REPLACE.to_string()),
                     Some(lib.get_pretty_version().to_string()),
                 ),
@@ -1838,7 +1839,7 @@ impl PlatformRepository {
                 Link::new(
                     format!("lib-{}", name),
                     format!("lib-{}", provide_lower),
-                    Box::new(Constraint::new("=", &version)),
+                    SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_PROVIDE.to_string()),
                     Some(lib.get_pretty_version().to_string()),
                 ),
@@ -1962,10 +1963,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<
-            String,
-            Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
-        >,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

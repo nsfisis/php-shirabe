@@ -5,8 +5,8 @@ use std::fmt;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, spl_object_hash, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::PartialSecurityAdvisory;
 use crate::package::BasePackage;
@@ -70,7 +70,7 @@ impl Pool {
     pub fn get_removed_versions(
         &self,
         name: &str,
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
     ) -> IndexMap<String, String> {
         let Some(versions) = self.removed_versions.get(name) else {
             return IndexMap::new();
@@ -78,7 +78,9 @@ impl Pool {
 
         let mut result: IndexMap<String, String> = IndexMap::new();
         for (version, pretty_version) in versions {
-            if constraint.matches(&Constraint::new("==", version)) {
+            if constraint
+                .matches(&SimpleConstraint::new("==".to_string(), version.to_string(), None).into())
+            {
                 result.insert(version.clone(), pretty_version.clone());
             }
         }
@@ -110,7 +112,7 @@ impl Pool {
     pub fn is_security_removed_package_version(
         &self,
         package_name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> bool {
         let empty = IndexMap::new();
         let versions = self
@@ -119,7 +121,9 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
             if let Some(c) = constraint {
-                if c.matches(&Constraint::new("==", version)) {
+                if c.matches(
+                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
+                ) {
                     return true;
                 }
             }
@@ -132,7 +136,7 @@ impl Pool {
     pub fn get_security_advisory_identifiers_for_package_version(
         &self,
         package_name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> Vec<String> {
         let empty = IndexMap::new();
         let versions = self
@@ -141,7 +145,9 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
             if let Some(c) = constraint {
-                if c.matches(&Constraint::new("==", version)) {
+                if c.matches(
+                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
+                ) {
                     return package_with_security_advisories
                         .iter()
                         .map(|advisory| advisory.advisory_id.clone())
@@ -156,7 +162,7 @@ impl Pool {
     pub fn is_abandoned_removed_package_version(
         &self,
         package_name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> bool {
         let empty = IndexMap::new();
         let versions = self
@@ -165,7 +171,9 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
             if let Some(c) = constraint {
-                if c.matches(&Constraint::new("==", version)) {
+                if c.matches(
+                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
+                ) {
                     return true;
                 }
             }
@@ -226,11 +234,11 @@ impl Pool {
     pub fn what_provides(
         &mut self,
         name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         // PHP: $key = (string) $constraint;
         let key = match constraint {
-            Some(c) => c.__to_string(),
+            Some(c) => c.to_string(),
             None => String::new(),
         };
         if let Some(by_key) = self.provider_cache.get(name) {
@@ -254,7 +262,7 @@ impl Pool {
     pub(crate) fn compute_what_provides(
         &self,
         name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> Vec<Box<dyn BasePackage>> {
         let Some(candidates) = self.package_by_name.get(name) else {
             return vec![];
@@ -306,7 +314,7 @@ impl Pool {
         &self,
         candidate: &dyn BasePackage,
         name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> bool {
         let candidate_name = candidate.get_name();
         let candidate_version = candidate.get_version();
@@ -315,7 +323,7 @@ impl Pool {
             return constraint.is_none()
                 || CompilingMatcher::r#match(
                     constraint.unwrap(),
-                    Constraint::OP_EQ,
+                    SimpleConstraint::OP_EQ,
                     candidate_version.to_string(),
                 );
         }

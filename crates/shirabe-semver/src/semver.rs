@@ -3,7 +3,8 @@
 use std::sync::OnceLock;
 
 use crate::comparator::Comparator;
-use crate::constraint::Constraint;
+use crate::constraint::AnyConstraint;
+use crate::constraint::SimpleConstraint;
 use crate::version_parser::VersionParser;
 
 pub struct Semver;
@@ -19,7 +20,12 @@ impl Semver {
 
     pub fn satisfies(version: String, constraints: String) -> anyhow::Result<bool> {
         let version_parser = Self::version_parser();
-        let provider = Constraint::new("==".to_string(), version_parser.normalize(&version, None)?);
+        let provider = SimpleConstraint::new(
+            "==".to_string(),
+            version_parser.normalize(&version, None)?,
+            None,
+        )
+        .into();
         let parsed_constraints = version_parser.parse_constraints(&constraints)?;
         Ok(parsed_constraints.matches(&provider))
     }

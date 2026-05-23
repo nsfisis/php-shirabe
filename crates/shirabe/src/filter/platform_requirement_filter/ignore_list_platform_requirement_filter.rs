@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/IgnoreListPlatformRequirementFilter.php
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_semver::interval::Interval;
 use shirabe_semver::intervals::Intervals;
 
@@ -41,9 +41,9 @@ impl IgnoreListPlatformRequirementFilter {
     pub fn filter_constraint(
         &self,
         req: &str,
-        constraint: Box<dyn ConstraintInterface>,
+        constraint: AnyConstraint,
         allow_upper_bound_override: bool,
-    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
+    ) -> anyhow::Result<AnyConstraint> {
         if !PlatformRepository::is_platform_package(req) {
             return Ok(constraint);
         }
@@ -53,20 +53,26 @@ impl IgnoreListPlatformRequirementFilter {
         }
 
         if Preg::is_match(&self.ignore_regex, req)? {
-            return Ok(Box::new(MatchAllConstraint::new()));
+            return Ok(MatchAllConstraint::new(None).into());
         }
 
-        let intervals = Intervals::get(&*constraint)?;
+        let intervals = Intervals::get(&constraint)?;
         let last = intervals.numeric.last();
         if let Some(last) = last {
             if last.get_end().to_string() != Interval::until_positive_infinity().to_string() {
-                let constraint = Box::new(MultiConstraint::new(
+                let constraint = MultiConstraint::new(
                     vec![
                         constraint,
-                        Box::new(Constraint::new(">=", last.get_end().get_version())),
+                        AnyConstraint::Simple(SimpleConstraint::new(
+                            ">=".to_string(),
+                            last.get_end().get_version().to_string(),
+                            None,
+                        )),
                     ],
                     false,
-                ));
+                    None,
+                )
+                .into();
                 return Ok(constraint);
             }
         }

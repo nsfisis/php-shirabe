@@ -8,7 +8,7 @@ use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::intervals::Intervals;
 
 #[derive(Debug)]
@@ -17,7 +17,7 @@ pub struct VersionBumper;
 impl VersionBumper {
     pub fn bump_requirement(
         &self,
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
         package: &dyn PackageInterface,
     ) -> Result<String> {
         let parser = VersionParser::new();
@@ -114,8 +114,8 @@ impl VersionBumper {
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;
-            if Intervals::is_subset_of(new_constraint.as_ref(), constraint)?
-                && Intervals::is_subset_of(constraint, new_constraint.as_ref())?
+            if Intervals::is_subset_of(&new_constraint, constraint)?
+                && Intervals::is_subset_of(constraint, &new_constraint)?
             {
                 return Ok(pretty_constraint);
             }

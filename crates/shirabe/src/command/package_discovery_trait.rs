@@ -880,9 +880,12 @@ pub trait PackageDiscoveryTrait {
             };
             if !link
                 .get_constraint()
-                .matches(&shirabe_semver::constraint::Constraint::new(
-                    "==",
-                    platform_pkg.get_version(),
+                .matches(&shirabe_semver::constraint::AnyConstraint::Simple(
+                    shirabe_semver::constraint::SimpleConstraint::new(
+                        "==".to_string(),
+                        platform_pkg.get_version().to_string(),
+                        None,
+                    ),
                 ))
             {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();

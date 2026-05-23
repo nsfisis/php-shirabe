@@ -8,8 +8,8 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, strtolower, version_compare,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
@@ -29,7 +29,7 @@ use crate::repository::RepositorySet;
 #[derive(Debug)]
 pub struct VersionSelector {
     repository_set: RepositorySet,
-    platform_constraints: IndexMap<String, Vec<Box<dyn ConstraintInterface>>>,
+    platform_constraints: IndexMap<String, Vec<AnyConstraint>>,
     parser: Option<VersionParser>,
 }
 
@@ -38,16 +38,19 @@ impl VersionSelector {
         repository_set: RepositorySet,
         platform_repo: Option<&crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
-        let mut platform_constraints: IndexMap<String, Vec<Box<dyn ConstraintInterface>>> =
-            IndexMap::new();
+        let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
             for package in <PlatformRepository as RepositoryInterface>::get_packages(platform_repo)
             {
-                let constraint = Constraint::new("==", package.get_version());
+                let constraint = SimpleConstraint::new(
+                    "==".to_string(),
+                    package.get_version().to_string(),
+                    None,
+                );
                 platform_constraints
                     .entry(package.get_name().to_string())
                     .or_default()
-                    .push(Box::new(constraint));
+                    .push(constraint.into());
             }
         }
         Ok(Self {
@@ -90,7 +93,7 @@ impl VersionSelector {
         };
         let mut candidates = self.repository_set.find_packages(
             &strtolower(package_name),
-            constraint.as_ref().map(|c| c.clone_box()),
+            constraint.as_ref().map(|c| c.clone()),
             repo_set_flags,
         );
 
@@ -142,7 +145,7 @@ impl VersionSelector {
                     let reason;
                     if let Some(provided_constraints) = self.platform_constraints.get(name) {
                         for provided_constraint in provided_constraints {
-                            if link.get_constraint().matches(provided_constraint.as_ref()) {
+                            if link.get_constraint().matches(provided_constraint) {
                                 continue 'reqs;
                             }
                             let list_filter_opt = platform_requirement_filter
@@ -154,10 +157,10 @@ impl VersionSelector {
                                 if list_filter.is_upper_bound_ignored(name) {
                                     let filtered_constraint = list_filter.filter_constraint(
                                         name,
-                                        link.get_constraint().clone_box(),
+                                        link.get_constraint().clone(),
                                         false,
                                     )?;
-                                    if filtered_constraint.matches(provided_constraint.as_ref()) {
+                                    if filtered_constraint.matches(provided_constraint) {
                                         continue 'reqs;
                                     }
                                 }

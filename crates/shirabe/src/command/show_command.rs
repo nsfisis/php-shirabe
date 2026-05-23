@@ -13,7 +13,7 @@ use shirabe_php_shim::{
     date, extension_loaded, in_array, realpath, strtolower, version_compare,
 };
 
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::PartialComposerHandle;
@@ -1486,7 +1486,7 @@ impl ShowCommand {
         IndexMap<String, String>,
     )> {
         let name = strtolower(name);
-        let constraint: Option<Box<dyn ConstraintInterface>> = match &version {
+        let constraint: Option<AnyConstraint> = match &version {
             PhpMixed::String(s) => Some(self.version_parser.parse_constraints(s)?),
             PhpMixed::Null => None,
             _ => None, // already a ConstraintInterface
@@ -1514,7 +1514,7 @@ impl ShowCommand {
         } else {
             repository_set.create_pool_for_package(&name, None)?
         };
-        let matches = pool.what_provides(&name, constraint.as_deref());
+        let matches = pool.what_provides(&name, constraint.as_ref());
         let mut literals: Vec<i64> = Vec::new();
         for package in matches.iter() {
             // avoid showing the 9999999-dev alias if the default branch has no branch-alias set

@@ -9,9 +9,9 @@ use shirabe_php_shim::{
     phpversion, spl_object_hash, sprintf, str_replace, str_starts_with, stripos, strpos,
     strtolower, substr, substr_count, version_compare,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::SecurityAdvisory;
 use crate::dependency_resolver::Pool;
@@ -92,14 +92,13 @@ impl Problem {
 
             let reason_data = rule_ref.get_reason_data();
             // TODO(phase-b): reason_data for RULE_ROOT_REQUIRE; extract via ReasonData::RootRequire variant.
-            let (package_name, constraint): (String, Option<&dyn ConstraintInterface>) =
-                match reason_data {
-                    rule::ReasonData::RootRequire {
-                        package_name,
-                        constraint,
-                    } => (package_name.clone(), Some(constraint.as_ref())),
-                    _ => (String::new(), None),
-                };
+            let (package_name, constraint): (String, Option<&AnyConstraint>) = match reason_data {
+                rule::ReasonData::RootRequire {
+                    package_name,
+                    constraint,
+                } => (package_name.clone(), Some(constraint)),
+                _ => (String::new(), None),
+            };
 
             let packages = pool.compute_what_provides(&package_name, constraint);
             if packages.len() == 0 {
@@ -393,7 +392,7 @@ impl Problem {
         pool: &mut Pool,
         is_verbose: bool,
         package_name: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> (String, String) {
         if PlatformRepository::is_platform_package(package_name) {
             // handle php/php-*/hhvm
@@ -572,7 +571,7 @@ impl Problem {
 
         if let Some(c) = constraint {
             if c.is_constraint()
-                && c.get_operator() == Constraint::STR_OP_EQ
+                && c.get_operator() == SimpleConstraint::STR_OP_EQ
                 && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None).unwrap_or(false)
             {
                 let new_constraint =
@@ -580,17 +579,25 @@ impl Problem {
                         .unwrap_or_else(|_| c.get_pretty_string());
                 let packages = repository_set.find_packages(
                     package_name,
-                    Some(Box::new(MultiConstraint::new(
-                        vec![
-                            Box::new(Constraint::new(Constraint::STR_OP_EQ, &new_constraint))
-                                as Box<dyn ConstraintInterface>,
-                            Box::new(Constraint::new(
-                                Constraint::STR_OP_EQ,
-                                &str_replace("#", "+", &new_constraint),
-                            )) as Box<dyn ConstraintInterface>,
-                        ],
-                        false,
-                    ))),
+                    Some(
+                        MultiConstraint::new(
+                            vec![
+                                AnyConstraint::Simple(SimpleConstraint::new(
+                                    SimpleConstraint::STR_OP_EQ.to_string(),
+                                    new_constraint.clone(),
+                                    None,
+                                )),
+                                AnyConstraint::Simple(SimpleConstraint::new(
+                                    SimpleConstraint::STR_OP_EQ.to_string(),
+                                    str_replace("#", "+", &new_constraint),
+                                    None,
+                                )),
+                            ],
+                            false,
+                            None,
+                        )
+                        .into(),
+                    ),
                     0,
                 );
                 if packages.len() > 0 {
@@ -618,15 +625,21 @@ impl Problem {
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages =
-            repository_set.find_packages(package_name, constraint.map(|c| c.clone_box()), 0);
+        let packages = repository_set.find_packages(package_name, constraint.map(|c| c.clone()), 0);
         if packages.len() > 0 {
             let root_reqs = repository_set.get_root_requires();
             if root_reqs.contains_key(package_name) {
                 let filtered: Vec<&Box<dyn BasePackage>> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[package_name].matches(&Constraint::new("==", p.get_version()))
+                        root_reqs[package_name].matches(
+                            &SimpleConstraint::new(
+                                "==".to_string(),
+                                p.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        )
                     })
                     .collect();
                 if filtered.len() == 0 {
@@ -663,7 +676,14 @@ impl Problem {
                     let filtered: Vec<&Box<dyn BasePackage>> = packages
                         .iter()
                         .filter(|p| {
-                            temp_reqs[&name].matches(&Constraint::new("==", p.get_version()))
+                            temp_reqs[&name].matches(
+                                &SimpleConstraint::new(
+                                    "==".to_string(),
+                                    p.get_version().to_string(),
+                                    None,
+                                )
+                                .into(),
+                            )
                         })
                         .collect();
                     if filtered.len() == 0 {
@@ -696,10 +716,23 @@ impl Problem {
             }
 
             if let Some(ref lp) = locked_package {
-                let fixed_constraint = Constraint::new("==", lp.get_version());
+                let fixed_constraint = AnyConstraint::from(SimpleConstraint::new(
+                    "==".to_string(),
+                    lp.get_version().to_string(),
+                    None,
+                ));
                 let filtered: Vec<&Box<dyn BasePackage>> = packages
                     .iter()
-                    .filter(|p| fixed_constraint.matches(&Constraint::new("==", p.get_version())))
+                    .filter(|p| {
+                        fixed_constraint.matches(
+                            &SimpleConstraint::new(
+                                "==".to_string(),
+                                p.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        )
+                    })
                     .collect();
                 if filtered.len() == 0 {
                     return (
@@ -837,14 +870,14 @@ impl Problem {
         // check if the package is found when bypassing stability checks
         let packages = repository_set.find_packages(
             package_name,
-            constraint.map(|c| c.clone_box()),
+            constraint.map(|c| c.clone()),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         );
         if packages.len() > 0 {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint.map(|c| c.clone_box()),
+                constraint.map(|c| c.clone()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             );
             if all_repos_packages.len() > 0 {
@@ -887,7 +920,7 @@ impl Problem {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
-                constraint.map(|c| c.clone_box()),
+                constraint.map(|c| c.clone()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             );
             if all_repos_packages.len() > 0 {
@@ -993,7 +1026,7 @@ impl Problem {
         packages: &Vec<Box<dyn BasePackage>>,
         is_verbose: bool,
         pool: Option<&Pool>,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
     ) -> String {
         struct PreparedEntry {
@@ -1213,7 +1246,7 @@ impl Problem {
         higher_repo_packages: &Vec<Box<dyn BasePackage>>,
         all_repos_packages: &Vec<Box<dyn BasePackage>>,
         reason: &str,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
     ) -> (String, String) {
         let mut next_repo_packages: Vec<Box<dyn BasePackage>> = Vec::new();
         let mut next_repo: Option<Box<dyn crate::repository::RepositoryInterface>> = None;
@@ -1346,10 +1379,10 @@ impl Problem {
     }
 
     /// Turns a constraint into text usable in a sentence describing a request
-    pub(crate) fn constraint_to_text(constraint: Option<&dyn ConstraintInterface>) -> String {
+    pub(crate) fn constraint_to_text(constraint: Option<&AnyConstraint>) -> String {
         if let Some(c) = constraint {
             if c.is_constraint()
-                && c.get_operator() == Constraint::STR_OP_EQ
+                && c.get_operator() == SimpleConstraint::STR_OP_EQ
                 && !str_starts_with(&c.get_version(), "dev-")
             {
                 if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None)

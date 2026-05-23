@@ -7,12 +7,12 @@ use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_semver::version_parser::VersionParser;
 
 fn serialize_constraint<S: serde::Serializer>(
-    c: &Box<dyn ConstraintInterface>,
+    c: &AnyConstraint,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(&c.get_pretty_string())
@@ -24,7 +24,7 @@ pub struct PartialSecurityAdvisory {
     pub advisory_id: String,
     pub package_name: String,
     #[serde(serialize_with = "serialize_constraint")]
-    pub affected_versions: Box<dyn ConstraintInterface>,
+    pub affected_versions: AnyConstraint,
 }
 
 impl PartialSecurityAdvisory {
@@ -35,21 +35,22 @@ impl PartialSecurityAdvisory {
     ) -> Result<PartialOrSecurityAdvisory> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
-        let constraint: Box<dyn ConstraintInterface> =
-            match parser.parse_constraints(affected_versions_str) {
-                Ok(c) => c,
-                Err(_) => {
-                    let affected_version =
-                        Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
-                    match parser.parse_constraints(affected_version.as_deref().unwrap_or("")) {
-                        Ok(c) => c,
-                        Err(_) => Box::new(Constraint::new(
-                            "==".to_string(),
-                            "0.0.0-invalid-version".to_string(),
-                        )),
-                    }
+        let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
+            Ok(c) => c,
+            Err(_) => {
+                let affected_version =
+                    Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
+                match parser.parse_constraints(affected_version.as_deref().unwrap_or("")) {
+                    Ok(c) => c,
+                    Err(_) => SimpleConstraint::new(
+                        "==".to_string(),
+                        "0.0.0-invalid-version".to_string(),
+                        None,
+                    )
+                    .into(),
                 }
-            };
+            }
+        };
 
         let has_full_data = data.contains_key("title")
             && data.contains_key("sources")
@@ -93,7 +94,7 @@ impl PartialSecurityAdvisory {
     pub fn new(
         package_name: String,
         advisory_id: String,
-        affected_versions: Box<dyn ConstraintInterface>,
+        affected_versions: AnyConstraint,
     ) -> Self {
         Self {
             advisory_id,

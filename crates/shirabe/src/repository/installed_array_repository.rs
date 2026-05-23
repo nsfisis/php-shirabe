@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackage;
 use crate::package::PackageInterface;
@@ -114,7 +114,7 @@ impl RepositoryInterface for InstalledArrayRepository {
     }
     fn load_packages(
         &self,
-        _package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        _package_name_map: IndexMap<String, Option<AnyConstraint>>,
         _acceptable_stabilities: IndexMap<String, i64>,
         _stability_flags: IndexMap<String, i64>,
         _already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

@@ -13,7 +13,8 @@ use shirabe_php_shim::{
     is_array, is_string, ksort, preg_quote, str_replace, strrpos, strtr, substr, trigger_error,
     trim, var_export, var_export_str, version_compare,
 };
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};
@@ -227,9 +228,7 @@ impl PluginManager {
 
         if package.get_type() == "composer-plugin" {
             let requires_map = package.get_requires();
-            let mut requires_composer: Option<
-                &dyn shirabe_semver::constraint::ConstraintInterface,
-            > = None;
+            let mut requires_composer: Option<&shirabe_semver::constraint::AnyConstraint> = None;
             for (_k, link) in &requires_map {
                 if "composer-plugin-api" == link.get_target() {
                     requires_composer = Some(link.get_constraint());
@@ -248,15 +247,17 @@ impl PluginManager {
             };
 
             let current_plugin_api_version = self.get_plugin_api_version();
-            let current_plugin_api_constraint = Constraint::new(
-                "==",
+            let current_plugin_api_constraint = SimpleConstraint::new(
+                "==".to_string(),
                 self.version_parser
-                    .normalize(&current_plugin_api_version, None)?,
+                    .normalize(&current_plugin_api_version, None)?
+                    .to_string(),
+                None,
             );
 
             if requires_composer.get_pretty_string() == self.get_plugin_api_version() {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name(), self.get_plugin_api_version(), self.get_plugin_api_version()));
-            } else if !requires_composer.matches(&current_plugin_api_constraint) {
+            } else if !requires_composer.matches(&current_plugin_api_constraint.into()) {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Composer installation (\"{}\"). You may need to run composer update with the \"--no-plugins\" option.</warning>",
                     package.get_name(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" },

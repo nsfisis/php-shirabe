@@ -3,7 +3,8 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, in_array};
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackage;
 use crate::package::Link;
@@ -177,16 +178,16 @@ impl AliasPackage {
             for link in &links {
                 // link is self.version, but must be replacing also the replaced version
                 if link.get_pretty_constraint().unwrap_or("") == "self.version" {
-                    let mut constraint = Constraint::new("=", &self.version);
+                    let constraint = SimpleConstraint::new(
+                        "=".to_string(),
+                        self.version.to_string(),
+                        Some(pretty_version.clone()),
+                    );
                     let new_link = Link::new(
                         link.get_source().to_string(),
                         link.get_target().to_string(),
-                        Box::new(constraint.clone()),
+                        constraint.into(),
                         Some(link_type.to_string()),
-                        Some(pretty_version.clone()),
-                    );
-                    shirabe_semver::constraint::ConstraintInterface::set_pretty_string(
-                        &mut constraint,
                         Some(pretty_version.clone()),
                     );
                     new_links.push(new_link);
@@ -200,16 +201,16 @@ impl AliasPackage {
                     if link_type == Link::TYPE_REQUIRE {
                         self.has_self_version_requires = true;
                     }
-                    let mut constraint = Constraint::new("=", &self.version);
+                    let constraint = SimpleConstraint::new(
+                        "=".to_string(),
+                        self.version.to_string(),
+                        Some(pretty_version.clone()),
+                    );
                     let new_link = Link::new(
                         links[index].get_source().to_string(),
                         links[index].get_target().to_string(),
-                        Box::new(constraint.clone()),
+                        constraint.into(),
                         Some(link_type.to_string()),
-                        Some(pretty_version.clone()),
-                    );
-                    shirabe_semver::constraint::ConstraintInterface::set_pretty_string(
-                        &mut constraint,
                         Some(pretty_version.clone()),
                     );
                     links[index] = new_link;

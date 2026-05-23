@@ -1,16 +1,16 @@
 //! ref: composer/src/Composer/Package/Version/VersionParser.php
 
 use indexmap::IndexMap;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::semver::Semver;
 use shirabe_semver::version_parser::VersionParser as SemverVersionParser;
 
 use crate::repository::PlatformRepository;
 
-static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, Arc<dyn ConstraintInterface + Send + Sync>>>> =
+static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, AnyConstraint>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 #[derive(Debug, Clone)]
@@ -21,12 +21,19 @@ pub struct VersionParser {
 impl VersionParser {
     pub const DEFAULT_BRANCH_ALIAS: &'static str = "9999999-dev";
 
-    pub fn parse_constraints(
-        &self,
-        constraints: &str,
-    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
-        // TODO(phase-b): re-introduce a memoization cache once trait objects are Send+Sync.
-        self.inner.parse_constraints(constraints)
+    pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
+        {
+            let cache = CONSTRAINTS.lock().unwrap();
+            if let Some(cached) = cache.get(constraints) {
+                return Ok(cached.clone());
+            }
+        }
+        let parsed = self.inner.parse_constraints(constraints)?;
+        CONSTRAINTS
+            .lock()
+            .unwrap()
+            .insert(constraints.to_string(), parsed.clone());
+        Ok(parsed)
     }
 
     pub fn parse_name_version_pairs(

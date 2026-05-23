@@ -205,14 +205,14 @@ impl RuleSetGenerator {
             }
 
             for link in package.get_requires().values() {
-                let mut constraint = link.get_constraint().clone_box();
+                let mut constraint = link.get_constraint().clone();
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
-                    let fallback = constraint.clone_box();
+                    let fallback = constraint.clone();
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, true)
                         .unwrap_or(fallback);
@@ -221,7 +221,7 @@ impl RuleSetGenerator {
                 let possible_requires: Vec<Box<dyn PackageInterface>> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&*constraint))
+                    .what_provides(link.get_target(), Some(&constraint))
                     .into_iter()
                     .map(|p| p.clone_package_box())
                     .collect();
@@ -258,14 +258,14 @@ impl RuleSetGenerator {
                     continue;
                 }
 
-                let mut constraint = link.get_constraint().clone_box();
+                let mut constraint = link.get_constraint().clone();
                 if platform_requirement_filter.is_ignored(link.get_target()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
                     .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                 ) {
-                    let fallback = constraint.clone_box();
+                    let fallback = constraint.clone();
                     constraint = ignore_list_filter
                         .filter_constraint(link.get_target(), constraint, false)
                         .unwrap_or(fallback);
@@ -274,7 +274,7 @@ impl RuleSetGenerator {
                 let conflicts = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&*constraint));
+                    .what_provides(link.get_target(), Some(&constraint));
 
                 for conflict in &conflicts {
                     // define the conflict rule for regular packages, for alias packages it's only needed if the name
@@ -354,14 +354,14 @@ impl RuleSetGenerator {
         }
 
         for (package_name, constraint) in request.get_requires() {
-            let mut constraint = constraint.clone_box();
+            let mut constraint = constraint.clone();
             if platform_requirement_filter.is_ignored(package_name) {
                 continue;
             } else if let Some(ignore_list_filter) = platform_requirement_filter
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
-                let fallback = constraint.clone_box();
+                let fallback = constraint.clone();
                 constraint = ignore_list_filter
                     .filter_constraint(package_name, constraint, true)
                     .unwrap_or(fallback);
@@ -370,7 +370,7 @@ impl RuleSetGenerator {
             let packages: Vec<Box<dyn PackageInterface>> = self
                 .pool
                 .borrow_mut()
-                .what_provides(package_name, Some(&*constraint))
+                .what_provides(package_name, Some(&constraint))
                 .into_iter()
                 .map(|p| p.clone_package_box())
                 .collect();

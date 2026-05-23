@@ -11,9 +11,9 @@ use shirabe_php_shim::{
 };
 
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::PartialSecurityAdvisory;
 use crate::cache::Cache;
@@ -327,11 +327,11 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         let name = strtolower(&name);
-        let constraint: Box<dyn ConstraintInterface> = match constraint {
-            PhpMixed::String(s) => self.version_parser.parse_constraints(&s)?.clone_box(),
+        let constraint: AnyConstraint = match constraint {
+            PhpMixed::String(s) => self.version_parser.parse_constraints(&s)?.clone(),
             _ => {
                 // already a ConstraintInterface object passed as opaque PhpMixed
-                self.version_parser.parse_constraints("")?.clone_box()
+                self.version_parser.parse_constraints("")?.clone()
             }
         };
 
@@ -345,7 +345,7 @@ impl ComposerRepository {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
                 let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                 return Ok(
-                    match self.filter_packages(packages_vec, Some(&*constraint), true) {
+                    match self.filter_packages(packages_vec, Some(&constraint), true) {
                         FindPackageReturn::Package(p) => Some(p),
                         _ => None,
                     },
@@ -356,7 +356,7 @@ impl ComposerRepository {
                 return Ok(None);
             }
 
-            let mut map: IndexMap<String, Option<Box<dyn ConstraintInterface>>> = IndexMap::new();
+            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
             map.insert(name.clone(), Some(constraint));
             let packages = self.load_async_packages(map, None, None, IndexMap::new())?;
 
@@ -374,7 +374,7 @@ impl ComposerRepository {
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
                     let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                     return Ok(
-                        match self.filter_packages(packages_vec, Some(&*constraint), true) {
+                        match self.filter_packages(packages_vec, Some(&constraint), true) {
                             FindPackageReturn::Package(p) => Some(p),
                             _ => None,
                         },
@@ -401,11 +401,9 @@ impl ComposerRepository {
         let has_providers = self.has_providers()?;
 
         let name = strtolower(&name);
-        let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
+        let constraint: Option<AnyConstraint> = match constraint {
             None => None,
-            Some(PhpMixed::String(s)) => {
-                Some(self.version_parser.parse_constraints(&s)?.clone_box())
-            }
+            Some(PhpMixed::String(s)) => Some(self.version_parser.parse_constraints(&s)?.clone()),
             Some(_) => None,
         };
 
@@ -419,7 +417,7 @@ impl ComposerRepository {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
                 let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                 return Ok(
-                    match self.filter_packages(packages_vec, constraint.as_deref(), false) {
+                    match self.filter_packages(packages_vec, constraint.as_ref(), false) {
                         FindPackageReturn::Packages(v) => v,
                         _ => vec![],
                     },
@@ -430,7 +428,7 @@ impl ComposerRepository {
                 return Ok(vec![]);
             }
 
-            let mut map: IndexMap<String, Option<Box<dyn ConstraintInterface>>> = IndexMap::new();
+            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
             map.insert(name.clone(), constraint);
             let result = self.load_async_packages(map, None, None, IndexMap::new())?;
 
@@ -444,7 +442,7 @@ impl ComposerRepository {
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
                     let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
                     return Ok(
-                        match self.filter_packages(packages_vec, constraint.as_deref(), false) {
+                        match self.filter_packages(packages_vec, constraint.as_ref(), false) {
                             FindPackageReturn::Packages(v) => v,
                             _ => vec![],
                         },
@@ -464,7 +462,7 @@ impl ComposerRepository {
     fn filter_packages(
         &self,
         packages: Vec<Box<dyn BasePackage>>,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         return_first_match: bool,
     ) -> FindPackageReturn {
         if constraint.is_none() {
@@ -482,9 +480,10 @@ impl ComposerRepository {
         let mut filtered_packages: Vec<Box<dyn BasePackage>> = Vec::new();
 
         for package in packages.into_iter() {
-            let pkg_constraint = Constraint::new("==", package.get_version().to_string());
+            let pkg_constraint =
+                SimpleConstraint::new("==".to_string(), package.get_version().to_string(), None);
 
-            if constraint.matches(&pkg_constraint) {
+            if constraint.matches(&pkg_constraint.into()) {
                 if return_first_match {
                     return FindPackageReturn::Package(package);
                 }
@@ -506,15 +505,10 @@ impl ComposerRepository {
         if self.lazy_providers_url.is_some() {
             if let Some(ref available_packages) = self.available_packages.clone() {
                 if self.available_package_patterns.is_none() {
-                    let mut package_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
-                        IndexMap::new();
+                    let mut package_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
                     for name in available_packages.values() {
-                        package_map.insert(
-                            name.clone(),
-                            Some(
-                                Box::new(MatchAllConstraint::new()) as Box<dyn ConstraintInterface>
-                            ),
-                        );
+                        package_map
+                            .insert(name.clone(), Some(MatchAllConstraint::new(None).into()));
                     }
 
                     let result =
@@ -715,7 +709,7 @@ impl ComposerRepository {
 
     pub fn load_packages(
         &mut self,
-        mut package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
@@ -767,7 +761,7 @@ impl ComposerRepository {
                 )?;
                 let constraint = package_name_map
                     .get(&name)
-                    .and_then(|c| c.as_ref().map(|c| c.clone_box()));
+                    .and_then(|c| c.as_ref().map(|c| c.clone()));
                 for (_uid, candidate) in candidates.iter() {
                     if candidate.get_name() != name {
                         return Err(LogicException {
@@ -780,8 +774,12 @@ impl ComposerRepository {
                     let matches_constraint = match &constraint {
                         None => true,
                         Some(c) => {
-                            let pkg_c = Constraint::new("==", candidate.get_version().to_string());
-                            c.matches(&pkg_c)
+                            let pkg_c = SimpleConstraint::new(
+                                "==".to_string(),
+                                candidate.get_version().to_string(),
+                                None,
+                            );
+                            c.matches(&pkg_c.into())
                         }
                     };
                     if matches_constraint {
@@ -1025,7 +1023,7 @@ impl ComposerRepository {
     /// @inheritDoc
     pub fn get_security_advisories(
         &mut self,
-        mut package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        mut package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         self.load_root_server_file(Some(600))?;
@@ -1059,7 +1057,7 @@ impl ComposerRepository {
         let repo_name = self.get_repo_name();
         let create = |data: &IndexMap<String, PhpMixed>,
                       name: &str,
-                      package_constraint_map: &IndexMap<String, Box<dyn ConstraintInterface>>|
+                      package_constraint_map: &IndexMap<String, AnyConstraint>|
          -> anyhow::Result<Option<PartialOrSecurityAdvisory>> {
             let advisory = PartialSecurityAdvisory::create(name, data, &semver_parser)?;
             let is_full = matches!(advisory, PartialOrSecurityAdvisory::Full(_));
@@ -1081,11 +1079,11 @@ impl ComposerRepository {
                 }
                 .into());
             }
-            let affected_versions: &dyn ConstraintInterface = match &advisory {
-                PartialOrSecurityAdvisory::Partial(p) => &*p.affected_versions,
+            let affected_versions: &AnyConstraint = match &advisory {
+                PartialOrSecurityAdvisory::Partial(p) => &p.affected_versions,
                 PartialOrSecurityAdvisory::Full(p) => p.affected_versions(),
             };
-            let constraint = package_constraint_map.get(name).map(|c| &**c);
+            let constraint = package_constraint_map.get(name);
             if let Some(c) = constraint {
                 if !affected_versions.matches(c) {
                     return Ok(None);
@@ -1795,7 +1793,7 @@ impl ComposerRepository {
     /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
     fn load_async_packages(
         &mut self,
-        mut package_names: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        mut package_names: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
@@ -1820,7 +1818,7 @@ impl ComposerRepository {
         for name in names_snapshot {
             let constraint = package_names
                 .get(&name)
-                .and_then(|c| c.as_ref().map(|c| c.clone_box()));
+                .and_then(|c| c.as_ref().map(|c| c.clone()));
             if acceptable_stabilities.is_none()
                 || stability_flags.is_none()
                 || StabilityFilter::is_package_acceptable(
@@ -1840,11 +1838,10 @@ impl ComposerRepository {
             }
         }
 
-        let names_iter: Vec<(String, Option<Box<dyn ConstraintInterface>>)> = package_names
+        let names_iter: Vec<(String, Option<AnyConstraint>)> = package_names
             .iter()
             .map(|(k, v)| {
-                let cloned: Option<Box<dyn ConstraintInterface>> =
-                    v.as_ref().map(|c| dyn_clone_constraint(&**c));
+                let cloned: Option<AnyConstraint> = v.clone();
                 (k.clone(), cloned)
             })
             .collect();
@@ -1972,7 +1969,7 @@ impl ComposerRepository {
                 }
 
                 let acceptable = ComposerRepository::is_version_acceptable_static(
-                    constraint.as_deref(),
+                    constraint.as_ref(),
                     &real_name,
                     &version,
                     acceptable_stabilities,
@@ -2093,7 +2090,7 @@ impl ComposerRepository {
     /// @param name package name (must be lowercased already)
     fn is_version_acceptable(
         &self,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         name: &str,
         version_data: &IndexMap<String, PhpMixed>,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
@@ -2110,7 +2107,7 @@ impl ComposerRepository {
     }
 
     fn is_version_acceptable_static(
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         name: &str,
         version_data: &IndexMap<String, PhpMixed>,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
@@ -2128,7 +2125,7 @@ impl ComposerRepository {
 
     fn is_version_acceptable_with_loader(
         loader: &ArrayLoader,
-        constraint: Option<&dyn ConstraintInterface>,
+        constraint: Option<&AnyConstraint>,
         name: &str,
         version_data: &IndexMap<String, PhpMixed>,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
@@ -2160,7 +2157,7 @@ impl ComposerRepository {
             }
 
             if let Some(c) = constraint {
-                if !CompilingMatcher::r#match(c, Constraint::OP_EQ, version.clone()) {
+                if !CompilingMatcher::r#match(c, SimpleConstraint::OP_EQ, version.clone()) {
                     continue;
                 }
             }
@@ -3490,9 +3487,5 @@ fn clone_root_data(rd: &RootData) -> RootData {
 }
 
 fn dyn_clone_box(_pkg: &dyn BasePackage) -> Box<dyn BasePackage> {
-    todo!()
-}
-
-fn dyn_clone_constraint(_c: &dyn ConstraintInterface) -> Box<dyn ConstraintInterface> {
     todo!()
 }

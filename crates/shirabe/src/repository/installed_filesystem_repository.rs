@@ -3,7 +3,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::json::JsonFile;
 use crate::package::BasePackage;
@@ -124,7 +124,7 @@ impl RepositoryInterface for InstalledFilesystemRepository {
     }
     fn load_packages(
         &self,
-        _package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        _package_name_map: IndexMap<String, Option<AnyConstraint>>,
         _acceptable_stabilities: IndexMap<String, i64>,
         _stability_flags: IndexMap<String, i64>,
         _already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

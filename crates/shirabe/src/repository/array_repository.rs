@@ -10,8 +10,8 @@ use shirabe_php_shim::{
     Countable, InvalidArgumentException, LogicException, implode, preg_quote, spl_object_hash,
     strtolower,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
@@ -162,7 +162,7 @@ impl RepositoryInterface for ArrayRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
@@ -178,7 +178,14 @@ impl RepositoryInterface for ArrayRepository {
                     .unwrap();
                 let constraint_matches = match constraint_opt {
                     None => true,
-                    Some(c) => c.matches(&Constraint::new("==", package.get_version())),
+                    Some(c) => c.matches(
+                        &SimpleConstraint::new(
+                            "==".to_string(),
+                            package.get_version().to_string(),
+                            None,
+                        )
+                        .into(),
+                    ),
                 };
                 if constraint_matches
                     && StabilityFilter::is_package_acceptable(
@@ -233,18 +240,22 @@ impl RepositoryInterface for ArrayRepository {
     ) -> Option<Box<dyn BasePackage>> {
         let name = strtolower(name);
 
-        let constraint: Box<dyn ConstraintInterface> = match constraint {
+        let constraint: AnyConstraint = match constraint {
             FindPackageConstraint::Constraint(c) => c,
             FindPackageConstraint::String(s) => {
                 let version_parser = VersionParser::new();
-                version_parser.parse_constraints(&s).unwrap().clone_box()
+                version_parser.parse_constraints(&s).unwrap().clone()
             }
         };
 
         for package in self.get_packages() {
             if name == PackageInterface::get_name(package.as_ref()) {
-                let pkg_constraint = Constraint::new("==", package.get_version());
-                if constraint.matches(&pkg_constraint) {
+                let pkg_constraint = SimpleConstraint::new(
+                    "==".to_string(),
+                    package.get_version().to_string(),
+                    None,
+                );
+                if constraint.matches(&pkg_constraint.into()) {
                     return Some(package);
                 }
             }
@@ -262,22 +273,26 @@ impl RepositoryInterface for ArrayRepository {
         let name = strtolower(name);
         let mut packages = vec![];
 
-        let constraint: Option<Box<dyn ConstraintInterface>> = match constraint {
+        let constraint: Option<AnyConstraint> = match constraint {
             None => None,
             Some(FindPackageConstraint::Constraint(c)) => Some(c),
             Some(FindPackageConstraint::String(s)) => {
                 let version_parser = VersionParser::new();
-                Some(version_parser.parse_constraints(&s).unwrap().clone_box())
+                Some(version_parser.parse_constraints(&s).unwrap().clone())
             }
         };
 
         for package in self.get_packages() {
             if name == PackageInterface::get_name(package.as_ref()) {
                 if constraint.is_none()
-                    || constraint
-                        .as_ref()
-                        .unwrap()
-                        .matches(&Constraint::new("==", package.get_version()))
+                    || constraint.as_ref().unwrap().matches(
+                        &SimpleConstraint::new(
+                            "==".to_string(),
+                            package.get_version().to_string(),
+                            None,
+                        )
+                        .into(),
+                    )
                 {
                     packages.push(package);
                 }

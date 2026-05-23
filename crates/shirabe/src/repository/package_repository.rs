@@ -13,7 +13,7 @@ use crate::repository::{
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct PackageRepository {
@@ -91,7 +91,7 @@ impl AdvisoryProviderInterface for PackageRepository {
 
     fn get_security_advisories(
         &self,
-        package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();

@@ -5,7 +5,8 @@ use std::cell::RefCell;
 
 use indexmap::IndexMap;
 use shirabe_semver::compiling_matcher::CompilingMatcher;
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
@@ -209,14 +210,16 @@ impl PolicyInterface for DefaultPolicy {
         if (a.is_dev() && a.get_version().starts_with("dev-"))
             || (b.is_dev() && b.get_version().starts_with("dev-"))
         {
-            let constraint = Constraint::new(operator, b.get_version());
-            let version = Constraint::new("==", a.get_version());
+            let constraint =
+                SimpleConstraint::new(operator.to_string(), b.get_version().to_string(), None);
+            let version =
+                SimpleConstraint::new("==".to_string(), a.get_version().to_string(), None);
             return constraint.match_specific(&version, true);
         }
 
         CompilingMatcher::r#match(
-            &Constraint::new(operator, b.get_version()),
-            Constraint::OP_EQ,
+            &SimpleConstraint::new(operator.to_string(), b.get_version().to_string(), None).into(),
+            SimpleConstraint::OP_EQ,
             a.get_version().to_string(),
         )
     }

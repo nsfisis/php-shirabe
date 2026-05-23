@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, spl_object_hash, strtolower};
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 use crate::package::BasePackage;
@@ -43,7 +43,7 @@ pub enum UpdateAllowTransitiveDeps {
 #[derive(Debug)]
 pub struct Request {
     pub(crate) locked_repository: Option<LockArrayRepository>,
-    pub(crate) requires: IndexMap<String, Box<dyn ConstraintInterface>>,
+    pub(crate) requires: IndexMap<String, AnyConstraint>,
     pub(crate) fixed_packages: IndexMap<String, Box<dyn BasePackage>>,
     pub(crate) locked_packages: IndexMap<String, Box<dyn BasePackage>>,
     pub(crate) fixed_locked_packages: IndexMap<String, Box<dyn BasePackage>>,
@@ -69,10 +69,10 @@ impl Request {
     pub fn require_name(
         &mut self,
         package_name: &str,
-        constraint: Option<Box<dyn ConstraintInterface>>,
+        constraint: Option<AnyConstraint>,
     ) -> anyhow::Result<()> {
         let package_name = strtolower(package_name);
-        let constraint = constraint.unwrap_or_else(|| Box::new(MatchAllConstraint::new()));
+        let constraint = constraint.unwrap_or_else(|| MatchAllConstraint::new(None).into());
         if self.requires.contains_key(&package_name) {
             return Err(LogicException {
                 message: format!(
@@ -155,7 +155,7 @@ impl Request {
             == UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps
     }
 
-    pub fn get_requires(&self) -> &IndexMap<String, Box<dyn ConstraintInterface>> {
+    pub fn get_requires(&self) -> &IndexMap<String, AnyConstraint> {
         &self.requires
     }
 

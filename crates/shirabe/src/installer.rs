@@ -97,8 +97,8 @@ use crate::repository::RepositorySet;
 use crate::repository::RootPackageRepository;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct Installer {
@@ -144,7 +144,7 @@ pub struct Installer {
     pub(crate) suggested_packages_reporter: SuggestedPackagesReporter,
     pub(crate) platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
     pub(crate) additional_fixed_repository: Option<Box<dyn RepositoryInterface>>,
-    pub(crate) temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+    pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
 }
 
 impl Installer {
@@ -1049,8 +1049,7 @@ impl Installer {
             }
             for (_key, link) in &root_requires {
                 if PlatformRepository::is_platform_package(link.get_target()) {
-                    request
-                        .require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
+                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
                 }
             }
 
@@ -1060,8 +1059,7 @@ impl Installer {
                 .get_platform_requirements(self.dev_mode)?
             {
                 if !root_requires.contains_key(link.get_target()) {
-                    request
-                        .require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
+                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
                 }
             }
             drop(root_requires);
@@ -1249,7 +1247,7 @@ impl Installer {
         let minimum_stability: String;
         let mut stability_flags: IndexMap<String, i64>;
 
-        let requires: IndexMap<String, Box<dyn ConstraintInterface>>;
+        let requires: IndexMap<String, AnyConstraint>;
         if for_update {
             minimum_stability = self.package.get_minimum_stability().to_string();
             stability_flags = self.package.get_stability_flags().clone();
@@ -1263,9 +1261,9 @@ impl Installer {
                 req_links.insert(k, v);
             }
             // Translate to constraint map for downstream uniform handling.
-            let mut tmp: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
             for (k, link) in req_links {
-                tmp.insert(k, link.get_constraint().clone_box());
+                tmp.insert(k, link.get_constraint().clone());
             }
             requires = tmp;
         } else {
@@ -1286,16 +1284,19 @@ impl Installer {
                 })
                 .unwrap_or_default();
 
-            let mut tmp: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages() {
-                let mut constraint = Constraint::new("=", package.get_version().to_string());
-                constraint.set_pretty_string(Some(package.get_pretty_version().to_string()));
-                tmp.insert(package.get_name().to_string(), Box::new(constraint));
+                let constraint = SimpleConstraint::new(
+                    "=".to_string(),
+                    package.get_version().to_string(),
+                    Some(package.get_pretty_version().to_string()),
+                );
+                tmp.insert(package.get_name().to_string(), constraint.into());
             }
             requires = tmp;
         }
 
-        let mut root_requires: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+        let mut root_requires: IndexMap<String, AnyConstraint> = IndexMap::new();
         for (req, mut constraint) in requires {
             // skip platform requirements from the root package to avoid filtering out existing platform packages
             if self.platform_requirement_filter.is_ignored(&req) {
@@ -1307,7 +1308,10 @@ impl Installer {
             {
                 constraint = filter
                     .filter_constraint(&req, constraint, false)
-                    .unwrap_or_else(|_| Box::new(Constraint::new("=", String::new())));
+                    .unwrap_or_else(|_| {
+                        SimpleConstraint::new("=".to_string(), String::new().to_string(), None)
+                            .into()
+                    });
             }
             root_requires.insert(req, constraint);
         }
@@ -1327,8 +1331,7 @@ impl Installer {
         // TODO(phase-b): convert root_aliases (Vec<IndexMap<String, String>>) into Vec<RootAliasInput>
         let root_aliases_input: Vec<crate::repository::RootAliasInput> = vec![];
         let _ = root_aliases;
-        // TODO(phase-b): temporary_constraints holds Box<dyn ConstraintInterface> which can't Clone
-        let temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+        let temporary_constraints: IndexMap<String, AnyConstraint> = IndexMap::new();
         let mut repository_set = RepositorySet::new(
             &minimum_stability,
             stability_flags,
@@ -1467,7 +1470,14 @@ impl Installer {
                     .get(package.get_name())
                     .unwrap()
                     .get_constraint()
-                    .matches(&Constraint::new("=", package.get_version().to_string()))
+                    .matches(
+                        &SimpleConstraint::new(
+                            "=".to_string(),
+                            package.get_version().to_string(),
+                            None,
+                        )
+                        .into(),
+                    )
             {
                 // TODO(phase-b): fix_package needs owned Box<dyn BasePackage>
                 let _ = &package;
@@ -1510,10 +1520,14 @@ impl Installer {
                 {
                     request.require_name(
                         locked_package.get_name(),
-                        Some(Box::new(Constraint::new(
-                            "==",
-                            locked_package.get_version().to_string(),
-                        ))),
+                        Some(
+                            SimpleConstraint::new(
+                                "==".to_string(),
+                                locked_package.get_version().to_string(),
+                                None,
+                            )
+                            .into(),
+                        ),
                     )?;
                 }
             }
@@ -1525,7 +1539,7 @@ impl Installer {
                 }
             }
             for (_key, link) in &links {
-                request.require_name(link.get_target(), Some(link.get_constraint().clone_box()))?;
+                request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
             }
         }
         Ok(())
@@ -1674,7 +1688,7 @@ impl Installer {
 
     pub fn set_temporary_constraints(
         &mut self,
-        constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+        constraints: IndexMap<String, AnyConstraint>,
     ) -> &mut Self {
         self.temporary_constraints = constraints;
 

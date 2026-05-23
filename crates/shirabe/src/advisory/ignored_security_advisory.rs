@@ -4,7 +4,7 @@ use crate::advisory::SecurityAdvisory;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,7 +19,7 @@ impl IgnoredSecurityAdvisory {
     pub fn new(
         package_name: String,
         advisory_id: String,
-        affected_versions: Box<dyn ConstraintInterface>,
+        affected_versions: AnyConstraint,
         title: String,
         sources: Vec<IndexMap<String, String>>,
         reported_at: DateTime<Utc>,

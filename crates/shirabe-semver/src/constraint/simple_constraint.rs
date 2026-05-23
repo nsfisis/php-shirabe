@@ -1,23 +1,19 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Constraint.php
 
-use std::sync::Mutex;
-
 use anyhow::bail;
 use shirabe_php_shim as php;
 
 use crate::constraint::Bound;
-use crate::constraint::ConstraintInterface;
 
-#[derive(Debug)]
-pub struct Constraint {
+/// Corresponds to PHP's `Constraint`.
+#[derive(Debug, Clone)]
+pub struct SimpleConstraint {
     pub(crate) operator: i64,
     pub(crate) version: String,
     pub(crate) pretty_string: Option<String>,
-    pub(crate) lower_bound: Mutex<Option<Bound>>,
-    pub(crate) upper_bound: Mutex<Option<Bound>>,
 }
 
-impl Constraint {
+impl SimpleConstraint {
     pub const OP_EQ: i64 = 0;
     pub const OP_LT: i64 = 1;
     pub const OP_LE: i64 = 2;
@@ -60,8 +56,7 @@ impl Constraint {
         }
     }
 
-    pub fn new(operator: impl Into<String>, version: impl Into<String>) -> Self {
-        let operator: String = operator.into();
+    pub fn new(operator: String, version: String, pretty_string: Option<String>) -> Self {
         let op_int = Self::trans_op_str(&operator).unwrap_or_else(|| {
             // PHP raises InvalidArgumentException; in the Rust port keep that as a panic
             // because invalid operators are programmer errors caught during porting.
@@ -74,10 +69,8 @@ impl Constraint {
 
         Self {
             operator: op_int,
-            version: version.into(),
-            pretty_string: None,
-            lower_bound: Mutex::new(None),
-            upper_bound: Mutex::new(None),
+            version,
+            pretty_string,
         }
     }
 
@@ -225,7 +218,7 @@ impl Constraint {
         format!("!$b && {}", code_comparison)
     }
 
-    pub fn match_specific(&self, provider: &Constraint, compare_branches: bool) -> bool {
+    pub fn match_specific(&self, provider: &SimpleConstraint, compare_branches: bool) -> bool {
         let no_equal_op = Self::trans_op_int(self.operator).replace('=', "");
         let provider_no_equal_op = Self::trans_op_int(provider.operator).replace('=', "");
 
@@ -286,18 +279,14 @@ impl Constraint {
         false
     }
 
-    fn extract_bounds(&self) {
-        if self.lower_bound.lock().unwrap().is_some() {
-            return;
-        }
-
+    /// Composer memoizes the result; this port recomputes on every call. It is not heavy
+    /// calculation so caching is a premature optimization.
+    fn extract_bounds(&self) -> (Bound, Bound) {
         if self.version.starts_with("dev-") {
-            *self.lower_bound.lock().unwrap() = Some(Bound::zero());
-            *self.upper_bound.lock().unwrap() = Some(Bound::positive_infinity());
-            return;
+            return (Bound::zero(), Bound::positive_infinity());
         }
 
-        let (lower, upper) = match self.operator {
+        match self.operator {
             Self::OP_EQ => (
                 Bound::new(self.version.clone(), true),
                 Bound::new(self.version.clone(), true),
@@ -314,96 +303,33 @@ impl Constraint {
             ),
             Self::OP_NE => (Bound::zero(), Bound::positive_infinity()),
             _ => panic!("unknown operator: {}", self.operator),
-        };
-
-        *self.lower_bound.lock().unwrap() = Some(lower);
-        *self.upper_bound.lock().unwrap() = Some(upper);
-    }
-}
-
-impl Clone for Constraint {
-    fn clone(&self) -> Self {
-        Self {
-            operator: self.operator,
-            version: self.version.clone(),
-            pretty_string: self.pretty_string.clone(),
-            lower_bound: Mutex::new(self.lower_bound.lock().unwrap().clone()),
-            upper_bound: Mutex::new(self.upper_bound.lock().unwrap().clone()),
         }
     }
-}
 
-impl ConstraintInterface for Constraint {
-    fn matches(&self, provider: &dyn ConstraintInterface) -> bool {
-        if let Some(p) = provider.as_any().downcast_ref::<Constraint>() {
-            return self.match_specific(p, false);
-        }
-        provider.matches(self)
-    }
-
-    fn compile(&self, other_operator: i64) -> String {
+    pub fn compile(&self, other_operator: i64) -> String {
         self.compile_constraint(other_operator)
     }
 
-    fn set_pretty_string(&mut self, pretty_string: Option<String>) {
-        self.pretty_string = pretty_string;
-    }
-
-    fn get_pretty_string(&self) -> String {
+    pub fn get_pretty_string(&self) -> String {
         if let Some(ref s) = self.pretty_string
             && !s.is_empty()
         {
             return s.clone();
         }
-        self.__to_string()
+        self.to_string()
     }
 
-    fn __to_string(&self) -> String {
-        format!("{} {}", Self::trans_op_int(self.operator), self.version)
+    pub fn get_lower_bound(&self) -> Bound {
+        self.extract_bounds().0
     }
 
-    fn get_lower_bound(&self) -> Bound {
-        self.extract_bounds();
-        self.lower_bound
-            .lock()
-            .unwrap()
-            .clone()
-            .expect("extract_bounds should have set lower_bound")
-    }
-
-    fn get_upper_bound(&self) -> Bound {
-        self.extract_bounds();
-        self.upper_bound
-            .lock()
-            .unwrap()
-            .clone()
-            .expect("extract_bounds should have set upper_bound")
-    }
-
-    fn clone_box(&self) -> Box<dyn ConstraintInterface> {
-        Box::new(self.clone())
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn is_constraint(&self) -> bool {
-        true
-    }
-
-    fn get_operator(&self) -> &'static str {
-        Self::trans_op_int(self.operator)
-    }
-
-    fn get_version(&self) -> &str {
-        &self.version
+    pub fn get_upper_bound(&self) -> Bound {
+        self.extract_bounds().1
     }
 }
 
-impl std::fmt::Display for Constraint {
+impl std::fmt::Display for SimpleConstraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use crate::constraint::ConstraintInterface;
-        write!(f, "{}", ConstraintInterface::__to_string(self))
+        write!(f, "{} {}", Self::trans_op_int(self.operator), self.version)
     }
 }

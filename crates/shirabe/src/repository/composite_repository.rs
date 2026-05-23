@@ -3,7 +3,7 @@
 use std::any::Any;
 
 use indexmap::IndexMap;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackage;
 use crate::package::PackageInterface;
@@ -111,7 +111,7 @@ impl RepositoryInterface for CompositeRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
@@ -121,11 +121,10 @@ impl RepositoryInterface for CompositeRepository {
 
         for repository in &self.repositories {
             // TODO(phase-b): manual deep clone since trait objects in maps don't derive Clone.
-            let name_map_cloned: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
-                package_name_map
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.as_ref().map(|c| c.clone_box())))
-                    .collect();
+            let name_map_cloned: IndexMap<String, Option<AnyConstraint>> = package_name_map
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_ref().map(|c| c.clone())))
+                .collect();
             let already_loaded_cloned: IndexMap<
                 String,
                 IndexMap<String, Box<dyn PackageInterface>>,

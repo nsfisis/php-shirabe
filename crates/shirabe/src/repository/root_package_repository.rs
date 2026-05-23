@@ -61,10 +61,7 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<
-            String,
-            Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>>,
-        >,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

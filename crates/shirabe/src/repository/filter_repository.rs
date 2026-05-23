@@ -10,7 +10,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct FilterRepository {
@@ -187,7 +187,7 @@ impl RepositoryInterface for FilterRepository {
 
     fn load_packages(
         &self,
-        mut package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
@@ -272,7 +272,7 @@ impl AdvisoryProviderInterface for FilterRepository {
 
     fn get_security_advisories(
         &self,
-        mut package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        mut package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         if let Some(advisory_repo) = self.repo.as_advisory_provider() {

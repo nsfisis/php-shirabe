@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, array_pop, array_shift, array_unshift, microtime, spl_object_hash, sprintf,
 };
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::dependency_resolver::Decisions;
 use crate::dependency_resolver::GenericRule;
@@ -189,8 +189,8 @@ impl Solver {
             // TODO(phase-b): ConstraintInterface is a PHP class — Box<dyn ConstraintInterface>
             // cannot be cloned. We borrow the original constraint and only allocate a fresh
             // box when the ignore filter rewrites it.
-            let mut filtered: Option<Box<dyn ConstraintInterface>> = None;
-            let constraint_ref: &dyn ConstraintInterface = constraint.as_ref();
+            let mut filtered: Option<AnyConstraint> = None;
+            let constraint_ref: &AnyConstraint = constraint;
             if platform_requirement_filter.is_ignored(package_name) {
                 continue;
             } else if let Some(ignore_filter) = platform_requirement_filter
@@ -204,8 +204,7 @@ impl Solver {
                 let _ = &mut filtered;
             }
 
-            let active_constraint: &dyn ConstraintInterface =
-                filtered.as_deref().unwrap_or(constraint_ref);
+            let active_constraint: &AnyConstraint = filtered.as_ref().unwrap_or(constraint_ref);
 
             if self
                 .pool

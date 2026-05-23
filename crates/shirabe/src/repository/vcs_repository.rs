@@ -8,7 +8,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_search_mixed, count, get_class, in_array,
     str_replace, strpos,
 };
-use shirabe_semver::constraint::Constraint;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::config::Config;
 use crate::downloader::TransportException;
@@ -514,9 +515,14 @@ impl VcsRepository {
                     });
                 if let Some(existing_package) = self.inner.find_package(
                     &tag_package_name,
-                    crate::repository::FindPackageConstraint::Constraint(Box::new(
-                        Constraint::new("=", &version_normalized),
-                    )),
+                    crate::repository::FindPackageConstraint::Constraint(
+                        SimpleConstraint::new(
+                            "=".to_string(),
+                            version_normalized.to_string(),
+                            None,
+                        )
+                        .into(),
+                    ),
                 ) {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -949,10 +955,10 @@ impl VcsRepository {
                 .to_string();
             if let Some(existing_package) = self.inner.find_package(
                 &name,
-                crate::repository::FindPackageConstraint::Constraint(Box::new(Constraint::new(
-                    "=",
-                    &version_normalized,
-                ))),
+                crate::repository::FindPackageConstraint::Constraint(
+                    SimpleConstraint::new("=".to_string(), version_normalized.to_string(), None)
+                        .into(),
+                ),
             ) {
                 if is_very_verbose {
                     self.io.write_error(&format!(

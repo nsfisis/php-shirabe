@@ -1,9 +1,9 @@
 //! ref: composer/vendor/composer/semver/src/VersionParser.php
 
-use crate::constraint::Constraint;
-use crate::constraint::ConstraintInterface;
+use crate::constraint::AnyConstraint;
 use crate::constraint::MatchAllConstraint;
 use crate::constraint::MultiConstraint;
+use crate::constraint::SimpleConstraint;
 use shirabe_php_shim as php;
 
 // Regex to match pre-release data (sort of).
@@ -294,16 +294,13 @@ impl VersionParser {
         name.to_string()
     }
 
-    pub fn parse_constraints(
-        &self,
-        constraints: &str,
-    ) -> anyhow::Result<Box<dyn ConstraintInterface>> {
+    pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
         let pretty_constraint = constraints.to_string();
 
         let or_constraints = php::preg_split("{\\s*\\|\\|?\\s*}", &php::trim(constraints, None))
             .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", constraints))?;
 
-        let mut or_groups: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+        let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
         for or_constraint in &or_constraints {
             let and_constraints = php::preg_split(
@@ -312,9 +309,8 @@ impl VersionParser {
             )
             .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", or_constraint))?;
 
-            let constraint_objects: Vec<Box<dyn ConstraintInterface>> = if and_constraints.len() > 1
-            {
-                let mut objs: Vec<Box<dyn ConstraintInterface>> = Vec::new();
+            let constraint_objects: Vec<AnyConstraint> = if and_constraints.len() > 1 {
+                let mut objs: Vec<AnyConstraint> = Vec::new();
                 for and_constraint in &and_constraints {
                     for parsed in self.parse_constraint(and_constraint)? {
                         objs.push(parsed);
@@ -325,26 +321,21 @@ impl VersionParser {
                 self.parse_constraint(&and_constraints[0])?
             };
 
-            let constraint: Box<dyn ConstraintInterface> = if constraint_objects.len() == 1 {
+            let constraint: AnyConstraint = if constraint_objects.len() == 1 {
                 constraint_objects.into_iter().next().unwrap()
             } else {
-                Box::new(MultiConstraint::new(constraint_objects, true))
+                MultiConstraint::new(constraint_objects, true, None).into()
             };
 
             or_groups.push(constraint);
         }
 
-        let mut parsed_constraint = MultiConstraint::create(or_groups, false)?;
-
-        parsed_constraint.set_pretty_string(Some(pretty_constraint));
-
-        Ok(parsed_constraint)
+        // PHP sets the pretty string on the create() result via setPrettyString();
+        // the port threads it through create() instead (no setter).
+        MultiConstraint::create(or_groups, false, Some(pretty_constraint))
     }
 
-    fn parse_constraint(
-        &self,
-        constraint: &str,
-    ) -> anyhow::Result<Vec<Box<dyn ConstraintInterface>>> {
+    fn parse_constraint(&self, constraint: &str) -> anyhow::Result<Vec<AnyConstraint>> {
         let mut constraint = constraint.to_string();
 
         // strip off aliasing
@@ -399,15 +390,14 @@ impl VersionParser {
                 .unwrap_or("")
                 .is_empty();
             if m1_nonempty || m2_nonempty {
-                return Ok(vec![Box::new(Constraint::new(
+                return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
                     ">=".to_string(),
                     "0.0.0.0-dev".to_string(),
+                    None,
                 ))]);
             }
 
-            return Ok(vec![Box::new(MatchAllConstraint {
-                pretty_string: None,
-            })]);
+            return Ok(vec![AnyConstraint::MatchAll(MatchAllConstraint::new(None))]);
         }
 
         let version_regex = format!(
@@ -461,7 +451,7 @@ impl VersionParser {
 
             let low_version =
                 self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = Constraint::new(">=".to_string(), low_version);
+            let lower_bound = SimpleConstraint::new(">=".to_string(), low_version, None);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
@@ -471,9 +461,12 @@ impl VersionParser {
                 self.manipulate_version_string(&matches, high_position, 1, "0")
                     .unwrap_or_default()
             );
-            let upper_bound = Constraint::new("<".to_string(), high_version);
+            let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
 
-            return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
+            return Ok(vec![
+                AnyConstraint::Simple(lower_bound),
+                AnyConstraint::Simple(upper_bound),
+            ]);
         }
 
         // Caret Range
@@ -508,7 +501,7 @@ impl VersionParser {
 
             let low_version =
                 self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = Constraint::new(">=".to_string(), low_version);
+            let lower_bound = SimpleConstraint::new(">=".to_string(), low_version, None);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
@@ -517,9 +510,12 @@ impl VersionParser {
                 self.manipulate_version_string(&matches, position, 1, "0")
                     .unwrap_or_default()
             );
-            let upper_bound = Constraint::new("<".to_string(), high_version);
+            let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
 
-            return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
+            return Ok(vec![
+                AnyConstraint::Simple(lower_bound),
+                AnyConstraint::Simple(upper_bound),
+            ]);
         }
 
         // X Range
@@ -554,15 +550,16 @@ impl VersionParser {
             );
 
             if low_version == "0.0.0.0-dev" {
-                return Ok(vec![Box::new(Constraint::new(
+                return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
                     "<".to_string(),
                     high_version,
+                    None,
                 ))]);
             }
 
             return Ok(vec![
-                Box::new(Constraint::new(">=".to_string(), low_version)),
-                Box::new(Constraint::new("<".to_string(), high_version)),
+                AnyConstraint::Simple(SimpleConstraint::new(">=".to_string(), low_version, None)),
+                AnyConstraint::Simple(SimpleConstraint::new("<".to_string(), high_version, None)),
             ]);
         }
 
@@ -593,9 +590,10 @@ impl VersionParser {
 
             let from_str = matches[1].clone().unwrap_or_default(); // matches['from']
             let low_version = self.normalize(&from_str, None)?;
-            let lower_bound = Constraint::new(
+            let lower_bound = SimpleConstraint::new(
                 ">=".to_string(),
                 format!("{}{}", low_version, low_stability_suffix),
+                None,
             );
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
@@ -603,14 +601,14 @@ impl VersionParser {
 
             // matches[12]=to minor, matches[13]=to patch, matches[15]=to stability,
             // matches[17]=to dev, matches[18]=to wildcard-dev
-            let upper_bound: Constraint = if (!empty(&matches[12]) && !empty(&matches[13]))
+            let upper_bound: SimpleConstraint = if (!empty(&matches[12]) && !empty(&matches[13]))
                 || !matches[15].as_deref().unwrap_or("").is_empty()
                 || !matches[17].as_deref().unwrap_or("").is_empty()
                 || !matches[18].as_deref().unwrap_or("").is_empty()
             {
                 let to_str = matches[10].clone().unwrap_or_default(); // matches['to']
                 let hv = self.normalize(&to_str, None)?;
-                Constraint::new("<=".to_string(), hv)
+                SimpleConstraint::new("<=".to_string(), hv, None)
             } else {
                 // matches[11]=to major, matches[12]=to minor, matches[13]=to patch,
                 // matches[14]=to fourth
@@ -632,10 +630,13 @@ impl VersionParser {
                     self.manipulate_version_string(&high_match, position, 1, "0")
                         .unwrap_or_default()
                 );
-                Constraint::new("<".to_string(), hv)
+                SimpleConstraint::new("<".to_string(), hv, None)
             };
 
-            return Ok(vec![Box::new(lower_bound), Box::new(upper_bound)]);
+            return Ok(vec![
+                AnyConstraint::Simple(lower_bound),
+                AnyConstraint::Simple(upper_bound),
+            ]);
         }
 
         // Basic Comparators
@@ -691,7 +692,9 @@ impl VersionParser {
                 } else {
                     op_str
                 };
-                return Ok(vec![Box::new(Constraint::new(final_op, version))]);
+                return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
+                    final_op, version, None,
+                ))]);
             }
         }
 

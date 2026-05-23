@@ -967,7 +967,7 @@ impl Locker {
                     .find_packages_with_replacers_and_providers(
                         &link.get_target(),
                         Some(FindPackageConstraint::Constraint(
-                            link.get_constraint().clone_box(),
+                            link.get_constraint().clone(),
                         )),
                     )
                     .is_empty()

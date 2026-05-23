@@ -171,7 +171,7 @@ impl InstalledVersions {
         let constraint = parser.parse_constraints(constraint.unwrap_or(""))?;
         let provided = parser.parse_constraints(&Self::get_version_ranges(package_name)?)?;
 
-        Ok(provided.matches(&*constraint))
+        Ok(provided.matches(&constraint))
     }
 
     /// Returns a version constraint representing all the range(s) which are installed for a given package

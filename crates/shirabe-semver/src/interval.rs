@@ -1,8 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Interval.php
 
-use std::sync::OnceLock;
-
-use crate::constraint::Constraint;
+use crate::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
 pub struct DevConstraintSet {
@@ -12,32 +10,29 @@ pub struct DevConstraintSet {
 
 #[derive(Debug, Clone)]
 pub struct Interval {
-    start: Constraint,
-    end: Constraint,
+    start: SimpleConstraint,
+    end: SimpleConstraint,
 }
 
 impl Interval {
-    pub fn new(start: Constraint, end: Constraint) -> Self {
+    pub fn new(start: SimpleConstraint, end: SimpleConstraint) -> Self {
         Self { start, end }
     }
 
-    pub fn get_start(&self) -> &Constraint {
+    pub fn get_start(&self) -> &SimpleConstraint {
         &self.start
     }
 
-    pub fn get_end(&self) -> &Constraint {
+    pub fn get_end(&self) -> &SimpleConstraint {
         &self.end
     }
 
-    pub fn from_zero() -> &'static Constraint {
-        static ZERO: OnceLock<Constraint> = OnceLock::new();
-        ZERO.get_or_init(|| Constraint::new(">=".to_string(), "0.0.0.0-dev".to_string()))
+    pub fn from_zero() -> SimpleConstraint {
+        SimpleConstraint::new(">=".to_string(), "0.0.0.0-dev".to_string(), None)
     }
 
-    pub fn until_positive_infinity() -> &'static Constraint {
-        static POSITIVE_INFINITY: OnceLock<Constraint> = OnceLock::new();
-        POSITIVE_INFINITY
-            .get_or_init(|| Constraint::new("<".to_string(), format!("{}.0.0.0", i64::MAX)))
+    pub fn until_positive_infinity() -> SimpleConstraint {
+        SimpleConstraint::new("<".to_string(), format!("{}.0.0.0", i64::MAX), None)
     }
 
     pub fn any() -> Self {

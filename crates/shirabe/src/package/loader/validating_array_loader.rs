@@ -11,9 +11,9 @@ use shirabe_php_shim::{
     is_string, json_encode, parse_url_all, php_to_string, sprintf, str_replace, strcasecmp,
     strtolower, strtotime, substr, trigger_error, trim, var_export,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchNoneConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 use shirabe_semver::intervals::Intervals;
 
 use crate::package::loader::InvalidPackageException;
@@ -877,7 +877,8 @@ impl ValidatingArrayLoader {
             }
         }
 
-        let unbound_constraint = Constraint::new("=", "10000000-dev");
+        let unbound_constraint =
+            SimpleConstraint::new("=".to_string(), "10000000-dev".to_string(), None).into();
 
         let link_types: Vec<&'static str> = SUPPORTED_LINK_TYPES.keys().copied().collect();
         for link_type in link_types {
@@ -952,11 +953,14 @@ impl ValidatingArrayLoader {
                         } else if (self.flags & Self::CHECK_STRICT_CONSTRAINTS) != 0
                             && link_type == "require"
                             && link_constraint
-                                .as_any()
-                                .downcast_ref::<Constraint>()
+                                .as_constraint()
                                 .map_or(false, |c| ["==", "="].contains(&c.get_operator()))
-                            && Constraint::new(">=", "1.0.0.0-dev")
-                                .matches(link_constraint.as_ref())
+                            && AnyConstraint::from(SimpleConstraint::new(
+                                ">=".to_string(),
+                                "1.0.0.0-dev".to_string(),
+                                None,
+                            ))
+                            .matches(&link_constraint)
                         {
                             self.warnings.push(format!(
                                 "{}.{} : exact version constraints ({}) should be avoided if the package follows semantic versioning",
@@ -964,8 +968,8 @@ impl ValidatingArrayLoader {
                             ));
                         }
 
-                        let compacted = Intervals::compact_constraint(link_constraint.as_ref())?;
-                        if compacted.as_any().is::<MatchNoneConstraint>() {
+                        let compacted = Intervals::compact_constraint(&link_constraint)?;
+                        if compacted.is_match_none() {
                             self.warnings.push(format!(
                                 "{}.{} : this version constraint cannot possibly match anything ({})",
                                 link_type, package, constraint_str

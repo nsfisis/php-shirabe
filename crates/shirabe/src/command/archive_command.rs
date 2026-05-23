@@ -305,11 +305,11 @@ impl ArchiveCommand {
         );
         repo_set.add_repository(Box::new(repo))?;
         let parser = VersionParser::new();
-        let constraint: Option<Box<dyn shirabe_semver::constraint::ConstraintInterface>> =
-            match version.as_deref() {
-                Some(v) => Some(parser.parse_constraints(v)?.clone_box()),
-                None => None,
-            };
+        let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match version.as_deref()
+        {
+            Some(v) => Some(parser.parse_constraints(v)?.clone()),
+            None => None,
+        };
         let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0);
 
         let package = if packages.len() > 1 {

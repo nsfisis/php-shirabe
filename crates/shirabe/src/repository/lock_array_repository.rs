@@ -9,7 +9,7 @@ use crate::repository::{
 };
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct LockArrayRepository {
@@ -61,7 +61,7 @@ impl RepositoryInterface for LockArrayRepository {
 
     fn load_packages(
         &self,
-        package_name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,

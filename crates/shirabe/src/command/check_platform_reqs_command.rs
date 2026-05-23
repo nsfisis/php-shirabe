@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, strip_tags};
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputOption;
@@ -147,22 +147,23 @@ impl CheckPlatformReqsCommand {
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
-                        let candidate_constraint: Option<Box<dyn ConstraintInterface>> =
+                        let candidate_constraint: Option<AnyConstraint> =
                             if candidate.get_name() == require {
-                                let mut c = Constraint::new("=", candidate.get_version());
-                                c.set_pretty_string(Some(
-                                    candidate.get_pretty_version().to_string(),
-                                ));
-                                Some(Box::new(c))
+                                let c = SimpleConstraint::new(
+                                    "=".to_string(),
+                                    candidate.get_version().to_string(),
+                                    Some(candidate.get_pretty_version().to_string()),
+                                );
+                                Some(c.into())
                             } else {
-                                let mut found: Option<Box<dyn ConstraintInterface>> = None;
+                                let mut found: Option<AnyConstraint> = None;
                                 for (_, link) in candidate
                                     .get_provides()
                                     .iter()
                                     .chain(candidate.get_replaces().iter())
                                 {
                                     if link.get_target() == require {
-                                        found = Some(link.get_constraint().clone_box());
+                                        found = Some(link.get_constraint().clone());
                                         break;
                                     }
                                 }
@@ -175,7 +176,7 @@ impl CheckPlatformReqsCommand {
                         };
 
                         for link in links {
-                            if !link.get_constraint().matches(&*candidate_constraint) {
+                            if !link.get_constraint().matches(&candidate_constraint) {
                                 req_results.push(CheckResult {
                                     platform_package: if candidate.get_name() == require {
                                         candidate.get_pretty_name().to_string()

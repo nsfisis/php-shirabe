@@ -11,10 +11,10 @@ use shirabe_php_shim::{
     array_search, array_search_mixed, count, in_array, microtime, number_format, round,
     spl_object_hash, sprintf, strpos,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolOptimizer;
@@ -41,13 +41,13 @@ pub struct PoolBuilder {
     stability_flags: IndexMap<String, i64>,
     root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
     root_references: IndexMap<String, String>,
-    temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+    temporary_constraints: IndexMap<String, AnyConstraint>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pool_optimizer: Option<PoolOptimizer>,
     io: Box<dyn IOInterface>,
     alias_map: IndexMap<String, IndexMap<i64, AliasPackage>>,
-    packages_to_load: IndexMap<String, Box<dyn ConstraintInterface>>,
-    loaded_packages: IndexMap<String, Box<dyn ConstraintInterface>>,
+    packages_to_load: IndexMap<String, AnyConstraint>,
+    loaded_packages: IndexMap<String, AnyConstraint>,
     loaded_per_repo: IndexMap<i64, IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>>,
     packages: IndexMap<i64, Box<dyn BasePackage>>,
     unacceptable_fixed_or_locked_packages: Vec<Box<dyn BasePackage>>,
@@ -88,7 +88,7 @@ impl PoolBuilder {
         io: Box<dyn IOInterface>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         pool_optimizer: Option<PoolOptimizer>,
-        temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+        temporary_constraints: IndexMap<String, AnyConstraint>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
     ) -> Self {
         Self {
@@ -195,14 +195,14 @@ impl PoolBuilder {
             // loading any packages
             self.loaded_packages.insert(
                 package.get_name().to_string(),
-                Box::new(MatchAllConstraint::new()),
+                MatchAllConstraint::new(None).into(),
             );
 
             // replace means conflict, so if a fixed package replaces a name, no need to load that one, packages would conflict anyways
             for (_k, link) in &package.get_replaces() {
                 self.loaded_packages.insert(
                     link.get_target().to_string(),
-                    Box::new(MatchAllConstraint::new()),
+                    MatchAllConstraint::new(None).into(),
                 );
             }
 
@@ -238,7 +238,7 @@ impl PoolBuilder {
             }
 
             self.packages_to_load
-                .insert(package_name.clone(), constraint.clone_box());
+                .insert(package_name.clone(), constraint.clone());
             self.max_extended_reqs.insert(package_name.clone(), true);
         }
 
@@ -271,7 +271,7 @@ impl PoolBuilder {
 
                 for package_name in package.get_names(true) {
                     let constraint = match self.temporary_constraints.get(&package_name) {
-                        Some(c) => c.clone_box(),
+                        Some(c) => c.clone(),
                         None => continue,
                     };
 
@@ -288,7 +288,8 @@ impl PoolBuilder {
 
                     let mut found = false;
                     for (_idx, version) in &package_and_aliases {
-                        if CompilingMatcher::matches(&*constraint, Constraint::OP_EQ, version) {
+                        if CompilingMatcher::matches(&constraint, SimpleConstraint::OP_EQ, version)
+                        {
                             found = true;
                         }
                     }
@@ -377,9 +378,9 @@ impl PoolBuilder {
         &mut self,
         request: &Request,
         name: &str,
-        constraint: &dyn ConstraintInterface,
+        constraint: &AnyConstraint,
     ) {
-        let constraint = constraint.clone_box();
+        let constraint = constraint.clone();
         // Skip platform requires at this stage
         if PlatformRepository::is_platform_package(name) {
             return;
@@ -398,8 +399,8 @@ impl PoolBuilder {
         let root_requires = request.get_requires();
         let mut constraint = constraint;
         if let Some(root_constraint) = root_requires.get(name) {
-            if !Intervals::is_subset_of(&*constraint, &**root_constraint).unwrap_or(false) {
-                constraint = root_constraint.clone_box();
+            if !Intervals::is_subset_of(&constraint, root_constraint).unwrap_or(false) {
+                constraint = root_constraint.clone();
             }
         }
 
@@ -410,17 +411,18 @@ impl PoolBuilder {
             // MultiConstraint::create() will optimize anyway)
             if let Some(existing) = self.packages_to_load.get(name) {
                 // Already marked for loading and this does not expand the constraint to be loaded, nothing to do
-                if Intervals::is_subset_of(&*constraint, &**existing).unwrap_or(false) {
+                if Intervals::is_subset_of(&constraint, existing).unwrap_or(false) {
                     return;
                 }
 
                 // extend the constraint to be loaded
                 constraint = Intervals::compact_constraint(
                     MultiConstraint::create(
-                        vec![existing.clone_box(), constraint.clone_box()],
+                        vec![existing.clone(), constraint.clone()],
                         false,
+                        None,
                     )
-                    .unwrap_or_else(|_| Box::new(MatchAllConstraint::new())),
+                    .unwrap_or_else(|_| MatchAllConstraint::new(None).into()),
                 );
             }
 
@@ -431,7 +433,7 @@ impl PoolBuilder {
 
         // No need to load this package with this constraint because it is
         // a subset of the constraint with which we have already loaded packages
-        if Intervals::is_subset_of(&*constraint, &**self.loaded_packages.get(name).unwrap())
+        if Intervals::is_subset_of(&constraint, self.loaded_packages.get(name).unwrap())
             .unwrap_or(false)
         {
             return;
@@ -444,13 +446,11 @@ impl PoolBuilder {
             name.to_string(),
             Intervals::compact_constraint(
                 MultiConstraint::create(
-                    vec![
-                        self.loaded_packages.get(name).unwrap().clone_box(),
-                        constraint,
-                    ],
+                    vec![self.loaded_packages.get(name).unwrap().clone(), constraint],
                     false,
+                    None,
                 )
-                .unwrap_or_else(|_| Box::new(MatchAllConstraint::new())),
+                .unwrap_or_else(|_| MatchAllConstraint::new(None).into()),
             ),
         );
         self.loaded_packages.shift_remove(name);
@@ -475,23 +475,23 @@ impl PoolBuilder {
         for name in to_remove {
             self.packages_to_load.shift_remove(&name);
         }
-        let snapshot: Vec<(String, Box<dyn ConstraintInterface>)> = self
+        let snapshot: Vec<(String, AnyConstraint)> = self
             .packages_to_load
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone_box()))
+            .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         for (name, constraint) in &snapshot {
             self.loaded_packages
-                .insert(name.clone(), constraint.clone_box());
+                .insert(name.clone(), constraint.clone());
         }
 
         // Load packages in chunks of 50 to prevent memory usage build-up due to caches of all sorts
         // TODO(phase-b): array_chunk shim signature expects &[T]; build IndexMap chunks manually.
-        let mut package_batches: Vec<IndexMap<String, Box<dyn ConstraintInterface>>> = {
-            let mut chunks: Vec<IndexMap<String, Box<dyn ConstraintInterface>>> = Vec::new();
-            let mut current: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+        let mut package_batches: Vec<IndexMap<String, AnyConstraint>> = {
+            let mut chunks: Vec<IndexMap<String, AnyConstraint>> = Vec::new();
+            let mut current: IndexMap<String, AnyConstraint> = IndexMap::new();
             for (k, v) in self.packages_to_load.iter() {
-                current.insert(k.clone(), v.clone_box());
+                current.insert(k.clone(), v.clone());
                 if current.len() as i64 >= Self::LOAD_BATCH_SIZE {
                     chunks.push(std::mem::take(&mut current));
                 }
@@ -525,11 +525,11 @@ impl PoolBuilder {
 
             // Iterate by index because we mutate package_batches inside the loop.
             for batch_index in 0..package_batches.len() {
-                let package_batch: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
-                    package_batches[batch_index]
-                        .iter()
-                        .map(|(k, v)| (k.clone(), Some(v.clone_box())))
-                        .collect();
+                let package_batch: IndexMap<String, Option<AnyConstraint>> = package_batches
+                    [batch_index]
+                    .iter()
+                    .map(|(k, v)| (k.clone(), Some(v.clone())))
+                    .collect();
                 let result = repository.load_packages(
                     package_batch,
                     self.acceptable_stabilities.clone(),
@@ -598,18 +598,18 @@ impl PoolBuilder {
             }
 
             // PHP: array_chunk(array_merge(...$packageBatches), self::LOAD_BATCH_SIZE, true)
-            let mut merged: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+            let mut merged: IndexMap<String, AnyConstraint> = IndexMap::new();
             for batch in &package_batches {
                 for (k, v) in batch {
-                    merged.insert(k.clone(), v.clone_box());
+                    merged.insert(k.clone(), v.clone());
                 }
             }
             // Rebuild chunks from merged.
             package_batches = {
-                let mut chunks: Vec<IndexMap<String, Box<dyn ConstraintInterface>>> = Vec::new();
-                let mut current: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+                let mut chunks: Vec<IndexMap<String, AnyConstraint>> = Vec::new();
+                let mut current: IndexMap<String, AnyConstraint> = IndexMap::new();
                 for (k, v) in merged.iter() {
-                    current.insert(k.clone(), v.clone_box());
+                    current.insert(k.clone(), v.clone());
                     if current.len() as i64 >= Self::LOAD_BATCH_SIZE {
                         chunks.push(std::mem::take(&mut current));
                     }
@@ -929,7 +929,7 @@ impl PoolBuilder {
                         self.mark_package_name_for_loading(
                             request,
                             &replacer_name,
-                            &MatchAllConstraint::new(),
+                            &MatchAllConstraint::new(None).into(),
                         );
                     } else {
                         let pkgs: Vec<Box<dyn BasePackage>> =
@@ -1050,8 +1050,8 @@ impl PoolBuilder {
 
     fn mark_package_name_for_loading_if_required(&mut self, request: &Request, name: &str) {
         if self.is_root_require(request, name) {
-            let cons = request.get_requires()[name].clone_box();
-            self.mark_package_name_for_loading(request, name, &*cons);
+            let cons = request.get_requires()[name].clone();
+            self.mark_package_name_for_loading(request, name, &cons);
         }
 
         let pkgs: Vec<Box<dyn BasePackage>> =

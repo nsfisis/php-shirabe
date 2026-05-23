@@ -8,10 +8,10 @@ use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_merge, array_merge_recursive, ksort,
     strtolower,
 };
-use shirabe_semver::constraint::Constraint;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::PartialSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
@@ -79,10 +79,10 @@ pub struct RepositorySet {
 
     /// @var ConstraintInterface[]
     /// @phpstan-var array<string, ConstraintInterface>
-    pub(crate) root_requires: IndexMap<String, Box<dyn ConstraintInterface>>,
+    pub(crate) root_requires: IndexMap<String, AnyConstraint>,
 
     /// @var array<string, ConstraintInterface>
-    pub(crate) temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+    pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
 
     /// @var bool
     locked: bool,
@@ -115,8 +115,8 @@ impl RepositorySet {
         stability_flags: IndexMap<String, i64>,
         root_aliases: Vec<RootAliasInput>,
         root_references: IndexMap<String, String>,
-        mut root_requires: IndexMap<String, Box<dyn ConstraintInterface>>,
-        temporary_constraints: IndexMap<String, Box<dyn ConstraintInterface>>,
+        mut root_requires: IndexMap<String, AnyConstraint>,
+        temporary_constraints: IndexMap<String, AnyConstraint>,
     ) -> Self {
         let root_aliases = Self::get_root_aliases_per_package(root_aliases);
 
@@ -156,12 +156,12 @@ impl RepositorySet {
 
     /// @return ConstraintInterface[] an array of package name => constraint from the root package, platform requirements excluded
     /// @phpstan-return array<string, ConstraintInterface>
-    pub fn get_root_requires(&self) -> &IndexMap<String, Box<dyn ConstraintInterface>> {
+    pub fn get_root_requires(&self) -> &IndexMap<String, AnyConstraint> {
         &self.root_requires
     }
 
     /// @return array<string, ConstraintInterface> Runtime temporary constraints that will be used to filter packages
-    pub fn get_temporary_constraints(&self) -> &IndexMap<String, Box<dyn ConstraintInterface>> {
+    pub fn get_temporary_constraints(&self) -> &IndexMap<String, AnyConstraint> {
         &self.temporary_constraints
     }
 
@@ -208,7 +208,7 @@ impl RepositorySet {
     pub fn find_packages(
         &self,
         name: &str,
-        constraint: Option<Box<dyn ConstraintInterface>>,
+        constraint: Option<AnyConstraint>,
         flags: i64,
     ) -> Vec<Box<dyn BasePackage>> {
         let ignore_stability = (flags & Self::ALLOW_UNACCEPTABLE_STABILITIES) != 0;
@@ -220,15 +220,14 @@ impl RepositorySet {
                 // PHP: $repository->findPackages($name, $constraint) ?: []
                 let constraint_clone = constraint
                     .as_ref()
-                    .map(|c| FindPackageConstraint::Constraint(c.clone_box()));
+                    .map(|c| FindPackageConstraint::Constraint(c.clone()));
                 let found = repository.find_packages(name, constraint_clone);
                 packages.push(found);
             }
         } else {
             'outer: for repository in &self.repositories {
-                let mut name_map: IndexMap<String, Option<Box<dyn ConstraintInterface>>> =
-                    IndexMap::new();
-                name_map.insert(name.to_string(), constraint.as_ref().map(|c| c.clone_box()));
+                let mut name_map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
+                name_map.insert(name.to_string(), constraint.as_ref().map(|c| c.clone()));
                 let acceptable = if ignore_stability {
                     // PHP: BasePackage::STABILITIES
                     crate::package::STABILITIES
@@ -290,9 +289,9 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
     ) -> Result<SecurityAdvisoriesResult> {
-        let mut map: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+        let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for name in &package_names {
-            map.insert(name.clone(), Box::new(MatchAllConstraint::new()));
+            map.insert(name.clone(), MatchAllConstraint::new(None).into());
         }
 
         let mut unreachable_repos: Vec<String> = vec![];
@@ -317,7 +316,7 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
     ) -> Result<SecurityAdvisoriesResult> {
-        let mut map: IndexMap<String, Box<dyn ConstraintInterface>> = IndexMap::new();
+        let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
             if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
@@ -327,20 +326,29 @@ impl RepositorySet {
             }
             let name = package.get_name().to_string();
             if map.contains_key(&name) {
-                // TODO(phase-b): MultiConstraint::new signature
                 let existing = map.shift_remove(&name).unwrap();
                 map.insert(
                     name,
-                    Box::new(MultiConstraint::new(
+                    MultiConstraint::new(
                         vec![
-                            Box::new(Constraint::new("=", package.get_version())),
+                            AnyConstraint::Simple(SimpleConstraint::new(
+                                "=".to_string(),
+                                package.get_version().to_string(),
+                                None,
+                            )),
                             existing,
                         ],
                         false,
-                    )),
+                        None,
+                    )
+                    .into(),
                 );
             } else {
-                map.insert(name, Box::new(Constraint::new("=", package.get_version())));
+                map.insert(
+                    name,
+                    SimpleConstraint::new("=".to_string(), package.get_version().to_string(), None)
+                        .into(),
+                );
             }
         }
 
@@ -363,7 +371,7 @@ impl RepositorySet {
     /// @return ($allowPartialAdvisories is true ? array<string, array<PartialSecurityAdvisory|SecurityAdvisory>> : array<string, array<SecurityAdvisory>>)
     fn get_security_advisories_for_constraints(
         &self,
-        package_constraint_map: IndexMap<String, Box<dyn ConstraintInterface>>,
+        package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,

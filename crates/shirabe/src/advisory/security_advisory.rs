@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_semver::constraint::ConstraintInterface;
+use shirabe_semver::constraint::AnyConstraint;
 
 use crate::advisory::IgnoredSecurityAdvisory;
 use crate::advisory::PartialSecurityAdvisory;
@@ -24,7 +24,7 @@ impl SecurityAdvisory {
     pub fn new(
         package_name: String,
         advisory_id: String,
-        affected_versions: Box<dyn ConstraintInterface>,
+        affected_versions: AnyConstraint,
         title: String,
         sources: Vec<IndexMap<String, String>>,
         reported_at: DateTime<Utc>,
@@ -48,15 +48,15 @@ impl SecurityAdvisory {
         &self.inner.advisory_id
     }
 
-    pub fn affected_versions(&self) -> &dyn ConstraintInterface {
-        &*self.inner.affected_versions
+    pub fn affected_versions(&self) -> &AnyConstraint {
+        &self.inner.affected_versions
     }
 
     pub fn to_ignored_advisory(&self, ignore_reason: Option<String>) -> IgnoredSecurityAdvisory {
         IgnoredSecurityAdvisory::new(
             self.inner.package_name.clone(),
             self.inner.advisory_id.clone(),
-            self.inner.affected_versions.clone_box(),
+            self.inner.affected_versions.clone(),
             self.title.clone(),
             self.sources.clone(),
             self.reported_at,
