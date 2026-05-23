@@ -2,6 +2,7 @@
 
 Yet another dependency manager for PHP.
 
+*WORK IN PROGRESS*
 
 
 ## License

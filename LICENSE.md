@@ -20,4 +20,6 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 ## Composer
 
+Shirabe is a port of Composer v2.9.7.
+
 See [composer/LICENSE](composer/LICENSE) for the original Composer license.
