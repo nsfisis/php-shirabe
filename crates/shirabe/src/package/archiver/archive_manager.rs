@@ -164,16 +164,26 @@ impl ArchiveManager {
             filesystem.ensure_directory_exists(&source_path)?;
 
             let download_result = (|| -> anyhow::Result<()> {
-                let promise =
-                    self.download_manager
-                        .borrow()
-                        .download(package, &source_path, None)?;
-                SyncHelper::r#await(&self.r#loop, Some(promise))?;
-                let promise = self
-                    .download_manager
-                    .borrow()
-                    .install(package, &source_path)?;
-                SyncHelper::r#await(&self.r#loop, Some(promise))?;
+                SyncHelper::r#await(
+                    &self.r#loop,
+                    Some(Box::pin(async {
+                        self.download_manager
+                            .borrow()
+                            .download(package, &source_path, None)
+                            .await
+                            .map(|_| ())
+                    })),
+                )?;
+                SyncHelper::r#await(
+                    &self.r#loop,
+                    Some(Box::pin(async {
+                        self.download_manager
+                            .borrow()
+                            .install(package, &source_path)
+                            .await
+                            .map(|_| ())
+                    })),
+                )?;
                 Ok(())
             })();
 

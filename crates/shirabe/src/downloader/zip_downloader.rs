@@ -14,7 +14,8 @@ use shirabe_external_packages::symfony::component::process::Process;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,
-    hash_file, is_file, json_encode, random_int, version_compare,
+    hash_file, is_file, json_encode, random_int, str_contains, str_replace, strlen, substr,
+    version_compare,
 };
 use std::sync::Mutex;
 
@@ -270,25 +271,151 @@ impl ZipDownloader {
             }
         }
 
-        // TODO(phase-c-promise): execute_async + .then fallback closure captures &mut self/io;
-        // recursive promise flattening, not a mechanical await chain.
-        // TODO(phase-b): full try_fallback closure deferred — PHP captures `$io`, `$self`
-        // and several locals by reference, conflicting with Rust's borrow checker because
-        // `extract_with_zip_archive` later needs `&mut self`. Restructure once the
-        // promise/closure plumbing supports that shape.
-        let _ = (
-            is_last_chance,
-            file,
-            path,
-            executable,
-            package,
-            &command,
-            &self.inner.io,
-        );
-        match self.inner.process.borrow_mut().execute_async(&command, ()) {
-            Ok(_promise) => todo!("phase-b: chain promise.then with fallback closure"),
-            Err(_e) => todo!("phase-b: pipe execute_async error into try_fallback"),
+        let process_result = self
+            .inner
+            .process
+            .borrow_mut()
+            .execute_async(&command, ())
+            .await;
+        match process_result {
+            Ok(process) => {
+                if !process.is_successful() {
+                    if self.cleanup_executed.contains_key(package.get_name()) {
+                        return Err(RuntimeException {
+                            message: format!(
+                                "Failed to extract {} as the installation was aborted by another package operation.",
+                                package.get_name()
+                            ),
+                            code: 0,
+                        }
+                        .into());
+                    }
+
+                    let output = process.get_error_output();
+                    let output =
+                        str_replace(&format!(", {}.zip or {}.ZIP", file, file), "", &output);
+
+                    return self
+                        .try_fallback(
+                            RuntimeException {
+                                message: format!(
+                                    "Failed to extract {}: ({}) {}\n\n{}",
+                                    package.get_name(),
+                                    process
+                                        .get_exit_code()
+                                        .map(|c| c.to_string())
+                                        .unwrap_or_default(),
+                                    command.join(" "),
+                                    output
+                                ),
+                                code: 0,
+                            }
+                            .into(),
+                            is_last_chance,
+                            file,
+                            path,
+                            package,
+                            &executable,
+                        )
+                        .await;
+                }
+
+                Ok(None)
+            }
+            Err(e) => {
+                self.try_fallback(e, is_last_chance, file, path, package, &executable)
+                    .await
+            }
         }
+    }
+
+    async fn try_fallback(
+        &mut self,
+        process_error: anyhow::Error,
+        is_last_chance: bool,
+        file: &str,
+        path: &str,
+        package: &dyn PackageInterface,
+        executable: &str,
+    ) -> Result<Option<PhpMixed>> {
+        if is_last_chance {
+            return Err(process_error);
+        }
+
+        if str_contains(&process_error.to_string(), "zip bomb") {
+            return Err(process_error);
+        }
+
+        if !is_file(file) {
+            self.inner
+                .io
+                .write_error(&format!("    <warning>{}</warning>", process_error));
+            self.inner.io.write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
+            self.inner.io.write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
+        } else {
+            self.inner
+                .io
+                .write_error(&format!("    <warning>{}</warning>", process_error));
+            self.inner.io.write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
+            self.inner.io.write_error(&format!(
+                "    Unzip with {} command failed, falling back to ZipArchive class",
+                executable
+            ));
+
+            // additional debug data to try to figure out GH actions issues https://github.com/composer/composer/issues/11148
+            if Platform::get_env("GITHUB_ACTIONS").is_some()
+                && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
+            {
+                self.inner.io.write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
+                self.inner.io.write_error(&format!(
+                    "File size: {}",
+                    filesize(file).map(|s| s.to_string()).unwrap_or_default()
+                ));
+                self.inner.io.write_error(&format!(
+                    "File SHA1: {}",
+                    hash_file("sha1", file).unwrap_or_default()
+                ));
+                self.inner.io.write_error(&format!(
+                    "First 100 bytes (hex): {}",
+                    bin2hex(
+                        substr(&file_get_contents(file).unwrap_or_default(), 0, Some(100))
+                            .as_bytes()
+                    )
+                ));
+                self.inner.io.write_error(&format!(
+                    "Last 100 bytes (hex): {}",
+                    bin2hex(
+                        substr(&file_get_contents(file).unwrap_or_default(), -100, None).as_bytes()
+                    )
+                ));
+                if strlen(package.get_dist_url().unwrap_or("")) > 0 {
+                    self.inner.io.write_error(&format!(
+                        "Origin URL: {}",
+                        self.inner
+                            .process_url(package, package.get_dist_url().unwrap_or(""))?
+                    ));
+                    let headers = {
+                        let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
+                            .lock()
+                            .unwrap();
+                        match response_headers.get(package.get_name()) {
+                            Some(list) => PhpMixed::List(
+                                list.iter()
+                                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                                    .collect(),
+                            ),
+                            None => PhpMixed::List(vec![]),
+                        }
+                    };
+                    self.inner.io.write_error(&format!(
+                        "Response Headers: {}",
+                        json_encode(&headers).unwrap_or_default()
+                    ));
+                }
+            }
+        }
+
+        self.extract_with_zip_archive(package, file, path).await
     }
 
     async fn extract_with_zip_archive(
@@ -425,6 +552,7 @@ impl ZipDownloader {
 // TODO(phase-b): ZipDownloader::download is overridden with extra setup (UNZIP_COMMANDS init,
 // etc.). The trait method here delegates straight to the inner FileDownloader; the bespoke
 // override on the struct itself takes &mut self and is not yet routed through the trait.
+#[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for ZipDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()

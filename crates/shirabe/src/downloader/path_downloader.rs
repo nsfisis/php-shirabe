@@ -537,6 +537,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
 // overrides download/install/remove with &mut self signatures that diverge from the trait. The
 // trait methods here delegate to the inner FileDownloader; the bespoke overrides on the struct
 // itself are not yet routed through the trait.
+#[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PathDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()

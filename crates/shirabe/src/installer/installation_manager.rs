@@ -3,7 +3,6 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::react::promise;
 use shirabe_external_packages::seld::signal::SignalHandler;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_search_mixed, array_splice, array_unshift, count,
@@ -181,7 +180,10 @@ impl InstallationManager {
         // @var array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
         let mut cleanup_promises: IndexMap<
             i64,
-            Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>,
+            Box<
+                dyn Fn()
+                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+            >,
         > = IndexMap::new();
 
         let signal_handler = SignalHandler::create(
@@ -234,15 +236,17 @@ impl InstallationManager {
             }
 
             for batch_to_execute in batches {
-                self.download_and_execute_batch(
-                    repo,
-                    batch_to_execute,
-                    &mut cleanup_promises,
-                    dev_mode,
-                    run_scripts,
-                    download_only,
-                    // TODO(phase-b): allOperations should be the original full list; would require clone
-                    vec![],
+                tokio::runtime::Runtime::new().unwrap().block_on(
+                    self.download_and_execute_batch(
+                        repo,
+                        batch_to_execute,
+                        &mut cleanup_promises,
+                        dev_mode,
+                        run_scripts,
+                        download_only,
+                        // TODO(phase-b): allOperations should be the original full list; would require clone
+                        vec![],
+                    ),
                 )?;
             }
 
@@ -255,7 +259,9 @@ impl InstallationManager {
         match result {
             Ok(()) => {}
             Err(e) => {
-                self.run_cleanup(&cleanup_promises);
+                tokio::runtime::Runtime::new()
+                    .unwrap()
+                    .block_on(self.run_cleanup(&cleanup_promises));
                 return Err(e);
             }
         }
@@ -275,20 +281,22 @@ impl InstallationManager {
     /// @param OperationInterface[] $operations    List of operations to execute in this batch
     /// @param OperationInterface[] $allOperations Complete list of operations to be executed in the install job, used for event listeners
     /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
-    fn download_and_execute_batch(
+    async fn download_and_execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operations: IndexMap<i64, Box<dyn OperationInterface>>,
-        cleanup_promises: &mut IndexMap<i64, Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>>,
+        cleanup_promises: &mut IndexMap<
+            i64,
+            Box<
+                dyn Fn()
+                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+            >,
+        >,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
         all_operations: Vec<Box<dyn OperationInterface>>,
     ) -> Result<()> {
-        // TODO(phase-c-promise): Loop::wait-driven batch orchestration (download/cleanup promises);
-        // rewrite to await collected futures once the async Loop boundary lands.
-        let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
-
         for (index, operation) in &operations {
             let op_type = operation.get_operation_type();
 
@@ -316,35 +324,35 @@ impl InstallationManager {
             }
             let installer = self.get_installer(package.get_type())?;
 
-            // TODO(phase-b): closure captures installer + package; needs Arc/Rc for shared state
+            // TODO(phase-b): closure captures installer + package; needs Rc-shared installer/package
             let _ = installer;
             let op_type_clone = op_type.clone();
-            let cleanup: Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>> =
-                Box::new(move || -> Option<Box<dyn PromiseInterface>> {
-                    // avoid calling cleanup if the download was not even initialized for a package
-                    // as without installation source configured nothing will work
-                    // TODO(phase-b): if (null === $package->getInstallationSource()) return \React\Promise\resolve(null);
-                    let _ = &op_type_clone;
-                    Some(promise::resolve(None))
-                });
+            let cleanup: Box<
+                dyn Fn()
+                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+            > = Box::new(move || {
+                // avoid calling cleanup if the download was not even initialized for a package
+                // as without installation source configured nothing will work
+                // TODO(phase-b): if (null === $package->getInstallationSource()) return resolve(null);
+                let _ = &op_type_clone;
+                // TODO(phase-c-promise): build the real installer.cleanup() future once the installer
+                // can be shared into a 'static cleanup closure (Stage 2 Rc/Arc).
+                let fut: std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>> =
+                    Box::pin(async { Ok(()) });
+                Some(fut)
+            });
             cleanup_promises.insert(*index, cleanup);
 
             if op_type != "uninstall" {
+                // TODO(phase-c-promise): PHP collects every download and runs them concurrently via
+                // Loop::wait; the single-threaded loop awaits each serially instead.
                 let installer = self.get_installer(package.get_type())?;
-                let promise = installer.download(package, initial_package);
-                if let Ok(Some(p)) = promise {
-                    promises.push(p);
-                }
+                installer.download(package, initial_package).await?;
             }
         }
 
-        // execute all downloads first
-        if (promises.len() as i64) > 0 {
-            self.wait_on_promises(promises);
-        }
-
         if download_only {
-            self.run_cleanup(cleanup_promises);
+            self.run_cleanup(cleanup_promises).await;
 
             return Ok(());
         }
@@ -385,7 +393,8 @@ impl InstallationManager {
                 dev_mode,
                 run_scripts,
                 &all_operations,
-            )?;
+            )
+            .await?;
         }
 
         Ok(())
@@ -394,18 +403,21 @@ impl InstallationManager {
     /// @param OperationInterface[] $operations    List of operations to execute in this batch
     /// @param OperationInterface[] $allOperations Complete list of operations to be executed in the install job, used for event listeners
     /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
-    fn execute_batch(
+    async fn execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
         operations: IndexMap<i64, Box<dyn OperationInterface>>,
-        cleanup_promises: &IndexMap<i64, Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>>,
+        cleanup_promises: &IndexMap<
+            i64,
+            Box<
+                dyn Fn()
+                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+            >,
+        >,
         dev_mode: bool,
         run_scripts: bool,
         all_operations: &[Box<dyn OperationInterface>],
     ) -> Result<()> {
-        // TODO(phase-c-promise): Loop::wait-driven batch orchestration (prepare/install promises);
-        // rewrite to await collected futures once the async Loop boundary lands.
-        let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
         let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
 
         for (index, operation) in operations {
@@ -473,14 +485,13 @@ impl InstallationManager {
             let _io = self.io.as_ref();
 
             let installer = self.get_installer(package.get_type())?;
-            let promise = installer.prepare(&op_type, package, initial_package);
-            let promise = match promise {
-                Ok(Some(p)) => p,
-                Ok(None) => promise::resolve(None),
-                Err(e) => return Err(e),
-            };
+            // TODO(phase-c-promise): PHP chains prepare()->then(install/update/uninstall)->then(cleanup
+            // + repo.write); the single-threaded loop awaits prepare and leaves the rest as phase-b work.
+            installer
+                .prepare(&op_type, package, initial_package)
+                .await?;
 
-            // TODO(phase-b): chain `.then(cb1).then(cb2)` with cleanup_promises[index], repo.write, etc.
+            // TODO(phase-b): chain the install/update/uninstall step with cleanup_promises[index], repo.write, etc.
             let _ = cleanup_promises.get(&index);
 
             let event_name_post = match op_type.as_str() {
@@ -497,13 +508,6 @@ impl InstallationManager {
                     // dispatcher.dispatch_package_event(event_name_post, dev_mode, repo, all_operations, operation);
                 }));
             }
-
-            promises.push(promise);
-        }
-
-        // execute all prepare => installs/updates/removes => cleanup steps
-        if (promises.len() as i64) > 0 {
-            self.wait_on_promises(promises);
         }
 
         Platform::workaround_filesystem_issues();
@@ -513,32 +517,6 @@ impl InstallationManager {
         }
 
         Ok(())
-    }
-
-    /// @param array<PromiseInterface<void|null>> $promises
-    fn wait_on_promises(&mut self, promises: Vec<Box<dyn PromiseInterface>>) {
-        // TODO(phase-c-promise): thin wrapper over Loop::wait (the async boundary owned separately).
-        let mut progress: Option<()> = None;
-        // TODO(phase-b): self.io instanceof ConsoleIO downcast
-        let io_is_console = false;
-        if self.output_progress
-            && io_is_console
-            && Platform::get_env("CI").is_none()
-            && !self.io.is_debug()
-            && (promises.len() as i64) > 1
-        {
-            // TODO(phase-b): progress = self.io.get_progress_bar();
-            progress = Some(());
-        }
-        // TODO(phase-b): pass actual ProgressBar when self.io.get_progress_bar() is implemented
-        let _ = self.loop_.borrow_mut().wait(promises, None);
-        if progress.is_some() {
-            // progress.clear();
-            // ProgressBar in non-decorated output does not output a final line-break and clear() does nothing
-            if !self.io.is_decorated() {
-                self.io.write_error3("", true, io_interface::NORMAL);
-            }
-        }
     }
 
     /// Executes download operation.
@@ -653,10 +631,8 @@ impl InstallationManager {
     }
 
     pub fn notify_installs(&mut self, _io: &dyn IOInterface) {
-        // TODO(phase-c-promise): collects http_downloader.add() promises and drives them via Loop::wait;
-        // rewrite to await the collected futures once the async Loop boundary lands.
-        let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
-
+        // TODO(phase-c-promise): PHP collects every http_downloader.add() promise and runs them via
+        // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
         let result: Result<()> = (|| -> Result<()> {
             for (repo_url, packages) in &self.notifiable_packages {
                 // non-batch API, deprecated
@@ -699,13 +675,13 @@ impl InstallationManager {
                             ),
                         );
 
-                        promises.push(
+                        tokio::runtime::Runtime::new().unwrap().block_on(
                             self.loop_
                                 .borrow()
                                 .get_http_downloader()
                                 .borrow_mut()
-                                .add(&url, opts)?,
-                        );
+                                .add(&url, opts),
+                        )?;
                     }
 
                     continue;
@@ -771,16 +747,14 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
                 );
 
-                promises.push(
+                tokio::runtime::Runtime::new().unwrap().block_on(
                     self.loop_
                         .borrow()
                         .get_http_downloader()
                         .borrow_mut()
-                        .add(repo_url, opts)?,
-                );
+                        .add(repo_url, opts),
+                )?;
             }
-
-            let _ = self.loop_.borrow_mut().wait(promises, None);
 
             Ok(())
         })();
@@ -800,28 +774,33 @@ impl InstallationManager {
     }
 
     /// @phpstan-param array<callable(): ?PromiseInterface<void|null>> $cleanupPromises
-    fn run_cleanup(
+    async fn run_cleanup(
         &mut self,
-        cleanup_promises: &IndexMap<i64, Box<dyn Fn() -> Option<Box<dyn PromiseInterface>>>>,
+        cleanup_promises: &IndexMap<
+            i64,
+            Box<
+                dyn Fn()
+                    -> Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>>,
+            >,
+        >,
     ) {
-        // TODO(phase-c-promise): runs cleanup closures and drives them via Loop::wait;
-        // rewrite once the async Loop boundary and async cleanup closures land.
-        let mut promises: Vec<Box<dyn PromiseInterface>> = vec![];
+        let mut promises: Vec<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>>>>> =
+            vec![];
 
         self.loop_.borrow().abort_jobs();
 
         for (_, cleanup) in cleanup_promises {
-            // TODO(phase-b): React\Promise\Promise constructor with executor; emulate by wrapping cleanup()
+            // PHP wraps a missing cleanup promise in \React\Promise\resolve(null).
             let promise = cleanup();
             if let Some(p) = promise {
                 promises.push(p);
             } else {
-                promises.push(promise::resolve(None));
+                promises.push(Box::pin(async { Ok(()) }));
             }
         }
 
         if (promises.len() as i64) > 0 {
-            let _ = self.loop_.borrow_mut().wait(promises, None);
+            let _ = self.loop_.borrow_mut().wait(promises, None).await;
         }
     }
 }

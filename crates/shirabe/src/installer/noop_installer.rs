@@ -8,6 +8,7 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 #[derive(Debug)]
 pub struct NoopInstaller;
 
+#[async_trait::async_trait(?Send)]
 impl InstallerInterface for NoopInstaller {
     fn supports(&self, _package_type: &str) -> bool {
         true

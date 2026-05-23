@@ -3,6 +3,7 @@
 use crate::package::PackageInterface;
 use shirabe_php_shim::PhpMixed;
 
+#[async_trait::async_trait(?Send)]
 pub trait DownloaderInterface: std::fmt::Debug {
     fn get_installation_source(&self) -> String;
 
@@ -21,7 +22,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
         path: &str,
         prev_package: Option<&dyn PackageInterface>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.download(package, path, prev_package, true)
+        self.download(package, path, prev_package, true).await
     }
 
     async fn prepare(
@@ -45,7 +46,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
         package: &dyn PackageInterface,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.install(package, path, true)
+        self.install(package, path, true).await
     }
 
     async fn update(
@@ -68,7 +69,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
         package: &dyn PackageInterface,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.remove(package, path, true)
+        self.remove(package, path, true).await
     }
 
     async fn cleanup(

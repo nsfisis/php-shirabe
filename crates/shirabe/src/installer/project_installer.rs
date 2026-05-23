@@ -29,6 +29,7 @@ impl ProjectInstaller {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl InstallerInterface for ProjectInstaller {
     fn supports(&self, _package_type: &str) -> bool {
         true

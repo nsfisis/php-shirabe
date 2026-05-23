@@ -149,43 +149,26 @@ impl Filesystem {
             vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
         };
 
-        // TODO(phase-c-promise): execute_async is now async fn -> Result<Process>; the .then_boxed continuation that
-        // inspects the process result and flattens into a recursive removeDirectoryPhp fallback needs job-machine
-        // boundary design before it can become a flat await chain.
-        let promise = self.get_process().execute_async(
-            PhpMixed::List(
-                cmd.iter()
-                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                    .collect(),
-            ),
-            (),
-        )?;
+        let process = self
+            .get_process()
+            .execute_async(
+                PhpMixed::List(
+                    cmd.iter()
+                        .map(|s| Box::new(PhpMixed::String(s.clone())))
+                        .collect(),
+                ),
+                (),
+            )
+            .await?;
 
-        let directory_owned = directory.to_string();
-        // TODO(plugin): closure capture of $this in PHP — port wires the same logic via a callback handle.
-        Ok(promise.then_boxed(
-            Some(Box::new(
-                move |process: PhpMixed| -> Box<dyn PromiseInterface> {
-                    // clear stat cache because external processes aren't tracked by the php stat cache
-                    clearstatcache2(false, "");
+        // clear stat cache because external processes aren't tracked by the php stat cache
+        clearstatcache2(false, "");
 
-                    // TODO(phase-b): ArrayObject has no call_method; PHP-side calls $process->isSuccessful().
-                    let is_successful = matches!(process, PhpMixed::Bool(true));
-                    if is_successful && !is_dir(&directory_owned) {
-                        return shirabe_external_packages::react::promise::resolve(Some(
-                            PhpMixed::Bool(true),
-                        ));
-                    }
+        if process.is_successful() && !is_dir(directory) {
+            return Ok(true);
+        }
 
-                    // PHP: \React\Promise\resolve($this->removeDirectoryPhp($directory))
-                    // The recursive PHP call doesn't have a clean async equivalent; we resort to a sync call.
-                    let mut fs = Filesystem::new(None);
-                    let res = fs.remove_directory_php(&directory_owned).unwrap_or(false);
-                    shirabe_external_packages::react::promise::resolve(Some(PhpMixed::Bool(res)))
-                },
-            )),
-            None,
-        ))
+        self.remove_directory_php(directory)
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful

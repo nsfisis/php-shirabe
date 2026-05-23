@@ -36,7 +36,6 @@ use crate::util::Url;
 use crate::util::http::CurlResponse;
 use crate::util::http::ProxyManager;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
-// use shirabe_external_packages::react::promise::Promise; // typehint only in PHP
 
 /// @phpstan-type Attributes array{retryAuthFailure: bool, redirects: int<0, max>, retries: int<0, max>, storeAuth: 'prompt'|bool, ipResolve: 4|6|null}
 /// @phpstan-type Job array{url: non-empty-string, origin: string, attributes: Attributes, options: mixed[], progress: mixed[], curlHandle: \CurlHandle, filename: string|null, headerHandle: resource, bodyHandle: resource, resolve: callable, reject: callable, primaryIp: string}

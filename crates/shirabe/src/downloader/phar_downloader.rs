@@ -63,6 +63,7 @@ impl PharDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PharDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()

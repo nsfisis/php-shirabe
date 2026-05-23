@@ -1103,10 +1103,6 @@ impl ComposerRepository {
             .map_or(false, |c| c.metadata)
             && (allow_partial_advisories || api_url.is_none())
         {
-            // TODO(phase-c-promise): collects start_cached_async_download().then_boxed() promises and
-            // drives them via Loop::wait; rewrite to await the collected futures once the async Loop
-            // boundary lands.
-            let mut promises: Vec<Box<dyn PromiseInterface>> = Vec::new();
             let names: Vec<String> = package_constraint_map.keys().cloned().collect();
             for name in names {
                 let name = strtolower(&name);
@@ -1116,89 +1112,46 @@ impl ComposerRepository {
                     continue;
                 }
 
-                // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
-                // not anyhow::Result<()>; needs structural reshape of closure type
-                let promise = self
-                    .start_cached_async_download(&name, Some(&name))?
-                    .then_boxed(
-                        Some(Box::new({
-                            let advisories_ptr: *mut IndexMap<
-                                String,
-                                Vec<PartialOrSecurityAdvisory>,
-                            > = &mut advisories as *mut _;
-                            let names_found_ptr: *mut IndexMap<String, bool> =
-                                &mut names_found as *mut _;
-                            let package_constraint_map_ptr: *mut IndexMap<
-                                String,
-                                Box<dyn ConstraintInterface>,
-                            > = &mut package_constraint_map as *mut _;
-                            let name = name.clone();
-                            // TODO(phase-b): create closure captures local references (semver_parser, repo_name,
-                            // allow_partial_advisories) but is consumed by a 'static Box; needs restructuring
-                            move |spec: PhpMixed| -> Box<dyn PromiseInterface> {
-                                let _result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-                                    // [$response] = $spec;
-                                    let response = spec
-                                        .as_list()
-                                        .and_then(|l| l.first())
-                                        .map(|b| (**b).clone())
-                                        .unwrap_or(PhpMixed::Null);
-                                    let response_arr = match response.as_array() {
-                                        Some(a) => a.clone(),
-                                        None => return Ok(()),
-                                    };
-                                    let sec_advs = match response_arr.get("security-advisories") {
-                                        Some(v) => v.clone(),
-                                        None => return Ok(()),
-                                    };
-                                    let sec_advs_arr = match sec_advs.as_array() {
-                                        Some(a) => a.clone(),
-                                        None => return Ok(()),
-                                    };
-                                    unsafe {
-                                        (*names_found_ptr).insert(name.clone(), true);
-                                    }
-                                    if !sec_advs_arr.is_empty() {
-                                        let mut entries: Vec<PartialOrSecurityAdvisory> =
-                                            Vec::new();
-                                        for (_k, data_mixed) in sec_advs_arr.iter() {
-                                            if let Some(data) = data_mixed.as_array() {
-                                                let data_map: IndexMap<String, PhpMixed> = data
-                                                    .iter()
-                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                                                    .collect();
-                                                let _pcm: &IndexMap<
-                                                    String,
-                                                    Box<dyn ConstraintInterface>,
-                                                > = unsafe { &*package_constraint_map_ptr };
-                                                let _ = &data_map;
-                                                // TODO(phase-b): call create() closure; it captures references
-                                                if let Some(adv) = None::<PartialOrSecurityAdvisory>
-                                                {
-                                                    entries.push(adv);
-                                                }
-                                            }
-                                        }
-                                        unsafe {
-                                            (*advisories_ptr).insert(name.clone(), entries);
-                                        }
-                                    }
-                                    unsafe {
-                                        (*package_constraint_map_ptr).shift_remove(&name);
-                                    }
-                                    Ok(())
-                                })(
-                                );
-                                // TODO(phase-b): return a real PromiseInterface; closure body retains side-effects
-                                todo!("return real PromiseInterface")
-                            }
-                        })),
-                        None,
-                    );
-                promises.push(promise);
-            }
+                let spec = tokio::runtime::Runtime::new()
+                    .unwrap()
+                    .block_on(self.start_cached_async_download(&name, Some(&name)))?;
 
-            self.r#loop.borrow_mut().wait(promises, None)?;
+                // [$response] = $spec;
+                let response = spec
+                    .as_list()
+                    .and_then(|l| l.first())
+                    .map(|b| (**b).clone())
+                    .unwrap_or(PhpMixed::Null);
+                let response_arr = match response.as_array() {
+                    Some(a) => a.clone(),
+                    None => continue,
+                };
+                let sec_advs_arr = match response_arr
+                    .get("security-advisories")
+                    .and_then(|v| v.as_array())
+                {
+                    Some(a) => a.clone(),
+                    None => continue,
+                };
+
+                names_found.insert(name.clone(), true);
+                if !sec_advs_arr.is_empty() {
+                    let mut entries: Vec<PartialOrSecurityAdvisory> = Vec::new();
+                    for (_k, data_mixed) in sec_advs_arr.iter() {
+                        if let Some(data) = data_mixed.as_array() {
+                            let data_map: IndexMap<String, PhpMixed> = data
+                                .iter()
+                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .collect();
+                            if let Some(adv) = create(&data_map, &name, &package_constraint_map)? {
+                                entries.push(adv);
+                            }
+                        }
+                    }
+                    advisories.insert(name.clone(), entries);
+                }
+                package_constraint_map.shift_remove(&name);
+            }
         }
 
         if let Some(api_url) = api_url {
@@ -1851,10 +1804,6 @@ impl ComposerRepository {
 
         let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
-        // TODO(phase-c-promise): collects start_cached_async_download().then_boxed() promises and
-        // drives them via Loop::wait; rewrite to await the collected futures once the async Loop
-        // boundary lands.
-        let mut promises: Vec<Box<dyn PromiseInterface>> = Vec::new();
 
         if self.lazy_providers_url.is_none() {
             return Err(LogicException {
@@ -1908,183 +1857,148 @@ impl ComposerRepository {
                 continue;
             }
 
-            // TODO(phase-b): Box<dyn PackageInterface> is not Clone; share via Rc
-            let already_loaded_clone: IndexMap<
-                String,
-                IndexMap<String, Box<dyn PackageInterface>>,
-            > = todo!("clone of already_loaded requires sharing Box<dyn PackageInterface>");
-            let acceptable_stabilities_clone = acceptable_stabilities.cloned();
-            let stability_flags_clone = stability_flags.cloned();
             let version_parser = self.version_parser.clone();
-            // TODO(phase-b): then_boxed expects closure returning Box<dyn PromiseInterface>,
-            // not anyhow::Result<()>; needs structural reshape
-            let promise = self
-                .start_cached_async_download(&name, Some(&real_name))?
-                .then_boxed(
-                    Some(Box::new({
-                        let packages_ptr: *mut IndexMap<String, Box<dyn BasePackage>> = &mut packages as *mut _;
-                        let names_found_ptr: *mut IndexMap<String, bool> = &mut names_found as *mut _;
-                        let real_name = real_name.clone();
-                        let constraint = constraint;
-                        move |spec: PhpMixed| -> Box<dyn PromiseInterface> {
-                            let _result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-                            let spec_list = spec.as_list().cloned().unwrap_or_default();
-                            let response = spec_list
-                                .first()
-                                .map(|b| (**b).clone())
-                                .unwrap_or(PhpMixed::Null);
-                            let packages_source_val = spec_list
-                                .get(1)
-                                .map(|b| (**b).clone())
-                                .unwrap_or(PhpMixed::Null);
-                            let packages_source: Option<String> =
-                                packages_source_val.as_string().map(|s| s.to_string());
-                            if response.is_null() {
-                                return Ok(());
-                            }
-                            let response_arr = match response.as_array() {
-                                Some(a) => a.clone(),
-                                None => return Ok(()),
-                            };
-                            let inner_packages = response_arr.get("packages");
-                            let versions_mixed = match inner_packages
-                                .and_then(|v| v.as_array())
-                                .and_then(|a| a.get(&real_name))
-                                .cloned()
-                            {
-                                Some(b) => *b,
-                                None => return Ok(()),
-                            };
+            let spec = tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(self.start_cached_async_download(&name, Some(&real_name)))?;
 
-                            let mut versions: Vec<IndexMap<String, PhpMixed>> =
-                                match &versions_mixed {
-                                    PhpMixed::List(l) => l
-                                        .iter()
-                                        .filter_map(|v| {
-                                            v.as_array().map(|a| {
-                                                a.iter()
-                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                                                    .collect::<IndexMap<String, PhpMixed>>()
-                                            })
-                                        })
-                                        .collect(),
-                                    PhpMixed::Array(a) => a
-                                        .values()
-                                        .filter_map(|v| {
-                                            v.as_array().map(|a| {
-                                                a.iter()
-                                                    .map(|(k, v)| (k.clone(), (**v).clone()))
-                                                    .collect::<IndexMap<String, PhpMixed>>()
-                                            })
-                                        })
-                                        .collect(),
-                                    _ => return Ok(()),
-                                };
+            // [$response, $packagesSource] = $spec;
+            let spec_list = spec.as_list().cloned().unwrap_or_default();
+            let response = spec_list
+                .first()
+                .map(|b| (**b).clone())
+                .unwrap_or(PhpMixed::Null);
+            let packages_source_val = spec_list
+                .get(1)
+                .map(|b| (**b).clone())
+                .unwrap_or(PhpMixed::Null);
+            let packages_source: Option<String> =
+                packages_source_val.as_string().map(|s| s.to_string());
+            if response.is_null() {
+                continue;
+            }
+            let response_arr = match response.as_array() {
+                Some(a) => a.clone(),
+                None => continue,
+            };
+            let inner_packages = response_arr.get("packages");
+            let versions_mixed = match inner_packages
+                .and_then(|v| v.as_array())
+                .and_then(|a| a.get(&real_name))
+                .cloned()
+            {
+                Some(b) => *b,
+                None => continue,
+            };
 
-                            let minified = response_arr
-                                .get("minified")
-                                .and_then(|v| v.as_string())
-                                .map_or(false, |s| s == "composer/2.0");
-                            if minified {
-                                // TODO(phase-b): MetadataMinifier::expand expects/returns IndexMap but versions is Vec
-                                versions = todo!("MetadataMinifier::expand signature mismatch with Vec<IndexMap>");
-                            }
+            let mut versions: Vec<IndexMap<String, PhpMixed>> = match &versions_mixed {
+                PhpMixed::List(l) => l
+                    .iter()
+                    .filter_map(|v| {
+                        v.as_array().map(|a| {
+                            a.iter()
+                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .collect::<IndexMap<String, PhpMixed>>()
+                        })
+                    })
+                    .collect(),
+                PhpMixed::Array(a) => a
+                    .values()
+                    .filter_map(|v| {
+                        v.as_array().map(|a| {
+                            a.iter()
+                                .map(|(k, v)| (k.clone(), (**v).clone()))
+                                .collect::<IndexMap<String, PhpMixed>>()
+                        })
+                    })
+                    .collect(),
+                _ => continue,
+            };
 
-                            unsafe {
-                                (*names_found_ptr).insert(real_name.clone(), true);
-                            }
-                            let mut versions_to_load: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                            for version in versions.into_iter() {
-                                let mut version = version;
-                                let has_vn = version.contains_key("version_normalized");
-                                if !has_vn {
-                                    let v = version
-                                        .get("version")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let normalized = version_parser.normalize(&v, None)?;
-                                    version.insert(
-                                        "version_normalized".to_string(),
-                                        PhpMixed::String(normalized),
-                                    );
-                                } else if version
-                                    .get("version_normalized")
-                                    .and_then(|v| v.as_string())
-                                    .map_or(false, |s| s == VersionParser::DEFAULT_BRANCH_ALIAS)
-                                {
-                                    // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
-                                    let v = version
-                                        .get("version")
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    let normalized = version_parser.normalize(&v, None)?;
-                                    version.insert(
-                                        "version_normalized".to_string(),
-                                        PhpMixed::String(normalized),
-                                    );
-                                }
+            let minified = response_arr
+                .get("minified")
+                .and_then(|v| v.as_string())
+                .map_or(false, |s| s == "composer/2.0");
+            if minified {
+                // TODO(phase-b): MetadataMinifier::expand expects/returns IndexMap but versions is Vec
+                versions = todo!("MetadataMinifier::expand signature mismatch with Vec<IndexMap>");
+            }
 
-                                let version_normalized = version
-                                    .get("version_normalized")
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or("")
-                                    .to_string();
-                                // avoid loading packages which have already been loaded
-                                if already_loaded_clone
-                                    .get(&real_name)
-                                    .map_or(false, |m| m.contains_key(&version_normalized))
-                                {
-                                    continue;
-                                }
+            names_found.insert(real_name.clone(), true);
+            let mut versions_to_load: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+            for version in versions.into_iter() {
+                let mut version = version;
+                let has_vn = version.contains_key("version_normalized");
+                if !has_vn {
+                    let v = version
+                        .get("version")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                        .to_string();
+                    let normalized = version_parser.normalize(&v, None)?;
+                    version.insert(
+                        "version_normalized".to_string(),
+                        PhpMixed::String(normalized),
+                    );
+                } else if version
+                    .get("version_normalized")
+                    .and_then(|v| v.as_string())
+                    .map_or(false, |s| s == VersionParser::DEFAULT_BRANCH_ALIAS)
+                {
+                    // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
+                    let v = version
+                        .get("version")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or("")
+                        .to_string();
+                    let normalized = version_parser.normalize(&v, None)?;
+                    version.insert(
+                        "version_normalized".to_string(),
+                        PhpMixed::String(normalized),
+                    );
+                }
 
-                                let acceptable = ComposerRepository::is_version_acceptable_static(
-                                    constraint.as_deref(),
-                                    &real_name,
-                                    &version,
-                                    acceptable_stabilities_clone.as_ref(),
-                                    stability_flags_clone.as_ref(),
-                                )?;
-                                if acceptable {
-                                    versions_to_load.push(version);
-                                }
-                            }
+                let version_normalized = version
+                    .get("version_normalized")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string();
+                // avoid loading packages which have already been loaded
+                if already_loaded
+                    .get(&real_name)
+                    .map_or(false, |m| m.contains_key(&version_normalized))
+                {
+                    continue;
+                }
 
-                            let loaded_packages: Vec<Box<dyn BasePackage>> =
-                                ComposerRepository::create_packages_static(
-                                    versions_to_load,
-                                    packages_source,
-                                )?;
-                            for mut package in loaded_packages.into_iter() {
-                                package.set_repository_self();
-                                let hash_c = spl_object_hash(&*package);
-                                if let Some(alias) = package.as_alias_package_mut() {
-                                    let aliased_hash = spl_object_hash(alias.get_alias_of());
-                                    if !unsafe { (*packages_ptr).contains_key(&aliased_hash) } {
-                                        alias.get_alias_of_mut().set_repository_self();
-                                        let aliased_clone = dyn_clone_box(alias.get_alias_of());
-                                        unsafe {
-                                            (*packages_ptr).insert(aliased_hash, aliased_clone);
-                                        }
-                                    }
-                                }
-                                unsafe {
-                                    (*packages_ptr).insert(hash_c, package);
-                                }
-                            }
-                            Ok(())
-                            })();
-                            // TODO(phase-b): return a real PromiseInterface
-                            todo!("return real PromiseInterface")
-                        }
-                    })),
-                    None,
-                );
-            promises.push(promise);
+                let acceptable = ComposerRepository::is_version_acceptable_static(
+                    constraint.as_deref(),
+                    &real_name,
+                    &version,
+                    acceptable_stabilities,
+                    stability_flags,
+                )?;
+                if acceptable {
+                    versions_to_load.push(version);
+                }
+            }
+
+            let loaded_packages: Vec<Box<dyn BasePackage>> =
+                ComposerRepository::create_packages_static(versions_to_load, packages_source)?;
+            for mut package in loaded_packages.into_iter() {
+                package.set_repository_self();
+                let hash_c = spl_object_hash(&*package);
+                if let Some(alias) = package.as_alias_package_mut() {
+                    let aliased_hash = spl_object_hash(alias.get_alias_of());
+                    if !packages.contains_key(&aliased_hash) {
+                        alias.get_alias_of_mut().set_repository_self();
+                        let aliased_clone = dyn_clone_box(alias.get_alias_of());
+                        packages.insert(aliased_hash, aliased_clone);
+                    }
+                }
+                packages.insert(hash_c, package);
+            }
         }
-
-        self.r#loop.borrow_mut().wait(promises, None)?;
 
         Ok(LoadAsyncPackagesResult {
             names_found,
@@ -3290,10 +3204,6 @@ impl ComposerRepository {
             return Ok(PhpMixed::Bool(true));
         }
 
-        // TODO(phase-c-promise): the live fetch path builds accept/reject closures (with raw-pointer
-        // shared state) and returns http_downloader.add(...).then_with_reject_boxed(accept, reject).
-        // Rewrite as an async fetch + inline accept/reject handling once the HttpDownloader async
-        // boundary lands.
         let mut filename = filename.to_string();
         let mut options = self.options.clone();
         if let Some(dispatcher) = self.event_dispatcher.as_ref() {
@@ -3354,140 +3264,116 @@ impl ComposerRepository {
             }
         }
 
-        let filename_for_closures = filename.clone();
-        let cache_key_owned = cache_key.to_string();
-        let url_owned = self.url.clone();
-        let last_modified_time_owned = last_modified_time.map(|s| s.to_string());
-
-        let packages_not_found_ptr: *mut IndexMap<String, bool> =
-            &mut self.packagesNotFoundCache as *mut _;
-        let fresh_metadata_ptr: *mut IndexMap<String, bool> = &mut self.freshMetadataUrls as *mut _;
-        let degraded_ptr: *mut bool = &mut self.degraded_mode as *mut _;
-        let cache_ptr: *mut Cache = &mut self.cache as *mut _;
-        let io_ptr = self.io.as_ref() as *const dyn IOInterface;
-
-        let accept = {
-            let filename = filename_for_closures.clone();
-            let cache_key_owned = cache_key_owned.clone();
-            let url_owned = url_owned.clone();
-            move |response_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                // emulate: $response is a Response object; status code/body/header accessed via methods
-                let mut response = Response::from_php_mixed(response_mixed);
-                // package not found is acceptable for a v2 protocol repository
-                if response.get_status_code() == 404 {
-                    unsafe {
-                        (*packages_not_found_ptr).insert(filename.clone(), true);
-                    }
-
-                    let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
-                    empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
-                    return Ok(PhpMixed::Array(
-                        empty.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                    ));
-                }
-
-                let mut json = response.get_body().unwrap_or("").to_string();
-                if json.is_empty() && response.get_status_code() == 304 {
-                    unsafe {
-                        (*fresh_metadata_ptr).insert(filename.clone(), true);
-                    }
-
-                    return Ok(PhpMixed::Bool(true));
-                }
-
-                // TODO(plugin): dispatch PostFileDownloadEvent
-
-                let decoded = response.decode_json()?;
-                let mut data: IndexMap<String, PhpMixed> = decoded
-                    .as_array()
-                    .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
-                    .unwrap_or_default();
-                let io_ref = unsafe { &*io_ptr };
-                HttpDownloader::output_warnings(io_ref, &url_owned, &data);
-
-                let last_modified_date = response.get_header("last-modified");
-                response.collect();
-                if let Some(lmd) = last_modified_date {
-                    data.insert("last-modified".to_string(), PhpMixed::String(lmd));
-                    let as_mixed = PhpMixed::Array(
-                        data.iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
-                    );
-                    json = JsonFile::encode(
-                        &as_mixed,
-                        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-                    );
-                }
-                let is_ro = unsafe { (*cache_ptr).is_read_only() };
-                if !is_ro {
-                    unsafe {
-                        (*cache_ptr).write(&cache_key_owned, &json);
-                    }
-                }
-                unsafe {
-                    (*fresh_metadata_ptr).insert(filename.clone(), true);
-                }
-
-                Ok(PhpMixed::Array(
-                    data.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                ))
-            }
-        };
-
-        let reject = {
-            let filename = filename_for_closures.clone();
-            let url_owned = url_owned.clone();
-            let last_modified_time = last_modified_time_owned.clone();
-            let accept_clone = accept.clone();
-            move |e: anyhow::Error| -> anyhow::Result<PhpMixed> {
-                if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_status_code() == Some(404) {
-                        unsafe {
-                            (*packages_not_found_ptr).insert(filename.clone(), true);
-                        }
-
-                        return Ok(PhpMixed::Bool(false));
-                    }
-                }
-
-                let is_degraded = unsafe { *degraded_ptr };
-                if !is_degraded {
-                    let io_ref = unsafe { &*io_ptr };
-                    io_ref.write_error(&format!(
-                        "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
-                        url_owned,
-                        e.to_string()
-                    ));
-                }
-                unsafe {
-                    *degraded_ptr = true;
-                }
-
-                // if the file is in the cache, we fake a 304 Not Modified to allow the process to continue
-                if last_modified_time.is_some() {
-                    let resp = Response::new_fake(&url_owned, 304, IndexMap::new(), String::new());
-                    return accept_clone(resp.to_php_mixed());
-                }
-
-                // special error code returned when network is being artificially disabled
-                if let Some(te) = e.downcast_ref::<TransportException>() {
-                    if te.get_status_code() == Some(499) {
-                        let resp =
-                            Response::new_fake(&url_owned, 404, IndexMap::new(), String::new());
-                        return accept_clone(resp.to_php_mixed());
-                    }
-                }
-
-                Err(e)
-            }
-        };
-
-        let initial = self
+        let response_result = self
             .http_downloader
             .borrow_mut()
-            .add(&filename, options.clone())?;
-        Ok(initial.then_with_reject_boxed(Box::new(accept), Box::new(reject)))
+            .add(&filename, options)
+            .await;
+        match response_result {
+            Ok(response) => self.async_fetch_file_accept(response, &filename, cache_key),
+            Err(e) => self.async_fetch_file_reject(e, &filename, cache_key, last_modified_time),
+        }
+    }
+
+    /// The onFulfilled handler of `asyncFetchFile`: turns the HTTP response into decoded metadata,
+    /// caches it, and records the URL as fresh.
+    fn async_fetch_file_accept(
+        &mut self,
+        mut response: Response,
+        filename: &str,
+        cache_key: &str,
+    ) -> anyhow::Result<PhpMixed> {
+        // package not found is acceptable for a v2 protocol repository
+        if response.get_status_code() == 404 {
+            self.packagesNotFoundCache
+                .insert(filename.to_string(), true);
+
+            let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
+            empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
+            return Ok(PhpMixed::Array(
+                empty.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+            ));
+        }
+
+        let mut json = response.get_body().unwrap_or("").to_string();
+        if json.is_empty() && response.get_status_code() == 304 {
+            self.freshMetadataUrls.insert(filename.to_string(), true);
+
+            return Ok(PhpMixed::Bool(true));
+        }
+
+        // TODO(plugin): dispatch PostFileDownloadEvent
+
+        let decoded = response.decode_json()?;
+        let mut data: IndexMap<String, PhpMixed> = decoded
+            .as_array()
+            .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+            .unwrap_or_default();
+        HttpDownloader::output_warnings(self.io.as_ref(), &self.url, &data);
+
+        let last_modified_date = response.get_header("last-modified");
+        response.collect();
+        if let Some(lmd) = last_modified_date {
+            data.insert("last-modified".to_string(), PhpMixed::String(lmd));
+            let as_mixed = PhpMixed::Array(
+                data.iter()
+                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                    .collect(),
+            );
+            json = JsonFile::encode(&as_mixed, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        }
+        if !self.cache.is_read_only() {
+            self.cache.write(cache_key, &json);
+        }
+        self.freshMetadataUrls.insert(filename.to_string(), true);
+
+        Ok(PhpMixed::Array(
+            data.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+        ))
+    }
+
+    /// The onRejected handler of `asyncFetchFile`: marks the package as not found / the repo as
+    /// degraded, and fakes a 304/404 response from cache where appropriate.
+    fn async_fetch_file_reject(
+        &mut self,
+        e: anyhow::Error,
+        filename: &str,
+        cache_key: &str,
+        last_modified_time: Option<&str>,
+    ) -> anyhow::Result<PhpMixed> {
+        if let Some(te) = e.downcast_ref::<TransportException>() {
+            if te.get_status_code() == Some(404) {
+                self.packagesNotFoundCache
+                    .insert(filename.to_string(), true);
+
+                return Ok(PhpMixed::Bool(false));
+            }
+        }
+
+        if !self.degraded_mode {
+            self.io.write_error(&format!(
+                "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
+                self.url,
+                e
+            ));
+        }
+        self.degraded_mode = true;
+
+        // if the file is in the cache, we fake a 304 Not Modified to allow the process to continue
+        if last_modified_time.is_some() {
+            let resp = Response::new_fake(&self.url, 304, IndexMap::new(), String::new());
+            return self.async_fetch_file_accept(resp, filename, cache_key);
+        }
+
+        // special error code returned when network is being artificially disabled
+        if let Some(te) = e.downcast_ref::<TransportException>() {
+            if te.get_status_code() == Some(499) {
+                let resp = Response::new_fake(&self.url, 404, IndexMap::new(), String::new());
+                return self.async_fetch_file_accept(resp, filename, cache_key);
+            }
+        }
+
+        Err(e)
     }
 
     /// This initializes the packages key of a partial packages.json that contain some packages inlined + a providers-lazy-url
@@ -3608,9 +3494,5 @@ fn dyn_clone_box(_pkg: &dyn BasePackage) -> Box<dyn BasePackage> {
 }
 
 fn dyn_clone_constraint(_c: &dyn ConstraintInterface) -> Box<dyn ConstraintInterface> {
-    todo!()
-}
-
-fn react_promise_resolve(_value: PhpMixed) -> Box<dyn PromiseInterface> {
     todo!()
 }

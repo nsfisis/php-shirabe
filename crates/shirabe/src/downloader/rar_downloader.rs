@@ -143,6 +143,7 @@ impl RarDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for RarDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()

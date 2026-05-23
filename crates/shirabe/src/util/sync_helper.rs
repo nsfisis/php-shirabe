@@ -86,7 +86,6 @@ impl<'a> DownloaderOrManager<'a> {
 pub struct SyncHelper;
 
 impl SyncHelper {
-    // TODO(phase-c-promise): synchronous wrapper driving now-async downloader calls via Self::await (loop.wait); needs async/loop boundary design.
     pub fn download_and_install_package_sync(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         downloader: DownloaderOrManager<'_>,
@@ -100,21 +99,41 @@ impl SyncHelper {
             "install"
         };
 
-        let result: Result<()> = (|| {
+        let result: Result<()> = (|| -> Result<()> {
             Self::r#await(
                 r#loop,
-                Some(downloader.download(package, &path, prev_package)?),
+                Some(Box::pin(async {
+                    downloader
+                        .download(package, &path, prev_package)
+                        .await
+                        .map(|_| ())
+                })),
             )?;
             Self::r#await(
                 r#loop,
-                Some(downloader.prepare(r#type, package, &path, prev_package)?),
+                Some(Box::pin(async {
+                    downloader
+                        .prepare(r#type, package, &path, prev_package)
+                        .await
+                        .map(|_| ())
+                })),
             )?;
             if r#type == "update" {
                 if let Some(prev) = prev_package {
-                    Self::r#await(r#loop, Some(downloader.update(package, prev, &path)?))?;
+                    Self::r#await(
+                        r#loop,
+                        Some(Box::pin(async {
+                            downloader.update(package, prev, &path).await.map(|_| ())
+                        })),
+                    )?;
                 }
             } else {
-                Self::r#await(r#loop, Some(downloader.install(package, &path)?))?;
+                Self::r#await(
+                    r#loop,
+                    Some(Box::pin(async {
+                        downloader.install(package, &path).await.map(|_| ())
+                    })),
+                )?;
             }
             Ok(())
         })();
@@ -122,25 +141,36 @@ impl SyncHelper {
         if result.is_err() {
             Self::r#await(
                 r#loop,
-                Some(downloader.cleanup(r#type, package, &path, prev_package)?),
+                Some(Box::pin(async {
+                    downloader
+                        .cleanup(r#type, package, &path, prev_package)
+                        .await
+                        .map(|_| ())
+                })),
             )?;
             return result;
         }
 
         Self::r#await(
             r#loop,
-            Some(downloader.cleanup(r#type, package, &path, prev_package)?),
+            Some(Box::pin(async {
+                downloader
+                    .cleanup(r#type, package, &path, prev_package)
+                    .await
+                    .map(|_| ())
+            })),
         )?;
         Ok(())
     }
 
-    // TODO(phase-c-promise): loop-pump synchronous wait over a promise; driving mechanism needs design.
     pub fn r#await(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
-        promise: Option<Box<dyn PromiseInterface>>,
+        promise: Option<std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + '_>>>,
     ) -> Result<()> {
         if let Some(promise) = promise {
-            r#loop.borrow_mut().wait(vec![promise], None)?;
+            tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(r#loop.borrow_mut().wait(vec![promise], None))?;
         }
         Ok(())
     }

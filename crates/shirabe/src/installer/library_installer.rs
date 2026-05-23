@@ -5,7 +5,8 @@ use std::any::Any;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, is_link, preg_quote, realpath, rmdir, rtrim, strpos,
+    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
+    realpath, rmdir, rtrim, strpos,
 };
 
 use crate::composer::PartialComposerWeakHandle;
@@ -215,6 +216,7 @@ impl LibraryInstaller {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl InstallerInterface for LibraryInstaller {
     fn supports(&self, package_type: &str) -> bool {
         match &self.r#type {
@@ -314,20 +316,16 @@ impl InstallerInterface for LibraryInstaller {
             self.binary_installer.remove_binaries(package);
         }
 
-        // TODO(phase-c-promise): rewrite install_code().then(installBinaries + repo.addPackage) as an await sequence.
-        let promise = self.install_code(package)?;
-        let promise = match promise {
-            Some(p) => p,
-            None => shirabe_external_packages::react::promise::resolve(None),
-        };
+        let _ = self.install_code(package).await?;
 
-        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
-        // arguments. The original PHP closure captures &mut self/binary_installer/repo/package;
-        // restructuring required.
-        let _ = promise;
-        Ok(Some(todo!(
-            "promise.then(...) chain to install_binaries + repo.add_package"
-        )))
+        let install_path = self.get_install_path(package).unwrap();
+        self.binary_installer
+            .install_binaries(package, &install_path, true);
+        if !repo.has_package(package) {
+            repo.add_package(package.clone_package_box());
+        }
+
+        Ok(None)
     }
 
     async fn update(
@@ -348,20 +346,17 @@ impl InstallerInterface for LibraryInstaller {
         // self.initialize_vendor_dir();
 
         self.binary_installer.remove_binaries(initial);
-        // TODO(phase-c-promise): rewrite update_code().then(installBinaries + repo updates) as an await sequence.
-        let promise = self.update_code(initial, target)?;
-        let promise = match promise {
-            Some(p) => p,
-            None => shirabe_external_packages::react::promise::resolve(None),
-        };
+        let _ = self.update_code(initial, target).await?;
 
-        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
-        // arguments. Closure captures &mut self/binary_installer/repo/initial/target;
-        // restructuring required.
-        let _ = promise;
-        Ok(Some(todo!(
-            "promise.then(...) chain to install_binaries + repo updates"
-        )))
+        let install_path = self.get_install_path(target).unwrap();
+        self.binary_installer
+            .install_binaries(target, &install_path, true);
+        repo.remove_package(initial);
+        if !repo.has_package(target) {
+            repo.add_package(target.clone_package_box());
+        }
+
+        Ok(None)
     }
 
     async fn uninstall(
@@ -377,20 +372,25 @@ impl InstallerInterface for LibraryInstaller {
             .into());
         }
 
-        // TODO(phase-c-promise): rewrite remove_code().then(remove_binaries/remove_package/rmdir) as an await sequence.
-        let promise = self.remove_code(package)?;
-        let promise = match promise {
-            Some(p) => p,
-            None => shirabe_external_packages::react::promise::resolve(None),
-        };
+        let _ = self.remove_code(package).await?;
 
-        // TODO(phase-b): promise.then expects Option<Box<dyn FnOnce(Option<PhpMixed>) -> Option<PhpMixed>>>
-        // arguments. Closure captures binary_installer/filesystem/download_path/package/repo;
-        // restructuring required.
-        let _ = promise;
-        Ok(Some(todo!(
-            "promise.then(...) chain to remove_binaries/remove_package/rmdir"
-        )))
+        let download_path = self.get_package_base_path(package);
+        self.binary_installer.remove_binaries(package);
+        repo.remove_package(package);
+
+        if strpos(package.get_name(), "/").map_or(false, |pos| pos != 0) {
+            let package_vendor_dir = dirname(&download_path);
+            if is_dir(&package_vendor_dir)
+                && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)
+            {
+                let _ = Silencer::call(|| {
+                    rmdir(&package_vendor_dir);
+                    Ok(())
+                });
+            }
+        }
+
+        Ok(None)
     }
 
     fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {

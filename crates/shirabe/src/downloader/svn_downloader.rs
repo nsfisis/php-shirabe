@@ -3,7 +3,6 @@
 use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise;
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 use crate::config::Config;
@@ -432,6 +431,7 @@ impl SvnDownloader {
 // TODO(phase-b): wire up VcsDownloader trait properly. SvnDownloader extends VcsDownloader which
 // implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
 // VcsDownloaderBase exposes the matching impl surface.
+#[async_trait::async_trait(?Send)]
 impl DownloaderInterface for SvnDownloader {
     fn get_installation_source(&self) -> String {
         todo!()

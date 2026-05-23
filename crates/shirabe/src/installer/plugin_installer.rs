@@ -41,7 +41,7 @@ impl PluginInstaller {
         self.get_plugin_manager().borrow_mut().disable_plugins();
     }
 
-    fn rollback_install(
+    async fn rollback_install(
         &mut self,
         e: anyhow::Error,
         repo: &mut dyn InstalledRepositoryInterface,
@@ -51,7 +51,7 @@ impl PluginInstaller {
             "Plugin initialization failed ({}), uninstalling plugin",
             e
         ));
-        self.inner.uninstall(repo, package)?;
+        self.inner.uninstall(repo, package).await?;
         Err(e)
     }
 
@@ -61,6 +61,7 @@ impl PluginInstaller {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl InstallerInterface for PluginInstaller {
     fn supports(&self, package_type: &str) -> bool {
         package_type == "composer-plugin" || package_type == "composer-installer"

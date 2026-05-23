@@ -518,18 +518,14 @@ impl VersionGuesser {
                 strnatcasecmp(b, a)
             });
 
-            // TODO(phase-c-promise): execute_async is now async; the .then continuation captures and mutates shared
-            // state (last_index, length, version, pretty_version, promises) and cancels sibling promises, while the
-            // loop is driven by process.wait(). This concurrent job/cancellation machinery needs design before it can
-            // become an await-based form, so the promise body (including the inner todo!()) is left as-is.
-            let mut promises: Vec<
-                Box<dyn shirabe_external_packages::react::promise::PromiseInterface>,
-            > = vec![];
             self.process.borrow_mut().set_max_jobs(30);
-            // TODO(phase-b): try/finally with resetMaxJobs
+            // PHP runs every candidate diff in parallel and cancels the siblings once a zero-length
+            // diff is found; the single-threaded sync bridge block_on's each diff serially and stops
+            // at the first zero-length match.
             let result: Result<()> = (|| -> Result<()> {
                 let mut last_index: i64 = -1;
                 for (index, candidate) in branches.iter().enumerate() {
+                    let index = index as i64;
                     let candidate_version =
                         Preg::replace(r"{^remotes/\S+/}", "", candidate).unwrap_or_default();
 
@@ -550,22 +546,29 @@ impl VersionGuesser {
                         },
                         &scm_cmdline,
                     );
-                    let async_promise = self.process.borrow_mut().execute_async(&cmd_line, path)?;
-                    // TODO(phase-b): closure receives Process in PHP but PromiseInterface::then expects fn(Option<PhpMixed>) -> Option<PhpMixed>;
-                    // closure captures need shared mutable state (last_index, length, version, pretty_version, promises)
-                    promises.push(async_promise.then(
-                        Some(Box::new(
-                            move |_value: Option<PhpMixed>| -> Option<PhpMixed> {
-                                todo!(
-                                    "mutate last_index/length/version/pretty_version and possibly cancel promises"
-                                )
-                            },
-                        )),
-                        None,
-                    ));
+                    let process = tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(self.process.borrow_mut().execute_async(&cmd_line, path))?;
+                    if !process.is_successful() {
+                        continue;
+                    }
+
+                    let output = process.get_output();
+                    // overwrite existing if we have a shorter diff, or we have an equal diff and an index that comes later in the array (i.e. older version)
+                    // as newer versions typically have more commits, if the feature branch is based on a newer branch it should have a longer diff to the old version
+                    // but if it doesn't and they have equal diffs, then it probably is based on the old version
+                    if strlen(&output) < length || (strlen(&output) == length && last_index < index)
+                    {
+                        last_index = index;
+                        length = strlen(&output);
+                        version = Some(self.version_parser.normalize_branch(&candidate_version)?);
+                        pretty_version = Some(format!("dev-{}", candidate_version));
+                        if length == 0 {
+                            break;
+                        }
+                    }
                 }
 
-                self.process.borrow_mut().wait();
                 Ok(())
             })();
             self.process.borrow_mut().reset_max_jobs();

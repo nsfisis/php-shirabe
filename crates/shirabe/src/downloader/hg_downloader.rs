@@ -220,6 +220,7 @@ impl HgDownloader {
 // TODO(phase-b): wire up VcsDownloader trait properly. HgDownloader extends VcsDownloader which
 // implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
 // VcsDownloaderBase exposes the matching impl surface.
+#[async_trait::async_trait(?Send)]
 impl DownloaderInterface for HgDownloader {
     fn get_installation_source(&self) -> String {
         todo!()

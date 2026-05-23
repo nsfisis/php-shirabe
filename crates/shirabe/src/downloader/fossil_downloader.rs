@@ -250,6 +250,7 @@ impl FossilDownloader {
 // TODO(phase-b): wire up VcsDownloader trait properly. FossilDownloader extends VcsDownloader
 // which implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the
 // inner VcsDownloaderBase exposes the matching impl surface.
+#[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FossilDownloader {
     fn get_installation_source(&self) -> String {
         todo!()

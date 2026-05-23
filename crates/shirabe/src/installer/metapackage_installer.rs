@@ -22,6 +22,7 @@ impl MetapackageInstaller {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl InstallerInterface for MetapackageInstaller {
     fn supports(&self, package_type: &str) -> bool {
         package_type == "metapackage"

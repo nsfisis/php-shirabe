@@ -4,6 +4,7 @@ use crate::package::PackageInterface;
 use crate::repository::InstalledRepositoryInterface;
 use shirabe_php_shim::PhpMixed;
 
+#[async_trait::async_trait(?Send)]
 pub trait InstallerInterface: std::fmt::Debug {
     fn supports(&self, package_type: &str) -> bool;
 

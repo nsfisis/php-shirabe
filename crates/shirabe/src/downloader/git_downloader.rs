@@ -4,7 +4,6 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::react::promise;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, basename, dirname, implode, in_array, is_dir,
     preg_quote, realpath, rtrim, sprintf, strlen, strpos, substr, trim, version_compare,
@@ -1359,6 +1358,7 @@ impl DvcsDownloaderInterface for GitDownloader {
 // TODO(phase-b): GitDownloader extends VcsDownloader which implements DownloaderInterface.
 // Delegating each trait method to todo!() until the inner VcsDownloaderBase exposes the
 // matching impl surface.
+#[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for GitDownloader {
     fn get_installation_source(&self) -> String {
         todo!()
