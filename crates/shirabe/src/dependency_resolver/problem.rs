@@ -35,7 +35,7 @@ pub struct Problem {
     pub(crate) reason_seen: IndexMap<String, bool>,
 
     /// A set of reasons for the problem, each is a rule or a root require and a rule
-    pub(crate) reasons: IndexMap<i64, Vec<Box<dyn Rule>>>,
+    pub(crate) reasons: IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
 
     pub(crate) section: i64,
 }
@@ -50,13 +50,13 @@ impl Problem {
     }
 
     /// Add a rule as a reason
-    pub fn add_rule(&mut self, rule: Box<dyn Rule>) {
-        let id = spl_object_hash(&rule);
+    pub fn add_rule(&mut self, rule: std::rc::Rc<std::cell::RefCell<Rule>>) {
+        let id = spl_object_hash(&*rule.borrow());
         self.add_reason(id, rule);
     }
 
     /// Retrieve all reasons for this problem
-    pub fn get_reasons(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
+    pub fn get_reasons(&self) -> &IndexMap<i64, Vec<std::rc::Rc<std::cell::RefCell<Rule>>>> {
         &self.reasons
     }
 
@@ -68,20 +68,21 @@ impl Problem {
         pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, Box<dyn BasePackage>>,
-        learned_pool: &Vec<Vec<Box<dyn Rule>>>,
+        learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> anyhow::Result<String> {
         // TODO doesn't this entirely defeat the purpose of the problem sections? what's the point of sections?
-        let mut reasons: Vec<Box<dyn Rule>> = Vec::new();
+        let mut reasons: Vec<std::rc::Rc<std::cell::RefCell<Rule>>> = Vec::new();
         for section_rules in self.reasons.values().rev() {
             for rule in section_rules {
-                reasons.push(rule.clone_box());
+                reasons.push(rule.clone());
             }
         }
 
         if reasons.len() == 1 {
-            let rule = reasons[0].clone_box();
+            let rule = reasons[0].clone();
+            let rule_ref = rule.borrow();
 
-            if rule.get_reason() != rule::RULE_ROOT_REQUIRE {
+            if rule_ref.get_reason() != rule::RULE_ROOT_REQUIRE {
                 return Err(LogicException {
                     message: "Single reason problems must contain a root require rule.".to_string(),
                     code: 0,
@@ -89,7 +90,7 @@ impl Problem {
                 .into());
             }
 
-            let reason_data = rule.get_reason_data();
+            let reason_data = rule_ref.get_reason_data();
             // TODO(phase-b): reason_data for RULE_ROOT_REQUIRE; extract via ReasonData::RootRequire variant.
             let (package_name, constraint): (String, Option<&dyn ConstraintInterface>) =
                 match reason_data {
@@ -115,14 +116,14 @@ impl Problem {
         }
 
         reasons.sort_by(|rule1, rule2| {
-            let rule1_prio = self.get_rule_priority(rule1.as_ref());
-            let rule2_prio = self.get_rule_priority(rule2.as_ref());
+            let rule1_prio = self.get_rule_priority(&rule1.borrow());
+            let rule2_prio = self.get_rule_priority(&rule2.borrow());
             if rule1_prio != rule2_prio {
                 return rule2_prio.cmp(&rule1_prio);
             }
 
-            self.get_sortable_string(pool, rule1.as_ref())
-                .cmp(&self.get_sortable_string(pool, rule2.as_ref()))
+            self.get_sortable_string(pool, &rule1.borrow())
+                .cmp(&self.get_sortable_string(pool, &rule2.borrow()))
         });
 
         Ok(Self::format_deduplicated_rules(
@@ -137,7 +138,7 @@ impl Problem {
         ))
     }
 
-    fn get_sortable_string(&self, pool: &Pool, rule: &dyn Rule) -> String {
+    fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> String {
         match rule.get_reason() {
             rule::RULE_ROOT_REQUIRE => match rule.get_reason_data() {
                 rule::ReasonData::RootRequire { package_name, .. } => package_name.clone(),
@@ -181,7 +182,7 @@ impl Problem {
         }
     }
 
-    fn get_rule_priority(&self, rule: &dyn Rule) -> i64 {
+    fn get_rule_priority(&self, rule: &Rule) -> i64 {
         match rule.get_reason() {
             rule::RULE_FIXED => 3,
             rule::RULE_ROOT_REQUIRE => 2,
@@ -199,14 +200,14 @@ impl Problem {
 
     /// @internal
     pub fn format_deduplicated_rules(
-        rules: &Vec<Box<dyn Rule>>,
+        rules: &Vec<std::rc::Rc<std::cell::RefCell<Rule>>>,
         indent: &str,
         repository_set: &RepositorySet,
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, Box<dyn BasePackage>>,
-        learned_pool: &Vec<Vec<Box<dyn Rule>>>,
+        learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> String {
         let mut messages: Vec<String> = Vec::new();
         let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
@@ -215,7 +216,8 @@ impl Problem {
         let deduplicatable_rule_types =
             vec![rule::RULE_PACKAGE_REQUIRES, rule::RULE_PACKAGE_CONFLICT];
         for rule in rules {
-            let mut message = rule.get_pretty_string(
+            let rule_ref = rule.borrow();
+            let mut message = rule_ref.get_pretty_string(
                 repository_set,
                 request,
                 pool,
@@ -225,7 +227,7 @@ impl Problem {
             );
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             let matched = if in_array(
-                PhpMixed::Int(rule.get_reason()),
+                PhpMixed::Int(rule_ref.get_reason()),
                 &PhpMixed::List(
                     deduplicatable_rule_types
                         .iter()
@@ -257,7 +259,7 @@ impl Problem {
                     .entry(pkg_key.clone())
                     .or_insert_with(IndexMap::new)
                     .insert(version_key, m2.clone());
-                let source_package = rule.get_source_package(pool);
+                let source_package = rule_ref.get_source_package(pool);
                 for (version, pretty_version) in
                     pool.get_removed_versions_by_package(&spl_object_hash(&source_package))
                 {
@@ -354,7 +356,10 @@ impl Problem {
     ) -> bool {
         for section_rules in self.reasons.values() {
             for rule in section_rules {
-                if rule.is_caused_by_lock(repository_set, request, pool) {
+                if rule
+                    .borrow()
+                    .is_caused_by_lock(repository_set, request, pool)
+                {
                     return true;
                 }
             }
@@ -364,7 +369,7 @@ impl Problem {
     }
 
     /// Store a reason descriptor but ignore duplicates
-    pub(crate) fn add_reason(&mut self, id: String, reason: Box<dyn Rule>) {
+    pub(crate) fn add_reason(&mut self, id: String, reason: std::rc::Rc<std::cell::RefCell<Rule>>) {
         // TODO: if a rule is part of a problem description in two sections, isn't this going to remove a message
         // that is important to understand the issue?
 

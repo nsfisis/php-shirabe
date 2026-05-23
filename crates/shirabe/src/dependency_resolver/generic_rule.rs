@@ -2,9 +2,9 @@
 
 use crate::dependency_resolver::{Rule, RuleBase};
 use anyhow::Result;
-use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, implode, unpack};
+use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, unpack};
 
-use super::{request::Request, rule::ReasonData};
+use super::rule::ReasonData;
 
 #[derive(Debug)]
 pub struct GenericRule {
@@ -17,6 +17,14 @@ impl GenericRule {
         let inner = RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data));
         literals.sort();
         Self { inner, literals }
+    }
+
+    pub(crate) fn base(&self) -> &RuleBase {
+        &self.inner
+    }
+
+    pub(crate) fn base_mut(&mut self) -> &mut RuleBase {
+        &mut self.inner
     }
 
     pub fn get_literals(&self) -> &Vec<i64> {
@@ -57,81 +65,12 @@ impl GenericRule {
         }
     }
 
-    pub fn equals(&self, rule: &dyn RuleLiterals) -> bool {
-        self.literals == *rule.get_literals()
+    pub fn equals(&self, rule: &Rule) -> bool {
+        self.literals == rule.get_literals()
     }
 
     pub fn is_assertion(&self) -> bool {
         self.literals.len() == 1
-    }
-}
-
-pub trait RuleLiterals {
-    fn get_literals(&self) -> &Vec<i64>;
-    fn is_multi_conflict_rule(&self) -> bool {
-        false
-    }
-    fn is_assertion(&self) -> bool {
-        false
-    }
-    fn is_disabled(&self) -> bool {
-        false
-    }
-    fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
-    }
-    /// Clone this rule into an owned `Box<dyn Rule>` so callers like
-    /// `RuleWatchGraph::propagate_literal` can hand it to `Decisions::decide`.
-    fn clone_rule_box(&self) -> Box<dyn Rule> {
-        todo!()
-    }
-}
-
-impl RuleLiterals for GenericRule {
-    fn get_literals(&self) -> &Vec<i64> {
-        &self.literals
-    }
-}
-
-impl Rule for GenericRule {
-    fn bitfield(&self) -> i64 {
-        todo!()
-    }
-
-    fn bitfield_mut(&mut self) -> &mut i64 {
-        todo!()
-    }
-
-    fn request(&self) -> Option<&Request> {
-        todo!()
-    }
-
-    fn request_mut(&mut self) -> Option<&mut Request> {
-        todo!()
-    }
-
-    fn reason_data(&self) -> Option<&ReasonData> {
-        todo!()
-    }
-
-    fn reason_data_mut(&mut self) -> Option<&mut ReasonData> {
-        todo!()
-    }
-
-    fn get_literals(&self) -> Vec<i64> {
-        todo!()
-    }
-
-    fn get_hash(&self) -> PhpMixed {
-        todo!()
-    }
-
-    fn equals(&self, rule: &dyn Rule) -> bool {
-        todo!()
-    }
-
-    fn is_assertion(&self) -> bool {
-        todo!()
     }
 }
 

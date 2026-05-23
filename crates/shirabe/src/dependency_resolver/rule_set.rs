@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSet.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use indexmap::IndexMap;
 use shirabe_php_shim::OutOfBoundsException;
 
@@ -11,10 +14,10 @@ use crate::repository::RepositorySet;
 
 #[derive(Debug)]
 pub struct RuleSet {
-    pub rule_by_id: IndexMap<i64, Box<dyn Rule>>,
-    pub(crate) rules: IndexMap<i64, Vec<Box<dyn Rule>>>,
+    pub rule_by_id: IndexMap<i64, Rc<RefCell<Rule>>>,
+    pub(crate) rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>>,
     pub(crate) next_rule_id: i64,
-    pub(crate) rules_by_hash: IndexMap<String, Vec<Box<dyn Rule>>>,
+    pub(crate) rules_by_hash: IndexMap<String, Vec<Rc<RefCell<Rule>>>>,
 }
 
 impl RuleSet {
@@ -47,7 +50,7 @@ impl RuleSet {
         Self::types().into_keys().collect()
     }
 
-    pub fn add(&mut self, rule: Box<dyn Rule>, r#type: i64) -> anyhow::Result<()> {
+    pub fn add(&mut self, rule: Rc<RefCell<Rule>>, r#type: i64) -> anyhow::Result<()> {
         let types = Self::types();
         if !types.contains_key(&r#type) {
             return Err(OutOfBoundsException {
@@ -57,26 +60,25 @@ impl RuleSet {
             .into());
         }
 
-        let hash = rule.get_hash().to_string();
+        let hash = rule.borrow().get_hash()?.to_string();
 
+        // Skip exact duplicates that share the same hash.
         if let Some(potential_duplicates) = self.rules_by_hash.get(&hash) {
             for potential_duplicate in potential_duplicates {
-                if rule.equals(potential_duplicate.as_ref()) {
+                if rule.borrow().equals(&potential_duplicate.borrow()) {
                     return Ok(());
                 }
             }
         }
 
-        // TODO(phase-b): Rule is a PHP class with shared ownership; should be Rc<dyn Rule>
-        // so the same instance can be inserted in rules, rule_by_id, and rules_by_hash.
-        // Box<dyn Rule> cannot be cloned; storing placeholders for now.
+        // The same rule instance is referenced from `rules`, `rule_by_id`, and
+        // `rules_by_hash` (PHP shares one object across all three).
         self.rules
             .entry(r#type)
             .or_insert_with(Vec::new)
-            .push(todo!("share rule via Rc"));
-        rule.set_type(r#type);
-        self.rule_by_id
-            .insert(self.next_rule_id, todo!("share rule via Rc"));
+            .push(rule.clone());
+        self.rule_by_id.insert(self.next_rule_id, rule.clone());
+        rule.borrow_mut().set_type(r#type);
 
         self.next_rule_id += 1;
 
@@ -92,34 +94,37 @@ impl RuleSet {
         self.next_rule_id
     }
 
-    pub fn rule_by_id(&self, id: i64) -> &dyn Rule {
-        &*self.rule_by_id[&id]
+    pub fn rule_by_id(&self, id: i64) -> Rc<RefCell<Rule>> {
+        self.rule_by_id[&id].clone()
     }
 
-    pub fn rule_by_id_mut(&mut self, id: i64) -> &mut dyn Rule {
-        self.rule_by_id.get_mut(&id).unwrap().as_mut()
-    }
-
-    pub fn get_rules(&self) -> &IndexMap<i64, Vec<Box<dyn Rule>>> {
+    pub fn get_rules(&self) -> &IndexMap<i64, Vec<Rc<RefCell<Rule>>>> {
         &self.rules
     }
 
     pub fn get_iterator(&self) -> RuleSetIterator {
-        // TODO(phase-b): same Rule-clone concern as get_iterator_for.
-        RuleSetIterator::new(IndexMap::new())
+        RuleSetIterator::new(self.rules.clone())
     }
 
     pub fn get_iterator_for(&self, types: Vec<i64>) -> RuleSetIterator {
-        // TODO(phase-b): Rule is a PHP class with shared ownership; should be Rc<dyn Rule>
-        // before this can compile. Returning an empty iterator placeholder for now.
-        let _ = (self, types);
-        RuleSetIterator::new(IndexMap::new())
+        let mut rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>> = IndexMap::new();
+        for r#type in types {
+            if let Some(rules_for_type) = self.rules.get(&r#type) {
+                rules.insert(r#type, rules_for_type.clone());
+            }
+        }
+        RuleSetIterator::new(rules)
     }
 
     pub fn get_iterator_without(&self, types: Vec<i64>) -> RuleSetIterator {
-        // TODO(phase-b): same as above; Box<dyn Rule> cannot be cloned.
-        let _ = (self, types);
-        RuleSetIterator::new(IndexMap::new())
+        let mut rules: IndexMap<i64, Vec<Rc<RefCell<Rule>>>> = IndexMap::new();
+        for (r#type, rules_for_type) in &self.rules {
+            if types.contains(r#type) {
+                continue;
+            }
+            rules.insert(*r#type, rules_for_type.clone());
+        }
+        RuleSetIterator::new(rules)
     }
 
     pub fn get_types(&self) -> Vec<i64> {
@@ -141,10 +146,10 @@ impl RuleSet {
             for rule in rules {
                 if repository_set.is_some() && request.is_some() && pool.is_some() {
                     // TODO(phase-b): get_pretty_string needs &mut Pool plus installed_map and learned_pool.
-                    let _ = (repository_set, request, pool, is_verbose, rule);
-                    string.push_str(&rule.to_string());
+                    let _ = (repository_set, request, pool, is_verbose);
+                    string.push_str(&rule.borrow().to_string());
                 } else {
-                    string.push_str(&rule.to_string());
+                    string.push_str(&rule.borrow().to_string());
                 }
                 string.push('\n');
             }

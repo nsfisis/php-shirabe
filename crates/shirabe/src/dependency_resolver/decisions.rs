@@ -10,7 +10,7 @@ use std::fmt;
 pub struct Decisions {
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) decision_map: IndexMap<i64, i64>,
-    pub(crate) decision_queue: Vec<(i64, Box<dyn Rule>)>,
+    pub(crate) decision_queue: Vec<(i64, std::rc::Rc<std::cell::RefCell<Rule>>)>,
     iterator_cursor: Option<usize>,
 }
 
@@ -36,7 +36,7 @@ impl Decisions {
         }
     }
 
-    pub fn decide(&mut self, literal: i64, level: i64, why: Box<dyn Rule>) {
+    pub fn decide(&mut self, literal: i64, level: i64, why: std::rc::Rc<std::cell::RefCell<Rule>>) {
         self.add_decision(literal, level);
         self.decision_queue.push((literal, why));
     }
@@ -90,12 +90,15 @@ impl Decisions {
         0
     }
 
-    pub fn decision_rule(&self, literal_or_package_id: i64) -> &dyn Rule {
+    pub fn decision_rule(
+        &self,
+        literal_or_package_id: i64,
+    ) -> std::rc::Rc<std::cell::RefCell<Rule>> {
         let package_id = literal_or_package_id.abs();
 
         for decision in &self.decision_queue {
             if package_id == decision.0.abs() {
-                return &*decision.1;
+                return decision.1.clone();
             }
         }
 
@@ -112,7 +115,7 @@ impl Decisions {
         );
     }
 
-    pub fn at_offset(&self, queue_offset: usize) -> &(i64, Box<dyn Rule>) {
+    pub fn at_offset(&self, queue_offset: usize) -> &(i64, std::rc::Rc<std::cell::RefCell<Rule>>) {
         &self.decision_queue[queue_offset]
     }
 
@@ -120,8 +123,8 @@ impl Decisions {
         queue_offset >= 0 && queue_offset < self.decision_queue.len() as i64
     }
 
-    pub fn last_reason(&self) -> &dyn Rule {
-        &*self.decision_queue[self.decision_queue.len() - 1].1
+    pub fn last_reason(&self) -> std::rc::Rc<std::cell::RefCell<Rule>> {
+        self.decision_queue[self.decision_queue.len() - 1].1.clone()
     }
 
     pub fn last_literal(&self) -> i64 {
@@ -159,7 +162,7 @@ impl Decisions {
         }
     }
 
-    pub fn current(&self) -> Option<&(i64, Box<dyn Rule>)> {
+    pub fn current(&self) -> Option<&(i64, std::rc::Rc<std::cell::RefCell<Rule>>)> {
         self.iterator_cursor
             .and_then(|cursor| self.decision_queue.get(cursor))
     }

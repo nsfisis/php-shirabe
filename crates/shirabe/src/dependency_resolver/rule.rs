@@ -1,19 +1,24 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule.php
 
 use std::any::Any;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, abs, array_filter, array_keys, array_shift, array_values, implode,
-    is_object,
+    LogicException, PhpMixed, RuntimeException, abs, array_filter, array_keys, array_shift,
+    array_values, implode, is_object,
 };
 use shirabe_semver::constraint::Constraint;
 use shirabe_semver::constraint::ConstraintInterface;
 
+use crate::dependency_resolver::GenericRule;
+use crate::dependency_resolver::MultiConflictRule;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Problem;
 use crate::dependency_resolver::Request;
+use crate::dependency_resolver::Rule2Literals;
 use crate::dependency_resolver::RuleSet;
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
@@ -23,8 +28,6 @@ use crate::package::version::VersionParser;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 
-/// PHP: @phpstan-type ReasonData = Link|BasePackage|string|int|array{...}|array{...}
-/// We model this as an enum.
 #[derive(Debug)]
 pub enum ReasonData {
     Link(Link),
@@ -70,41 +73,98 @@ pub const BITFIELD_TYPE: i64 = 0;
 pub const BITFIELD_REASON: i64 = 8;
 pub const BITFIELD_DISABLED: i64 = 16;
 
-pub trait Rule: std::fmt::Display + std::fmt::Debug {
-    fn bitfield(&self) -> i64;
-    fn bitfield_mut(&mut self) -> &mut i64;
-    fn request(&self) -> Option<&Request>;
-    fn request_mut(&mut self) -> Option<&mut Request>;
-    fn reason_data(&self) -> Option<&ReasonData>;
-    fn reason_data_mut(&mut self) -> Option<&mut ReasonData>;
+#[derive(Debug)]
+pub enum Rule {
+    Generic(GenericRule),
+    MultiConflict(MultiConflictRule),
+    TwoLiterals(Rule2Literals),
+}
 
-    fn get_literals(&self) -> Vec<i64>;
-    fn get_hash(&self) -> PhpMixed;
-    fn equals(&self, rule: &dyn Rule) -> bool;
-    fn is_assertion(&self) -> bool;
-
-    fn clone_box(&self) -> Box<dyn Rule> {
-        todo!()
+impl Rule {
+    fn base(&self) -> &RuleBase {
+        match self {
+            Rule::Generic(r) => r.base(),
+            Rule::MultiConflict(r) => r.base(),
+            Rule::TwoLiterals(r) => r.base(),
+        }
     }
 
-    /// PHP: `$rule instanceof MultiConflictRule`. Returns a borrow of the
-    /// underlying `MultiConflictRule` when this rule is one, otherwise `None`.
-    fn as_multi_conflict(&self) -> Option<&crate::dependency_resolver::MultiConflictRule> {
-        None
+    fn base_mut(&mut self) -> &mut RuleBase {
+        match self {
+            Rule::Generic(r) => r.base_mut(),
+            Rule::MultiConflict(r) => r.base_mut(),
+            Rule::TwoLiterals(r) => r.base_mut(),
+        }
+    }
+
+    fn bitfield(&self) -> i64 {
+        self.base().bitfield
+    }
+
+    fn bitfield_mut(&mut self) -> &mut i64 {
+        &mut self.base_mut().bitfield
+    }
+
+    fn reason_data(&self) -> Option<&ReasonData> {
+        self.base().reason_data.as_ref()
+    }
+
+    pub fn get_literals(&self) -> Vec<i64> {
+        match self {
+            Rule::Generic(r) => r.get_literals().clone(),
+            Rule::MultiConflict(r) => r.get_literals().clone(),
+            // PHP Rule2Literals::getLiterals returns [$literal1, $literal2].
+            Rule::TwoLiterals(r) => vec![r.literal1, r.literal2],
+        }
+    }
+
+    pub fn get_hash(&self) -> Result<PhpMixed> {
+        match self {
+            Rule::Generic(r) => Ok(PhpMixed::Int(r.get_hash()?)),
+            Rule::MultiConflict(r) => Ok(PhpMixed::Int(r.get_hash()?)),
+            Rule::TwoLiterals(r) => Ok(PhpMixed::String(r.get_hash())),
+        }
+    }
+
+    pub fn equals(&self, rule: &Rule) -> bool {
+        match self {
+            Rule::Generic(r) => r.equals(rule),
+            Rule::MultiConflict(r) => r.equals(rule),
+            Rule::TwoLiterals(r) => r.equals(rule),
+        }
+    }
+
+    pub fn is_assertion(&self) -> bool {
+        match self {
+            Rule::Generic(r) => r.is_assertion(),
+            Rule::MultiConflict(r) => r.is_assertion(),
+            Rule::TwoLiterals(r) => r.is_assertion(),
+        }
+    }
+
+    pub fn is_multi_conflict_rule(&self) -> bool {
+        matches!(self, Rule::MultiConflict(_))
+    }
+
+    pub fn as_multi_conflict(&self) -> Option<&MultiConflictRule> {
+        match self {
+            Rule::MultiConflict(r) => Some(r),
+            _ => None,
+        }
     }
 
     /// @return self::RULE_*
-    fn get_reason(&self) -> i64 {
+    pub fn get_reason(&self) -> i64 {
         (self.bitfield() & (255 << BITFIELD_REASON)) >> BITFIELD_REASON
     }
 
     /// @phpstan-return ReasonData
-    fn get_reason_data(&self) -> &ReasonData {
+    pub fn get_reason_data(&self) -> &ReasonData {
         // TODO(phase-b): reason_data() returns Option; PHP getReasonData unconditional
         self.reason_data().unwrap()
     }
 
-    fn get_required_package(&self) -> Option<String> {
+    pub fn get_required_package(&self) -> Option<String> {
         match self.get_reason() {
             r if r == RULE_ROOT_REQUIRE => match self.get_reason_data() {
                 ReasonData::RootRequire { package_name, .. } => Some(package_name.clone()),
@@ -123,33 +183,41 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
     }
 
     /// @param RuleSet::TYPE_* $type
-    fn set_type(&mut self, r#type: i64) {
+    pub fn set_type(&mut self, r#type: i64) {
         *self.bitfield_mut() =
             (self.bitfield() & !(255i64 << BITFIELD_TYPE)) | ((255 & r#type) << BITFIELD_TYPE);
     }
 
-    fn get_type(&self) -> i64 {
+    pub fn get_type(&self) -> i64 {
         (self.bitfield() & (255 << BITFIELD_TYPE)) >> BITFIELD_TYPE
     }
 
-    fn disable(&mut self) {
+    pub fn disable(&mut self) -> Result<()> {
+        if let Rule::MultiConflict(_) = self {
+            return Err(RuntimeException {
+                message: "Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string(),
+                code: 0,
+            }
+            .into());
+        }
         *self.bitfield_mut() =
             (self.bitfield() & !(255i64 << BITFIELD_DISABLED)) | (1i64 << BITFIELD_DISABLED);
+        Ok(())
     }
 
-    fn enable(&mut self) {
+    pub fn enable(&mut self) {
         *self.bitfield_mut() &= !(255i64 << BITFIELD_DISABLED);
     }
 
-    fn is_disabled(&self) -> bool {
+    pub fn is_disabled(&self) -> bool {
         0 != ((self.bitfield() & (255 << BITFIELD_DISABLED)) >> BITFIELD_DISABLED)
     }
 
-    fn is_enabled(&self) -> bool {
+    pub fn is_enabled(&self) -> bool {
         0 == ((self.bitfield() & (255 << BITFIELD_DISABLED)) >> BITFIELD_DISABLED)
     }
 
-    fn is_caused_by_lock(
+    pub fn is_caused_by_lock(
         &self,
         _repository_set: &RepositorySet,
         request: &Request,
@@ -221,7 +289,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
     }
 
     /// @internal
-    fn get_source_package(&self, pool: &Pool) -> Result<Box<dyn BasePackage>> {
+    pub fn get_source_package(&self, pool: &Pool) -> Result<Box<dyn BasePackage>> {
         let literals = self.get_literals();
 
         match self.get_reason() {
@@ -263,14 +331,14 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
 
     /// @param BasePackage[] $installedMap
     /// @param array<Rule[]> $learnedPool
-    fn get_pretty_string(
+    pub fn get_pretty_string(
         &self,
         repository_set: &RepositorySet,
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
         installed_map: &IndexMap<String, Box<dyn BasePackage>>,
-        _learned_pool: &Vec<Vec<Box<dyn Rule>>>,
+        _learned_pool: &Vec<Vec<Rc<RefCell<Rule>>>>,
     ) -> String {
         let mut literals = self.get_literals();
 
@@ -295,7 +363,6 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     );
                 }
 
-                // PHP: array_values(array_filter($packages, fn ($p) => !($p instanceof AliasPackage)))
                 let packages_non_alias: Vec<Box<dyn BasePackage>> = packages
                     .iter()
                     .filter(|p| p.as_any().downcast_ref::<AliasPackage>().is_none())
@@ -317,7 +384,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     "Root composer.json requires {} {} -> satisfiable by {}.",
                     package_name,
                     constraint.get_pretty_string(),
-                    self.format_packages_unique(
+                    self.format_packages_unique_from_packages(
                         pool,
                         packages,
                         is_verbose,
@@ -437,7 +504,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     format!(
                         "{} -> satisfiable by {}.",
                         text,
-                        self.format_packages_unique(
+                        self.format_packages_unique_from_packages(
                             pool,
                             requires,
                             is_verbose,
@@ -467,7 +534,6 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     let package = pool.literal_to_package(*literal);
                     package_names.insert(package.get_name().to_string(), true);
                 }
-                // PHP: unset($literal);
                 let replaced_name = match self.get_reason_data() {
                     ReasonData::String(s) => s.clone(),
                     _ => String::new(),
@@ -510,14 +576,14 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                     if installed_packages.len() > 0 && removable_packages.len() > 0 {
                         return format!(
                             "{} cannot be installed as that would require removing {}. {}",
-                            self.format_packages_unique(
+                            self.format_packages_unique_from_packages(
                                 pool,
                                 removable_packages,
                                 is_verbose,
                                 None,
                                 true,
                             ),
-                            self.format_packages_unique(
+                            self.format_packages_unique_from_packages(
                                 pool,
                                 installed_packages,
                                 is_verbose,
@@ -576,7 +642,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
                             "{}{} {}",
                             group,
                             if packages.len() > 1 { " one of" } else { "" },
-                            self.format_packages_unique(
+                            self.format_packages_unique_from_packages(
                                 pool,
                                 packages.iter().map(|p| p.clone_box()).collect(),
                                 is_verbose,
@@ -640,22 +706,15 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         }
     }
 
-    /// @param array<int|BasePackage> $literalsOrPackages An array containing packages or literals
-    fn format_packages_unique(
+    // Corresponds the variant formatPackagesUnique() that takes an array of BasePackages.
+    fn format_packages_unique_from_packages(
         &self,
         pool: &Pool,
-        literals_or_packages: Vec<Box<dyn BasePackage>>,
+        packages: Vec<Box<dyn BasePackage>>,
         is_verbose: bool,
         constraint: Option<&dyn ConstraintInterface>,
         use_removed_version_group: bool,
     ) -> String {
-        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
-        for package in literals_or_packages {
-            // PHP: \is_object($package) ? $package : $pool->literalToPackage($package);
-            // In Rust we already have BasePackage, so no conversion needed.
-            packages.push(package);
-        }
-
         Problem::get_package_list(
             &packages,
             is_verbose,
@@ -665,7 +724,7 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         )
     }
 
-    /// Helper for cases where literals come as int IDs (PHP supports both via union).
+    // Corresponds the variant formatPackagesUnique() that takes an array of integers.
     fn format_packages_unique_from_literals(
         &self,
         pool: &Pool,
@@ -698,6 +757,16 @@ pub trait Rule: std::fmt::Display + std::fmt::Debug {
         }
 
         package
+    }
+}
+
+impl std::fmt::Display for Rule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Rule::Generic(r) => write!(f, "{}", r),
+            Rule::MultiConflict(r) => write!(f, "{}", r),
+            Rule::TwoLiterals(r) => write!(f, "{}", r),
+        }
     }
 }
 

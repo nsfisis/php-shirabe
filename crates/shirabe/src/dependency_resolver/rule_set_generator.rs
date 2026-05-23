@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php
 
 use std::any::Any;
+use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::rc::Rc;
 
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -121,20 +123,20 @@ impl RuleSetGenerator {
         packages: &[Box<dyn PackageInterface>],
         reason: i64,
         reason_data: PhpMixed,
-    ) -> Box<dyn Rule> {
+    ) -> Rule {
         let literals: Vec<i64> = packages.iter().map(|p| -p.get_id()).collect();
 
         if literals.len() == 2 {
-            // Rule2Literals and MultiConflictRule both implement Rule (Phase B: define Rule type)
-            Box::new(Rule2Literals::new(
+            Rule::TwoLiterals(Rule2Literals::new(
                 literals[0],
                 literals[1],
                 PhpMixed::Int(reason),
                 reason_data,
-            )) as Box<dyn Rule>
+            ))
         } else {
-            Box::new(MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap())
-                as Box<dyn Rule>
+            Rule::MultiConflict(
+                MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap(),
+            )
         }
     }
 
@@ -142,9 +144,9 @@ impl RuleSetGenerator {
     ///
     /// To be able to directly pass in the result of one of the rule creation
     /// methods null is allowed which will not insert a rule.
-    fn add_rule(&mut self, r#type: i64, new_rule: Option<Box<dyn Rule>>) {
+    fn add_rule(&mut self, r#type: i64, new_rule: Option<Rule>) {
         if let Some(rule) = new_rule {
-            self.rules.add(rule, r#type).ok();
+            self.rules.add(Rc::new(RefCell::new(rule)), r#type).ok();
         }
     }
 
@@ -184,10 +186,7 @@ impl RuleSetGenerator {
                     rule::RULE_PACKAGE_ALIAS,
                     PhpMixed::Null, // reasonData: $package (BasePackage)
                 );
-                self.add_rule(
-                    RuleSet::TYPE_PACKAGE,
-                    rule.map(|r| Box::new(r) as Box<dyn Rule>),
-                );
+                self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::Generic));
 
                 // aliases must be installed with their main package, so create a rule the other way around as well
                 let inverse_rule = self.create_require_rule(
@@ -196,10 +195,7 @@ impl RuleSetGenerator {
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
                     PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
                 );
-                self.add_rule(
-                    RuleSet::TYPE_PACKAGE,
-                    inverse_rule.map(|r| Box::new(r) as Box<dyn Rule>),
-                );
+                self.add_rule(RuleSet::TYPE_PACKAGE, inverse_rule.map(Rule::Generic));
 
                 // if alias package has no self.version requires, its requirements do not
                 // need to be added as the aliased package processing will take care of it
@@ -236,10 +232,7 @@ impl RuleSetGenerator {
                     rule::RULE_PACKAGE_REQUIRES,
                     PhpMixed::Null, // reasonData: $link (Link)
                 );
-                self.add_rule(
-                    RuleSet::TYPE_PACKAGE,
-                    rule.map(|r| Box::new(r) as Box<dyn Rule>),
-                );
+                self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::Generic));
 
                 for require in possible_requires {
                     work_queue.push_back(require);
@@ -297,10 +290,7 @@ impl RuleSetGenerator {
                             rule::RULE_PACKAGE_CONFLICT,
                             PhpMixed::Null, // reasonData: $link (Link)
                         );
-                        self.add_rule(
-                            RuleSet::TYPE_PACKAGE,
-                            rule.map(|r| Box::new(r) as Box<dyn Rule>),
-                        );
+                        self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::TwoLiterals));
                     }
                 }
             }
@@ -360,7 +350,7 @@ impl RuleSetGenerator {
                 rule::RULE_FIXED,
                 PhpMixed::Array(reason_data),
             );
-            self.add_rule(RuleSet::TYPE_REQUEST, Some(Box::new(rule) as Box<dyn Rule>));
+            self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
         }
 
         for (package_name, constraint) in request.get_requires() {
@@ -406,7 +396,7 @@ impl RuleSetGenerator {
                     rule::RULE_ROOT_REQUIRE,
                     PhpMixed::Array(reason_data),
                 );
-                self.add_rule(RuleSet::TYPE_REQUEST, Some(Box::new(rule) as Box<dyn Rule>));
+                self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
             }
         }
 

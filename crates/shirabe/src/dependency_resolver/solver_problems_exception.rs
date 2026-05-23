@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/SolverProblemsException.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use shirabe_php_shim::RuntimeException;
 
 use crate::dependency_resolver::Pool;
@@ -13,7 +16,7 @@ use crate::util::IniHelper;
 pub struct SolverProblemsException {
     inner: RuntimeException,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Box<dyn Rule>>>,
+    pub(crate) learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>,
 }
 
 impl SolverProblemsException {
@@ -27,7 +30,7 @@ impl SolverProblemsException {
         &self.inner.message
     }
 
-    pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Box<dyn Rule>>>) -> Self {
+    pub fn new(problems: Vec<Problem>, learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>) -> Self {
         let message = format!(
             "Failed resolving dependencies with {} problems, call getPrettyString to get formatted details",
             problems.len()
@@ -70,10 +73,10 @@ impl SolverProblemsException {
                     .unwrap_or_default()
             ));
             // TODO(phase-b): get_reasons returns an IndexMap; flatten its values into Vec<Vec<...>>.
-            let reasons_vec: Vec<Vec<Box<dyn crate::dependency_resolver::Rule>>> = problem
+            let reasons_vec: Vec<Vec<Rc<RefCell<Rule>>>> = problem
                 .get_reasons()
                 .values()
-                .map(|v| v.iter().map(|r| r.clone_box()).collect())
+                .map(|v| v.iter().map(|r| r.clone()).collect())
                 .collect();
             missing_extensions.extend(self.get_extension_problems(reasons_vec));
             is_caused_by_lock =
@@ -159,11 +162,11 @@ impl SolverProblemsException {
         text
     }
 
-    fn get_extension_problems(&self, reason_sets: Vec<Vec<Box<dyn Rule>>>) -> Vec<String> {
+    fn get_extension_problems(&self, reason_sets: Vec<Vec<Rc<RefCell<Rule>>>>) -> Vec<String> {
         let mut missing_extensions: indexmap::IndexMap<String, i64> = indexmap::IndexMap::new();
         for reason_set in reason_sets {
             for rule in reason_set {
-                let required = rule.get_required_package();
+                let required = rule.borrow().get_required_package();
                 if let Some(req) = required {
                     if req.starts_with("ext-") {
                         missing_extensions.insert(req.to_string(), 1);

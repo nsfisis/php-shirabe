@@ -1,12 +1,15 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::dependency_resolver::Decisions;
-use crate::dependency_resolver::RuleLiterals;
+use crate::dependency_resolver::Rule;
 
 pub struct RuleWatchNode {
     pub watch1: i64,
     pub watch2: i64,
-    pub(crate) rule: Box<dyn RuleLiterals>,
+    pub(crate) rule: Rc<RefCell<Rule>>,
 }
 
 impl std::fmt::Debug for RuleWatchNode {
@@ -19,8 +22,8 @@ impl std::fmt::Debug for RuleWatchNode {
 }
 
 impl RuleWatchNode {
-    pub fn new(rule: Box<dyn RuleLiterals>) -> Self {
-        let literals = rule.get_literals();
+    pub fn new(rule: Rc<RefCell<Rule>>) -> Self {
+        let literals = rule.borrow().get_literals();
         let literal_count = literals.len();
         let watch1 = if literal_count > 0 { literals[0] } else { 0 };
         let watch2 = if literal_count > 1 { literals[1] } else { 0 };
@@ -33,14 +36,13 @@ impl RuleWatchNode {
     }
 
     pub fn watch2_on_highest(&mut self, decisions: &Decisions) {
-        let literals = self.rule.get_literals();
+        let literals = self.rule.borrow().get_literals();
 
         // if there are only 2 elements, both are being watched anyway
-        if literals.len() < 3 || self.rule.is_multi_conflict_rule() {
+        if literals.len() < 3 || self.rule.borrow().is_multi_conflict_rule() {
             return;
         }
 
-        let literals: Vec<i64> = literals.clone();
         let mut watch_level: i64 = 0;
 
         for literal in &literals {
@@ -53,14 +55,8 @@ impl RuleWatchNode {
         }
     }
 
-    pub fn get_rule(&self) -> &dyn RuleLiterals {
-        self.rule.as_ref()
-    }
-
-    /// Owned clone for callers that need a `Box<dyn Rule>`. Default impl in
-    /// `RuleLiterals` returns `todo!()`; concrete rule impls override it.
-    pub fn get_rule_boxed(&self) -> Box<dyn crate::dependency_resolver::Rule> {
-        self.rule.clone_rule_box()
+    pub fn get_rule(&self) -> Rc<RefCell<Rule>> {
+        self.rule.clone()
     }
 
     pub fn get_other_watch(&self, literal: i64) -> i64 {

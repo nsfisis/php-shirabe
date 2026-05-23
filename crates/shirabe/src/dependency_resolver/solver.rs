@@ -1,5 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Solver.php
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use indexmap::IndexMap;
 
 use shirabe_php_shim::{
@@ -43,7 +46,7 @@ pub struct Solver {
     /// Pairs of `(literals, level)` — PHP indexes into these with the BRANCH_* constants.
     pub(crate) branches: Vec<(Vec<i64>, i64)>,
     pub(crate) problems: Vec<Problem>,
-    pub(crate) learned_pool: Vec<Vec<Box<dyn Rule>>>,
+    pub(crate) learned_pool: Vec<Vec<Rc<RefCell<Rule>>>>,
     pub(crate) learned_why: IndexMap<String, i64>,
 
     pub test_flag_learned_positive_literal: bool,
@@ -94,18 +97,18 @@ impl Solver {
         let rules_count = self.rules.count();
         let mut rule_index = 0_i64;
         while rule_index < rules_count {
-            let rule = self.rules.rule_by_id(rule_index).clone_box();
+            let rule = self.rules.rule_by_id(rule_index);
 
-            if !rule.is_assertion() || rule.is_disabled() {
+            if !rule.borrow().is_assertion() || rule.borrow().is_disabled() {
                 rule_index += 1;
                 continue;
             }
 
-            let literals = rule.get_literals();
+            let literals = rule.borrow().get_literals();
             let literal = literals[0];
 
             if !self.decisions.decided(literal) {
-                self.decisions.decide(literal, 1, rule.clone_box());
+                self.decisions.decide(literal, 1, rule.clone());
                 rule_index += 1;
                 continue;
             }
@@ -116,24 +119,20 @@ impl Solver {
             }
 
             // found a conflict
-            if RuleSet::TYPE_LEARNED == rule.get_type() {
-                let rule_mut = self.rules.rule_by_id_mut(rule_index);
-                // TODO(phase-b): PHP `disable()` may throw for MultiConflictRule.
-                // The Rule trait method returns `()`; the special case isn't surfaced.
-                rule_mut.disable();
+            if RuleSet::TYPE_LEARNED == rule.borrow().get_type() {
+                rule.borrow_mut().disable()?;
                 rule_index += 1;
                 continue;
             }
 
-            let conflict = self.decisions.decision_rule(literal).clone_box();
+            let conflict = self.decisions.decision_rule(literal);
 
-            if RuleSet::TYPE_PACKAGE == conflict.get_type() {
+            if RuleSet::TYPE_PACKAGE == conflict.borrow().get_type() {
                 let mut problem = Problem::new();
 
-                problem.add_rule(rule.clone_box());
+                problem.add_rule(rule.clone());
                 problem.add_rule(conflict);
-                // TODO(phase-b): PHP `disable()` may throw for MultiConflictRule.
-                self.rules.rule_by_id_mut(rule_index).disable();
+                rule.borrow_mut().disable()?;
                 self.problems.push(problem);
                 rule_index += 1;
                 continue;
@@ -141,33 +140,29 @@ impl Solver {
 
             // conflict with another root require/fixed package
             let mut problem = Problem::new();
-            problem.add_rule(rule.clone_box());
+            problem.add_rule(rule.clone());
             problem.add_rule(conflict);
 
             // push all of our rules (can only be root require/fixed package rules)
             // asserting this literal on the problem stack
-            // TODO(phase-b): RuleSetIterator does not expose an `ids()` method matching
-            // PHP's `array_keys($iterator->rules())`. Returning an empty Vec until the
-            // iterator surfaces the underlying rule ids.
-            let request_rules: Vec<i64> = {
-                let _iter = self.rules.get_iterator_for(vec![RuleSet::TYPE_REQUEST]);
-                Vec::new()
-            };
-            for assert_rule_id in request_rules {
-                let assert_rule = self.rules.rule_by_id(assert_rule_id).clone_box();
-                if assert_rule.is_disabled() || !assert_rule.is_assertion() {
+            let mut assert_iterator = self.rules.get_iterator_for(vec![RuleSet::TYPE_REQUEST]);
+            while assert_iterator.valid() {
+                let assert_rule = assert_iterator.current();
+                if assert_rule.borrow().is_disabled() || !assert_rule.borrow().is_assertion() {
+                    assert_iterator.next();
                     continue;
                 }
 
-                let assert_rule_literals = assert_rule.get_literals();
+                let assert_rule_literals = assert_rule.borrow().get_literals();
                 let assert_rule_literal = assert_rule_literals[0];
 
                 if literal.abs() != assert_rule_literal.abs() {
+                    assert_iterator.next();
                     continue;
                 }
-                problem.add_rule(assert_rule);
-                // TODO(phase-b): PHP `disable()` may throw for MultiConflictRule.
-                self.rules.rule_by_id_mut(assert_rule_id).disable();
+                problem.add_rule(assert_rule.clone());
+                assert_rule.borrow_mut().disable()?;
+                assert_iterator.next();
             }
             self.problems.push(problem);
 
@@ -227,7 +222,7 @@ impl Solver {
                 // TODO(phase-b): store the constraint inside reason_data; PhpMixed needs to
                 // accept a `dyn ConstraintInterface` wrapper.
                 reason_data.insert("constraint".to_string(), PhpMixed::Null);
-                problem.add_rule(Box::new(GenericRule::new(
+                problem.add_rule(Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
                     Vec::new(),
                     PhpMixed::Int(rule::RULE_ROOT_REQUIRE),
                     PhpMixed::Array(
@@ -236,7 +231,7 @@ impl Solver {
                             .map(|(k, v)| (k, Box::new(v)))
                             .collect(),
                     ),
-                )) as Box<dyn Rule>);
+                )))));
                 self.problems.push(problem);
             }
         }
@@ -265,10 +260,13 @@ impl Solver {
         self.decisions = Decisions::new(self.pool.clone());
         self.watch_graph = RuleWatchGraph::new();
 
-        // TODO(phase-b): RuleSet does not expose `iter()`; RuleWatchNode expects
-        // Box<dyn RuleLiterals>. Skipping watch-graph seeding until rule storage is
-        // refactored to share rules between RuleSet and RuleWatchGraph.
-        let _ = &mut self.watch_graph;
+        let mut iterator = self.rules.get_iterator();
+        while iterator.valid() {
+            let rule = iterator.current();
+            self.watch_graph
+                .insert(Rc::new(RefCell::new(RuleWatchNode::new(rule))));
+            iterator.next();
+        }
 
         // make decisions based on root require/fix assertions
         self.make_assertion_rule_decisions()?;
@@ -288,10 +286,10 @@ impl Solver {
         );
 
         if self.problems.len() > 0 {
-            // TODO(phase-b): SolverProblemsException stores `Box<dyn Rule>` which is not
+            // TODO(phase-b): SolverProblemsException stores `Rc<RefCell<Rule>>` which is not
             // `Send + Sync`, so it cannot satisfy `anyhow::Error`'s bounds. Returning a
-            // placeholder error preserves control flow until Rule gains thread-safety
-            // requirements or the exception type is reworked.
+            // placeholder error preserves control flow until the `Send + Sync` requirement
+            // is removed (single-threaded `Rc` model) or the exception type is reworked.
             let _ = SolverProblemsException::new(
                 std::mem::take(&mut self.problems),
                 std::mem::take(&mut self.learned_pool),
@@ -316,7 +314,7 @@ impl Solver {
     /// If we find unit rules we make new decisions based on them
     ///
     /// Returns a `Rule` on conflict, otherwise `None`.
-    fn propagate(&mut self, level: i64) -> Option<Box<dyn Rule>> {
+    fn propagate(&mut self, level: i64) -> Option<Rc<RefCell<Rule>>> {
         while self.decisions.valid_offset(self.propagate_index) {
             let decision = self
                 .decisions
@@ -377,7 +375,7 @@ impl Solver {
         &mut self,
         level: i64,
         literal: i64,
-        rule: Box<dyn Rule>,
+        rule: Rc<RefCell<Rule>>,
     ) -> anyhow::Result<i64> {
         let mut level = level + 1;
 
@@ -392,7 +390,7 @@ impl Solver {
             };
 
             if level == 1 {
-                self.analyze_unsolvable(rule.as_ref());
+                self.analyze_unsolvable(rule);
 
                 return Ok(0);
             }
@@ -411,14 +409,19 @@ impl Solver {
 
             self.revert(level);
 
-            // TODO(phase-b): GenericRule is a PHP class — Composer shares the same
-            // instance between RuleSet, RuleWatchGraph, and Decisions. Without shared
-            // ownership we can't add the rule once and reference it later; the watch
-            // graph and decisions hand-off are stubbed.
-            let _ = new_rule;
-            let _ = learn_literal;
-            let _ = why;
-            todo!("share learned GenericRule across RuleSet, RuleWatchGraph, and Decisions");
+            // The same learned rule instance is shared between RuleSet,
+            // RuleWatchGraph, and Decisions (PHP shares one object).
+            let new_rule = Rc::new(RefCell::new(Rule::Generic(new_rule)));
+            self.rules.add(new_rule.clone(), RuleSet::TYPE_LEARNED)?;
+
+            self.learned_why
+                .insert(spl_object_hash(&*new_rule.borrow()), why);
+
+            let rule_node = Rc::new(RefCell::new(RuleWatchNode::new(new_rule.clone())));
+            rule_node.borrow_mut().watch2_on_highest(&self.decisions);
+            self.watch_graph.insert(rule_node);
+
+            self.decisions.decide(learn_literal, level, new_rule);
         }
 
         Ok(level)
@@ -428,13 +431,13 @@ impl Solver {
         &mut self,
         level: i64,
         decision_queue: Vec<i64>,
-        rule: Box<dyn Rule>,
+        rule: Rc<RefCell<Rule>>,
     ) -> anyhow::Result<i64> {
         // choose best package to install from decisionQueue
         let mut literals = self.policy.select_preferred_packages(
             &*self.pool.borrow(),
             decision_queue,
-            rule.get_required_package(),
+            rule.borrow().get_required_package(),
         );
 
         let selected_literal = array_shift::<i64>(&mut literals)
@@ -451,9 +454,9 @@ impl Solver {
     fn analyze(
         &mut self,
         level: i64,
-        rule: Box<dyn Rule>,
+        rule: Rc<RefCell<Rule>>,
     ) -> anyhow::Result<(i64, i64, GenericRule, i64)> {
-        let analyzed_rule = rule.clone_box();
+        let analyzed_rule = rule.clone();
         let mut rule = rule;
         let mut rule_level = 1_i64;
         let mut num = 0_i64;
@@ -468,11 +471,11 @@ impl Solver {
 
         'outer: loop {
             let last = self.learned_pool.len() - 1;
-            self.learned_pool[last].push(rule.clone_box());
+            self.learned_pool[last].push(rule.clone());
 
-            for literal in rule.get_literals().clone() {
+            for literal in rule.borrow().get_literals() {
                 // multiconflictrule is really a bunch of rules in one, so some may not have finished propagating yet
-                if rule.as_multi_conflict().is_some() && !self.decisions.decided(literal) {
+                if rule.borrow().as_multi_conflict().is_some() && !self.decisions.decided(literal) {
                     continue;
                 }
 
@@ -521,8 +524,8 @@ impl Solver {
                         return Err(anyhow::anyhow!(SolverBugException::new(format!(
                             "Reached invalid decision id {} while looking through {} for a literal present in the analyzed rule {}.",
                             decision_id,
-                            rule.to_string(),
-                            analyzed_rule.to_string()
+                            rule.borrow().to_string(),
+                            analyzed_rule.borrow().to_string()
                         ))));
                     }
 
@@ -557,16 +560,16 @@ impl Solver {
                     l1num += 1;
                     l1retry = true;
                 } else {
-                    rule = self.decisions.at_offset(decision_id as usize).1.clone_box();
+                    rule = self.decisions.at_offset(decision_id as usize).1.clone();
 
-                    if rule.as_multi_conflict().is_some() {
+                    if rule.borrow().as_multi_conflict().is_some() {
                         // there is only ever exactly one positive decision in a MultiConflictRule
-                        for rule_literal in rule.get_literals().clone() {
+                        for rule_literal in rule.borrow().get_literals() {
                             if !seen.contains_key(&rule_literal.abs())
                                 && self.decisions.satisfy(-rule_literal)
                             {
                                 let last = self.learned_pool.len() - 1;
-                                self.learned_pool[last].push(rule.clone_box());
+                                self.learned_pool[last].push(rule.clone());
                                 let l = self.decisions.decision_level(rule_literal);
                                 if 1 == l {
                                     l1num += 1;
@@ -592,7 +595,7 @@ impl Solver {
             }
             let _ = literal_for_outer;
 
-            rule = self.decisions.at_offset(decision_id as usize).1.clone_box();
+            rule = self.decisions.at_offset(decision_id as usize).1.clone();
         }
 
         let why = (self.learned_pool.len() as i64) - 1;
@@ -602,7 +605,7 @@ impl Solver {
             None => {
                 return Err(anyhow::anyhow!(SolverBugException::new(format!(
                     "Did not find a learnable literal in analyzed rule {}.",
-                    analyzed_rule.to_string()
+                    analyzed_rule.borrow().to_string()
                 ))));
             }
         };
@@ -620,44 +623,44 @@ impl Solver {
     fn analyze_unsolvable_rule(
         &self,
         problem: &mut Problem,
-        conflict_rule: &dyn Rule,
+        conflict_rule: Rc<RefCell<Rule>>,
         rule_seen: &mut IndexMap<String, bool>,
     ) {
-        let why = spl_object_hash(conflict_rule);
+        let why = spl_object_hash(&*conflict_rule.borrow());
         rule_seen.insert(why.clone(), true);
 
-        if conflict_rule.get_type() == RuleSet::TYPE_LEARNED {
+        if conflict_rule.borrow().get_type() == RuleSet::TYPE_LEARNED {
             let learned_why = self.learned_why[&why];
-            let problem_rules = &self.learned_pool[learned_why as usize];
+            let problem_rules = self.learned_pool[learned_why as usize].clone();
 
             for problem_rule in problem_rules {
-                if !rule_seen.contains_key(&spl_object_hash(problem_rule)) {
-                    self.analyze_unsolvable_rule(problem, problem_rule.as_ref(), rule_seen);
+                if !rule_seen.contains_key(&spl_object_hash(&*problem_rule.borrow())) {
+                    self.analyze_unsolvable_rule(problem, problem_rule, rule_seen);
                 }
             }
 
             return;
         }
 
-        if conflict_rule.get_type() == RuleSet::TYPE_PACKAGE {
+        if conflict_rule.borrow().get_type() == RuleSet::TYPE_PACKAGE {
             // package rules cannot be part of a problem
             return;
         }
 
         problem.next_section();
-        problem.add_rule(conflict_rule.clone_box());
+        problem.add_rule(conflict_rule);
     }
 
-    fn analyze_unsolvable(&mut self, conflict_rule: &dyn Rule) {
+    fn analyze_unsolvable(&mut self, conflict_rule: Rc<RefCell<Rule>>) {
         let mut problem = Problem::new();
-        problem.add_rule(conflict_rule.clone_box());
+        problem.add_rule(conflict_rule.clone());
 
         let mut rule_seen: IndexMap<String, bool> = IndexMap::new();
 
-        self.analyze_unsolvable_rule(&mut problem, conflict_rule, &mut rule_seen);
+        self.analyze_unsolvable_rule(&mut problem, conflict_rule.clone(), &mut rule_seen);
 
         let mut seen: IndexMap<i64, bool> = IndexMap::new();
-        let literals = conflict_rule.get_literals().clone();
+        let literals = conflict_rule.borrow().get_literals();
 
         for literal in &literals {
             // skip the one true literal
@@ -681,12 +684,12 @@ impl Solver {
                 continue;
             }
 
-            let why = self.decisions.at_offset(offset - 1).1.clone_box();
+            let why = self.decisions.at_offset(offset - 1).1.clone();
 
-            problem.add_rule(why.clone_box());
-            self.analyze_unsolvable_rule(&mut problem, why.as_ref(), &mut rule_seen);
+            problem.add_rule(why.clone());
+            self.analyze_unsolvable_rule(&mut problem, why.clone(), &mut rule_seen);
 
-            let literals = why.get_literals().clone();
+            let literals = why.borrow().get_literals();
             for literal in &literals {
                 // skip the one true literal
                 if self.decisions.satisfy(*literal) {
@@ -717,7 +720,7 @@ impl Solver {
             if 1 == level {
                 let conflict_rule = self.propagate(level);
                 if let Some(cr) = conflict_rule {
-                    self.analyze_unsolvable(cr.as_ref());
+                    self.analyze_unsolvable(cr);
 
                     return Ok(());
                 }
@@ -728,12 +731,12 @@ impl Solver {
                 let mut iterator = self.rules.get_iterator_for(vec![RuleSet::TYPE_REQUEST]);
                 let mut broke_inner = false;
                 while iterator.valid() {
-                    let rule = iterator.current().clone_box();
-                    if rule.is_enabled() {
+                    let rule = iterator.current();
+                    if rule.borrow().is_enabled() {
                         let mut decision_queue: Vec<i64> = Vec::new();
                         let mut none_satisfied = true;
 
-                        for literal in rule.get_literals().clone() {
+                        for literal in rule.borrow().get_literals() {
                             if self.decisions.satisfy(literal) {
                                 none_satisfied = false;
                                 break;
@@ -820,10 +823,10 @@ impl Solver {
                     pass += 1;
                 }
 
-                let rule = self.rules.rule_by_id(i).clone_box();
-                let literals = rule.get_literals().clone();
+                let rule = self.rules.rule_by_id(i);
+                let literals = rule.borrow().get_literals();
 
-                if rule.is_disabled() {
+                if rule.borrow().is_disabled() {
                     i += 1;
                     n += 1;
                     continue;
@@ -918,7 +921,7 @@ impl Solver {
                     level = last_level_v;
                     self.revert(level);
 
-                    let why = self.decisions.last_reason().clone_box();
+                    let why = self.decisions.last_reason();
 
                     level = self.set_propagate_learn(level, last_literal_v, why)?;
 

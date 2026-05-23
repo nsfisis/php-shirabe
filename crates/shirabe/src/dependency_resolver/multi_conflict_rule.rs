@@ -1,12 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/MultiConflictRule.php
 
-use shirabe_php_shim::PhpMixed;
-
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::RuleLiterals;
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 use anyhow::Result;
-use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw};
+use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw};
 
 #[derive(Debug)]
 pub struct MultiConflictRule {
@@ -15,11 +11,7 @@ pub struct MultiConflictRule {
 }
 
 impl MultiConflictRule {
-    pub fn new(
-        mut literals: Vec<i64>,
-        reason: shirabe_php_shim::PhpMixed,
-        reason_data: shirabe_php_shim::PhpMixed,
-    ) -> Result<Self> {
+    pub fn new(mut literals: Vec<i64>, reason: PhpMixed, reason_data: PhpMixed) -> Result<Self> {
         if literals.len() < 3 {
             return Err(RuntimeException {
                 message: "multi conflict rule requires at least 3 literals".to_string(),
@@ -35,6 +27,14 @@ impl MultiConflictRule {
             inner: RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data)),
             literals,
         })
+    }
+
+    pub(crate) fn base(&self) -> &RuleBase {
+        &self.inner
+    }
+
+    pub(crate) fn base_mut(&mut self) -> &mut RuleBase {
+        &mut self.inner
     }
 
     pub fn get_literals(&self) -> &Vec<i64> {
@@ -75,77 +75,16 @@ impl MultiConflictRule {
         }
     }
 
-    pub fn equals(&self, rule: &dyn RuleLiterals) -> bool {
-        // PHP: if ($rule instanceof MultiConflictRule) { ... } return false;
-        // Phase A: instanceof check not representable via RuleLiterals trait; literals-only comparison used
-        self.literals == *rule.get_literals()
+    pub fn equals(&self, rule: &Rule) -> bool {
+        if let Rule::MultiConflict(other) = rule {
+            self.literals == other.literals
+        } else {
+            false
+        }
     }
 
     pub fn is_assertion(&self) -> bool {
         false
-    }
-
-    pub fn disable(&mut self) -> Result<()> {
-        Err(RuntimeException {
-            message: "Disabling multi conflict rules is not possible. Please contact composer at https://github.com/composer/composer to let us debug what lead to this situation.".to_string(),
-            code: 0,
-        }.into())
-    }
-}
-
-impl RuleLiterals for MultiConflictRule {
-    fn get_literals(&self) -> &Vec<i64> {
-        &self.literals
-    }
-
-    fn is_multi_conflict_rule(&self) -> bool {
-        true
-    }
-}
-
-impl Rule for MultiConflictRule {
-    fn bitfield(&self) -> i64 {
-        todo!()
-    }
-
-    fn bitfield_mut(&mut self) -> &mut i64 {
-        todo!()
-    }
-
-    fn request(&self) -> Option<&Request> {
-        todo!()
-    }
-
-    fn request_mut(&mut self) -> Option<&mut Request> {
-        todo!()
-    }
-
-    fn reason_data(&self) -> Option<&ReasonData> {
-        todo!()
-    }
-
-    fn reason_data_mut(&mut self) -> Option<&mut ReasonData> {
-        todo!()
-    }
-
-    fn get_literals(&self) -> Vec<i64> {
-        todo!()
-    }
-
-    fn get_hash(&self) -> PhpMixed {
-        todo!()
-    }
-
-    fn equals(&self, rule: &dyn Rule) -> bool {
-        todo!()
-    }
-
-    fn is_assertion(&self) -> bool {
-        todo!()
-    }
-
-    fn as_multi_conflict(&self) -> Option<&MultiConflictRule> {
-        Some(self)
     }
 }
 

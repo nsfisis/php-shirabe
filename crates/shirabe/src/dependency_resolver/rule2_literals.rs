@@ -2,8 +2,6 @@
 
 use shirabe_php_shim::PhpMixed;
 
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::RuleLiterals;
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 
 #[derive(Debug)]
@@ -11,16 +9,10 @@ pub struct Rule2Literals {
     inner: RuleBase,
     pub(crate) literal1: i64,
     pub(crate) literal2: i64,
-    literals: Vec<i64>,
 }
 
 impl Rule2Literals {
-    pub fn new(
-        literal1: i64,
-        literal2: i64,
-        reason: shirabe_php_shim::PhpMixed,
-        reason_data: shirabe_php_shim::PhpMixed,
-    ) -> Self {
+    pub fn new(literal1: i64, literal2: i64, reason: PhpMixed, reason_data: PhpMixed) -> Self {
         let (literal1, literal2) = if literal1 < literal2 {
             (literal1, literal2)
         } else {
@@ -31,17 +23,33 @@ impl Rule2Literals {
             inner: RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data)),
             literal1,
             literal2,
-            literals: vec![literal1, literal2],
         }
+    }
+
+    pub(crate) fn base(&self) -> &RuleBase {
+        &self.inner
+    }
+
+    pub(crate) fn base_mut(&mut self) -> &mut RuleBase {
+        &mut self.inner
     }
 
     pub fn get_hash(&self) -> String {
         format!("{},{}", self.literal1, self.literal2)
     }
 
-    pub fn equals(&self, rule: &dyn RuleLiterals) -> bool {
-        // PHP: specialized fast-case for instanceof self, then fallback to literal comparison
-        // In Rust: use get_literals() for all cases (semantically equivalent)
+    pub fn equals(&self, rule: &Rule) -> bool {
+        // PHP: specialized fast-case when `$rule instanceof self`.
+        if let Rule::TwoLiterals(other) = rule {
+            if self.literal1 != other.literal1 {
+                return false;
+            }
+            if self.literal2 != other.literal2 {
+                return false;
+            }
+            return true;
+        }
+
         let literals = rule.get_literals();
         if literals.len() != 2 {
             return false;
@@ -57,54 +65,6 @@ impl Rule2Literals {
 
     pub fn is_assertion(&self) -> bool {
         false
-    }
-}
-
-impl RuleLiterals for Rule2Literals {
-    fn get_literals(&self) -> &Vec<i64> {
-        &self.literals
-    }
-}
-
-impl Rule for Rule2Literals {
-    fn bitfield(&self) -> i64 {
-        todo!()
-    }
-
-    fn bitfield_mut(&mut self) -> &mut i64 {
-        todo!()
-    }
-
-    fn request(&self) -> Option<&Request> {
-        todo!()
-    }
-
-    fn request_mut(&mut self) -> Option<&mut Request> {
-        todo!()
-    }
-
-    fn reason_data(&self) -> Option<&ReasonData> {
-        todo!()
-    }
-
-    fn reason_data_mut(&mut self) -> Option<&mut ReasonData> {
-        todo!()
-    }
-
-    fn get_literals(&self) -> Vec<i64> {
-        todo!()
-    }
-
-    fn get_hash(&self) -> PhpMixed {
-        todo!()
-    }
-
-    fn equals(&self, rule: &dyn Rule) -> bool {
-        todo!()
-    }
-
-    fn is_assertion(&self) -> bool {
-        todo!()
     }
 }
 
