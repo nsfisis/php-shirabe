@@ -251,13 +251,14 @@ impl BumpCommand {
                     None => continue,
                     Some(p) => p,
                 };
-                while let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
-                    // TODO(phase-b): get_alias_of returns &dyn BasePackage; cloning into Box
-                    // requires clone_box on BasePackage applied to a borrowed ref.
-                    package = alias.get_alias_of().clone_box();
+                while let Some(alias) = package.as_alias() {
+                    package = alias.get_alias_of().into();
                 }
 
-                let bumped = bumper.bump_requirement(link.get_constraint(), package.as_ref())?;
+                let bumped = bumper.bump_requirement(
+                    link.get_constraint(),
+                    package.as_rc().borrow().as_package_interface(),
+                )?;
 
                 if bumped == current_constraint {
                     continue;

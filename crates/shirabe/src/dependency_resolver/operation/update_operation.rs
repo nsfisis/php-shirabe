@@ -3,28 +3,29 @@
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 
 #[derive(Debug)]
 pub struct UpdateOperation {
-    pub(crate) initial_package: Box<dyn PackageInterface>,
-    pub(crate) target_package: Box<dyn PackageInterface>,
+    pub(crate) initial_package: PackageInterfaceHandle,
+    pub(crate) target_package: PackageInterfaceHandle,
 }
 
 impl UpdateOperation {
-    pub fn new(initial: Box<dyn PackageInterface>, target: Box<dyn PackageInterface>) -> Self {
+    pub fn new(initial: PackageInterfaceHandle, target: PackageInterfaceHandle) -> Self {
         Self {
             initial_package: initial,
             target_package: target,
         }
     }
 
-    pub fn get_initial_package(&self) -> &dyn PackageInterface {
-        self.initial_package.as_ref()
+    pub fn get_initial_package(&self) -> &PackageInterfaceHandle {
+        &self.initial_package
     }
 
-    pub fn get_target_package(&self) -> &dyn PackageInterface {
-        self.target_package.as_ref()
+    pub fn get_target_package(&self) -> &PackageInterfaceHandle {
+        &self.target_package
     }
 
     pub fn format(
@@ -89,8 +90,8 @@ impl OperationInterface for UpdateOperation {
 
     fn show(&self, lock: bool) -> String {
         Self::format(
-            self.initial_package.as_ref(),
-            self.target_package.as_ref(),
+            self.initial_package.as_rc().borrow().as_package_interface(),
+            self.target_package.as_rc().borrow().as_package_interface(),
             lock,
         )
     }

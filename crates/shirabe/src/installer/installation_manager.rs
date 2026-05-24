@@ -23,8 +23,8 @@ use crate::installer::PackageEvents;
 use crate::installer::PluginInstaller;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
-use crate::package::AliasPackage;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
@@ -37,7 +37,7 @@ pub struct InstallationManager {
     /// @var array<string, InstallerInterface>
     cache: IndexMap<String, Box<dyn InstallerInterface>>,
     /// @var array<string, array<PackageInterface>>
-    notifiable_packages: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
+    notifiable_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: Box<dyn IOInterface>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -133,18 +133,19 @@ impl InstallationManager {
     pub fn is_package_installed(
         &mut self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<bool> {
-        // TODO(phase-b): $package instanceof AliasPackage downcast
-        let package_as_alias: Option<&AliasPackage> = None;
-        if let Some(alias) = package_as_alias {
-            return Ok(repo.has_package(package)
-                && self.is_package_installed(repo, alias.get_alias_of())?);
+        if let Some(alias) = package.as_alias() {
+            let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
+            return Ok(
+                repo.has_package(package.as_rc().borrow().as_package_interface())
+                    && self.is_package_installed(repo, &alias_of)?,
+            );
         }
 
         Ok(self
-            .get_installer(package.get_type())?
-            .is_installed(repo, package))
+            .get_installer(&package.get_type())?
+            .is_installed(repo, package.as_rc().borrow().as_package_interface()))
     }
 
     /// Install binary for the given package.
@@ -311,9 +312,10 @@ impl InstallationManager {
             let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
                 // @var UpdateOperation $operation
-                if let Some(u) = update_op {
-                    package = u.get_target_package();
-                    initial_package = Some(u.get_initial_package());
+                if let Some(_u) = update_op {
+                    // TODO(phase-c): bridge UpdateOperation handles (target/initial) into the
+                    // &dyn PackageInterface that the installer APIs still expect.
+                    continue;
                 } else {
                     continue;
                 }
@@ -451,9 +453,10 @@ impl InstallationManager {
             let initial_package: Option<&dyn PackageInterface>;
             let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
-                if let Some(u) = update_op {
-                    package = u.get_target_package();
-                    initial_package = Some(u.get_initial_package());
+                if let Some(_u) = update_op {
+                    // TODO(phase-c): bridge UpdateOperation handles (target/initial) into the
+                    // &dyn PackageInterface that the installer APIs still expect.
+                    continue;
                 } else {
                     continue;
                 }
@@ -537,10 +540,11 @@ impl InstallationManager {
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &InstallOperation,
     ) -> Option<PhpMixed> {
-        let package = operation.get_package();
-        let installer = self.get_installer(package.get_type()).ok()?;
-        let promise = installer.install(repo, package).await.ok()?;
-        self.mark_for_notification(package);
+        let package = operation.get_package().clone();
+        let package_type = package.get_type();
+        let installer = self.get_installer(&package_type).ok()?;
+        let promise = installer.install(repo, &package).await.ok()?;
+        self.mark_for_notification(&package);
 
         promise
     }
@@ -553,27 +557,27 @@ impl InstallationManager {
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UpdateOperation,
     ) -> Option<PhpMixed> {
-        let initial = operation.get_initial_package();
-        let target = operation.get_target_package();
+        let initial = operation.get_initial_package().clone();
+        let target = operation.get_target_package().clone();
 
         let initial_type = initial.get_type();
         let target_type = target.get_type();
 
         let promise = if initial_type == target_type {
-            let installer = self.get_installer(initial_type).ok()?;
-            let promise = installer.update(repo, initial, target).await.ok()?;
-            self.mark_for_notification(target);
+            let installer = self.get_installer(&initial_type).ok()?;
+            let promise = installer.update(repo, &initial, &target).await.ok()?;
+            self.mark_for_notification(&target);
             promise
         } else {
             // PHP: uninstall initial, then install target via the target-type installer.
             let _ = self
-                .get_installer(initial_type)
+                .get_installer(&initial_type)
                 .ok()?
-                .uninstall(repo, initial)
+                .uninstall(repo, &initial)
                 .await
                 .ok()?;
-            let installer = self.get_installer(target_type).ok()?;
-            installer.install(repo, target).await.ok()?
+            let installer = self.get_installer(&target_type).ok()?;
+            installer.install(repo, &target).await.ok()?
         };
 
         promise
@@ -587,10 +591,11 @@ impl InstallationManager {
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UninstallOperation,
     ) -> Option<PhpMixed> {
-        let package = operation.get_package();
-        let installer = self.get_installer(package.get_type()).ok()?;
+        let package = operation.get_package().clone();
+        let package_type = package.get_type();
+        let installer = self.get_installer(&package_type).ok()?;
 
-        installer.uninstall(repo, package).await.ok()?
+        installer.uninstall(repo, &package).await.ok()?
     }
 
     /// Executes markAliasInstalled operation.
@@ -602,7 +607,10 @@ impl InstallationManager {
         let package = operation.get_package();
 
         if !repo.has_package(package) {
-            repo.add_package(package.clone_package_box());
+            // TODO(phase-c): MarkAliasInstalledOperation::get_package() yields a borrowed
+            // &AliasPackage; add_package now wants a shared PackageInterfaceHandle.
+            let package_handle: PackageInterfaceHandle = todo!();
+            repo.add_package(package_handle);
         }
     }
 
@@ -638,17 +646,11 @@ impl InstallationManager {
                 // non-batch API, deprecated
                 if str_contains(repo_url, "%package%") {
                     for package in packages {
-                        let url = str_replace("%package%", package.get_pretty_name(), repo_url);
+                        let url = str_replace("%package%", &package.get_pretty_name(), repo_url);
 
                         let mut params: IndexMap<String, String> = IndexMap::new();
-                        params.insert(
-                            "version".to_string(),
-                            package.get_pretty_version().to_string(),
-                        );
-                        params.insert(
-                            "version_normalized".to_string(),
-                            package.get_version().to_string(),
-                        );
+                        params.insert("version".to_string(), package.get_pretty_version());
+                        params.insert("version_normalized".to_string(), package.get_version());
                         let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
                         let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -693,15 +695,15 @@ impl InstallationManager {
                     let mut package_notification: IndexMap<String, PhpMixed> = IndexMap::new();
                     package_notification.insert(
                         "name".to_string(),
-                        PhpMixed::String(package.get_pretty_name().to_string()),
+                        PhpMixed::String(package.get_pretty_name()),
                     );
                     package_notification.insert(
                         "version".to_string(),
-                        PhpMixed::String(package.get_version().to_string()),
+                        PhpMixed::String(package.get_version()),
                     );
                     if strpos(repo_url, "packagist.org/").is_some() {
                         if let Some(metadata) =
-                            FileDownloader::download_metadata().get(package.get_name())
+                            FileDownloader::download_metadata().get(&package.get_name())
                         {
                             package_notification.insert("downloaded".to_string(), metadata.clone());
                         } else {
@@ -764,12 +766,12 @@ impl InstallationManager {
         self.reset();
     }
 
-    fn mark_for_notification(&mut self, package: &dyn PackageInterface) {
+    fn mark_for_notification(&mut self, package: &PackageInterfaceHandle) {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
-                .entry(notification_url.to_string())
+                .entry(notification_url)
                 .or_insert_with(Vec::new)
-                .push(package.clone_package_box());
+                .push(package.clone());
         }
     }
 

@@ -6,19 +6,14 @@ use std::cell::RefCell;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    Countable, InvalidArgumentException, LogicException, implode, preg_quote, spl_object_hash,
-    strtolower,
-};
+use shirabe_php_shim::{Countable, LogicException, implode, preg_quote, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
-use crate::package::CompleteAliasPackage;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
+use crate::package::BasePackageHandle;
+use crate::package::PackageHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
 use crate::package::version::VersionParser;
 use crate::repository::{
@@ -31,15 +26,15 @@ use crate::repository::{
 pub struct ArrayRepository {
     /// @var ?array<BasePackage>
     // TODO(phase-b): RefCell models PHP's lazy init via getPackages()/count() under &self
-    pub(crate) packages: RefCell<Option<Vec<Box<dyn BasePackage>>>>,
+    pub(crate) packages: RefCell<Option<Vec<BasePackageHandle>>>,
 
     /// @var ?array<BasePackage> indexed by package unique name and used to cache hasPackage calls
-    pub(crate) package_map: RefCell<Option<IndexMap<String, Box<dyn BasePackage>>>>,
+    pub(crate) package_map: RefCell<Option<IndexMap<String, BasePackageHandle>>>,
 }
 
 impl ArrayRepository {
     /// @param array<PackageInterface> $packages
-    pub fn new(packages: Vec<Box<dyn PackageInterface>>) -> Result<Self> {
+    pub fn new(packages: Vec<PackageInterfaceHandle>) -> Result<Self> {
         let this = Self {
             packages: RefCell::new(None),
             package_map: RefCell::new(None),
@@ -51,41 +46,27 @@ impl ArrayRepository {
     }
 
     /// Adds a new package to the repository
-    pub fn add_package(&self, package: Box<dyn PackageInterface>) -> Result<()> {
-        // PHP: if (!$package instanceof BasePackage) throw new \InvalidArgumentException(...)
-        // TODO(phase-b): need a real `instanceof BasePackage` check on dyn PackageInterface;
-        // dyn-trait downcast requires Sized. Defer until BasePackage exposes an `as_base_package`.
-        if false {
-            return Err(InvalidArgumentException {
-                message: "Only subclasses of BasePackage are supported".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-        // TODO(phase-b): convert Box<dyn PackageInterface> to Box<dyn BasePackage>
-        let mut package: Box<dyn BasePackage> =
-            todo!("downcast Box<dyn PackageInterface> to Box<dyn BasePackage>");
-
+    pub fn add_package(&self, package: PackageInterfaceHandle) -> Result<()> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }
         // TODO(phase-b): pass a reference to self, not a clone
         package.set_repository(todo!("self as Box<dyn RepositoryInterface>"))?;
 
-        let aliased_package: Option<Box<dyn BasePackage>> =
-            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
-                Some(alias.get_alias_of().clone_box())
-            } else {
-                None
-            };
+        let aliased_package: Option<PackageHandle> =
+            package.as_alias().map(|alias| alias.get_alias_of());
 
-        self.packages.borrow_mut().as_mut().unwrap().push(package);
+        self.packages
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .push(package.into());
 
         if let Some(aliased_package) = aliased_package {
-            if aliased_package.get_repository().is_none() {
-                // TODO(phase-b): pass aliased_package as Box<dyn PackageInterface>
-                self.add_package(todo!("Box<BasePackage> -> Box<dyn PackageInterface>"))?;
-            }
+            // PHP: if ($aliasedPackage->getRepository() === null) $this->addPackage($aliasedPackage);
+            // TODO(phase-c): the handle does not expose get_repository (a `RefCell`-borrowed
+            // back-reference); this needs repository back-references on handles.
+            let _ = aliased_package;
         }
 
         // invalidate package map cache
@@ -96,16 +77,18 @@ impl ArrayRepository {
     /// @return AliasPackage|CompleteAliasPackage
     pub(crate) fn create_alias_package(
         &self,
-        mut package: Box<dyn BasePackage>,
+        package: BasePackageHandle,
         alias: String,
         pretty_alias: String,
-    ) -> Box<dyn BasePackage> {
-        while let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
-            package = alias_pkg.get_alias_of().clone_box();
+    ) -> BasePackageHandle {
+        let mut package = package;
+        while let Some(alias_pkg) = package.as_alias() {
+            package = alias_pkg.get_alias_of().into();
         }
 
-        if package.as_any().downcast_ref::<CompletePackage>().is_some() {
-            // TODO(phase-b): construct CompleteAliasPackage/AliasPackage and return as Box<BasePackage>
+        let _ = (&package, &alias, &pretty_alias);
+        if package.as_complete_package().is_some() {
+            // TODO(phase-b): construct CompleteAliasPackage/AliasPackage and return as a handle
             return todo!("new CompleteAliasPackage(package, alias, pretty_alias)");
         }
 
@@ -165,17 +148,15 @@ impl RepositoryInterface for ArrayRepository {
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         let packages = self.get_packages();
 
-        let mut result: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+        let mut result: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
         for package in &packages {
-            if package_name_map.contains_key(PackageInterface::get_name(package.as_ref())) {
-                let constraint_opt = package_name_map
-                    .get(PackageInterface::get_name(package.as_ref()))
-                    .unwrap();
+            if package_name_map.contains_key(&package.get_name()) {
+                let constraint_opt = package_name_map.get(&package.get_name()).unwrap();
                 let constraint_matches = match constraint_opt {
                     None => true,
                     Some(c) => c.matches(
@@ -191,38 +172,35 @@ impl RepositoryInterface for ArrayRepository {
                     && StabilityFilter::is_package_acceptable(
                         &acceptable_stabilities,
                         &stability_flags,
-                        &PackageInterface::get_names(package.as_ref(), true),
-                        package.get_stability(),
+                        &package.get_names(true),
+                        &package.get_stability(),
                     )
                     && !already_loaded
-                        .get(PackageInterface::get_name(package.as_ref()))
-                        .map(|v| v.contains_key(package.get_version()))
+                        .get(&package.get_name())
+                        .map(|v| v.contains_key(&package.get_version()))
                         .unwrap_or(false)
                 {
                     // add selected packages which match stability requirements
-                    result.insert(spl_object_hash(package.as_ref()), package.clone_box());
+                    result.insert(package.ptr_id().to_string(), package.clone());
                     // add the aliased package for packages where the alias matches
-                    if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
+                    if let Some(alias) = package.as_alias() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(&spl_object_hash(aliased)) {
-                            result.insert(spl_object_hash(aliased), aliased.clone_box());
+                        if !result.contains_key(&aliased.ptr_id().to_string()) {
+                            result.insert(aliased.ptr_id().to_string(), aliased.into());
                         }
                     }
                 }
 
-                names_found.insert(
-                    PackageInterface::get_name(package.as_ref()).to_string(),
-                    true,
-                );
+                names_found.insert(package.get_name(), true);
             }
         }
 
         // add aliases of packages that were selected, even if the aliases did not match
         for package in &packages {
-            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
+            if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(&spl_object_hash(aliased)) {
-                    result.insert(spl_object_hash(package.as_ref()), package.clone_box());
+                if result.contains_key(&aliased.ptr_id().to_string()) {
+                    result.insert(package.ptr_id().to_string(), package.clone());
                 }
             }
         }
@@ -237,7 +215,7 @@ impl RepositoryInterface for ArrayRepository {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         let name = strtolower(name);
 
         let constraint: AnyConstraint = match constraint {
@@ -249,7 +227,7 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         for package in self.get_packages() {
-            if name == PackageInterface::get_name(package.as_ref()) {
+            if name == package.get_name() {
                 let pkg_constraint = SimpleConstraint::new(
                     "==".to_string(),
                     package.get_version().to_string(),
@@ -268,7 +246,7 @@ impl RepositoryInterface for ArrayRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         // normalize name
         let name = strtolower(name);
         let mut packages = vec![];
@@ -283,7 +261,7 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         for package in self.get_packages() {
-            if name == PackageInterface::get_name(package.as_ref()) {
+            if name == package.get_name() {
                 if constraint.is_none()
                     || constraint.as_ref().unwrap().matches(
                         &SimpleConstraint::new(
@@ -314,7 +292,7 @@ impl RepositoryInterface for ArrayRepository {
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
         for package in self.get_packages() {
-            let mut name = PackageInterface::get_name(package.as_ref()).to_string();
+            let mut name = package.get_name();
             if mode == crate::repository::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
                 let parts: Vec<&str> = name.splitn(2, '/').collect();
@@ -329,7 +307,7 @@ impl RepositoryInterface for ArrayRepository {
                 }
             }
 
-            let complete = package.as_any().downcast_ref::<CompletePackage>();
+            let complete = package.as_complete();
 
             let fulltext_match = mode == crate::repository::SEARCH_FULLTEXT
                 && complete.is_some()
@@ -337,8 +315,12 @@ impl RepositoryInterface for ArrayRepository {
                     &regex,
                     &format!(
                         "{} {}",
-                        implode(" ", &complete.unwrap().get_keywords()),
-                        complete.unwrap().get_description().unwrap_or("")
+                        implode(" ", &complete.as_ref().unwrap().get_keywords()),
+                        complete
+                            .as_ref()
+                            .unwrap()
+                            .get_description()
+                            .unwrap_or_default()
                     ),
                 )
                 .unwrap_or(false);
@@ -355,14 +337,12 @@ impl RepositoryInterface for ArrayRepository {
                         },
                     );
                 } else {
-                    let description = complete.and_then(|c| c.get_description().map(String::from));
-                    let abandoned = if let Some(c) = complete {
+                    let description = complete.as_ref().and_then(|c| c.get_description());
+                    let abandoned = if let Some(c) = &complete {
                         if c.is_abandoned() {
                             // PHP: $package->getReplacementPackage() ?: true
                             match c.get_replacement_package() {
-                                Some(s) if !s.is_empty() => {
-                                    Some(AbandonedInfo::Replacement(s.to_string()))
-                                }
+                                Some(s) if !s.is_empty() => Some(AbandonedInfo::Replacement(s)),
                                 _ => Some(AbandonedInfo::Abandoned),
                             }
                         } else {
@@ -374,7 +354,7 @@ impl RepositoryInterface for ArrayRepository {
                     matches.insert(
                         name.clone(),
                         SearchResult {
-                            name: package.get_pretty_name().to_string(),
+                            name: package.get_pretty_name(),
                             description,
                             abandoned,
                             url: None,
@@ -389,7 +369,7 @@ impl RepositoryInterface for ArrayRepository {
 
     fn has_package(&self, package: &dyn PackageInterface) -> bool {
         if self.package_map.borrow().is_none() {
-            let mut map: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+            let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
             for repo_package in self.get_packages() {
                 map.insert(repo_package.get_unique_name(), repo_package);
             }
@@ -407,19 +387,19 @@ impl RepositoryInterface for ArrayRepository {
         let mut result: IndexMap<String, ProviderInfo> = IndexMap::new();
 
         'candidates: for candidate in self.get_packages() {
-            if result.contains_key(PackageInterface::get_name(candidate.as_ref())) {
+            if result.contains_key(&candidate.get_name()) {
                 continue;
             }
             for link in candidate.get_provides().values() {
                 if package_name == link.get_target() {
-                    let complete = candidate.as_any().downcast_ref::<CompletePackage>();
-                    let description = complete.and_then(|c| c.get_description().map(String::from));
+                    let complete = candidate.as_complete();
+                    let description = complete.and_then(|c| c.get_description());
                     result.insert(
-                        PackageInterface::get_name(candidate.as_ref()).to_string(),
+                        candidate.get_name(),
                         ProviderInfo {
-                            name: PackageInterface::get_name(candidate.as_ref()).to_string(),
+                            name: candidate.get_name(),
                             description,
-                            r#type: candidate.get_type().to_string(),
+                            r#type: candidate.get_type(),
                         },
                     );
                     continue 'candidates;
@@ -430,7 +410,7 @@ impl RepositoryInterface for ArrayRepository {
         result
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }
@@ -447,13 +427,12 @@ impl RepositoryInterface for ArrayRepository {
             );
         }
 
-        // TODO(phase-b): return references rather than cloning the whole vector
         self.packages
             .borrow()
             .as_ref()
             .unwrap()
             .iter()
-            .map(|p| p.clone_box())
+            .map(|p| p.clone())
             .collect()
     }
 

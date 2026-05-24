@@ -42,12 +42,10 @@ impl OperationInterface for MarkAliasUninstalledOperation {
                 true,
                 <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
             ),
-            PackageInterface::get_pretty_name(self.package.get_alias_of()),
-            PackageInterface::get_full_pretty_version(
-                self.package.get_alias_of(),
-                true,
-                <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
-            ),
+            self.package.get_alias_of().get_pretty_name(),
+            self.package
+                .get_alias_of()
+                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,),
         )
     }
 

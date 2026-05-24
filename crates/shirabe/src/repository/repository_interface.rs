@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Repository/RepositoryInterface.php
 
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::AdvisoryProviderInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
@@ -24,7 +25,7 @@ impl Clone for FindPackageConstraint {
 #[derive(Debug)]
 pub struct LoadPackagesResult {
     pub names_found: Vec<String>,
-    pub packages: IndexMap<String, Box<dyn BasePackage>>,
+    pub packages: IndexMap<String, BasePackageHandle>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,22 +60,22 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>>;
+    ) -> Option<BasePackageHandle>;
 
     fn find_packages(
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>>;
+    ) -> Vec<BasePackageHandle>;
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>>;
+    fn get_packages(&self) -> Vec<BasePackageHandle>;
 
     fn load_packages(
         &self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult;
 
     fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult>;

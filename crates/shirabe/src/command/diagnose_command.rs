@@ -173,7 +173,7 @@ impl DiagnoseCommand {
         )
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
-        if let Some(cp) = php_pkg.as_complete_package_interface() {
+        if let Some(cp) = php_pkg.as_complete() {
             if str_contains(&cp.get_description().unwrap_or_default(), "overridden") {
                 php_version = format!(
                     "{} - {}",
@@ -928,7 +928,7 @@ impl DiagnoseCommand {
                 normalized_version,
                 version.clone(),
             );
-            packages.push(Box::new(root_pkg));
+            packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));

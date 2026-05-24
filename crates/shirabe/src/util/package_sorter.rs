@@ -1,20 +1,19 @@
 //! ref: composer/src/Composer/Util/PackageSorter.php
 
-use std::any::Any;
-
 use indexmap::IndexMap;
 use shirabe_php_shim::{strnatcasecmp, version_compare};
 
 use crate::package::Link;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackage;
 
 pub struct PackageSorter;
 
 impl PackageSorter {
     pub fn get_most_current_version(
-        packages: Vec<Box<dyn PackageInterface>>,
-    ) -> Option<Box<dyn PackageInterface>> {
+        packages: Vec<PackageInterfaceHandle>,
+    ) -> Option<PackageInterfaceHandle> {
         if packages.is_empty() {
             return None;
         }
@@ -25,7 +24,7 @@ impl PackageSorter {
             if candidate.is_default_branch() {
                 return Some(candidate);
             }
-            if version_compare(highest.get_version(), candidate.get_version(), "<") {
+            if version_compare(&highest.get_version(), &candidate.get_version(), "<") {
                 highest = candidate;
             }
         }
@@ -34,16 +33,16 @@ impl PackageSorter {
     }
 
     pub fn sort_packages_alphabetically(
-        mut packages: Vec<Box<dyn PackageInterface>>,
-    ) -> Vec<Box<dyn PackageInterface>> {
-        packages.sort_by_key(|p| p.get_name().to_string());
+        mut packages: Vec<PackageInterfaceHandle>,
+    ) -> Vec<PackageInterfaceHandle> {
+        packages.sort_by_key(|p| p.get_name());
         packages
     }
 
     pub fn sort_packages(
-        packages: Vec<Box<dyn PackageInterface>>,
+        packages: Vec<PackageInterfaceHandle>,
         weights: IndexMap<String, i64>,
-    ) -> Vec<Box<dyn PackageInterface>> {
+    ) -> Vec<PackageInterfaceHandle> {
         let mut usage_list: IndexMap<String, Vec<String>> = IndexMap::new();
 
         for package in &packages {
@@ -58,7 +57,7 @@ impl PackageSorter {
                 usage_list
                     .entry(target)
                     .or_default()
-                    .push(package.get_name().to_string());
+                    .push(package.get_name());
             }
         }
 
@@ -84,7 +83,7 @@ impl PackageSorter {
             }
         });
 
-        let mut packages: Vec<Option<Box<dyn PackageInterface>>> =
+        let mut packages: Vec<Option<PackageInterfaceHandle>> =
             packages.into_iter().map(Some).collect();
         weighted_packages
             .into_iter()

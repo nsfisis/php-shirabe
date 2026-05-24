@@ -12,11 +12,14 @@ use shirabe_php_shim::{
 
 use crate::package::CompleteAliasPackage;
 use crate::package::CompletePackage;
+use crate::package::CompletePackageHandle;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootAliasPackage;
 use crate::package::RootPackage;
+use crate::package::RootPackageHandle;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, SUPPORTED_LINK_TYPES};
@@ -51,7 +54,7 @@ impl LoaderInterface for ArrayLoader {
         &self,
         mut config: IndexMap<String, PhpMixed>,
         class: Option<String>,
-    ) -> Result<Box<dyn BasePackage>> {
+    ) -> Result<PackageInterfaceHandle> {
         let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
 
         if class != "Composer\\Package\\CompletePackage"
@@ -104,8 +107,8 @@ impl ArrayLoader {
     pub fn load_packages(
         &self,
         versions: Vec<IndexMap<String, PhpMixed>>,
-    ) -> Result<Vec<Box<dyn BasePackage>>> {
-        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
+    ) -> Result<Vec<PackageInterfaceHandle>> {
+        let mut packages: Vec<PackageInterfaceHandle> = vec![];
         let mut link_cache: IndexMap<
             String,
             IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
@@ -226,7 +229,7 @@ impl ArrayLoader {
         &self,
         mut package: Box<CompletePackage>,
         config: &mut IndexMap<String, PhpMixed>,
-    ) -> Result<Box<dyn BasePackage>> {
+    ) -> Result<PackageInterfaceHandle> {
         // PHP: if (!$package instanceof CompletePackage) — true by construction in Rust
         // (create_object always returns Box<CompletePackage>); kept as a no-op for parity.
         let _ = LogicException {
@@ -593,12 +596,20 @@ impl ArrayLoader {
                 // TODO(phase-b): `$package instanceof RootPackage` downcast from CompletePackage
                 let package_as_root: Option<RootPackage> = None;
                 if let Some(root) = package_as_root {
-                    let _ = RootAliasPackage::new(root, alias_normalized, pretty_alias);
+                    let _ = RootAliasPackage::new(
+                        RootPackageHandle::from_root_package(root),
+                        alias_normalized,
+                        pretty_alias,
+                    );
                     // TODO(phase-b): return Box<RootAliasPackage> wrapped as Box<BasePackage>
                     todo!("phase-b: return RootAliasPackage as Box<BasePackage>")
                 }
 
-                let _ = CompleteAliasPackage::new(*package, alias_normalized, pretty_alias);
+                let _ = CompleteAliasPackage::new(
+                    CompletePackageHandle::from_complete_package(*package),
+                    alias_normalized,
+                    pretty_alias,
+                );
                 // TODO(phase-b): return Box<CompleteAliasPackage> wrapped as Box<BasePackage>
                 todo!("phase-b: return CompleteAliasPackage as Box<BasePackage>")
             }

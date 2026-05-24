@@ -17,9 +17,12 @@ use shirabe_semver::constraint::SimpleConstraint;
 use crate::composer;
 use crate::composer::ComposerHandle;
 use crate::package::CompletePackage;
+use crate::package::CompletePackageHandle;
 use crate::package::CompletePackageInterface;
+use crate::package::CompletePackageInterfaceHandle;
 use crate::package::Link;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::platform::HhvmDetector;
 use crate::platform::Runtime;
@@ -46,7 +49,7 @@ pub struct PlatformRepository {
     pub(crate) inner: ArrayRepository,
     pub(crate) version_parser: Option<VersionParser>,
     pub(crate) overrides: IndexMap<String, PlatformOverride>,
-    pub(crate) disabled_packages: IndexMap<String, Box<dyn CompletePackageInterface>>,
+    pub(crate) disabled_packages: IndexMap<String, CompletePackageInterfaceHandle>,
     pub(crate) runtime: Runtime,
     pub(crate) hhvm_detector: HhvmDetector,
 }
@@ -55,14 +58,14 @@ impl PlatformRepository {
     pub const PLATFORM_PACKAGE_REGEX: &'static str = "{^(?:php(?:-64bit|-ipv6|-zts|-debug)?|hhvm|(?:ext|lib)-[a-z0-9](?:[_.-]?[a-z0-9]+)*|composer(?:-(?:plugin|runtime)-api)?)$}iD";
 
     pub fn new(
-        packages: Vec<Box<dyn PackageInterface>>,
+        packages: Vec<PackageInterfaceHandle>,
         overrides: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<Self> {
         Self::new4(packages, overrides, None, None)
     }
 
     pub fn new4(
-        packages: Vec<Box<dyn PackageInterface>>,
+        packages: Vec<PackageInterfaceHandle>,
         overrides: IndexMap<String, PhpMixed>,
         runtime: Option<Runtime>,
         hhvm_detector: Option<HhvmDetector>,
@@ -117,7 +120,7 @@ impl PlatformRepository {
         self.disabled_packages.contains_key(name)
     }
 
-    pub fn get_disabled_packages(&self) -> &IndexMap<String, Box<dyn CompletePackageInterface>> {
+    pub fn get_disabled_packages(&self) -> &IndexMap<String, CompletePackageInterfaceHandle> {
         &self.disabled_packages
     }
 
@@ -167,7 +170,7 @@ impl PlatformRepository {
             pretty_version.clone(),
         );
         composer.set_description("Composer package".to_string());
-        self.add_package(Box::new(composer))?;
+        self.add_package(CompletePackageHandle::from_complete_package(composer).into())?;
 
         pretty_version = plugin_interface::PLUGIN_API_VERSION.to_string();
         version = self
@@ -181,7 +184,7 @@ impl PlatformRepository {
             pretty_version.clone(),
         );
         composer_plugin_api.set_description("The Composer Plugin API".to_string());
-        self.add_package(Box::new(composer_plugin_api))?;
+        self.add_package(CompletePackageHandle::from_complete_package(composer_plugin_api).into())?;
 
         pretty_version = composer::RUNTIME_API_VERSION.to_string();
         version = self
@@ -195,7 +198,9 @@ impl PlatformRepository {
             pretty_version.clone(),
         );
         composer_runtime_api.set_description("The Composer Runtime API".to_string());
-        self.add_package(Box::new(composer_runtime_api))?;
+        self.add_package(
+            CompletePackageHandle::from_complete_package(composer_runtime_api).into(),
+        )?;
 
         let php_version_const = self.runtime.get_constant("PHP_VERSION", None);
         let php_version_str = match &php_version_const {
@@ -226,7 +231,7 @@ impl PlatformRepository {
         let mut php =
             CompletePackage::new("php".to_string(), version.clone(), pretty_version.clone());
         php.set_description("The PHP interpreter".to_string());
-        self.add_package(Box::new(php))?;
+        self.add_package(CompletePackageHandle::from_complete_package(php).into())?;
 
         if self
             .runtime
@@ -240,7 +245,7 @@ impl PlatformRepository {
                 pretty_version.clone(),
             );
             phpdebug.set_description("The PHP interpreter, with debugging symbols".to_string());
-            self.add_package(Box::new(phpdebug))?;
+            self.add_package(CompletePackageHandle::from_complete_package(phpdebug).into())?;
         }
 
         if self.runtime.has_constant("PHP_ZTS", None)
@@ -256,7 +261,7 @@ impl PlatformRepository {
                 pretty_version.clone(),
             );
             phpzts.set_description("The PHP interpreter, with Zend Thread Safety".to_string());
-            self.add_package(Box::new(phpzts))?;
+            self.add_package(CompletePackageHandle::from_complete_package(phpzts).into())?;
         }
 
         if self
@@ -272,7 +277,7 @@ impl PlatformRepository {
                 pretty_version.clone(),
             );
             php64.set_description("The PHP interpreter, 64bit".to_string());
-            self.add_package(Box::new(php64))?;
+            self.add_package(CompletePackageHandle::from_complete_package(php64).into())?;
         }
 
         // The AF_INET6 constant is only defined if ext-sockets is available but
@@ -297,7 +302,7 @@ impl PlatformRepository {
                 pretty_version.clone(),
             );
             php_ipv6.set_description("The PHP interpreter, with IPv6 support".to_string());
-            self.add_package(Box::new(php_ipv6))?;
+            self.add_package(CompletePackageHandle::from_complete_package(php_ipv6).into())?;
         }
 
         let loaded_extensions = self.runtime.get_extensions();
@@ -1582,14 +1587,13 @@ impl PlatformRepository {
 
             let mut hhvm = CompletePackage::new("hhvm".to_string(), version, pretty_version);
             hhvm.set_description("The HHVM Runtime (64bit)".to_string());
-            self.add_package(Box::new(hhvm))?;
+            self.add_package(CompletePackageHandle::from_complete_package(hhvm).into())?;
         }
         Ok(())
     }
 
-    pub fn add_package(&mut self, package: Box<dyn PackageInterface>) -> anyhow::Result<()> {
-        // TODO(phase-b): downcast `package` to CompletePackage; this stub keeps the structure.
-        if !Self::is_complete_package(package.as_ref()) {
+    pub fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        if package.as_complete().is_none() {
             return Err(anyhow::anyhow!(UnexpectedValueException {
                 message: format!(
                     "Expected CompletePackage but got {}",
@@ -1599,18 +1603,17 @@ impl PlatformRepository {
             }));
         }
 
+        let name = package.get_name();
+
         // Skip if overridden
-        if self.overrides.contains_key(package.get_name()) {
-            if matches!(
-                self.overrides[package.get_name()].version,
-                PhpMixed::Bool(false)
-            ) {
+        if self.overrides.contains_key(&name) {
+            if matches!(self.overrides[&name].version, PhpMixed::Bool(false)) {
                 self.add_disabled_package_from_pkg(package);
                 return Ok(());
             }
 
             let overrider = self.inner.find_package(
-                package.get_name(),
+                &name,
                 crate::repository::FindPackageConstraint::String("*".to_string()),
             );
             let actual_text = if let Some(ref ov) = overrider {
@@ -1622,24 +1625,24 @@ impl PlatformRepository {
             } else {
                 format!("actual: {}", package.get_pretty_version())
             };
-            if let Some(_overrider_pkg) = overrider {
-                // TODO(phase-b): downcast `overrider` to CompletePackageInterface for setDescription
-                let _ = actual_text;
+            if let Some(overrider) = overrider {
+                if let Some(overrider) = overrider.as_complete() {
+                    let description = overrider.get_description().unwrap_or_default();
+                    overrider.set_description(format!("{}, {}", description, actual_text));
+                }
             }
 
             return Ok(());
         }
 
         // Skip if PHP is overridden and we are adding a php-* package
-        if self.overrides.contains_key("php") && strpos(package.get_name(), "php-") == Some(0) {
+        if self.overrides.contains_key("php") && strpos(&name, "php-") == Some(0) {
             let php_override = PlatformOverride {
                 name: self.overrides["php"].name.clone(),
                 version: self.overrides["php"].version.clone(),
             };
-            let mut overrider = self.add_overridden_package(
-                &php_override,
-                Some(package.get_pretty_name().to_string()),
-            )?;
+            let mut overrider =
+                self.add_overridden_package(&php_override, Some(package.get_pretty_name()))?;
             let actual_text = if package.get_version() == overrider.get_version() {
                 "same as actual".to_string()
             } else {
@@ -1693,22 +1696,32 @@ impl PlatformRepository {
         Ok(package)
     }
 
-    fn add_disabled_package_from_pkg(&mut self, _package: Box<dyn PackageInterface>) {
-        // TODO(phase-b): downcast to CompletePackage and call `addDisabledPackage`.
+    fn add_disabled_package_from_pkg(&mut self, package: PackageInterfaceHandle) {
+        // PHP type-hints CompletePackage here; the handle is guaranteed complete by add_package.
+        let complete = package
+            .as_complete()
+            .expect("addDisabledPackage expects a CompletePackage");
+        self.add_disabled_package(complete);
     }
 
-    fn add_disabled_package(&mut self, mut package: CompletePackage) {
-        let current_description = package.get_description().unwrap_or("").to_string();
+    fn add_disabled_package(&mut self, package: CompletePackageInterfaceHandle) {
+        let current_description = package.get_description().unwrap_or_default();
         package.set_description(format!(
             "{}. <warning>Package disabled via config.platform</warning>",
             current_description
         ));
         let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
-        package.inner.set_extra(extra);
+        // NOTE(phase-c): neither PackageInterface nor CompletePackageInterface exposes
+        // setExtra (PHP defines it on BasePackage), and the handle API does not surface
+        // it. Disabled packages are always plain CompletePackage objects, so reach the
+        // concrete Package through the shared Rc.
+        match &mut *package.as_rc().borrow_mut() {
+            crate::package::AnyPackage::CompletePackage(p) => p.inner.set_extra(extra),
+            _ => unreachable!("disabled platform package must be a concrete CompletePackage"),
+        }
 
-        self.disabled_packages
-            .insert(package.get_name().to_string(), Box::new(package));
+        self.disabled_packages.insert(package.get_name(), package);
     }
 
     /// Parses the version and adds a new package to the repository
@@ -1768,7 +1781,7 @@ impl PlatformRepository {
             ext.inner.set_replaces(replaces);
         }
 
-        self.add_package(Box::new(ext))?;
+        self.add_package(CompletePackageHandle::from_complete_package(ext).into())?;
         Ok(())
     }
 
@@ -1848,7 +1861,7 @@ impl PlatformRepository {
         lib.inner.set_replaces(replace_links);
         lib.inner.set_provides(provide_links);
 
-        self.add_package(Box::new(lib))?;
+        self.add_package(CompletePackageHandle::from_complete_package(lib).into())?;
         Ok(())
     }
 
@@ -1945,7 +1958,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         &self,
         name: &str,
         constraint: crate::repository::FindPackageConstraint,
-    ) -> Option<Box<dyn crate::package::BasePackage>> {
+    ) -> Option<crate::package::BasePackageHandle> {
         self.inner.find_package(name, constraint)
     }
 
@@ -1953,11 +1966,11 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         &self,
         name: &str,
         constraint: Option<crate::repository::FindPackageConstraint>,
-    ) -> Vec<Box<dyn crate::package::BasePackage>> {
+    ) -> Vec<crate::package::BasePackageHandle> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn crate::package::BasePackage>> {
+    fn get_packages(&self) -> Vec<crate::package::BasePackageHandle> {
         self.inner.get_packages()
     }
 
@@ -1966,7 +1979,7 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
         package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, crate::package::PackageInterfaceHandle>>,
     ) -> crate::repository::LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,

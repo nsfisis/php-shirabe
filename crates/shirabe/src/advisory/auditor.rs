@@ -15,8 +15,9 @@ use crate::advisory::SecurityAdvisory;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
-use crate::package::CompletePackageInterface;
+use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::base_package::BasePackage;
 use crate::repository::PartialOrSecurityAdvisory;
@@ -73,7 +74,7 @@ impl Auditor {
         &self,
         io: &mut dyn IOInterface,
         repo_set: &RepositorySet,
-        packages: Vec<Box<dyn PackageInterface>>,
+        packages: Vec<PackageInterfaceHandle>,
         format: &str,
         warning_only: bool,
         ignore_list: IndexMap<String, Option<String>>,
@@ -109,12 +110,12 @@ impl Auditor {
 
         let mut abandoned_count: i64 = 0;
         let affected_packages_count = advisories.len() as i64;
-        let abandoned_packages: Vec<Box<dyn CompletePackageInterface>>;
+        let abandoned_packages: Vec<CompletePackageInterfaceHandle>;
         if abandoned == Self::ABANDONED_IGNORE {
             abandoned_packages = vec![];
         } else {
             // TODO(phase-b): $packages reused here; see note above
-            abandoned_packages = self.filter_abandoned_packages(&[], &ignore_abandoned);
+            abandoned_packages = self.filter_abandoned_packages(&[], &ignore_abandoned)?;
             if abandoned == Self::ABANDONED_FAIL {
                 abandoned_count = abandoned_packages.len() as i64;
             }
@@ -144,11 +145,8 @@ impl Auditor {
             let abandoned_map = array_reduce(
                 &abandoned_packages,
                 |mut carry: IndexMap<String, Option<String>>,
-                 package: &Box<dyn CompletePackageInterface>| {
-                    carry.insert(
-                        package.get_pretty_name().to_string(),
-                        package.get_replacement_package().map(|s| s.to_string()),
-                    );
+                 package: &CompletePackageInterfaceHandle| {
+                    carry.insert(package.get_pretty_name(), package.get_replacement_package());
                     carry
                 },
                 IndexMap::new(),
@@ -284,9 +282,9 @@ impl Auditor {
     /// @return array<CompletePackageInterface>
     pub fn filter_abandoned_packages(
         &self,
-        packages: &[Box<dyn PackageInterface>],
+        packages: &[PackageInterfaceHandle],
         ignore_abandoned: &IndexMap<String, Option<String>>,
-    ) -> Vec<Box<dyn CompletePackageInterface>> {
+    ) -> anyhow::Result<Vec<CompletePackageInterfaceHandle>> {
         let mut filter: Option<String> = None;
         if ignore_abandoned.len() != 0 {
             filter = Some(base_package::package_names_to_regexp(
@@ -295,16 +293,19 @@ impl Auditor {
             ));
         }
 
-        // PHP: array_filter($packages, fn($pkg) => $pkg instanceof CompletePackageInterface && $pkg->isAbandoned() && ($filter === null || !Preg::isMatch($filter, $pkg->getName())))
-        // TODO(phase-b): downcast Box<dyn PackageInterface> -> Box<dyn CompletePackageInterface>
-        let _ = packages;
-        let _ = filter;
-        let _ = |pkg: &Box<dyn PackageInterface>| -> bool {
-            // pkg instanceof CompletePackageInterface && pkg.is_abandoned() && (filter.is_none() || !Preg::is_match(filter.as_ref().unwrap(), pkg.get_name()))
-            let _ = Preg::is_match("", "");
-            false
-        };
-        vec![]
+        // PHP: array_filter($packages, fn(PackageInterface $pkg) => $pkg instanceof CompletePackageInterface && $pkg->isAbandoned() && ($filter === null || !Preg::isMatch($filter, $pkg->getName())))
+        let mut result: Vec<CompletePackageInterfaceHandle> = vec![];
+        for pkg in packages {
+            let Some(pkg) = pkg.as_complete() else {
+                continue;
+            };
+            if pkg.is_abandoned()
+                && (filter.is_none() || !Preg::is_match(filter.as_ref().unwrap(), &pkg.get_name())?)
+            {
+                result.push(pkg);
+            }
+        }
+        Ok(result)
     }
 
     /// @phpstan-param array<string, array<PartialOrSecurityAdvisory|SecurityAdvisory>> $allAdvisories
@@ -577,7 +578,7 @@ impl Auditor {
     fn output_abandoned_packages(
         &self,
         io: &mut dyn IOInterface,
-        packages: &[Box<dyn CompletePackageInterface>],
+        packages: &[CompletePackageInterfaceHandle],
         format: &str,
     ) -> Result<()> {
         io.write_error(&sprintf(
@@ -673,10 +674,10 @@ impl Auditor {
     // upcast to PackageInterface (e.g. via an as_package_interface() trait method)
     fn get_package_name_with_link_for_complete(
         &self,
-        package: &Box<dyn CompletePackageInterface>,
+        package: &CompletePackageInterfaceHandle,
     ) -> String {
         let _ = package;
-        // PackageInfo::get_view_source_or_homepage_url(package as &dyn PackageInterface)
+        // PackageInfo::get_view_source_or_homepage_url(package.as_rc().borrow().as_package_interface())
         String::new()
     }
 

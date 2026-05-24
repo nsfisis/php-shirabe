@@ -25,6 +25,7 @@ use crate::package::CompletePackage;
 use crate::package::Link;
 use crate::package::Locker;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterface;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::version::VersionParser;
@@ -143,10 +144,20 @@ impl PluginManager {
                 .borrow()
                 .get_local_repository()
                 .clone_box();
-            // The root package borrow is also tied to `self.composer`; clone the package box
-            // for the same reason as above.
-            let root_package = self.composer_full().borrow().get_package().clone_box();
-            self.load_repository(&*repo, false, Some(&*root_package))?;
+            // The root package borrow is also tied to `self.composer`; clone the package handle
+            // (shared Rc) for the same reason as above.
+            let root_package = self.composer_full().borrow().get_package().clone();
+            self.load_repository(
+                &*repo,
+                false,
+                Some(
+                    root_package
+                        .as_rc()
+                        .borrow()
+                        .as_root_package_interface()
+                        .unwrap(),
+                ),
+            )?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
@@ -532,23 +543,18 @@ impl PluginManager {
         }
 
         let sorted_packages = PackageSorter::sort_packages(
-            packages.iter().map(|p| p.clone_package_box()).collect(),
+            packages.iter().map(|p| p.clone().into()).collect(),
             weights,
         );
-        let required_packages: Vec<Box<dyn PackageInterface>> = if !is_global_repo {
+        let required_packages: Vec<crate::package::BasePackageHandle> = if !is_global_repo {
             // PHP: $requiredPackages = RepositoryUtils::filterRequiredPackages($packages, $rootPackage, true);
-            // RepositoryUtils::filter_required_packages takes &[Box<dyn BasePackage>] plus a bucket.
-            // We need to convert &[Box<dyn BasePackage>] from packages.
-            let bucket: Vec<Box<dyn crate::package::BasePackage>> = vec![];
+            let bucket: Vec<crate::package::BasePackageHandle> = vec![];
             RepositoryUtils::filter_required_packages(
                 packages.as_slice(),
-                root_package.unwrap(),
+                root_package.unwrap() as &dyn PackageInterface,
                 true,
                 bucket,
             )
-            .iter()
-            .map(|p| p.clone_package_box())
-            .collect()
         } else {
             vec![]
         };
@@ -565,26 +571,33 @@ impl PluginManager {
             }
 
             // PHP: !in_array($package, $requiredPackages, true) — identity-based comparison.
-            // Compare data pointers since `sorted_packages` and `required_packages` are both
-            // `Box<dyn PackageInterface>`.
-            let package_addr =
-                package.as_ref() as *const dyn PackageInterface as *const () as usize;
-            let in_required = required_packages.iter().any(|rp| {
-                (rp.as_ref() as *const dyn PackageInterface as *const () as usize) == package_addr
-            });
+            // Both `sorted_packages` and `required_packages` are package handles, so compare
+            // by shared-Rc pointer identity.
+            let package_addr = package.ptr_id();
+            let in_required = required_packages
+                .iter()
+                .any(|rp| rp.ptr_id() == package_addr);
             if !is_global_repo
                 && !in_required
-                && !self.is_plugin_allowed(package.get_name(), false, true, false)?
+                && !self.is_plugin_allowed(&package.get_name(), false, true, false)?
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name()));
                 continue;
             }
 
             if "composer-plugin" == package.get_type() {
-                self.register_package(&**package, false, is_global_repo)?;
+                self.register_package(
+                    package.as_rc().borrow().as_package_interface(),
+                    false,
+                    is_global_repo,
+                )?;
             // Backward compatibility
             } else if "composer-installer" == package.get_type() {
-                self.register_package(&**package, false, is_global_repo)?;
+                self.register_package(
+                    package.as_rc().borrow().as_package_interface(),
+                    false,
+                    is_global_repo,
+                )?;
             }
             let _ = cp;
         }
@@ -596,7 +609,7 @@ impl PluginManager {
         let packages = repo.get_packages();
         // PHP: $sortedPackages = array_reverse(PackageSorter::sortPackages($packages));
         let mut sorted_packages = PackageSorter::sort_packages(
-            packages.iter().map(|p| p.clone_package_box()).collect(),
+            packages.iter().map(|p| p.clone().into()).collect(),
             IndexMap::new(),
         );
         sorted_packages.reverse();
@@ -606,10 +619,10 @@ impl PluginManager {
                 continue;
             }
             if "composer-plugin" == package.get_type() {
-                self.deactivate_package(&**package);
+                self.deactivate_package(package.as_rc().borrow().as_package_interface());
             // Backward compatibility
             } else if "composer-installer" == package.get_type() {
-                self.deactivate_package(&**package);
+                self.deactivate_package(package.as_rc().borrow().as_package_interface());
             }
         }
     }
@@ -617,21 +630,21 @@ impl PluginManager {
     fn collect_dependencies(
         &self,
         installed_repo: &InstalledRepository,
-        mut collected: IndexMap<String, Box<dyn PackageInterface>>,
+        mut collected: IndexMap<String, PackageInterfaceHandle>,
         package: &dyn PackageInterface,
-    ) -> IndexMap<String, Box<dyn PackageInterface>> {
+    ) -> IndexMap<String, PackageInterfaceHandle> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in &package.get_requires() {
             for required_package in installed_repo
                 .find_packages_with_replacers_and_providers(require_link.get_target(), None)
             {
-                if !collected.contains_key(required_package.get_name()) {
-                    collected.insert(
-                        required_package.get_name().to_string(),
-                        required_package.clone_package_box(),
+                if !collected.contains_key(&required_package.get_name()) {
+                    collected.insert(required_package.get_name(), required_package.clone().into());
+                    collected = self.collect_dependencies(
+                        installed_repo,
+                        collected,
+                        required_package.as_rc().borrow().as_package_interface(),
                     );
-                    collected =
-                        self.collect_dependencies(installed_repo, collected, &*required_package);
                 }
             }
         }

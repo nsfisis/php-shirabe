@@ -8,8 +8,8 @@ use shirabe_external_packages::composer::semver::CompilingMatcher;
 use shirabe_external_packages::composer::semver::Intervals;
 use shirabe_php_shim::{
     LogicException, PhpMixed, array_chunk, array_flip, array_flip_strings, array_map, array_merge,
-    array_search, array_search_mixed, count, in_array, microtime, number_format, round,
-    spl_object_hash, sprintf, strpos,
+    array_search, array_search_mixed, count, in_array, microtime, number_format, round, sprintf,
+    strpos,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -23,10 +23,12 @@ use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::AliasPackage;
+use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackage;
 use crate::package::CompletePackage;
 use crate::package::PackageInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::PackageInterfaceHandle;
+use crate::package::base_package;
 use crate::package::version::StabilityFilter;
 use crate::plugin::PluginEvents;
 use crate::plugin::PrePoolCreateEvent;
@@ -48,11 +50,11 @@ pub struct PoolBuilder {
     alias_map: IndexMap<String, IndexMap<i64, AliasPackage>>,
     packages_to_load: IndexMap<String, AnyConstraint>,
     loaded_packages: IndexMap<String, AnyConstraint>,
-    loaded_per_repo: IndexMap<i64, IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>>,
-    packages: IndexMap<i64, Box<dyn BasePackage>>,
-    unacceptable_fixed_or_locked_packages: Vec<Box<dyn BasePackage>>,
+    loaded_per_repo: IndexMap<i64, IndexMap<String, IndexMap<String, PackageInterfaceHandle>>>,
+    packages: IndexMap<i64, BasePackageHandle>,
+    unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
     update_allow_list: Vec<String>,
-    skipped_load: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
+    skipped_load: IndexMap<String, Vec<PackageInterfaceHandle>>,
     ignored_types: Vec<String>,
     allowed_types: Option<Vec<String>>,
     /// If provided, only these package names are loaded
@@ -161,10 +163,7 @@ impl PoolBuilder {
             for locked_package in
                 CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
             {
-                if !self.is_update_allowed(&*locked_package) {
-                    // TODO(phase-b): PackageInterface lacks clone_box; PHP shares references.
-                    // skipped_load population needs shared-ownership Rc<dyn PackageInterface>.
-
+                if !self.is_update_allowed(locked_package.as_rc().borrow().as_package_interface()) {
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
                     // regular packages. We mark them specially so they can be reloaded fully including update propagation
@@ -182,10 +181,7 @@ impl PoolBuilder {
                         }
                     }
 
-                    // TODO(phase-b): lock_package wants Box<dyn BasePackage>; locked_package is a
-                    // PackageInterface trait object from CanonicalPackagesTrait::get_packages. The
-                    // PHP code passes the same object; needs Rc<dyn BasePackage> migration.
-                    request.lock_package(todo!("convert PackageInterface → Box<dyn BasePackage>"));
+                    request.lock_package(locked_package.into());
                 }
             }
         }
@@ -209,9 +205,9 @@ impl PoolBuilder {
             // TODO in how far can we do the above for conflicts? It's more tricky cause conflicts can be limited to
             // specific versions while replace is a conflict with all versions of the name
 
-            let in_root_or_platform = package
-                .get_repository()
-                .map(|r| {
+            // TODO(phase-c): package->repository back-reference not yet on handles
+            let in_root_or_platform = None
+                .map(|r: &dyn RepositoryInterface| {
                     r.as_any().is::<RootPackageRepository>()
                         || r.as_any().is::<PlatformRepository>()
                 })
@@ -221,13 +217,12 @@ impl PoolBuilder {
                     &self.acceptable_stabilities,
                     &self.stability_flags,
                     &package.get_names(true),
-                    package.get_stability(),
+                    &package.get_stability(),
                 )
             {
-                self.load_package(request, &repositories, &*package, false)?;
+                self.load_package(request, &repositories, &package, false)?;
             } else {
-                self.unacceptable_fixed_or_locked_packages
-                    .push(package.clone_box());
+                self.unacceptable_fixed_or_locked_packages.push(package);
             }
         }
 
@@ -261,11 +256,11 @@ impl PoolBuilder {
             let indices: Vec<i64> = self.packages.keys().cloned().collect();
             for i in indices {
                 let package = match self.packages.get(&i) {
-                    Some(p) => p.clone_box(),
+                    Some(p) => p.clone(),
                     None => continue,
                 };
                 // we check all alias related packages at once, so no need to check individual aliases
-                if package.as_alias_package().is_some() {
+                if package.as_alias().is_some() {
                     continue;
                 }
 
@@ -275,12 +270,11 @@ impl PoolBuilder {
                         None => continue,
                     };
 
-                    // TODO(phase-b): package_and_aliases originally held Box<dyn BasePackage>;
-                    // AliasPackage is a PHP class so we collect (index, version) tuples instead of
-                    // cloning the alias objects.
+                    // TODO(phase-c): alias_map still stores AliasPackage by value, so we collect
+                    // (index, version) tuples instead of the alias handles.
                     let mut package_and_aliases: Vec<(i64, String)> = Vec::new();
                     package_and_aliases.push((i, package.get_version().to_string()));
-                    if let Some(aliases) = self.alias_map.get(&spl_object_hash(&*package)) {
+                    if let Some(aliases) = self.alias_map.get(&package.ptr_id().to_string()) {
                         for (idx, alias) in aliases {
                             package_and_aliases.push((*idx, alias.get_version().to_string()));
                         }
@@ -314,10 +308,10 @@ impl PoolBuilder {
                 self.stability_flags.clone(),
                 self.root_aliases.clone(),
                 self.root_references.clone(),
-                self.packages.values().map(|p| p.clone_box()).collect(),
+                self.packages.values().cloned().collect(),
                 self.unacceptable_fixed_or_locked_packages
                     .iter()
-                    .map(|p| p.clone_box())
+                    .cloned()
                     .collect(),
             );
             // TODO(phase-b): EventDispatcher::dispatch expects an owned Event, not &mut PrePoolCreateEvent
@@ -327,24 +321,16 @@ impl PoolBuilder {
                 .borrow_mut()
                 .dispatch(Some(pre_pool_create_event.get_name()), None)?;
             // PHP rebinds $this->packages to a list-style array; preserve indices via reindexing.
-            self.packages = pre_pool_create_event
-                .get_packages()
-                .iter()
-                .enumerate()
-                .map(|(i, p)| (i as i64, p.clone_box()))
-                .collect();
-            self.unacceptable_fixed_or_locked_packages = pre_pool_create_event
-                .get_unacceptable_fixed_packages()
-                .iter()
-                .map(|p| p.clone_box())
-                .collect();
+            // TODO(plugin)/TODO(phase-c): rebind self.packages from the (handle-based) event packages
+            // once EventDispatcher::dispatch returns the mutated event.
+            let _ = &pre_pool_create_event;
         }
 
         let mut pool = Pool::new(
-            self.packages.values().map(|p| p.clone_box()).collect(),
+            self.packages.values().cloned().collect(),
             self.unacceptable_fixed_or_locked_packages
                 .iter()
-                .map(|p| p.clone_box())
+                .cloned()
                 .collect(),
             IndexMap::new(),
             IndexMap::new(),
@@ -543,7 +529,7 @@ impl PoolBuilder {
                                         k.clone(),
                                         inner
                                             .iter()
-                                            .map(|(kk, vv)| (kk.clone(), vv.clone_package_box()))
+                                            .map(|(kk, vv)| (kk.clone(), vv.clone()))
                                             .collect(),
                                     )
                                 })
@@ -561,8 +547,6 @@ impl PoolBuilder {
                 }
                 let packages_in_result = result.packages;
                 for (_, package) in &packages_in_result {
-                    // TODO(phase-b): proper upcast Box<dyn BasePackage> → Box<dyn PackageInterface>;
-                    // clone_box on BasePackage produces a BasePackage, while loaded_per_repo stores PackageInterface.
                     let pkg_name = package.get_name().to_string();
                     let pkg_version = package.get_version().to_string();
                     let pkg_type = package.get_type().to_string();
@@ -592,8 +576,8 @@ impl PoolBuilder {
                         continue;
                     }
                     let _ = (pkg_name, pkg_version);
-                    let propagate = !self.path_repo_unlocked.contains_key(package.get_name());
-                    self.load_package(request, repositories, package.as_ref(), propagate)?;
+                    let propagate = !self.path_repo_unlocked.contains_key(&package.get_name());
+                    self.load_package(request, repositories, package, propagate)?;
                 }
             }
 
@@ -627,36 +611,33 @@ impl PoolBuilder {
         &mut self,
         request: &mut Request,
         repositories: &Vec<Box<dyn RepositoryInterface>>,
-        package: &dyn BasePackage,
+        package: &BasePackageHandle,
         propagate_update: bool,
     ) -> anyhow::Result<()> {
         let index = self.index_counter;
         self.index_counter += 1;
-        self.packages.insert(index, package.clone_box());
+        self.packages.insert(index, package.clone());
 
-        if let Some(alias) = package.as_alias_package() {
+        if let Some(alias) = package.as_alias() {
             // TODO(phase-b): alias_map should hold shared references (Rc<AliasPackage>); AliasPackage
             // is a PHP class and must not be cloned.
-            let _ = alias;
+            let _ = &alias;
             self.alias_map
-                .entry(spl_object_hash(alias.get_alias_of()))
+                .entry(alias.get_alias_of().ptr_id().to_string())
                 .or_insert_with(IndexMap::new)
                 .insert(index, todo!("share AliasPackage via Rc"));
         }
 
-        let name = PackageInterface::get_name(package).to_string();
+        let name = package.get_name();
 
         // we're simply setting the root references on all versions for a name here and rely on the solver to pick the
         // right version. It'd be more work to figure out which versions and which aliases of those versions this may
         // apply to
         if let Some(reference) = self.root_references.get(&name) {
-            // do not modify the references on already locked or fixed packages
-            if !request.is_locked_package(package) && !request.is_fixed_package(package) {
-                // TODO(phase-b): set_source_dist_references mutates the package; load_package takes
-                // `&dyn BasePackage`. PHP passes by reference (shared) and mutates in place. Needs
-                // either &mut dyn BasePackage propagation or Rc<RefCell<...>>.
-                let _ = reference;
-            }
+            // TODO(phase-c): apply root references to the package; PHP mutates the shared package in
+            // place and skips already locked/fixed packages, which needs &mut access through the
+            // handle plus a handle-based Request.
+            let _ = reference;
         }
 
         // if propagateUpdate is false we are loading a fixed or locked package, root aliases do not apply as they are
@@ -664,51 +645,39 @@ impl PoolBuilder {
         //
         // packages in pathRepoUnlocked however need to also load root aliases, they have propagateUpdate set to
         // false because their deps should not be unlocked, but that is irrelevant for root aliases
-        let path_repo_match = self
-            .path_repo_unlocked
-            .contains_key(PackageInterface::get_name(package));
+        let path_repo_match = self.path_repo_unlocked.contains_key(&package.get_name());
         let alias_for_version = self
             .root_aliases
             .get(&name)
-            .and_then(|m| m.get(package.get_version()))
+            .and_then(|m| m.get(&package.get_version()))
             .cloned();
         if (propagate_update || path_repo_match) && alias_for_version.is_some() {
             let alias = alias_for_version.unwrap();
-            let base_package: Box<dyn BasePackage> = if let Some(ap) = package.as_alias_package() {
-                ap.get_alias_of().clone_box()
+            let base_package: BasePackageHandle = if let Some(ap) = package.as_alias() {
+                ap.get_alias_of().into()
             } else {
-                package.clone_box()
+                package.clone()
             };
-            let alias_package: Box<dyn BasePackage> =
-                if base_package.as_any().is::<CompletePackage>() {
-                    // TODO(phase-b): CompleteAliasPackage does not yet impl BasePackage; also its
-                    // constructor wants CompletePackage by value but BasePackage is a PHP class
-                    // (shared). Needs Rc<CompletePackage> migration + BasePackage impl.
-                    let _ = CompleteAliasPackage::new(
-                        todo!("downcast Box<dyn BasePackage> to CompletePackage by value"),
-                        alias.get("alias_normalized").cloned().unwrap_or_default(),
-                        alias.get("alias").cloned().unwrap_or_default(),
-                    );
-                    todo!("CompleteAliasPackage must implement BasePackage")
-                } else {
-                    Box::new(AliasPackage::new(
-                        base_package.clone_box(),
-                        alias.get("alias_normalized").cloned().unwrap_or_default(),
-                        alias.get("alias").cloned().unwrap_or_default(),
-                    ))
-                };
+            let _ = (&base_package, &alias);
+            let alias_package: BasePackageHandle = if base_package.as_complete_package().is_some() {
+                // TODO(phase-c): construct CompleteAliasPackage from the aliasOf handle.
+                todo!("new CompleteAliasPackage(base_package, alias_normalized, alias)")
+            } else {
+                // TODO(phase-c): construct AliasPackage from the aliasOf handle.
+                todo!("new AliasPackage(base_package, alias_normalized, alias)")
+            };
             // PHP: $aliasPackage->setRootPackageAlias(true);
             // BasePackage doesn't expose this directly; the AliasPackage trait method handles it.
 
             let new_index = self.index_counter;
             self.index_counter += 1;
-            self.packages.insert(new_index, alias_package.clone_box());
-            if let Some(ap) = alias_package.as_alias_package() {
+            self.packages.insert(new_index, alias_package.clone());
+            if let Some(ap) = alias_package.as_alias() {
                 // TODO(phase-b): alias_map should hold shared references (Rc<AliasPackage>); AliasPackage
                 // is a PHP class and must not be cloned.
-                let _ = ap;
+                let _ = &ap;
                 self.alias_map
-                    .entry(spl_object_hash(ap.get_alias_of()))
+                    .entry(ap.get_alias_of().ptr_id().to_string())
                     .or_insert_with(IndexMap::new)
                     .insert(new_index, todo!("share AliasPackage via Rc"));
             }
@@ -800,7 +769,7 @@ impl PoolBuilder {
         if root_requires.contains_key(name) {
             let name_owned = name.to_string();
             return array_map(
-                |package: &Box<dyn PackageInterface>| -> String {
+                |package: &PackageInterfaceHandle| -> String {
                     if name_owned != package.get_name() {
                         format!("{} (via replace of {})", package.get_name(), name_owned)
                     } else {
@@ -812,8 +781,8 @@ impl PoolBuilder {
         }
 
         for package_or_replacer in &self.skipped_load[name] {
-            if root_requires.contains_key(package_or_replacer.get_name()) {
-                matches.push(package_or_replacer.get_name().to_string());
+            if root_requires.contains_key(&package_or_replacer.get_name()) {
+                matches.push(package_or_replacer.get_name());
             }
             for (_k, link) in &package_or_replacer.get_replaces() {
                 if root_requires.contains_key(link.get_target()) {
@@ -863,7 +832,7 @@ impl PoolBuilder {
             for package in
                 CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
             {
-                if Preg::is_match3(&pattern_regexp, package.get_name(), None).unwrap_or(false) {
+                if Preg::is_match3(&pattern_regexp, &package.get_name(), None).unwrap_or(false) {
                     continue 'outer;
                 }
             }
@@ -905,10 +874,10 @@ impl PoolBuilder {
         repositories: &Vec<Box<dyn RepositoryInterface>>,
         name: &str,
     ) -> anyhow::Result<()> {
-        let skipped: Vec<Box<dyn PackageInterface>> = self
+        let skipped: Vec<PackageInterfaceHandle> = self
             .skipped_load
             .get(name)
-            .map(|v| v.iter().map(|p| p.clone_package_box()).collect())
+            .map(|v| v.iter().cloned().collect())
             .unwrap_or_default();
         for package_or_replacer in &skipped {
             // if we unfixed a replaced package name, we also need to unfix the replacer itself
@@ -916,9 +885,9 @@ impl PoolBuilder {
             if package_or_replacer.get_name() != name
                 && self
                     .skipped_load
-                    .contains_key(package_or_replacer.get_name())
+                    .contains_key(&package_or_replacer.get_name())
             {
-                let replacer_name = package_or_replacer.get_name().to_string();
+                let replacer_name = package_or_replacer.get_name();
                 if request.get_update_allow_transitive_root_dependencies()
                     || (!self.is_root_require(request, name)
                         && !self.is_root_require(request, &replacer_name))
@@ -932,8 +901,8 @@ impl PoolBuilder {
                             &MatchAllConstraint::new(None).into(),
                         );
                     } else {
-                        let pkgs: Vec<Box<dyn BasePackage>> =
-                            self.packages.values().map(|p| p.clone_box()).collect();
+                        let pkgs: Vec<BasePackageHandle> =
+                            self.packages.values().cloned().collect();
                         for loaded_package in &pkgs {
                             let requires = loaded_package.get_requires();
                             if let Some(req_link) = requires.get(&replacer_name) {
@@ -950,14 +919,14 @@ impl PoolBuilder {
         }
 
         if self.path_repo_unlocked.contains_key(name) {
-            let entries: Vec<(i64, Box<dyn BasePackage>)> = self
+            let entries: Vec<(i64, BasePackageHandle)> = self
                 .packages
                 .iter()
-                .filter(|(_, p)| PackageInterface::get_name(p.as_ref()) == name)
-                .map(|(i, p)| (*i, p.clone_box()))
+                .filter(|(_, p)| p.get_name() == name)
+                .map(|(i, p)| (*i, p.clone()))
                 .collect();
             for (index, package) in &entries {
-                self.remove_loaded_package(request, repositories, &**package, *index);
+                self.remove_loaded_package(request, repositories, package, *index);
             }
         }
 
@@ -967,58 +936,41 @@ impl PoolBuilder {
         self.path_repo_unlocked.shift_remove(name);
 
         // remove locked package by this name which was already initialized
-        let locked_packages: Vec<Box<dyn BasePackage>> = request
-            .get_locked_packages()
-            .values()
-            .map(|p| p.clone_box())
-            .collect();
+        let locked_packages: Vec<BasePackageHandle> =
+            request.get_locked_packages().values().cloned().collect();
         for locked_package in &locked_packages {
-            if locked_package.as_alias_package().is_none() && locked_package.get_name() == name {
-                let pkgs: Vec<Box<dyn BasePackage>> =
-                    self.packages.values().map(|p| p.clone_box()).collect();
+            if locked_package.as_alias().is_none() && locked_package.get_name() == name {
+                let pkgs: Vec<BasePackageHandle> = self.packages.values().cloned().collect();
                 // PHP uses array_search with strict identity; map to pointer comparison.
-                let index_opt = pkgs.iter().position(|p| {
-                    std::ptr::eq(
-                        p.as_ref() as *const _ as *const u8,
-                        locked_package.as_ref() as *const _ as *const u8,
-                    )
-                });
+                let index_opt = pkgs.iter().position(|p| p.ptr_eq(locked_package));
                 if let Some(index) = index_opt {
-                    request.unlock_package(&**locked_package);
-                    self.remove_loaded_package(
-                        request,
-                        repositories,
-                        &**locked_package,
-                        index as i64,
-                    );
+                    request.unlock_package(locked_package);
+                    self.remove_loaded_package(request, repositories, locked_package, index as i64);
 
                     // make sure that any requirements for this package by other locked or fixed packages are now
                     // also loaded, as they were previously ignored because the locked (now unlocked) package already
                     // satisfied their requirements
                     // and if this package is replacing another that is required by a locked or fixed package, ensure
                     // that we load that replaced package in case an update to this package removes the replacement
-                    let fixed_or_locked: Vec<Box<dyn BasePackage>> = request
+                    let fixed_or_locked: Vec<BasePackageHandle> = request
                         .get_fixed_or_locked_packages()
                         .values()
-                        .map(|p| p.clone_box())
+                        .cloned()
                         .collect();
                     for fixed_or_locked_package in &fixed_or_locked {
-                        if std::ptr::eq(
-                            fixed_or_locked_package.as_ref() as *const _,
-                            locked_package.as_ref() as *const _,
-                        ) {
+                        if fixed_or_locked_package.ptr_eq(locked_package) {
                             continue;
                         }
 
                         if self
                             .skipped_load
-                            .contains_key(fixed_or_locked_package.get_name())
+                            .contains_key(&fixed_or_locked_package.get_name())
                         {
                             let requires = fixed_or_locked_package.get_requires();
-                            if let Some(req_link) = requires.get(locked_package.get_name()) {
+                            if let Some(req_link) = requires.get(&locked_package.get_name()) {
                                 self.mark_package_name_for_loading(
                                     request,
-                                    locked_package.get_name(),
+                                    &locked_package.get_name(),
                                     req_link.get_constraint(),
                                 );
                             }
@@ -1054,8 +1006,7 @@ impl PoolBuilder {
             self.mark_package_name_for_loading(request, name, &cons);
         }
 
-        let pkgs: Vec<Box<dyn BasePackage>> =
-            self.packages.values().map(|p| p.clone_box()).collect();
+        let pkgs: Vec<BasePackageHandle> = self.packages.values().cloned().collect();
         for package in &pkgs {
             for (_k, link) in &package.get_requires() {
                 if name == link.get_target() {
@@ -1073,35 +1024,24 @@ impl PoolBuilder {
         &mut self,
         _request: &Request,
         repositories: &Vec<Box<dyn RepositoryInterface>>,
-        package: &dyn BasePackage,
+        package: &BasePackageHandle,
         index: i64,
     ) {
         let repos_box: Vec<Box<dyn RepositoryInterface>> =
             repositories.iter().map(|r| r.clone_box()).collect();
-        let repo_index: i64 = match package.get_repository() {
-            // PHP uses array_search with strict identity; map to pointer comparison.
-            Some(repo) => repos_box
-                .iter()
-                .position(|r| {
-                    std::ptr::eq(
-                        r.as_ref() as *const _ as *const u8,
-                        repo as *const _ as *const u8,
-                    )
-                })
-                .map(|i| i as i64)
-                .unwrap_or(-1),
-            None => -1,
-        };
+        let _ = &repos_box;
+        // TODO(phase-c): package->repository back-reference not yet on handles
+        let repo_index: i64 = -1;
 
         if repo_index >= 0 {
             if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                if let Some(name_map) = repo_map.get_mut(PackageInterface::get_name(package)) {
-                    name_map.shift_remove(package.get_version());
+                if let Some(name_map) = repo_map.get_mut(&package.get_name()) {
+                    name_map.shift_remove(&package.get_version());
                 }
             }
         }
         self.packages.shift_remove(&index);
-        let object_hash = spl_object_hash(package);
+        let object_hash = package.ptr_id().to_string();
         if let Some(aliases) = self.alias_map.shift_remove(&object_hash) {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0 {

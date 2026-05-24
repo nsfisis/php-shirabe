@@ -47,6 +47,7 @@ use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::Locker;
 use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::package::archiver::ArchiveManager;
 use crate::package::archiver::PharArchiver;
 use crate::package::archiver::ZipArchiver;
@@ -690,7 +691,7 @@ impl Factory {
                         io,
                         &mut rm.borrow_mut(),
                         &vendor_dir,
-                        composer.get_package(),
+                        composer.get_package().clone(),
                         Some(&process),
                     );
                     composer.set_repository_manager(rm.clone());
@@ -871,7 +872,7 @@ impl Factory {
         io: &dyn IOInterface,
         rm: &mut RepositoryManager,
         vendor_dir: &str,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
         let fs = process
@@ -886,7 +887,7 @@ impl Factory {
                 )
                 .expect("installed.json path is always valid"),
                 true,
-                Some(RootPackageInterface::clone_box(root_package)),
+                Some(root_package),
                 fs,
             )
             .expect("InstalledFilesystemRepository::new should not fail"),
@@ -1237,8 +1238,7 @@ impl Factory {
         im: &mut InstallationManager,
     ) -> anyhow::Result<()> {
         for package in repo.get_packages() {
-            if !im.is_package_installed(repo, package.as_ref())? {
-                // TODO(phase-b): mutable access on repo trait object
+            if !im.is_package_installed(repo, &package)? {
                 let _ = package;
             }
         }

@@ -6,6 +6,7 @@ use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
@@ -45,7 +46,7 @@ impl PluginInstaller {
         &mut self,
         e: anyhow::Error,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<()> {
         self.inner.io.write_error(&format!(
             "Plugin initialization failed ({}), uninstalling plugin",
@@ -123,7 +124,7 @@ impl InstallerInterface for PluginInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         self.inner.install(repo, package).await?;
 
@@ -137,8 +138,8 @@ impl InstallerInterface for PluginInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: &PackageInterfaceHandle,
+        target: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(repo, initial, target).await?;
 
@@ -153,12 +154,12 @@ impl InstallerInterface for PluginInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager()
             .borrow_mut()
-            .uninstall_package(package);
+            .uninstall_package(package.as_rc().borrow().as_package_interface());
 
         self.inner.uninstall(repo, package).await
     }

@@ -19,17 +19,15 @@ use crate::dependency_resolver::rule::{self, Rule};
 use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {
     pub(crate) policy: Box<dyn PolicyInterface>,
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) rules: RuleSet,
-    pub(crate) added_map: IndexMap<i64, Box<dyn PackageInterface>>,
-    pub(crate) added_packages_by_names: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
+    pub(crate) added_map: IndexMap<i64, PackageInterfaceHandle>,
+    pub(crate) added_packages_by_names: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
 impl RuleSetGenerator {
@@ -52,8 +50,8 @@ impl RuleSetGenerator {
     /// one requirement of the package A.
     fn create_require_rule(
         &self,
-        package: &dyn PackageInterface,
-        providers: &[Box<dyn PackageInterface>],
+        package: &PackageInterfaceHandle,
+        providers: &[PackageInterfaceHandle],
         reason: i64,
         reason_data: PhpMixed,
     ) -> Option<GenericRule> {
@@ -61,10 +59,7 @@ impl RuleSetGenerator {
 
         for provider in providers {
             // self fulfilling rule?
-            if std::ptr::eq(
-                provider.as_ref() as *const dyn PackageInterface,
-                package as *const dyn PackageInterface,
-            ) {
+            if provider.ptr_eq(package) {
                 return None;
             }
             literals.push(provider.get_id());
@@ -83,7 +78,7 @@ impl RuleSetGenerator {
     /// set of packages is empty an impossible rule is generated.
     fn create_install_one_of_rule(
         &self,
-        packages: &[Box<dyn PackageInterface>],
+        packages: &[PackageInterfaceHandle],
         reason: i64,
         reason_data: PhpMixed,
     ) -> GenericRule {
@@ -97,16 +92,13 @@ impl RuleSetGenerator {
     /// and B the provider.
     fn create_rule2_literals(
         &self,
-        issuer: &dyn PackageInterface,
-        provider: &dyn PackageInterface,
+        issuer: &PackageInterfaceHandle,
+        provider: &PackageInterfaceHandle,
         reason: i64,
         reason_data: PhpMixed,
     ) -> Option<Rule2Literals> {
         // ignore self conflict
-        if std::ptr::eq(
-            issuer as *const dyn PackageInterface,
-            provider as *const dyn PackageInterface,
-        ) {
+        if issuer.ptr_eq(provider) {
             return None;
         }
 
@@ -120,7 +112,7 @@ impl RuleSetGenerator {
 
     fn create_multi_conflict_rule(
         &self,
-        packages: &[Box<dyn PackageInterface>],
+        packages: &[PackageInterfaceHandle],
         reason: i64,
         reason_data: PhpMixed,
     ) -> Rule {
@@ -152,10 +144,10 @@ impl RuleSetGenerator {
 
     pub(crate) fn add_rules_for_package(
         &mut self,
-        package: Box<dyn PackageInterface>,
+        package: PackageInterfaceHandle,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let mut work_queue: VecDeque<Box<dyn PackageInterface>> = VecDeque::new();
+        let mut work_queue: VecDeque<PackageInterfaceHandle> = VecDeque::new();
         work_queue.push_back(package);
 
         while let Some(package) = work_queue.pop_front() {
@@ -163,26 +155,25 @@ impl RuleSetGenerator {
                 continue;
             }
 
-            self.added_map
-                .insert(package.get_id(), package.clone_package_box());
+            self.added_map.insert(package.get_id(), package.clone());
 
-            let is_alias = package.as_any().downcast_ref::<AliasPackage>().is_some();
+            let is_alias = package.as_alias().is_some();
 
             if !is_alias {
                 for name in package.get_names(false) {
                     self.added_packages_by_names
                         .entry(name)
                         .or_default()
-                        .push(package.clone_package_box());
+                        .push(package.clone());
                 }
             } else {
-                let alias_pkg = package.as_any().downcast_ref::<AliasPackage>().unwrap();
+                let alias_pkg = package.as_alias().unwrap();
 
-                work_queue.push_back(alias_pkg.get_alias_of().clone_package_box());
-                let alias_of = alias_pkg.get_alias_of();
+                let alias_of: PackageInterfaceHandle = alias_pkg.get_alias_of().into();
+                work_queue.push_back(alias_of.clone());
                 let rule = self.create_require_rule(
-                    &*package,
-                    &[alias_of.clone_package_box()],
+                    &package,
+                    &[alias_of.clone()],
                     rule::RULE_PACKAGE_ALIAS,
                     PhpMixed::Null, // reasonData: $package (BasePackage)
                 );
@@ -190,8 +181,8 @@ impl RuleSetGenerator {
 
                 // aliases must be installed with their main package, so create a rule the other way around as well
                 let inverse_rule = self.create_require_rule(
-                    alias_of,
-                    &[package.clone_package_box()],
+                    &alias_of,
+                    &[package.clone()],
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
                     PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
                 );
@@ -218,16 +209,16 @@ impl RuleSetGenerator {
                         .unwrap_or(fallback);
                 }
 
-                let possible_requires: Vec<Box<dyn PackageInterface>> = self
+                let possible_requires: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
                     .what_provides(link.get_target(), Some(&constraint))
                     .into_iter()
-                    .map(|p| p.clone_package_box())
+                    .map(|p| p.into())
                     .collect();
 
                 let rule = self.create_require_rule(
-                    &*package,
+                    &package,
                     &possible_requires,
                     rule::RULE_PACKAGE_REQUIRES,
                     PhpMixed::Null, // reasonData: $link (Link)
@@ -245,11 +236,7 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let packages: Vec<Box<dyn PackageInterface>> = self
-            .added_map
-            .values()
-            .map(|p| p.clone_package_box())
-            .collect();
+        let packages: Vec<PackageInterfaceHandle> = self.added_map.values().cloned().collect();
 
         for package in &packages {
             for link in package.get_conflicts().values() {
@@ -271,22 +258,24 @@ impl RuleSetGenerator {
                         .unwrap_or(fallback);
                 }
 
-                let conflicts = self
+                let conflicts: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&constraint));
+                    .what_provides(link.get_target(), Some(&constraint))
+                    .into_iter()
+                    .map(|p| p.into())
+                    .collect();
 
                 for conflict in &conflicts {
                     // define the conflict rule for regular packages, for alias packages it's only needed if the name
                     // matches the conflict exactly, otherwise the name match is by provide/replace which means the
                     // package which this is an alias of will conflict anyway, so no need to create additional rules
-                    let conflict_is_alias =
-                        conflict.as_any().downcast_ref::<AliasPackage>().is_some();
+                    let conflict_is_alias = conflict.as_alias().is_some();
                     let conflict_name_matches = conflict.get_name() == link.get_target();
                     if !conflict_is_alias || conflict_name_matches {
                         let rule = self.create_rule2_literals(
-                            &**package,
-                            &**conflict,
+                            package,
+                            conflict,
                             rule::RULE_PACKAGE_CONFLICT,
                             PhpMixed::Null, // reasonData: $link (Link)
                         );
@@ -296,10 +285,10 @@ impl RuleSetGenerator {
             }
         }
 
-        let names_packages: Vec<(String, Vec<Box<dyn PackageInterface>>)> = self
+        let names_packages: Vec<(String, Vec<PackageInterfaceHandle>)> = self
             .added_packages_by_names
             .iter()
-            .map(|(k, v)| (k.clone(), v.iter().map(|p| p.clone_package_box()).collect()))
+            .map(|(k, v)| (k.clone(), v.iter().cloned().collect()))
             .collect();
 
         for (name, packages) in names_packages {
@@ -320,11 +309,9 @@ impl RuleSetGenerator {
         for package in request.get_fixed_packages().values() {
             if package.get_id() == -1 {
                 // fixed package was not added to the pool as it did not pass the stability requirements, this is fine
-                if self
-                    .pool
-                    .borrow()
-                    .is_unacceptable_fixed_or_locked_package(package.as_ref())
-                {
+                // TODO(phase-c): wire Pool::is_unacceptable_fixed_or_locked_package(package) here;
+                // the package handle and the pool's identity check are now both handle-based.
+                if todo!("is_unacceptable_fixed_or_locked_package with a request package handle") {
                     continue;
                 }
 
@@ -338,7 +325,7 @@ impl RuleSetGenerator {
                 }));
             }
 
-            self.add_rules_for_package(package.clone_box(), platform_requirement_filter);
+            self.add_rules_for_package(package.clone().into(), platform_requirement_filter);
 
             let mut reason_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             reason_data.insert(
@@ -346,7 +333,7 @@ impl RuleSetGenerator {
                 Box::new(PhpMixed::Null), // reasonData: $package (BasePackage)
             );
             let rule = self.create_install_one_of_rule(
-                &[package.clone_package_box()],
+                &[package.clone().into()],
                 rule::RULE_FIXED,
                 PhpMixed::Array(reason_data),
             );
@@ -367,19 +354,16 @@ impl RuleSetGenerator {
                     .unwrap_or(fallback);
             }
 
-            let packages: Vec<Box<dyn PackageInterface>> = self
+            let packages: Vec<PackageInterfaceHandle> = self
                 .pool
                 .borrow_mut()
                 .what_provides(package_name, Some(&constraint))
                 .into_iter()
-                .map(|p| p.clone_package_box())
+                .map(|p| p.into())
                 .collect();
             if !packages.is_empty() {
                 for package in &packages {
-                    self.add_rules_for_package(
-                        package.clone_package_box(),
-                        platform_requirement_filter,
-                    );
+                    self.add_rules_for_package(package.clone(), platform_requirement_filter);
                 }
 
                 let mut reason_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
@@ -407,19 +391,19 @@ impl RuleSetGenerator {
         &mut self,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) {
-        let packages: Vec<Box<dyn BasePackage>> = self
+        let packages: Vec<PackageInterfaceHandle> = self
             .pool
             .borrow()
             .get_packages()
             .iter()
-            .map(|p| p.clone_box())
+            .map(|p| p.clone().into())
             .collect();
         for package in &packages {
             // ensure that rules for root alias packages and aliases of packages which were loaded are also loaded
             // even if the alias itself isn't required, otherwise a package could be installed without its alias which
             // leads to unexpected behavior
             let is_not_added = !self.added_map.contains_key(&package.get_id());
-            let as_alias = package.as_any().downcast_ref::<AliasPackage>();
+            let as_alias = package.as_alias();
             if is_not_added {
                 if let Some(alias_pkg) = as_alias {
                     if alias_pkg.is_root_package_alias()
@@ -427,10 +411,7 @@ impl RuleSetGenerator {
                             .added_map
                             .contains_key(&alias_pkg.get_alias_of().get_id())
                     {
-                        self.add_rules_for_package(
-                            package.clone_package_box(),
-                            platform_requirement_filter,
-                        );
+                        self.add_rules_for_package(package.clone(), platform_requirement_filter);
                     }
                 }
             }

@@ -216,7 +216,7 @@ impl ValidateCommand {
                 let path = composer
                     .get_installation_manager()
                     .borrow_mut()
-                    .get_install_path(package.as_ref());
+                    .get_install_path(package.as_rc().borrow().as_package_interface());
                 let path = match path {
                     Some(p) => p,
                     None => continue,
@@ -229,7 +229,7 @@ impl ValidateCommand {
 
                     self.output_result(
                         io,
-                        package.get_pretty_name(),
+                        &package.get_pretty_name(),
                         &mut dep_errors,
                         &mut dep_warnings,
                         check_publish,

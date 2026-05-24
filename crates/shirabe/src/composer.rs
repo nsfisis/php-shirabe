@@ -9,7 +9,7 @@ use crate::downloader::DownloadManager;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::InstallationManager;
 use crate::package::archiver::ArchiveManager;
-use crate::package::{Locker, RootPackageInterface};
+use crate::package::{Locker, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManager;
 use crate::util::r#loop::Loop;
@@ -35,7 +35,7 @@ pub fn get_version() -> String {
 #[derive(Debug, Default)]
 pub struct PartialComposer {
     global: bool,
-    package: Option<Box<dyn RootPackageInterface>>,
+    package: Option<RootPackageInterfaceHandle>,
     r#loop: Option<std::rc::Rc<std::cell::RefCell<Loop>>>,
     repository_manager: Option<std::rc::Rc<std::cell::RefCell<RepositoryManager>>>,
     installation_manager: Option<std::rc::Rc<std::cell::RefCell<InstallationManager>>>,
@@ -44,12 +44,12 @@ pub struct PartialComposer {
 }
 
 impl PartialComposer {
-    pub fn set_package(&mut self, package: Box<dyn RootPackageInterface>) {
+    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
         self.package = Some(package);
     }
 
-    pub fn get_package(&self) -> &dyn RootPackageInterface {
-        self.package.as_deref().unwrap()
+    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
+        self.package.as_ref().unwrap()
     }
 
     pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) {
@@ -193,11 +193,11 @@ impl Composer {
         &mut self.partial
     }
 
-    pub fn set_package(&mut self, package: Box<dyn crate::package::RootPackageInterface>) {
+    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
         self.partial.set_package(package);
     }
 
-    pub fn get_package(&self) -> &dyn crate::package::RootPackageInterface {
+    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
         self.partial.get_package()
     }
 
@@ -316,14 +316,14 @@ impl PartialOrFullComposer {
         }
     }
 
-    pub fn set_package(&mut self, package: Box<dyn crate::package::RootPackageInterface>) {
+    pub fn set_package(&mut self, package: RootPackageInterfaceHandle) {
         match self {
             Self::Full(full) => full.set_package(package),
             Self::Partial(partial) => partial.set_package(package),
         }
     }
 
-    pub fn get_package(&self) -> &dyn crate::package::RootPackageInterface {
+    pub fn get_package(&self) -> &RootPackageInterfaceHandle {
         match self {
             Self::Full(full) => full.get_package(),
             Self::Partial(partial) => partial.get_package(),

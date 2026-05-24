@@ -2,17 +2,18 @@
 
 use crate::installer::InstallationManager;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::RepositoryInterface;
 use anyhow::Result;
 
 pub trait WritableRepositoryInterface: RepositoryInterface {
     fn write(&mut self, dev_mode: bool, installation_manager: &InstallationManager) -> Result<()>;
 
-    fn add_package(&mut self, package: Box<dyn PackageInterface>) -> Result<()>;
+    fn add_package(&mut self, package: PackageInterfaceHandle) -> Result<()>;
 
     fn remove_package(&mut self, package: &dyn PackageInterface) -> Result<()>;
 
-    fn get_canonical_packages(&self) -> Vec<Box<dyn PackageInterface>>;
+    fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle>;
 
     fn reload(&mut self);
 

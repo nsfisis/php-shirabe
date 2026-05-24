@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::PackageInterfaceHandle;
+use crate::package::base_package::{self};
 use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
@@ -165,7 +167,7 @@ impl RepositoryInterface for FilterRepository {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         if !self.is_allowed(name) {
             return None;
         }
@@ -177,7 +179,7 @@ impl RepositoryInterface for FilterRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         if !self.is_allowed(name) {
             return Vec::new();
         }
@@ -190,7 +192,7 @@ impl RepositoryInterface for FilterRepository {
         mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         package_name_map.retain(|name, _| self.is_allowed(name));
 
@@ -226,10 +228,10 @@ impl RepositoryInterface for FilterRepository {
         result
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         let mut result = Vec::new();
         for package in self.repo.get_packages() {
-            if self.is_allowed(PackageInterface::get_name(package.as_ref())) {
+            if self.is_allowed(&package.get_name()) {
                 result.push(package);
             }
         }

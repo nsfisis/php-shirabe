@@ -5,8 +5,9 @@ use std::any::Any;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
 };
@@ -79,7 +80,7 @@ impl RepositoryInterface for CompositeRepository {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         for repository in &self.repositories {
             let package = repository.find_package(name, constraint.clone());
             if package.is_some() {
@@ -93,7 +94,7 @@ impl RepositoryInterface for CompositeRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         let mut packages = vec![];
         for repository in &self.repositories {
             packages.extend(repository.find_packages(name, constraint.clone()));
@@ -101,7 +102,7 @@ impl RepositoryInterface for CompositeRepository {
         packages
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         let mut packages = vec![];
         for repository in &self.repositories {
             packages.extend(repository.get_packages());
@@ -114,35 +115,21 @@ impl RepositoryInterface for CompositeRepository {
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         let mut all_packages = IndexMap::new();
         let mut all_names_found = vec![];
 
         for repository in &self.repositories {
-            // TODO(phase-b): manual deep clone since trait objects in maps don't derive Clone.
             let name_map_cloned: IndexMap<String, Option<AnyConstraint>> = package_name_map
                 .iter()
                 .map(|(k, v)| (k.clone(), v.as_ref().map(|c| c.clone())))
-                .collect();
-            let already_loaded_cloned: IndexMap<
-                String,
-                IndexMap<String, Box<dyn PackageInterface>>,
-            > = already_loaded
-                .iter()
-                .map(|(k, inner)| {
-                    let inner_cloned: IndexMap<String, Box<dyn PackageInterface>> = inner
-                        .iter()
-                        .map(|(ik, iv)| (ik.clone(), iv.clone_package_box()))
-                        .collect();
-                    (k.clone(), inner_cloned)
-                })
                 .collect();
             let result = repository.load_packages(
                 name_map_cloned,
                 acceptable_stabilities.clone(),
                 stability_flags.clone(),
-                already_loaded_cloned,
+                already_loaded.clone(),
             );
             all_packages.extend(result.packages);
             all_names_found.extend(result.names_found);

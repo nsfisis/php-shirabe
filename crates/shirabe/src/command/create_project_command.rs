@@ -31,7 +31,6 @@ use crate::installer::ProjectInstaller;
 use crate::installer::SuggestedPackagesReporter;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
-use crate::package::AliasPackage;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
@@ -511,7 +510,7 @@ impl CreateProjectCommand {
                         config_source.add_link(
                             r#type,
                             link.get_target(),
-                            package.get_pretty_version(),
+                            &package.get_pretty_version(),
                         );
                     }
                 }
@@ -873,14 +872,10 @@ impl CreateProjectCommand {
         }
 
         // avoid displaying 9999999-dev as version if default-branch was selected
-        // TODO(phase-b): `$package instanceof AliasPackage` downcast and reassigning
-        // `package` to its alias-of requires Rc<dyn PackageInterface> sharing. Skipped.
-        let package_as_alias: Option<&AliasPackage> = None;
-        if package_as_alias.is_some()
-            && package.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS
-        {
-            // package = package_as_alias.unwrap().get_alias_of();
-            todo!("phase-b: reassigning package to alias_of needs Rc-shared ownership");
+        if let Some(alias) = package.as_alias() {
+            if package.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
+                package = alias.get_alias_of().into();
+            }
         }
 
         io.write_error(&format!(
@@ -896,12 +891,8 @@ impl CreateProjectCommand {
             io.write_error("<info>Plugins have been disabled.</info>");
         }
 
-        // TODO(phase-b): `$package instanceof AliasPackage` downcast and reassigning
-        // `package` to its alias-of requires Rc<dyn PackageInterface> sharing. Skipped.
-        let package_as_alias: Option<&AliasPackage> = None;
-        if let Some(_alias) = package_as_alias {
-            // package = alias.get_alias_of();
-            todo!("phase-b: reassigning package to alias_of needs Rc-shared ownership");
+        if let Some(alias) = package.as_alias() {
+            package = alias.get_alias_of().into();
         }
 
         let dm = composer.get_download_manager();
@@ -917,7 +908,7 @@ impl CreateProjectCommand {
         let mut installed_repo = InstalledArrayRepository::new()?;
         im.execute(
             &mut installed_repo,
-            vec![Box::new(InstallOperation::new(package.clone_package_box()))],
+            vec![Box::new(InstallOperation::new(package.clone()))],
             true,
             true,
             false,
@@ -928,7 +919,7 @@ impl CreateProjectCommand {
         // TODO(phase-b): self.suggested_packages_reporter is on the outer scope via &self
         // self.suggested_packages_reporter.add_suggestions_from_package(&*package);
 
-        let installed_from_vcs = "source" == package.get_installation_source().unwrap_or("");
+        let installed_from_vcs = package.get_installation_source().as_deref() == Some("source");
 
         io.write_error(&format!("<info>Created project in {}</info>", directory));
         chdir(&directory);
@@ -942,7 +933,7 @@ impl CreateProjectCommand {
             Platform::clear_env("COMPOSER");
         }
 
-        Platform::put_env("COMPOSER_ROOT_VERSION", package.get_pretty_version());
+        Platform::put_env("COMPOSER_ROOT_VERSION", &package.get_pretty_version());
 
         // once the root project is fully initialized, we do not need to wipe everything on user abort anymore even if it happens during deps install
         if let Some(handler) = signal_handler {

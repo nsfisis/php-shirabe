@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Repository/RootPackageRepository.php
 
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
+use crate::package::PackageInterfaceHandle;
+use crate::package::RootPackageInterfaceHandle;
 use crate::repository::ArrayRepository;
 use crate::repository::{ProviderInfo, RepositoryInterface, SearchResult};
 use indexmap::IndexMap;
@@ -13,13 +14,9 @@ pub struct RootPackageRepository {
 }
 
 impl RootPackageRepository {
-    pub fn new(package: Box<dyn RootPackageInterface>) -> Self {
+    pub fn new(package: RootPackageInterfaceHandle) -> Self {
         Self {
-            // TODO(phase-b): RootPackageInterface vs BasePackage upcast + ArrayRepository::new error
-            inner: ArrayRepository::new(vec![todo!(
-                "convert Box<dyn RootPackageInterface> to Box<dyn BasePackage>"
-            )])
-            .expect("invalid root package"),
+            inner: ArrayRepository::new(vec![package.into()]).expect("invalid root package"),
         }
     }
 
@@ -43,7 +40,7 @@ impl RepositoryInterface for RootPackageRepository {
         &self,
         name: &str,
         constraint: crate::repository::FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         self.inner.find_package(name, constraint)
     }
 
@@ -51,11 +48,11 @@ impl RepositoryInterface for RootPackageRepository {
         &self,
         name: &str,
         constraint: Option<crate::repository::FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         self.inner.get_packages()
     }
 
@@ -64,7 +61,7 @@ impl RepositoryInterface for RootPackageRepository {
         package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> crate::repository::LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,

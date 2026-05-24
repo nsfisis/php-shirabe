@@ -31,7 +31,6 @@ use crate::installer::InstallerEvent;
 use crate::installer::PackageEvent;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
 use crate::plugin::CommandEvent;
 use crate::plugin::PreCommandRunEvent;
 use crate::repository::RepositoryInterface;
@@ -1260,7 +1259,9 @@ impl EventDispatcher {
         let generator = generator.borrow();
         let mut hash_input = packages
             .iter()
-            .map(|p: &Box<dyn PackageInterface>| format!("{}/{}", p.get_name(), p.get_version()))
+            .map(|p: &crate::package::PackageInterfaceHandle| {
+                format!("{}/{}", p.get_name(), p.get_version())
+            })
             .collect::<Vec<_>>()
             .join(",");
         // TODO(plugin): polymorphic isDevMode propagation for ScriptEvent / PackageEvent / InstallerEvent
@@ -1278,11 +1279,19 @@ impl EventDispatcher {
         // Composer is &Composer here so we cannot take a mut borrow. Defer until shared ownership.
         let _ = &generator;
         let _ = packages;
-        let package_map: Vec<(Box<dyn PackageInterface>, Option<String>)> =
+        let package_map: Vec<(crate::package::PackageInterfaceHandle, Option<String>)> =
             todo!("build_package_map requires &mut InstallationManager");
         // TODO(phase-b): parse_autoloads also expects the filtered dev packages list
         // (PhpMixed in this port).
-        let map = generator.parse_autoloads(package_map, package, shirabe_php_shim::PhpMixed::Null);
+        let map = generator.parse_autoloads(
+            package_map,
+            package
+                .as_rc()
+                .borrow()
+                .as_root_package_interface()
+                .unwrap(),
+            shirabe_php_shim::PhpMixed::Null,
+        );
 
         if self.loader.is_some() {
             self.loader.as_mut().unwrap().unregister();

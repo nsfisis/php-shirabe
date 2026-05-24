@@ -290,14 +290,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Set dist and source references and update dist URL for ones that contain a reference
     fn set_source_dist_references(&mut self, reference: &str);
 
-    // clone_box was moved to BasePackage with a Box<dyn BasePackage> return type;
-    // exposing it here too caused trait-method ambiguity at every BasePackage call site.
-    // Callers holding `&dyn PackageInterface` (rather than `&dyn BasePackage`) can use
-    // `clone_package_box` instead.
-    fn clone_package_box(&self) -> Box<dyn PackageInterface> {
-        todo!()
-    }
-
     fn as_alias_package(&self) -> Option<&crate::package::AliasPackage> {
         None
     }

@@ -3,6 +3,7 @@
 use crate::downloader::DownloadManager;
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
@@ -95,19 +96,22 @@ impl InstallerInterface for ProjectInstaller {
     async fn install(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .install(package, &self.install_path)
+            .install(
+                package.as_rc().borrow().as_package_interface(),
+                &self.install_path,
+            )
             .await
     }
 
     async fn update(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
+        _initial: &PackageInterfaceHandle,
+        _target: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),
@@ -119,7 +123,7 @@ impl InstallerInterface for ProjectInstaller {
     async fn uninstall(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        _package: &dyn PackageInterface,
+        _package: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),

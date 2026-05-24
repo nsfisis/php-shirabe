@@ -26,9 +26,7 @@ impl RootPackage {
     pub const DEFAULT_PRETTY_VERSION: &'static str = "1.0.0+no-version-set";
 
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
-        // TODO(phase-b): CompletePackage::new signature is not yet pinned down
-        let inner: CompletePackage = todo!();
-        let _ = (name, version, pretty_version);
+        let inner = CompletePackage::new(name, version, pretty_version);
         Self {
             inner,
             minimum_stability: "stable".to_string(),

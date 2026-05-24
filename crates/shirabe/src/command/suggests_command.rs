@@ -47,9 +47,12 @@ impl SuggestsCommand {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
-        let mut installed_repos: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(
-            RootPackageRepository::new(composer.get_package().clone_box()),
-        )];
+        // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a
+        // RootPackageInterfaceHandle, so it cannot be shared into RootPackageRepository::new yet.
+        let root_package_handle: crate::package::RootPackageInterfaceHandle =
+            todo!("share composer.get_package() as a RootPackageInterfaceHandle");
+        let mut installed_repos: Vec<Box<dyn RepositoryInterface>> =
+            vec![Box::new(RootPackageRepository::new(root_package_handle))];
 
         if composer.get_locker().borrow_mut().is_locked() {
             // TODO(phase-b): get_platform_overrides returns IndexMap<String, String>; PlatformRepository::new expects IndexMap<String, PhpMixed>
@@ -93,24 +96,16 @@ impl SuggestsCommand {
 
         let filter = input.get_argument("packages");
         let mut packages = RepositoryInterface::get_packages(&installed_repo);
-        // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; pushing into Vec<Box<dyn BasePackage>> requires conversion
-        let root_pkg_as_base: Box<dyn crate::package::BasePackage> =
-            todo!("convert RootPackageInterface to Box<dyn BasePackage>");
+        // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a handle,
+        // so it cannot be shared into the package list yet.
+        let root_pkg_as_base: crate::package::BasePackageHandle =
+            todo!("share composer.get_package() as a BasePackageHandle");
         packages.push(root_pkg_as_base);
         for package in &packages {
-            if !empty(&filter)
-                && !in_array(
-                    PhpMixed::String(package.get_name().to_string()),
-                    &filter,
-                    false,
-                )
-            {
+            if !empty(&filter) && !in_array(PhpMixed::String(package.get_name()), &filter, false) {
                 continue;
             }
-            // TODO(phase-b): add_suggestions_from_package expects &dyn PackageInterface; BasePackage is a separate trait
-            reporter.add_suggestions_from_package(todo!(
-                "convert Box<dyn BasePackage> to &dyn PackageInterface"
-            ));
+            reporter.add_suggestions_from_package(package.as_rc().borrow().as_package_interface());
         }
 
         let mut mode = SuggestedPackagesReporter::MODE_BY_PACKAGE;

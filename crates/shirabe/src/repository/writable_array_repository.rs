@@ -14,7 +14,7 @@ pub struct WritableArrayRepository {
 }
 
 impl WritableArrayRepository {
-    pub fn new(packages: Vec<Box<dyn crate::package::PackageInterface>>) -> Result<Self> {
+    pub fn new(packages: Vec<crate::package::PackageInterfaceHandle>) -> Result<Self> {
         Ok(Self {
             inner: ArrayRepository::new(packages)?,
             dev_package_names: Vec::new(),
@@ -48,10 +48,7 @@ impl WritableArrayRepository {
         self.dev_mode = None;
     }
 
-    pub fn add_package(
-        &mut self,
-        package: Box<dyn crate::package::PackageInterface>,
-    ) -> Result<()> {
+    pub fn add_package(&mut self, package: crate::package::PackageInterfaceHandle) -> Result<()> {
         self.inner.add_package(package)
     }
 
@@ -66,14 +63,13 @@ impl WritableArrayRepository {
         Ok(())
     }
 
-    pub fn get_canonical_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
+    pub fn get_canonical_packages(&self) -> Vec<crate::package::PackageInterfaceHandle> {
         // TODO(phase-b): delegate to inner once it exposes get_canonical_packages
         Vec::new()
     }
 
-    pub fn get_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
-        // TODO(phase-b): delegate to inner ArrayRepository::get_packages
-        Vec::new()
+    pub fn get_packages(&self) -> Vec<crate::package::BasePackageHandle> {
+        crate::repository::RepositoryInterface::get_packages(&self.inner)
     }
 
     pub fn get_repo_name(&self) -> String {

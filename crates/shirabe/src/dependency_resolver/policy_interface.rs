@@ -1,15 +1,11 @@
 //! ref: composer/src/Composer/DependencyResolver/PolicyInterface.php
 
 use crate::dependency_resolver::Pool;
-use crate::package::PackageInterface;
+use crate::package::BasePackageHandle;
 
 pub trait PolicyInterface: std::fmt::Debug {
-    fn version_compare(
-        &self,
-        a: &dyn PackageInterface,
-        b: &dyn PackageInterface,
-        operator: &str,
-    ) -> bool;
+    fn version_compare(&self, a: &BasePackageHandle, b: &BasePackageHandle, operator: &str)
+    -> bool;
 
     fn select_preferred_packages(
         &self,

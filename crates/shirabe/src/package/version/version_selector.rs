@@ -16,9 +16,8 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
-use crate::package::AliasPackage;
 use crate::package::PackageInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
@@ -69,7 +68,7 @@ impl VersionSelector {
         repo_set_flags: i64,
         io: Option<&dyn IOInterface>,
         show_warnings: shirabe_php_shim::PhpMixed,
-    ) -> anyhow::Result<Option<Box<dyn PackageInterface>>> {
+    ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         if !base_package::STABILITIES.contains_key(preferred_stability) {
             return Err(shirabe_php_shim::UnexpectedValueException {
                 message: format!(
@@ -99,8 +98,14 @@ impl VersionSelector {
 
         let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {
-            let a_priority = a.get_stability_priority();
-            let b_priority = b.get_stability_priority();
+            // BasePackage::get_stability_priority() is not forwarded by the handle; compute it
+            // directly from the stability name.
+            let a_priority = *base_package::STABILITIES
+                .get(a.get_stability().as_str())
+                .unwrap();
+            let b_priority = *base_package::STABILITIES
+                .get(b.get_stability().as_str())
+                .unwrap();
 
             if min_priority < a_priority && b_priority < a_priority {
                 return std::cmp::Ordering::Greater;
@@ -112,9 +117,9 @@ impl VersionSelector {
                 return std::cmp::Ordering::Less;
             }
 
-            if version_compare(b.get_version(), a.get_version(), ">") {
+            if version_compare(&b.get_version(), &a.get_version(), ">") {
                 std::cmp::Ordering::Greater
-            } else if version_compare(b.get_version(), a.get_version(), "<") {
+            } else if version_compare(&b.get_version(), &a.get_version(), "<") {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal
@@ -127,11 +132,11 @@ impl VersionSelector {
             .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
             .is_some();
 
-        let package: Option<Box<dyn PackageInterface>>;
+        let package: Option<crate::package::PackageInterfaceHandle>;
         if !self.platform_constraints.is_empty() && !is_ignore_all {
             let mut already_warned_names: IndexMap<String, bool> = IndexMap::new();
             let mut already_seen_names: IndexMap<String, bool> = IndexMap::new();
-            let mut found_package: Option<Box<dyn PackageInterface>> = None;
+            let mut found_package: Option<crate::package::PackageInterfaceHandle> = None;
 
             'pkgs: for pkg in candidates.iter() {
                 let reqs = pkg.get_requires();
@@ -171,7 +176,7 @@ impl VersionSelector {
                         reason = "is missing from your platform";
                     }
 
-                    let is_latest_version = !already_seen_names.contains_key(pkg.get_name());
+                    let is_latest_version = !already_seen_names.contains_key(&pkg.get_name());
                     already_seen_names.insert(pkg.get_name().to_string(), true);
                     if let Some(io) = io {
                         let should_warn = match &show_warnings {
@@ -215,13 +220,13 @@ impl VersionSelector {
                     continue;
                 }
 
-                found_package = Some(pkg.clone_box());
+                found_package = Some(pkg.clone().into());
                 break;
             }
             package = found_package;
         } else {
             package = if !candidates.is_empty() {
-                Some(candidates.remove(0).clone_package_box())
+                Some(candidates.remove(0).into())
             } else {
                 None
             };
@@ -232,10 +237,9 @@ impl VersionSelector {
             Some(p) => p,
         };
 
-        let package = if let Some(alias) = package.as_ref().as_any().downcast_ref::<AliasPackage>()
-        {
+        let package = if let Some(alias) = package.as_alias() {
             if alias.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                alias.get_alias_of().clone_package_box()
+                alias.get_alias_of().into()
             } else {
                 package
             }

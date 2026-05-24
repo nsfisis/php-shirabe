@@ -27,10 +27,7 @@ use crate::installer::InstallerEvents;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
 use crate::json::JsonManipulator;
-use crate::package::AliasPackage;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
-use crate::package::base_package::{self, BasePackage};
+use crate::package::base_package;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::VersionParser;
@@ -338,16 +335,16 @@ impl RequireCommand {
                     continue;
                 }
 
-                // TODO(phase-b): find_packages returns Vec<Box<dyn BasePackage>> but
-                // get_most_current_version expects Vec<Box<dyn PackageInterface>>; needs trait
-                // upcasting once Rust supports it stably or an adapter.
-                let _ = self.get_repos().find_packages(name, None);
-                let pkg: Option<Box<dyn PackageInterface>> =
-                    PackageSorter::get_most_current_version(todo!(
-                        "convert Vec<Box<dyn BasePackage>> to Vec<Box<dyn PackageInterface>>"
-                    ));
-                // TODO(phase-b): instanceof CompletePackageInterface downcast
-                let pkg_as_complete: Option<&dyn CompletePackageInterface> = None;
+                let found_packages: Vec<crate::package::PackageInterfaceHandle> = self
+                    .get_repos()
+                    .find_packages(name, None)
+                    .into_iter()
+                    .map(|p| p.into())
+                    .collect();
+                let pkg: Option<crate::package::PackageInterfaceHandle> =
+                    PackageSorter::get_most_current_version(found_packages);
+                let pkg_as_complete: Option<crate::package::CompletePackageInterfaceHandle> =
+                    pkg.as_ref().and_then(|p| p.as_complete());
                 if let Some(pkg_complete) = pkg_as_complete {
                     let lowered: Vec<String> =
                         array_map(|s: &String| strtolower(s), &pkg_complete.get_keywords());
@@ -713,8 +710,8 @@ impl RequireCommand {
                 .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
-                root_package.get_name(),
-                root_package.get_pretty_version(),
+                &root_package.get_name(),
+                &root_package.get_pretty_version(),
                 base_package::SUPPORTED_LINK_TYPES
                     .get(require_key)
                     .map(|t| t.method)
@@ -742,7 +739,7 @@ impl RequireCommand {
             );
             let _ = RootPackageLoader::extract_stability_flags(
                 requirements,
-                root_package.get_minimum_stability(),
+                &root_package.get_minimum_stability(),
                 root_package.get_stability_flags().clone(),
             );
             // unset($stabilityFlags, $references);
@@ -962,12 +959,8 @@ impl RequireCommand {
                 package_name,
                 crate::repository::FindPackageConstraint::String("*".to_string()),
             );
-            // TODO(phase-b): `$package instanceof AliasPackage` downcast
-            let package_as_alias: Option<&AliasPackage> = None;
-            while let Some(_alias) = package_as_alias {
-                // TODO(phase-b): get_alias_of returns &dyn BasePackage; clone is not available
-                // and BasePackage is not PackageInterface (the latter is a super-trait).
-                package = todo!("upcast alias.get_alias_of() to Box<dyn BasePackage>");
+            while let Some(alias) = package.as_ref().and_then(|p| p.as_alias()) {
+                package = Some(alias.get_alias_of().into());
             }
 
             let package = match package {
@@ -976,18 +969,13 @@ impl RequireCommand {
             };
 
             if fixed {
-                requirements.insert(
-                    package_name.clone(),
-                    package.get_pretty_version().to_string(),
-                );
+                requirements.insert(package_name.clone(), package.get_pretty_version());
             } else {
-                // TODO(phase-b): trait upcast from &dyn BasePackage to &dyn PackageInterface
-                // is not yet stable in Rust; use explicit as_package_interface() when available.
-                let pkg_as_pi: &dyn PackageInterface =
-                    todo!("upcast &dyn BasePackage to &dyn PackageInterface");
                 requirements.insert(
                     package_name.clone(),
-                    version_selector.find_recommended_require_version(pkg_as_pi)?,
+                    version_selector.find_recommended_require_version(
+                        package.as_rc().borrow().as_package_interface(),
+                    )?,
                 );
             }
             self.get_io().write_error3(
@@ -1057,7 +1045,7 @@ impl RequireCommand {
             {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
                     &requirements,
-                    composer.get_package().get_minimum_stability(),
+                    &composer.get_package().get_minimum_stability(),
                     IndexMap::new(),
                 );
                 let stability_flags_clone = stability_flags.clone();

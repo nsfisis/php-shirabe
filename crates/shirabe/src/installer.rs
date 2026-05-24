@@ -76,8 +76,10 @@ use crate::package::Link;
 use crate::package::Locker;
 use crate::package::Package;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootAliasPackage;
 use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
@@ -104,9 +106,9 @@ use shirabe_semver::constraint::SimpleConstraint;
 pub struct Installer {
     pub(crate) io: Box<dyn IOInterface>,
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
-    pub(crate) package: Box<dyn RootPackageInterface>,
+    pub(crate) package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
-    pub(crate) fixed_root_package: Box<dyn RootPackageInterface>,
+    pub(crate) fixed_root_package: RootPackageInterfaceHandle,
     pub(crate) download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
     pub(crate) repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
     pub(crate) locker: std::rc::Rc<std::cell::RefCell<Locker>>,
@@ -161,7 +163,7 @@ impl Installer {
     pub fn new(
         io: Box<dyn IOInterface>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        package: Box<dyn RootPackageInterface>,
+        package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
         repository_manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
         locker: std::rc::Rc<std::cell::RefCell<Locker>>,
@@ -176,8 +178,8 @@ impl Installer {
         Self {
             io,
             config,
-            package: package.clone_box(),
-            fixed_root_package: package.clone_box(),
+            package: package.clone(),
+            fixed_root_package: package.clone(),
             download_manager,
             repository_manager,
             locker,
@@ -353,11 +355,13 @@ impl Installer {
             let installed_repo = InstalledRepository::new(vec![
                 locked_repository_box,
                 Box::new(self.create_platform_repo(false)),
-                Box::new(RootPackageRepository::new(self.package.clone_box())),
+                Box::new(RootPackageRepository::new(self.package.clone())),
             ]);
             if is_fresh_install {
                 self.suggested_packages_reporter
-                    .add_suggestions_from_package(&*self.package);
+                    .add_suggestions_from_package(
+                        self.package.as_rc().borrow().as_package_interface(),
+                    );
             }
             self.suggested_packages_reporter
                 .output_minimalistic(Some(&installed_repo), None);
@@ -408,7 +412,11 @@ impl Installer {
             self.autoload_generator.borrow_mut().dump(
                 &*self.config.borrow(),
                 self.repository_manager.borrow().get_local_repository(),
-                &*self.package,
+                self.package
+                    .as_rc()
+                    .borrow()
+                    .as_root_package_interface()
+                    .unwrap(),
                 &mut *self.installation_manager.borrow_mut(),
                 "composer",
                 self.optimize_autoloader,
@@ -423,9 +431,11 @@ impl Installer {
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages() {
+                // TODO(phase-c): InstallationManager APIs still take &dyn PackageInterface; bridge
+                // the handle until they migrate to handles.
                 self.installation_manager
                     .borrow_mut()
-                    .ensure_binaries_presence(&*package);
+                    .ensure_binaries_presence(package.as_rc().borrow().as_package_interface());
             }
         }
 
@@ -443,8 +453,8 @@ impl Installer {
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages() {
-                if let Some(cp) = package.as_complete_package_interface() {
-                    if package.as_alias_package().is_none() && !cp.get_funding().is_empty() {
+                if let Some(cp) = package.as_complete() {
+                    if package.as_alias().is_none() && !cp.get_funding().is_empty() {
                         funding_count += 1;
                     }
                 }
@@ -622,8 +632,13 @@ impl Installer {
             repository_set.add_repository(lr.clone_box())?;
         }
 
+        let fixed_root_package = self.fixed_root_package.clone();
         let mut request = self.create_request(
-            &*self.fixed_root_package,
+            fixed_root_package
+                .as_rc()
+                .borrow()
+                .as_root_package_interface()
+                .unwrap(),
             &platform_repo,
             locked_repository.as_ref(),
         );
@@ -819,7 +834,9 @@ impl Installer {
             // collect suggestions
             if let Some(io) = operation.as_install_operation() {
                 self.suggested_packages_reporter
-                    .add_suggestions_from_package(&*io.get_package());
+                    .add_suggestions_from_package(
+                        io.get_package().as_rc().borrow().as_package_interface(),
+                    );
             }
 
             // output op if lock file is enabled, but alias op only in debug verbosity
@@ -836,13 +853,9 @@ impl Installer {
                 if self.io.is_very_verbose()
                     && strpos(&operation.get_operation_type(), "Alias").is_none()
                 {
-                    let operation_pkg: Box<dyn PackageInterface> =
-                        if let Some(uo) = operation.as_update_operation() {
-                            uo.get_target_package().clone_package_box()
-                        } else {
-                            operation.get_package().clone_package_box()
-                        };
-                    if let Some(repo) = operation_pkg.get_repository() {
+                    // TODO(phase-c): package->repository back-reference not yet on handles
+                    let repository: Option<&dyn RepositoryInterface> = None;
+                    if let Some(repo) = repository {
                         source_repo = format!(" from {}", repo.get_repo_name());
                     }
                 }
@@ -877,8 +890,8 @@ impl Installer {
             platform_reqs,
             platform_dev_reqs,
             aliases_php_mixed,
-            self.package.get_minimum_stability(),
-            self.package.get_stability_flags().clone(),
+            &self.package.get_minimum_stability(),
+            self.package.get_stability_flags(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
             platform_overrides,
@@ -915,16 +928,24 @@ impl Installer {
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             let loaded = loader.load(
-                dumper.dump(&*pkg),
+                dumper.dump(pkg.as_rc().borrow().as_package_interface()),
                 Some("Composer\\Package\\CompletePackage".to_string()),
             )?;
-            result_repo.add_package(loaded.clone_package_box())?;
+            result_repo.add_package(loaded)?;
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
         repository_set.add_repository(Box::new(result_repo))?;
 
-        let mut request = self.create_request(&*self.fixed_root_package, platform_repo, None);
+        let mut request = self.create_request(
+            self.fixed_root_package
+                .as_rc()
+                .borrow()
+                .as_root_package_interface()
+                .unwrap(),
+            platform_repo,
+            None,
+        );
         self.require_packages_for_update(&mut request, locked_repository, false)?;
 
         let pool = repository_set.create_pool_with_all_packages()?;
@@ -1005,8 +1026,13 @@ impl Installer {
             repository_set.add_repository(locked_repository.clone_box())?;
 
             // creating requirements request
+            let fixed_root_package = self.fixed_root_package.clone();
             let mut request = self.create_request(
-                &*self.fixed_root_package,
+                fixed_root_package
+                    .as_rc()
+                    .borrow()
+                    .as_root_package_interface()
+                    .unwrap(),
                 &platform_repo,
                 Some(&locked_repository),
             );
@@ -1019,10 +1045,15 @@ impl Installer {
                 );
             }
 
-            let missing_requirement_info = self
-                .locker
-                .borrow_mut()
-                .get_missing_requirement_info(&*self.package, self.dev_mode)?;
+            let package_for_missing = self.package.clone();
+            let missing_requirement_info = self.locker.borrow_mut().get_missing_requirement_info(
+                package_for_missing
+                    .as_rc()
+                    .borrow()
+                    .as_root_package_interface()
+                    .unwrap(),
+                self.dev_mode,
+            )?;
             if !missing_requirement_info.is_empty() {
                 self.io.write_error(&missing_requirement_info.join("\n"));
 
@@ -1038,7 +1069,7 @@ impl Installer {
             }
 
             for package in RepositoryInterface::get_packages(&locked_repository) {
-                request.fix_locked_package(package);
+                request.fix_locked_package(package.clone());
             }
 
             let mut root_requires = self.package.get_requires();
@@ -1316,16 +1347,17 @@ impl Installer {
             root_requires.insert(req, constraint);
         }
 
-        // TODO(phase-b): self.package is Box<dyn RootPackageInterface>; cannot clone a trait
-        // object without Clone. PHP shares the reference. Skipping fixed_root_package assignment.
-        // self.fixed_root_package = clone(&self.package);
+        // TODO(phase-c): PHP does `$this->fixedRootPackage = clone($this->package)` (a deep,
+        // fresh-identity copy) and then strips its requires below. A handle clone only shares the
+        // same Rc, so a real deep clone of the package is needed to avoid mutating self.package.
+        // self.fixed_root_package = deep_clone(&self.package);
         self.fixed_root_package.set_requires(vec![]);
         self.fixed_root_package.set_dev_requires(vec![]);
 
         stability_flags.insert(
-            self.package.get_name().to_string(),
+            self.package.get_name(),
             base_package::STABILITIES
-                [VersionParser::parse_stability(self.package.get_version()).as_str()],
+                [VersionParser::parse_stability(&self.package.get_version()).as_str()],
         );
 
         // TODO(phase-b): convert root_aliases (Vec<IndexMap<String, String>>) into Vec<RootAliasInput>
@@ -1405,18 +1437,18 @@ impl Installer {
         if for_update && self.minimal_update && locked_repo.is_some() {
             let mut versions: IndexMap<String, String> = IndexMap::new();
             for pkg in CanonicalPackagesTrait::get_packages(locked_repo.unwrap()) {
-                if pkg.as_alias_package().is_some()
+                if pkg.as_alias().is_some()
                     || (self.update_allow_list.is_some()
                         && self
                             .update_allow_list
                             .as_ref()
                             .unwrap()
                             .iter()
-                            .any(|s| s == pkg.get_name()))
+                            .any(|s| s == &pkg.get_name()))
                 {
                     continue;
                 }
-                versions.insert(pkg.get_name().to_string(), pkg.get_version().to_string());
+                versions.insert(pkg.get_name(), pkg.get_version());
             }
             preferred_versions = Some(versions);
         }
@@ -1439,7 +1471,8 @@ impl Installer {
         let _ = locked_repository;
         let mut request = Request::new(None);
 
-        // TODO(phase-b): request.fix_package wants Box<dyn BasePackage>; root_package is &dyn RootPackageInterface
+        // TODO(phase-c): request.fix_package wants a BasePackageHandle; root_package is only a
+        // borrowed &dyn RootPackageInterface here and cannot be lifted back into a handle.
         let _ = root_package;
         // request.fix_package(root_package);
         if let Some(_alias) = root_package.as_any().downcast_ref::<RootAliasPackage>() {
@@ -1457,17 +1490,13 @@ impl Installer {
         let provided = root_package.get_provides();
         for package in fixed_packages {
             // skip platform packages that are provided by the root package
-            let pkg_repo_is_platform = match package.get_repository() {
-                Some(r) => std::ptr::eq(
-                    r.as_any() as *const _ as *const u8,
-                    platform_repo.as_any() as *const _ as *const u8,
-                ),
-                None => false,
-            };
+            // TODO(phase-c): the handle does not expose get_repository (a `RefCell`-borrowed
+            // back-reference); detecting the platform repo needs repository back-refs on handles.
+            let pkg_repo_is_platform = false;
             if !pkg_repo_is_platform
-                || !provided.contains_key(package.get_name())
+                || !provided.contains_key(&package.get_name())
                 || !provided
-                    .get(package.get_name())
+                    .get(&package.get_name())
                     .unwrap()
                     .get_constraint()
                     .matches(
@@ -1479,9 +1508,9 @@ impl Installer {
                         .into(),
                     )
             {
-                // TODO(phase-b): fix_package needs owned Box<dyn BasePackage>
+                // TODO(phase-c): wire up once the platform-repo detection above is implemented.
                 let _ = &package;
-                // request.fix_package(&*package);
+                // request.fix_package(package.clone());
             }
         }
 
@@ -1515,15 +1544,15 @@ impl Installer {
             for locked_package in CanonicalPackagesTrait::get_packages(locked_repository.unwrap()) {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
-                if locked_package.as_alias_package().is_none()
-                    && !excluded_packages.contains_key(locked_package.get_name())
+                if locked_package.as_alias().is_none()
+                    && !excluded_packages.contains_key(&locked_package.get_name())
                 {
                     request.require_name(
-                        locked_package.get_name(),
+                        &locked_package.get_name(),
                         Some(
                             SimpleConstraint::new(
                                 "==".to_string(),
-                                locked_package.get_version().to_string(),
+                                locked_package.get_version(),
                                 None,
                             )
                             .into(),
@@ -1576,21 +1605,21 @@ impl Installer {
     ///
     /// This is to prevent any accidental modification of the existing repos on disk
     fn mock_local_repositories(&self, rm: &mut RepositoryManager) {
-        let mut packages: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
+        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages() {
-            packages.insert(package.to_string(), package.clone_box());
+            packages.insert(package.to_string(), package.clone().into());
         }
         let keys: Vec<String> = packages.keys().cloned().collect();
         for key in keys {
-            let package_clone = packages.get(&key).unwrap().clone_package_box();
-            if let Some(alias_pkg) = package_clone.as_alias_package() {
+            let package_clone = packages.get(&key).unwrap().clone();
+            if let Some(alias_pkg) = package_clone.as_alias() {
                 let alias_key = alias_pkg.get_alias_of().to_string();
                 // TODO(phase-b): get_class on dyn PackageInterface; skipped because PhpMixed shim only
                 let _class_name = "Composer\\Package\\AliasPackage".to_string();
                 // PHP: $packages[$key] = new $className($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
-                // TODO(phase-b): AliasPackage::new expects Box<dyn BasePackage>; have Box<dyn PackageInterface>
-                let _aliased = packages.get(&alias_key).unwrap().clone_package_box();
-                let new_alias_package: Box<dyn PackageInterface> = todo!();
+                // TODO(phase-c): re-create the alias package over the mocked aliased handle.
+                let _aliased = packages.get(&alias_key).unwrap().clone();
+                let new_alias_package: PackageInterfaceHandle = todo!();
                 packages.insert(key, new_alias_package);
             }
         }
@@ -1653,7 +1682,7 @@ impl Installer {
         Self::new(
             io,
             composer.get_config(),
-            composer.get_package().clone_box(),
+            composer.get_package().clone(),
             composer.get_download_manager(),
             composer.get_repository_manager(),
             composer.get_locker(),

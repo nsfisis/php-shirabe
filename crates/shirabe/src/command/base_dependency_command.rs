@@ -53,7 +53,7 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
         repos.push(Box::new(RootPackageRepository::new(
-            composer.get_package().clone_box(),
+            composer.get_package().clone(),
         )));
 
         if input.get_option("locked").as_bool().unwrap_or(false) {
@@ -158,7 +158,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 FindPackageConstraint::String(text_constraint.clone()),
             ) {
                 installed_repo.add_repository(Box::new(
-                    InstalledArrayRepository::new_with_packages(vec![r#match.clone_box()])?,
+                    InstalledArrayRepository::new_with_packages(vec![r#match.into()])?,
                 ))?;
             } else if PlatformRepository::is_platform_package(&needle) {
                 let parser = VersionParser::new();
@@ -170,9 +170,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                         .to_string();
                     let temp_platform_pkg = Package::new(needle.clone(), version.clone(), version);
                     installed_repo.add_repository(Box::new(
-                        InstalledArrayRepository::new_with_packages(vec![Box::new(
-                            temp_platform_pkg,
-                        )])?,
+                        InstalledArrayRepository::new_with_packages(vec![
+                            crate::package::PackageHandle::from_package(temp_platform_pkg).into(),
+                        ])?,
                     ))?;
                 }
             } else {
@@ -270,9 +270,9 @@ pub trait BaseDependencyCommand: BaseCommand {
             self.init_styles(output);
             let root = &packages[0];
             let description = root
-                .as_complete_package_interface()
+                .as_complete()
                 .and_then(|c| c.get_description())
-                .unwrap_or("");
+                .unwrap_or_default();
             self.get_io().write(&format!(
                 "<info>{}</info> {} {}",
                 root.get_pretty_name(),
@@ -335,7 +335,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     package.get_pretty_version().to_string()
                 };
-                let package_url = PackageInfo::get_view_source_or_homepage_url(&*package);
+                let package_url = PackageInfo::get_view_source_or_homepage_url(
+                    package.as_rc().borrow().as_package_interface(),
+                );
                 let name_with_link = match &package_url {
                     Some(url) => format!(
                         "<href={}>{}</>",
@@ -410,7 +412,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     package.get_pretty_version().to_string()
                 };
-            let package_url = PackageInfo::get_view_source_or_homepage_url(&**package);
+            let package_url = PackageInfo::get_view_source_or_homepage_url(
+                package.as_rc().borrow().as_package_interface(),
+            );
             let name_with_link = match &package_url {
                 Some(url) => format!(
                     "<href={}>{}</>",

@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Installer/InstallerInterface.php
 
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use shirabe_php_shim::PhpMixed;
 
@@ -30,20 +31,20 @@ pub trait InstallerInterface: std::fmt::Debug {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: &PackageInterfaceHandle,
+        target: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn cleanup(

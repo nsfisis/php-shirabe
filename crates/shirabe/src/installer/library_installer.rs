@@ -16,6 +16,7 @@ use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
@@ -305,24 +306,36 @@ impl InstallerInterface for LibraryInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package).unwrap();
+        let download_path = self
+            .get_install_path(package.as_rc().borrow().as_package_interface())
+            .unwrap();
 
         // remove the binaries if it appears the package files are missing
-        if !Filesystem::is_readable(&download_path) && repo.has_package(package) {
-            self.binary_installer.remove_binaries(package);
+        if !Filesystem::is_readable(&download_path)
+            && repo.has_package(package.as_rc().borrow().as_package_interface())
+        {
+            self.binary_installer
+                .remove_binaries(package.as_rc().borrow().as_package_interface());
         }
 
-        let _ = self.install_code(package).await?;
+        let _ = self
+            .install_code(package.as_rc().borrow().as_package_interface())
+            .await?;
 
-        let install_path = self.get_install_path(package).unwrap();
-        self.binary_installer
-            .install_binaries(package, &install_path, true);
-        if !repo.has_package(package) {
-            repo.add_package(package.clone_package_box());
+        let install_path = self
+            .get_install_path(package.as_rc().borrow().as_package_interface())
+            .unwrap();
+        self.binary_installer.install_binaries(
+            package.as_rc().borrow().as_package_interface(),
+            &install_path,
+            true,
+        );
+        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+            repo.add_package(package.clone());
         }
 
         Ok(None)
@@ -331,10 +344,10 @@ impl InstallerInterface for LibraryInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: &PackageInterfaceHandle,
+        target: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(initial) {
+        if !repo.has_package(initial.as_rc().borrow().as_package_interface()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -345,15 +358,26 @@ impl InstallerInterface for LibraryInstaller {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
 
-        self.binary_installer.remove_binaries(initial);
-        let _ = self.update_code(initial, target).await?;
-
-        let install_path = self.get_install_path(target).unwrap();
         self.binary_installer
-            .install_binaries(target, &install_path, true);
-        repo.remove_package(initial);
-        if !repo.has_package(target) {
-            repo.add_package(target.clone_package_box());
+            .remove_binaries(initial.as_rc().borrow().as_package_interface());
+        let _ = self
+            .update_code(
+                initial.as_rc().borrow().as_package_interface(),
+                target.as_rc().borrow().as_package_interface(),
+            )
+            .await?;
+
+        let install_path = self
+            .get_install_path(target.as_rc().borrow().as_package_interface())
+            .unwrap();
+        self.binary_installer.install_binaries(
+            target.as_rc().borrow().as_package_interface(),
+            &install_path,
+            true,
+        );
+        repo.remove_package(initial.as_rc().borrow().as_package_interface());
+        if !repo.has_package(target.as_rc().borrow().as_package_interface()) {
+            repo.add_package(target.clone());
         }
 
         Ok(None)
@@ -362,9 +386,9 @@ impl InstallerInterface for LibraryInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: &PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(package) {
+        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,
@@ -372,13 +396,17 @@ impl InstallerInterface for LibraryInstaller {
             .into());
         }
 
-        let _ = self.remove_code(package).await?;
+        let _ = self
+            .remove_code(package.as_rc().borrow().as_package_interface())
+            .await?;
 
-        let download_path = self.get_package_base_path(package);
-        self.binary_installer.remove_binaries(package);
-        repo.remove_package(package);
+        let download_path =
+            self.get_package_base_path(package.as_rc().borrow().as_package_interface());
+        self.binary_installer
+            .remove_binaries(package.as_rc().borrow().as_package_interface());
+        repo.remove_package(package.as_rc().borrow().as_package_interface());
 
-        if strpos(package.get_name(), "/").map_or(false, |pos| pos != 0) {
+        if strpos(&package.get_name(), "/").map_or(false, |pos| pos != 0) {
             let package_vendor_dir = dirname(&download_path);
             if is_dir(&package_vendor_dir)
                 && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)

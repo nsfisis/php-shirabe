@@ -66,7 +66,7 @@ impl RootPackageLoader {
         config: IndexMap<String, Box<shirabe_php_shim::PhpMixed>>,
         class: &str,
         cwd: Option<&str>,
-    ) -> anyhow::Result<Box<dyn PackageInterface>> {
+    ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
         if class != "Composer\\Package\\RootPackage" {
             shirabe_php_shim::trigger_error(
                 "The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.",
@@ -193,11 +193,14 @@ impl RootPackageLoader {
             Some("Composer\\Package\\RootPackage".to_string()),
         )?;
 
-        // TODO(phase-b): as_any_mut is not available on BasePackage; downcast via Any is not
-        // possible without it. Skipping real downcast and using todo!() placeholder.
+        // TODO(phase-c): mutating the loaded RootPackage through a PackageInterfaceHandle
+        // requires going through as_root_package() + a RefCell borrow; the inherent
+        // RootPackage mutators used below are not yet reachable that way.
         let real_package: &mut RootPackage = {
             let _ = &mut package;
-            todo!("downcast Box<dyn BasePackage> to &mut RootPackage requires as_any_mut on trait")
+            todo!(
+                "mutate RootPackage through PackageInterfaceHandle (as_root_package + borrow_mut)"
+            )
         };
 
         if auto_versioned {

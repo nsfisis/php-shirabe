@@ -8,6 +8,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackage;
 use crate::package::Link;
+use crate::package::PackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterface;
@@ -34,7 +35,7 @@ pub struct AliasPackage {
     pub(crate) has_self_version_requires: bool,
 
     /// @var BasePackage
-    pub(crate) alias_of: Box<dyn BasePackage>,
+    pub(crate) alias_of: PackageHandle,
     /// @var Link[]
     pub(crate) requires: IndexMap<String, Link>,
     /// @var Link[]
@@ -53,8 +54,8 @@ impl AliasPackage {
     /// @param BasePackage $aliasOf       The package this package is an alias of
     /// @param string      $version       The version the alias must report
     /// @param string      $prettyVersion The alias's non-normalized version
-    pub fn new(alias_of: Box<dyn BasePackage>, version: String, pretty_version: String) -> Self {
-        let alias_name = alias_of.get_name().to_string();
+    pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
+        let alias_name = alias_of.get_name();
 
         let stability = VersionParser::parse_stability(&version).to_string();
         let dev = stability == "dev";
@@ -130,12 +131,8 @@ impl AliasPackage {
         this
     }
 
-    pub fn get_alias_of(&self) -> &dyn BasePackage {
-        self.alias_of.as_ref()
-    }
-
-    pub fn get_alias_of_mut(&mut self) -> &mut dyn BasePackage {
-        &mut *self.alias_of
+    pub fn get_alias_of(&self) -> PackageHandle {
+        self.alias_of.clone()
     }
 
     /// Stores whether this is an alias created by an aliasing in the requirements of the root package or not
@@ -244,11 +241,13 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_name(&self) -> &str {
-        self.alias_of.get_name()
+        // PHP delegates to aliasOf; the local name mirrors aliasOf->getName(),
+        // so it is returned here to avoid borrowing across the shared handle.
+        &self.name
     }
 
     fn get_pretty_name(&self) -> &str {
-        self.alias_of.get_pretty_name()
+        &self.pretty_name
     }
 
     fn get_names(&self, provides: bool) -> Vec<String> {
@@ -306,11 +305,14 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_type(&self) -> &str {
-        self.alias_of.get_type()
+        // Delegates to the shared `aliasOf` handle, whose getters yield owned
+        // `String`s; a borrow cannot escape the `RefCell`. Use the handle API
+        // (`AliasPackageHandle::get_alias_of().get_type()`) instead.
+        todo!("AliasPackage::get_type cannot return &str across the aliasOf handle")
     }
 
     fn get_target_dir(&self) -> Option<&str> {
-        self.alias_of.get_target_dir()
+        todo!("AliasPackage::get_target_dir cannot return &str across the aliasOf handle")
     }
 
     fn get_extra(&self) -> IndexMap<String, PhpMixed> {
@@ -322,15 +324,15 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_installation_source(&self) -> Option<&str> {
-        self.alias_of.get_installation_source()
+        todo!("AliasPackage::get_installation_source cannot return &str across the aliasOf handle")
     }
 
     fn get_source_type(&self) -> Option<&str> {
-        self.alias_of.get_source_type()
+        todo!("AliasPackage::get_source_type cannot return &str across the aliasOf handle")
     }
 
     fn get_source_url(&self) -> Option<&str> {
-        self.alias_of.get_source_url()
+        todo!("AliasPackage::get_source_url cannot return &str across the aliasOf handle")
     }
 
     fn get_source_urls(&self) -> Vec<String> {
@@ -338,7 +340,7 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_source_reference(&self) -> Option<&str> {
-        self.alias_of.get_source_reference()
+        todo!("AliasPackage::get_source_reference cannot return &str across the aliasOf handle")
     }
 
     fn set_source_reference(&mut self, reference: Option<String>) {
@@ -354,11 +356,11 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_dist_type(&self) -> Option<&str> {
-        self.alias_of.get_dist_type()
+        todo!("AliasPackage::get_dist_type cannot return &str across the aliasOf handle")
     }
 
     fn get_dist_url(&self) -> Option<&str> {
-        self.alias_of.get_dist_url()
+        todo!("AliasPackage::get_dist_url cannot return &str across the aliasOf handle")
     }
 
     fn get_dist_urls(&self) -> Vec<String> {
@@ -366,7 +368,7 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_dist_reference(&self) -> Option<&str> {
-        self.alias_of.get_dist_reference()
+        todo!("AliasPackage::get_dist_reference cannot return &str across the aliasOf handle")
     }
 
     fn set_dist_reference(&mut self, reference: Option<String>) {
@@ -374,7 +376,7 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        self.alias_of.get_dist_sha1_checksum()
+        todo!("AliasPackage::get_dist_sha1_checksum cannot return &str across the aliasOf handle")
     }
 
     fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
@@ -422,7 +424,7 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_notification_url(&self) -> Option<&str> {
-        self.alias_of.get_notification_url()
+        todo!("AliasPackage::get_notification_url cannot return &str across the aliasOf handle")
     }
 
     fn is_default_branch(&self) -> bool {
@@ -442,9 +444,8 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
-        // TODO(phase-b): BasePackage.get_full_pretty_version returns Result; bridge here
-        BasePackage::get_full_pretty_version(self.alias_of.as_ref(), truncate, display_mode)
-            .unwrap_or_default()
+        self.alias_of
+            .get_full_pretty_version(truncate, display_mode)
     }
 
     fn get_unique_name(&self) -> String {
@@ -460,7 +461,7 @@ impl PackageInterface for AliasPackage {
     }
 
     fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        self.alias_of.get_repository()
+        todo!("AliasPackage::get_repository cannot return a borrow across the aliasOf handle")
     }
 }
 
@@ -498,10 +499,6 @@ impl BasePackage for AliasPackage {
     }
 
     fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
-        todo!()
-    }
-
-    fn clone_box(&self) -> Box<dyn BasePackage> {
         todo!()
     }
 }

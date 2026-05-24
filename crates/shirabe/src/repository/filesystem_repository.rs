@@ -16,10 +16,10 @@ use shirabe_php_shim::{
 use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManager;
 use crate::json::JsonFile;
-use crate::package::AliasPackage;
 use crate::package::PackageInterface;
-use crate::package::RootAliasPackage;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
@@ -38,7 +38,7 @@ pub struct FilesystemRepository {
     /// @var bool
     dump_versions: bool,
     /// @var ?RootPackageInterface
-    root_package: Option<Box<dyn RootPackageInterface>>,
+    root_package: Option<RootPackageInterfaceHandle>,
     /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var bool|null
@@ -53,7 +53,7 @@ impl FilesystemRepository {
     pub fn new(
         repository_file: JsonFile,
         dump_versions: bool,
-        root_package: Option<Box<dyn RootPackageInterface>>,
+        root_package: Option<RootPackageInterfaceHandle>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Result<Self> {
         let filesystem = filesystem
@@ -66,8 +66,7 @@ impl FilesystemRepository {
             .into());
         }
         Ok(Self {
-            // TODO(phase-b): WritableArrayRepository::new() needs to be exposed
-            inner: todo!("WritableArrayRepository::new()"),
+            inner: WritableArrayRepository::new(vec![])?,
             file: repository_file,
             dump_versions,
             root_package,
@@ -220,8 +219,9 @@ impl FilesystemRepository {
         let mut install_paths: IndexMap<String, Option<String>> = IndexMap::new();
 
         for package in self.inner.get_canonical_packages() {
-            let mut pkg_array = dumper.dump(&*package);
-            let path = installation_manager.get_install_path(&*package);
+            let mut pkg_array = dumper.dump(package.as_rc().borrow().as_package_interface());
+            let path = installation_manager
+                .get_install_path(package.as_rc().borrow().as_package_interface());
             let mut install_path: Option<String> = None;
             if let Some(path_str) = &path {
                 if !path_str.is_empty() {
@@ -476,14 +476,13 @@ impl FilesystemRepository {
                 .map(|s| Box::new(PhpMixed::String(s.clone())))
                 .collect(),
         ));
-        let mut packages: Vec<Box<dyn PackageInterface>> = self
+        let mut packages: Vec<PackageInterfaceHandle> = self
             .inner
             .get_packages()
             .into_iter()
-            // TODO(phase-b): Box<BasePackage> -> Box<dyn PackageInterface>
-            .map(|p| todo!("Box<BasePackage> to Box<dyn PackageInterface>"))
+            .map(|p| p.into())
             .collect();
-        let mut root_package = match &self.root_package {
+        let mut current_root: RootPackageInterfaceHandle = match &self.root_package {
             None => {
                 return Err(LogicException {
                     message:
@@ -493,25 +492,27 @@ impl FilesystemRepository {
                 }
                 .into());
             }
-            // TODO(phase-b): clone root_package to push into packages list
-            Some(_r) => todo!("clone root_package"),
+            Some(r) => r.clone(),
         };
         // packages[] = $rootPackage = $this->rootPackage;
-        // TODO(phase-b): track current root_package in mutable variable
-        let mut current_root: Box<dyn RootPackageInterface> = root_package;
-        // packages.push(current_root.clone_box());
+        packages.push(current_root.clone().into());
 
-        while let Some(_alias) = current_root.as_any().downcast_ref::<RootAliasPackage>() {
-            current_root =
-                todo!("RootAliasPackage::get_alias_of() returning Box<dyn RootPackageInterface>");
-            // packages.push(current_root.clone_box());
+        while let Some(root_alias) =
+            PackageInterfaceHandle::from(current_root.clone()).as_root_alias_package()
+        {
+            current_root = root_alias.get_alias_of().into();
+            packages.push(current_root.clone().into());
         }
         let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();
         versions.insert(
             "root".to_string(),
             PhpMixed::Array(
                 self.dump_root_package(
-                    &*current_root,
+                    current_root
+                        .as_rc()
+                        .borrow()
+                        .as_root_package_interface()
+                        .expect("current_root is a RootPackageInterface"),
                     install_paths,
                     dev_mode,
                     repo_dir,
@@ -526,12 +527,16 @@ impl FilesystemRepository {
 
         // add real installed packages
         for package in &packages {
-            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
+            if package.as_alias().is_some() {
                 continue;
             }
 
-            let dumped =
-                self.dump_installed_package(&**package, install_paths, repo_dir, &dev_packages);
+            let dumped = self.dump_installed_package(
+                package.as_rc().borrow().as_package_interface(),
+                install_paths,
+                repo_dir,
+                &dev_packages,
+            );
             if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
                 versions_map.insert(
                     package.get_name().to_string(),
@@ -546,7 +551,7 @@ impl FilesystemRepository {
         for package in &packages {
             let is_dev_package = dev_packages
                 .as_array()
-                .map(|m| m.contains_key(package.get_name()))
+                .map(|m| m.contains_key(&package.get_name()))
                 .unwrap_or(false);
             for (_, replace) in package.get_replaces() {
                 // exclude platform replaces as when they are really there we can not check for their presence
@@ -587,12 +592,13 @@ impl FilesystemRepository {
 
         // add aliases
         for package in &packages {
-            let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() else {
+            let Some(_alias) = package.as_alias() else {
                 continue;
             };
             // TODO(phase-b): mutate nested versions['versions'][name]['aliases']
             todo!("append alias->getPrettyVersion() to versions['versions'][name]['aliases']");
-            if package.as_root_package_interface().is_some() {
+            #[allow(unreachable_code)]
+            if package.as_root().is_some() {
                 // TODO(phase-b): same mutation on versions['root']['aliases']
                 todo!("append alias->getPrettyVersion() to versions['root']['aliases']");
             }
@@ -721,9 +727,7 @@ impl FilesystemRepository {
         repo_dir: &str,
         dev_packages: &PhpMixed,
     ) -> IndexMap<String, PhpMixed> {
-        let data =
-            // TODO(phase-b): RootPackageInterface trait bound — pass as &dyn PackageInterface
-            self.dump_installed_package(todo!("package as &dyn PackageInterface"), install_paths, repo_dir, dev_packages);
+        let data = self.dump_installed_package(package, install_paths, repo_dir, dev_packages);
 
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert(

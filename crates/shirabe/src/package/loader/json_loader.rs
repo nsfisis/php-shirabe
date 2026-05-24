@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Loader/JsonLoader.php
 
 use crate::json::JsonFile;
-use crate::package::BasePackage;
+use crate::package::PackageInterfaceHandle;
 use crate::package::loader::LoaderInterface;
 use anyhow::Result;
 use std::path::Path;
@@ -20,7 +20,7 @@ impl JsonLoader {
         Self { loader }
     }
 
-    pub fn load(&self, json: JsonLoaderInput) -> Result<Box<dyn BasePackage>> {
+    pub fn load(&self, json: JsonLoaderInput) -> Result<PackageInterfaceHandle> {
         let config = match json {
             JsonLoaderInput::File(mut json_file) => json_file.read()?,
             JsonLoaderInput::String(ref s) if Path::new(s).exists() => {

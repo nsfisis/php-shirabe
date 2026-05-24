@@ -29,7 +29,7 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 
 #[derive(Debug)]
 pub struct Solver {
@@ -40,7 +40,7 @@ pub struct Solver {
 
     pub(crate) watch_graph: RuleWatchGraph,
     pub(crate) decisions: Decisions,
-    pub(crate) fixed_map: IndexMap<i64, Box<dyn BasePackage>>,
+    pub(crate) fixed_map: IndexMap<i64, BasePackageHandle>,
 
     pub(crate) propagate_index: i64,
     /// Pairs of `(literals, level)` — PHP indexes into these with the BRANCH_* constants.
@@ -176,7 +176,7 @@ impl Solver {
     fn setup_fixed_map(&mut self, request: &Request) {
         self.fixed_map = IndexMap::new();
         for (_, package) in request.get_fixed_packages() {
-            self.fixed_map.insert(package.get_id(), package.clone_box());
+            self.fixed_map.insert(package.get_id(), package.clone());
         }
     }
 
@@ -296,13 +296,22 @@ impl Solver {
             return Err(anyhow::anyhow!("solver problems"));
         }
 
-        // TODO(phase-b): LockTransaction expects IndexMap<_, Box<dyn PackageInterface>>
-        // and borrows Pool/Decisions. The present/fixed maps from Request are keyed
-        // by BasePackage; converting requires reworking Request.
+        // LockTransaction stores PackageInterfaceHandle maps; widen the request's BasePackageHandle
+        // maps into them.
+        let present_map = request
+            .get_present_map(false)
+            .into_iter()
+            .map(|(k, v)| (k, v.into()))
+            .collect();
+        let unlockable_map = request
+            .get_fixed_packages_map()
+            .into_iter()
+            .map(|(k, v)| (k, v.into()))
+            .collect();
         Ok(LockTransaction::new(
             &*self.pool.borrow(),
-            todo!("convert request.get_present_map(false) to PackageInterface map"),
-            todo!("convert request.get_fixed_packages_map() to PackageInterface map"),
+            present_map,
+            unlockable_map,
             &self.decisions,
         ))
     }

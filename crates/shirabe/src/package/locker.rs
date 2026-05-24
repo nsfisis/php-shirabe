@@ -15,11 +15,11 @@ use shirabe_php_shim::{
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackage;
 use crate::package::Link;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterface;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
@@ -219,15 +219,15 @@ impl Locker {
             false
         };
         if has_name {
-            let mut package_by_name: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+            let mut package_by_name: IndexMap<String, BasePackageHandle> = IndexMap::new();
             if let PhpMixed::List(list) = locked_packages {
                 for info in list {
                     if let PhpMixed::Array(m) = info.as_ref() {
                         let info_map: IndexMap<String, PhpMixed> =
                             m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
                         let package = self.loader.load(info_map, None)?;
-                        // TODO(phase-b): PHP shares the package between repository and map (Rc<dyn BasePackage>)
-                        let _name = package.get_name().to_string();
+                        // PHP shares the package between repository and map; the handle is the shared Rc.
+                        let _name = package.get_name();
                         let _ = (&mut packages, &mut package_by_name, package);
                         todo!(
                             "packages.add_package(package); package_by_name.insert(name, package); + AliasPackage downcast"
@@ -245,10 +245,11 @@ impl Locker {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or("")
                                 .to_string();
-                            // TODO(phase-b): Box<dyn BasePackage> is not Clone; PHP semantics need Rc<dyn BasePackage>
                             if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
                                 let mut alias_pkg = CompleteAliasPackage::new(
-                                    todo!("phase-b: downcast Box<BasePackage> to CompletePackage"),
+                                    todo!(
+                                        "phase-c: narrow base_pkg handle to CompletePackageHandle"
+                                    ),
                                     m.get("alias_normalized")
                                         .and_then(|v| v.as_string())
                                         .unwrap_or("")
@@ -463,8 +464,8 @@ impl Locker {
     /// Locks provided data into lockfile.
     pub fn set_lock_data(
         &mut self,
-        packages: Vec<Box<dyn PackageInterface>>,
-        dev_packages: Option<Vec<Box<dyn PackageInterface>>>,
+        packages: Vec<PackageInterfaceHandle>,
+        dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<String, String>,
         platform_dev_reqs: IndexMap<String, String>,
         aliases: Vec<IndexMap<String, PhpMixed>>,
@@ -743,13 +744,11 @@ impl Locker {
     }
 
     /// @param PackageInterface[] $packages
-    fn lock_packages(&mut self, packages: &[Box<dyn PackageInterface>]) -> Result<PhpMixed> {
+    fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> Result<PhpMixed> {
         let mut locked: Vec<IndexMap<String, PhpMixed>> = vec![];
 
         for package in packages {
-            // TODO(phase-b): `$package instanceof AliasPackage` downcast
-            let package_as_alias: Option<&AliasPackage> = None;
-            if package_as_alias.is_some() {
+            if package.as_alias().is_some() {
                 continue;
             }
 
@@ -767,15 +766,20 @@ impl Locker {
                 .into());
             }
 
-            let mut spec = self.dumper.dump(&**package);
+            let mut spec = self
+                .dumper
+                .dump(package.as_rc().borrow().as_package_interface());
             spec.shift_remove("version_normalized");
 
             // always move time to the end of the package definition
             let time = spec.get("time").cloned();
             spec.shift_remove("time");
-            let time = if package.is_dev() && package.get_installation_source() == Some("source") {
+            let time = if package.is_dev()
+                && package.get_installation_source() == Some("source".to_string())
+            {
                 // use the exact commit time of the current reference if it's a dev package
-                let pkg_time = self.get_package_time(&**package)?;
+                let pkg_time =
+                    self.get_package_time(package.as_rc().borrow().as_package_interface())?;
                 pkg_time.map(PhpMixed::String).or(time)
             } else {
                 time
@@ -976,11 +980,10 @@ impl Locker {
                         .find_packages_with_replacers_and_providers(&link.get_target(), None);
 
                     if !results.is_empty() {
-                        // TODO(phase-b): reset_first requires Clone on dyn BasePackage; PHP returns shared reference
-                        let provider: &Box<dyn BasePackage> =
-                            todo!("reset_first(&results) shared ref");
+                        // PHP `reset($results)` returns the first shared package; clone the handle.
+                        let provider: BasePackageHandle = results.first().unwrap().clone();
                         let _ = &results;
-                        let mut description = provider.get_pretty_version().to_string();
+                        let mut description = provider.get_pretty_version();
                         if provider.get_name() != link.get_target() {
                             'outer: for (method, text) in [
                                 ("getReplaces", "replaced as %s by %s"),

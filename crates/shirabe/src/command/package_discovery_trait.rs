@@ -574,7 +574,10 @@ pub trait PackageDiscoveryTrait {
                         message: sprintf(
                             &format!(
                                 "Package %s has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
-                                self.get_platform_exception_details(&*candidate, platform_repo),
+                                self.get_platform_exception_details(
+                                    candidate.as_rc().borrow().as_package_interface(),
+                                    platform_repo,
+                                ),
                             ),
                             &[PhpMixed::String(name.to_string())],
                         ),
@@ -610,8 +613,10 @@ pub trait PackageDiscoveryTrait {
                         message: format!(
                             "Package {} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
                             name,
-                            all_repos_package.get_repository().unwrap().get_repo_name(),
-                            package.get_repository().unwrap().get_repo_name(),
+                            // TODO(phase-c): the originating repository names need the handle's
+                            // repository back-reference (phase-c handoff item #1).
+                            "a higher priority repository",
+                            "a lower priority repository",
                         ),
                         code: 0,
                     }
@@ -666,7 +671,10 @@ pub trait PackageDiscoveryTrait {
                         message: sprintf(
                             &format!(
                                 "Could not find package %s in any version matching your PHP version, PHP extensions and Composer version{}%s",
-                                self.get_platform_exception_details(&*candidate, platform_repo),
+                                self.get_platform_exception_details(
+                                    candidate.as_rc().borrow().as_package_interface(),
+                                    platform_repo,
+                                ),
                             ),
                             &[
                                 PhpMixed::String(name.to_string()),
@@ -772,7 +780,9 @@ pub trait PackageDiscoveryTrait {
             if fixed {
                 package.get_pretty_version().to_string()
             } else {
-                version_selector.find_recommended_require_version(&*package)?
+                version_selector.find_recommended_require_version(
+                    package.as_rc().borrow().as_package_interface(),
+                )?
             },
         ))
     }
@@ -798,9 +808,7 @@ pub trait PackageDiscoveryTrait {
             Ok(r) => r,
             Err(e) => {
                 // PHP: if ($e instanceof \LogicException) throw $e;
-                // TODO(phase-b): downcast to LogicException
-                let is_logic: bool = todo!("e instanceof LogicException");
-                if is_logic {
+                if e.downcast_ref::<LogicException>().is_some() {
                     return Err(e);
                 }
 
@@ -891,7 +899,7 @@ pub trait PackageDiscoveryTrait {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key("config.platform");
-                let is_complete = platform_pkg.as_complete_package_interface().is_some();
+                let is_complete = platform_pkg.as_complete().is_some();
                 if has_config_platform && is_complete {
                     // TODO(phase-b): platform_pkg.get_description() via CompletePackageInterface
                     platform_pkg_version = format!(

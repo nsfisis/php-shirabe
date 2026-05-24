@@ -12,11 +12,11 @@ pub struct RepositoryUtils;
 
 impl RepositoryUtils {
     pub fn filter_required_packages(
-        packages: &[Box<dyn crate::package::BasePackage>],
+        packages: &[crate::package::BasePackageHandle],
         requirer: &dyn PackageInterface,
         include_require_dev: bool,
-        mut bucket: Vec<Box<dyn crate::package::BasePackage>>,
-    ) -> Vec<Box<dyn crate::package::BasePackage>> {
+        mut bucket: Vec<crate::package::BasePackageHandle>,
+    ) -> Vec<crate::package::BasePackageHandle> {
         let mut requires: IndexMap<String, Link> = requirer.get_requires();
         if include_require_dev {
             requires.extend(requirer.get_dev_requires());
@@ -25,15 +25,9 @@ impl RepositoryUtils {
         for candidate in packages {
             for name in candidate.get_names(true) {
                 if requires.contains_key(&name) {
-                    let already_in_bucket = bucket.iter().any(|b| {
-                        std::ptr::eq(
-                            b.as_ref() as *const dyn crate::package::BasePackage as *const (),
-                            candidate.as_ref() as *const dyn crate::package::BasePackage
-                                as *const (),
-                        )
-                    });
+                    let already_in_bucket = bucket.iter().any(|b| b.ptr_eq(candidate));
                     if !already_in_bucket {
-                        bucket.push(candidate.clone_box());
+                        bucket.push(candidate.clone());
                         // TODO(phase-b): recursion requires &dyn PackageInterface; cast pending.
                         let _ = (requires.contains_key("dummy"),);
                     }

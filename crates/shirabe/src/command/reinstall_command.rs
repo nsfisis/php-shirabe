@@ -16,9 +16,6 @@ use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::io::IOInterface;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
-use crate::package::PackageInterface;
 use crate::package::base_package;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
@@ -73,7 +70,7 @@ impl ReinstallCommand {
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let local_repo = repository_manager.get_local_repository();
-        let mut packages_to_reinstall: Vec<Box<dyn crate::package::PackageInterface>> = vec![];
+        let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
         let type_option = input.get_option("type");
@@ -100,8 +97,8 @@ impl ReinstallCommand {
                 })
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages() {
-                if filter_types.contains(&package.get_type().to_string()) {
-                    package_names_to_reinstall.push(package.get_name().to_string());
+                if filter_types.contains(&package.get_type()) {
+                    package_names_to_reinstall.push(package.get_name());
                     packages_to_reinstall.push(package);
                 }
             }
@@ -126,9 +123,9 @@ impl ReinstallCommand {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
                 let mut matched = false;
                 for package in local_repo.get_canonical_packages() {
-                    if Preg::is_match(&pattern_regexp, package.get_name()).unwrap_or(false) {
+                    if Preg::is_match(&pattern_regexp, &package.get_name()).unwrap_or(false) {
                         matched = true;
-                        package_names_to_reinstall.push(package.get_name().to_string());
+                        package_names_to_reinstall.push(package.get_name());
                         packages_to_reinstall.push(package);
                     }
                 }
@@ -149,14 +146,12 @@ impl ReinstallCommand {
         }
 
         let present_packages = local_repo.get_packages();
-        let result_packages: Vec<Box<dyn PackageInterface>> = present_packages
-            .iter()
-            .map(|p| p.clone_package_box())
-            .collect();
-        let present_packages: Vec<Box<dyn PackageInterface>> = present_packages
+        let result_packages: Vec<crate::package::PackageInterfaceHandle> =
+            present_packages.iter().map(|p| p.clone().into()).collect();
+        let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages
             .into_iter()
-            .filter(|package| !package_names_to_reinstall.contains(&package.get_name().to_string()))
-            .map(|p| p.clone_package_box())
+            .filter(|package| !package_names_to_reinstall.contains(&package.get_name()))
+            .map(|p| p.into())
             .collect();
 
         let transaction = Transaction::new(present_packages, result_packages);
@@ -165,24 +160,19 @@ impl ReinstallCommand {
         let mut install_order = indexmap::IndexMap::new();
         for (index, op) in install_operations.iter().enumerate() {
             if let Some(install_op) = op.as_any().downcast_ref::<InstallOperation>() {
-                if install_op
-                    .get_package()
-                    .as_any()
-                    .downcast_ref::<AliasPackage>()
-                    .is_none()
-                {
-                    install_order.insert(install_op.get_package().get_name().to_string(), index);
+                if install_op.get_package().as_alias().is_none() {
+                    install_order.insert(install_op.get_package().get_name(), index);
                 }
             }
         }
 
         uninstall_operations.sort_by(|a, b| {
             let a_order = install_order
-                .get(a.get_package().get_name())
+                .get(&a.get_package().get_name())
                 .copied()
                 .unwrap_or(0);
             let b_order = install_order
-                .get(b.get_package().get_name())
+                .get(&b.get_package().get_name())
                 .copied()
                 .unwrap_or(0);
             b_order.cmp(&a_order)

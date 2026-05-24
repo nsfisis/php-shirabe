@@ -67,14 +67,14 @@ impl FundCommand {
         let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
         let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
         for package in repo.get_packages() {
-            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
+            if package.as_alias().is_some() {
                 continue;
             }
             packages_to_load.insert(
-                package.get_name().to_string(),
+                package.get_name(),
                 Some(MatchAllConstraint::new(None).into()),
             );
-            packages_to_load_names.insert(package.get_name().to_string());
+            packages_to_load_names.insert(package.get_name());
         }
 
         // load all packages dev versions in parallel
@@ -87,15 +87,15 @@ impl FundCommand {
 
         // collect funding data from default branches
         for (_, package) in &result.packages {
-            if package.as_any().downcast_ref::<AliasPackage>().is_none() {
+            if package.as_alias().is_none() {
                 // TODO: check for CompleteAliasPackage as well
-                if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
+                if let Some(complete_pkg) = package.as_complete() {
                     if complete_pkg.is_default_branch()
                         && !complete_pkg.get_funding().is_empty()
-                        && packages_to_load_names.contains(complete_pkg.get_name())
+                        && packages_to_load_names.contains(&complete_pkg.get_name())
                     {
-                        Self::insert_funding_data(&mut fundings, complete_pkg)?;
-                        packages_to_load_names.shift_remove(complete_pkg.get_name());
+                        Self::insert_funding_data(&mut fundings, &complete_pkg)?;
+                        packages_to_load_names.shift_remove(&complete_pkg.get_name());
                     }
                 }
             }
@@ -103,15 +103,14 @@ impl FundCommand {
 
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages() {
-            if package.as_any().downcast_ref::<AliasPackage>().is_some()
-                || !packages_to_load_names.contains(package.get_name())
+            if package.as_alias().is_some() || !packages_to_load_names.contains(&package.get_name())
             {
                 continue;
             }
             // TODO: check for CompleteAliasPackage as well
-            if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
+            if let Some(complete_pkg) = package.as_complete() {
                 if !complete_pkg.get_funding().is_empty() {
-                    Self::insert_funding_data(&mut fundings, complete_pkg)?;
+                    Self::insert_funding_data(&mut fundings, &complete_pkg)?;
                 }
             }
         }
@@ -172,10 +171,12 @@ impl FundCommand {
 
     fn insert_funding_data(
         fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
-        package: &CompletePackage,
+        package: &crate::package::CompletePackageInterfaceHandle,
     ) -> Result<()> {
         let pretty_name = package.get_pretty_name();
-        let (vendor, package_name) = pretty_name.split_once('/').unwrap_or(("", pretty_name));
+        let (vendor, package_name) = pretty_name
+            .split_once('/')
+            .unwrap_or(("", pretty_name.as_str()));
 
         for funding_option in package.get_funding() {
             let url_val = funding_option.get("url").and_then(|v| v.as_string());

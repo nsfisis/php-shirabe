@@ -1,11 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/Transaction.php
 
-use std::any::Any;
-
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, spl_object_hash,
-    strcmp, uasort,
+    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
 };
 
 use crate::dependency_resolver::operation::InstallOperation;
@@ -14,9 +11,8 @@ use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
-use crate::package::AliasPackage;
 use crate::package::Link;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::PlatformRepository;
 
 /// @internal
@@ -27,14 +23,14 @@ pub struct Transaction {
 
     /// Packages present at the beginning of the transaction
     /// @var PackageInterface[]
-    pub(crate) present_packages: Vec<Box<dyn PackageInterface>>,
+    pub(crate) present_packages: Vec<PackageInterfaceHandle>,
 
     /// Package set resulting from this transaction
     /// @var array<string, PackageInterface>
-    pub(crate) result_package_map: IndexMap<String, Box<dyn PackageInterface>>,
+    pub(crate) result_package_map: IndexMap<String, PackageInterfaceHandle>,
 
     /// @var array<string, PackageInterface[]>
-    pub(crate) result_packages_by_name: IndexMap<String, Vec<Box<dyn PackageInterface>>>,
+    pub(crate) result_packages_by_name: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
 impl Default for Transaction {
@@ -52,8 +48,8 @@ impl Transaction {
     /// @param PackageInterface[] $presentPackages
     /// @param PackageInterface[] $resultPackages
     pub fn new(
-        present_packages: Vec<Box<dyn PackageInterface>>,
-        result_packages: Vec<Box<dyn PackageInterface>>,
+        present_packages: Vec<PackageInterfaceHandle>,
+        result_packages: Vec<PackageInterfaceHandle>,
     ) -> Self {
         let mut this = Self {
             operations: vec![],
@@ -72,23 +68,23 @@ impl Transaction {
     }
 
     /// @param PackageInterface[] $resultPackages
-    fn set_result_package_maps(&mut self, result_packages: Vec<Box<dyn PackageInterface>>) {
+    fn set_result_package_maps(&mut self, result_packages: Vec<PackageInterfaceHandle>) {
         // PHP: static function (PackageInterface $a, PackageInterface $b): int { ... };
         // TODO(phase-b): bridge the closure to uasort's argument type
-        let _package_sort = |a: &dyn PackageInterface, b: &dyn PackageInterface| -> i64 {
+        let _package_sort = |a: &PackageInterfaceHandle, b: &PackageInterfaceHandle| -> i64 {
             // sort alias packages by the same name behind their non alias version
             if a.get_name() == b.get_name() {
-                let a_is_alias = a.as_any().downcast_ref::<AliasPackage>().is_some();
-                let b_is_alias = b.as_any().downcast_ref::<AliasPackage>().is_some();
+                let a_is_alias = a.as_alias().is_some();
+                let b_is_alias = b.as_alias().is_some();
                 if a_is_alias != b_is_alias {
                     return if a_is_alias { -1 } else { 1 };
                 }
 
                 // if names are the same, compare version, e.g. to sort aliases reliably, actual order does not matter
-                return strcmp(b.get_version(), a.get_version());
+                return strcmp(&b.get_version(), &a.get_version());
             }
 
-            strcmp(b.get_name(), a.get_name())
+            strcmp(&b.get_name(), &a.get_name())
         };
 
         self.result_package_map = IndexMap::new();
@@ -97,10 +93,10 @@ impl Transaction {
                 self.result_packages_by_name
                     .entry(name)
                     .or_insert_with(Vec::new)
-                    .push(package.clone_package_box());
+                    .push(package.clone());
             }
             self.result_package_map
-                .insert(spl_object_hash(package.as_ref()), package);
+                .insert(package.ptr_id().to_string(), package);
         }
 
         // TODO(phase-b): uasort signature mismatch — needs to operate on the IndexMap with a PackageInterface comparator
@@ -121,24 +117,23 @@ impl Transaction {
     pub(crate) fn calculate_operations(&mut self) -> Vec<Box<dyn OperationInterface>> {
         let mut operations: Vec<Box<dyn OperationInterface>> = vec![];
 
-        let mut present_package_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
-        let mut remove_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
-        let mut present_alias_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
-        let mut remove_alias_map: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
+        let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut remove_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut present_alias_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut remove_alias_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         for package in &self.present_packages {
-            if package.as_any().downcast_ref::<AliasPackage>().is_some() {
+            if package.as_alias().is_some() {
                 let key = format!("{}::{}", package.get_name(), package.get_version());
-                present_alias_map.insert(key.clone(), package.clone_package_box());
-                remove_alias_map.insert(key, package.clone_package_box());
+                present_alias_map.insert(key.clone(), package.clone());
+                remove_alias_map.insert(key, package.clone());
             } else {
-                present_package_map
-                    .insert(package.get_name().to_string(), package.clone_package_box());
-                remove_map.insert(package.get_name().to_string(), package.clone_package_box());
+                present_package_map.insert(package.get_name().to_string(), package.clone());
+                remove_map.insert(package.get_name().to_string(), package.clone());
             }
         }
 
         // PHP: $stack = $this->getRootPackages();
-        let mut stack: Vec<Box<dyn PackageInterface>> =
+        let mut stack: Vec<PackageInterfaceHandle> =
             self.get_root_packages().into_values().collect();
 
         let mut visited: IndexMap<String, bool> = IndexMap::new();
@@ -147,16 +142,16 @@ impl Transaction {
         while !stack.is_empty() {
             let package = array_pop(&mut stack).unwrap();
 
-            if processed.contains_key(&spl_object_hash(package.as_ref())) {
+            if processed.contains_key(&package.ptr_id().to_string()) {
                 continue;
             }
 
-            if !visited.contains_key(&spl_object_hash(package.as_ref())) {
-                visited.insert(spl_object_hash(package.as_ref()), true);
+            if !visited.contains_key(&package.ptr_id().to_string()) {
+                visited.insert(package.ptr_id().to_string(), true);
 
-                stack.push(package.clone_package_box());
-                if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
-                    stack.push(alias.get_alias_of().clone_package_box());
+                stack.push(package.clone());
+                if let Some(alias) = package.as_alias() {
+                    stack.push(alias.get_alias_of().into());
                 } else {
                     for link in package.get_requires().values() {
                         let possible_requires = self.get_providers_in_result(link);
@@ -166,10 +161,10 @@ impl Transaction {
                         }
                     }
                 }
-            } else if !processed.contains_key(&spl_object_hash(package.as_ref())) {
-                processed.insert(spl_object_hash(package.as_ref()), true);
+            } else if !processed.contains_key(&package.ptr_id().to_string()) {
+                processed.insert(package.ptr_id().to_string(), true);
 
-                if package.as_any().downcast_ref::<AliasPackage>().is_some() {
+                if package.as_alias().is_some() {
                     let alias_key = format!("{}::{}", package.get_name(), package.get_version());
                     if present_alias_map.contains_key(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
@@ -179,18 +174,22 @@ impl Transaction {
                             "package as AliasPackage by value"
                         ))));
                     }
-                } else if let Some(source) = present_package_map.get(package.get_name()) {
+                } else if let Some(source) = present_package_map.get(&package.get_name()).cloned() {
                     // do we need to update?
                     // TODO different for lock?
-                    let present = present_package_map.get(package.get_name()).unwrap();
-                    // TODO(phase-b): downcast to CompletePackageInterface trait object
-                    let package_is_complete = false;
-                    let present_is_complete = false;
+                    let present = present_package_map.get(&package.get_name()).unwrap();
+                    // PHP: $package instanceof CompletePackageInterface
+                    //      && $presentPackageMap[$package->getName()] instanceof CompletePackageInterface
+                    //      && ($package->isAbandoned() !== $presentPackageMap[...]->isAbandoned()
+                    //          || $package->getReplacementPackage() !== $presentPackageMap[...]->getReplacementPackage())
                     let abandoned_or_replacement_changed =
-                        package_is_complete && present_is_complete && {
-                            // PHP: $package->isAbandoned() !== $presentPackageMap[$package->getName()]->isAbandoned()
-                            //      || $package->getReplacementPackage() !== $presentPackageMap[$package->getName()]->getReplacementPackage()
-                            todo!("compare abandoned/replacement across CompletePackageInterface")
+                        match (package.as_complete(), present.as_complete()) {
+                            (Some(package), Some(present)) => {
+                                package.is_abandoned() != present.is_abandoned()
+                                    || package.get_replacement_package()
+                                        != present.get_replacement_package()
+                            }
+                            _ => false,
                         };
                     if package.get_version() != present.get_version()
                         || package.get_dist_reference() != present.get_dist_reference()
@@ -198,14 +197,14 @@ impl Transaction {
                         || abandoned_or_replacement_changed
                     {
                         operations.push(Box::new(UpdateOperation::new(
-                            source.clone_package_box(),
-                            package.clone_package_box(),
+                            source.clone(),
+                            package.clone(),
                         )));
                     }
-                    remove_map.shift_remove(package.get_name());
+                    remove_map.shift_remove(&package.get_name());
                 } else {
-                    operations.push(Box::new(InstallOperation::new(package.clone_package_box())));
-                    remove_map.shift_remove(package.get_name());
+                    operations.push(Box::new(InstallOperation::new(package.clone())));
+                    remove_map.shift_remove(&package.get_name());
                 }
             }
         }
@@ -244,11 +243,11 @@ impl Transaction {
     /// If there are packages with a cycle on the top level the package with the lowest name gets picked
     ///
     /// @return array<string, PackageInterface>
-    pub(crate) fn get_root_packages(&self) -> IndexMap<String, Box<dyn PackageInterface>> {
-        let mut roots: IndexMap<String, Box<dyn PackageInterface>> = self
+    pub(crate) fn get_root_packages(&self) -> IndexMap<String, PackageInterfaceHandle> {
+        let mut roots: IndexMap<String, PackageInterfaceHandle> = self
             .result_package_map
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone_package_box()))
+            .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
         for (package_hash, package) in &self.result_package_map {
@@ -261,8 +260,8 @@ impl Transaction {
 
                 for require in possible_requires {
                     // PHP: if ($require !== $package) — strict reference inequality
-                    if spl_object_hash(require.as_ref()) != spl_object_hash(package.as_ref()) {
-                        roots.shift_remove(&spl_object_hash(require.as_ref()));
+                    if require.ptr_id().to_string() != package.ptr_id().to_string() {
+                        roots.shift_remove(&require.ptr_id().to_string());
                     }
                 }
             }
@@ -272,12 +271,12 @@ impl Transaction {
     }
 
     /// @return PackageInterface[]
-    pub(crate) fn get_providers_in_result(&self, link: &Link) -> Vec<Box<dyn PackageInterface>> {
+    pub(crate) fn get_providers_in_result(&self, link: &Link) -> Vec<PackageInterfaceHandle> {
         let Some(packages) = self.result_packages_by_name.get(link.get_target()) else {
             return vec![];
         };
 
-        packages.iter().map(|p| p.clone_package_box()).collect()
+        packages.iter().cloned().collect()
     }
 
     /// Workaround: if your packages depend on plugins, we must be sure
@@ -308,12 +307,12 @@ impl Transaction {
         for idx in (0..operations.len()).rev() {
             let op = &operations[idx];
 
-            let package: Box<dyn PackageInterface> = if let Some(install_op) =
+            let package: PackageInterfaceHandle = if let Some(install_op) =
                 op.as_ref().as_any().downcast_ref::<InstallOperation>()
             {
-                install_op.get_package().clone_package_box()
+                install_op.get_package().clone()
             } else if let Some(update_op) = op.as_ref().as_any().downcast_ref::<UpdateOperation>() {
-                update_op.get_target_package().clone_package_box()
+                update_op.get_target_package().clone()
             } else {
                 continue;
             };

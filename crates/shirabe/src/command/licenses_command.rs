@@ -113,7 +113,11 @@ impl LicensesCommand {
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 RepositoryUtils::filter_required_packages(
                     &repo.get_packages(),
-                    composer.get_package(),
+                    composer
+                        .get_package()
+                        .as_rc()
+                        .borrow()
+                        .as_package_interface(),
                     false,
                     vec![],
                 )
@@ -123,11 +127,8 @@ impl LicensesCommand {
         };
         let _ = composer.get_package();
 
-        // TODO(phase-b): convert BasePackage trait objects to PackageInterface for sorting.
-        let pkg_pi: Vec<Box<dyn crate::package::PackageInterface>> = packages
-            .into_iter()
-            .map(|p| p.clone_package_box())
-            .collect();
+        let pkg_pi: Vec<crate::package::PackageInterfaceHandle> =
+            packages.into_iter().map(|p| p.into()).collect();
         let packages = PackageSorter::sort_packages_alphabetically(pkg_pi);
         let io = self.get_io();
 
@@ -158,7 +159,9 @@ impl LicensesCommand {
                     PhpMixed::String("Licenses".to_string()),
                 ]);
                 for package in &packages {
-                    let link = PackageInfo::get_view_source_or_homepage_url(package.as_ref());
+                    let link = PackageInfo::get_view_source_or_homepage_url(
+                        package.as_rc().borrow().as_package_interface(),
+                    );
                     let name = if let Some(link) = link {
                         format!(
                             "<href={}>{}</>",
@@ -168,9 +171,7 @@ impl LicensesCommand {
                     } else {
                         package.get_pretty_name().to_string()
                     };
-                    let pkg_licenses = if let Some(complete_pkg) =
-                        package.as_any().downcast_ref::<CompletePackage>()
-                    {
+                    let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
                     } else {
                         vec![]
@@ -199,9 +200,7 @@ impl LicensesCommand {
                 let mut dependencies: IndexMap<String, IndexMap<String, PhpMixed>> =
                     IndexMap::new();
                 for package in &packages {
-                    let pkg_licenses = if let Some(complete_pkg) =
-                        package.as_any().downcast_ref::<CompletePackage>()
-                    {
+                    let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
                     } else {
                         vec![]
@@ -268,9 +267,7 @@ impl LicensesCommand {
             "summary" => {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();
                 for package in &packages {
-                    let mut licenses = if let Some(complete_pkg) =
-                        package.as_any().downcast_ref::<CompletePackage>()
-                    {
+                    let mut licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
                     } else {
                         vec![]

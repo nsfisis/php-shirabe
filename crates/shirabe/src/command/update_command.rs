@@ -24,7 +24,6 @@ use crate::console::input::InputOption;
 use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
 use crate::installer::Installer;
 use crate::io::IOInterface;
-use crate::package::BasePackage;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -162,7 +161,7 @@ impl UpdateCommand {
             RootPackageLoader::extract_references(&reqs, root_package.get_references().clone());
         let stability_flags = RootPackageLoader::extract_stability_flags(
             &reqs,
-            root_package.get_minimum_stability(),
+            &root_package.get_minimum_stability(),
             root_package.get_stability_flags().clone(),
         );
         let _ = references;
@@ -222,7 +221,7 @@ impl UpdateCommand {
                 }
                 let matches = Preg::is_match_with_indexed_captures(
                     r"{^(\d+\.\d+\.\d+)}",
-                    package.get_version(),
+                    &package.get_version(),
                 )?;
                 let Some(matches) = matches else {
                     continue;
@@ -231,18 +230,18 @@ impl UpdateCommand {
                     "~{}",
                     matches.get(1).cloned().unwrap_or_default()
                 ))?;
-                if temporary_constraints.contains_key(package.get_name()) {
+                if temporary_constraints.contains_key(&package.get_name()) {
                     let existing = temporary_constraints
-                        .get(package.get_name())
+                        .get(&package.get_name())
                         .map(|c| c.clone())
                         .unwrap();
                     temporary_constraints.insert(
-                        package.get_name().to_string(),
+                        package.get_name(),
                         // TODO(phase-b): MultiConstraint::create signature
                         todo!("MultiConstraint::create([existing, constraint], true)"),
                     );
                 } else {
-                    temporary_constraints.insert(package.get_name().to_string(), constraint);
+                    temporary_constraints.insert(package.get_name(), constraint);
                 }
             }
         }
@@ -493,10 +492,9 @@ impl UpdateCommand {
             io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
-        // TODO(phase-b): unify return types — CanonicalPackagesTrait returns
-        // Vec<Box<dyn PackageInterface>> while RepositoryInterface::get_packages
-        // returns Vec<Box<dyn BasePackage>>. Use only the locker branch for now.
-        let installed_packages: Vec<Box<dyn crate::package::PackageInterface>> =
+        // TODO(phase-c): wire the non-locked branch through get_local_repository().get_packages()
+        // (returns Vec<BasePackageHandle>); only the locker branch is populated for now.
+        let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 CanonicalPackagesTrait::get_packages(
                     &composer_ref
@@ -515,7 +513,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter {
-                if !Preg::is_match(filter, package.get_name()).unwrap_or(false) {
+                if !Preg::is_match(filter, &package.get_name()).unwrap_or(false) {
                     continue;
                 }
             }
@@ -525,7 +523,7 @@ impl UpdateCommand {
             // TODO(phase-b): derive from stabilityFlags / minimum_stability
             let stability: &str = "stable";
             let latest_version = version_selector.find_best_candidate(
-                package.get_name(),
+                &package.get_name(),
                 constraint,
                 stability,
                 None,
@@ -538,7 +536,7 @@ impl UpdateCommand {
             if let Some(latest) = latest_version {
                 if package.get_version() != latest.get_version() || latest.is_dev() {
                     autocompleter_values.insert(
-                        package.get_name().to_string(),
+                        package.get_name(),
                         format!(
                             "<comment>{}</comment> => <comment>{}</comment>",
                             current_version,
@@ -622,7 +620,7 @@ impl UpdateCommand {
     fn create_version_selector(&self, composer: &PartialComposerHandle) -> Result<VersionSelector> {
         let composer = crate::command::composer_full(composer);
         let mut repository_set = RepositorySet::new(
-            composer.get_package().get_minimum_stability(),
+            &composer.get_package().get_minimum_stability(),
             composer.get_package().get_stability_flags().clone(),
             // TODO(phase-b): collect root aliases from composer.get_package().get_aliases()
             Vec::new(),

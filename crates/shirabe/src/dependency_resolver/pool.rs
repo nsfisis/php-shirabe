@@ -3,28 +3,29 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, spl_object_hash, str_pad};
+use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::advisory::PartialSecurityAdvisory;
 use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 
 /// A package pool contains all packages for dependency resolution
 #[derive(Debug)]
 pub struct Pool {
     /// @var BasePackage[]
-    pub(crate) packages: Vec<Box<dyn BasePackage>>,
+    pub(crate) packages: Vec<BasePackageHandle>,
     /// @var array<string, BasePackage[]>
-    pub(crate) package_by_name: IndexMap<String, Vec<Box<dyn BasePackage>>>,
+    pub(crate) package_by_name: IndexMap<String, Vec<BasePackageHandle>>,
     /// @var VersionParser
     pub(crate) version_parser: VersionParser,
     /// @var array<string, array<string, BasePackage[]>>
-    pub(crate) provider_cache: IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
+    pub(crate) provider_cache: IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
     /// @var BasePackage[]
-    pub(crate) unacceptable_fixed_or_locked_packages: Vec<Box<dyn BasePackage>>,
+    pub(crate) unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
     /// @var array<string, array<string, string>> Map of package name => normalized version => pretty version
     pub(crate) removed_versions: IndexMap<String, IndexMap<String, String>>,
     /// @var array<string, array<string, string>> Map of package object hash => removed normalized versions => removed pretty version
@@ -44,8 +45,8 @@ impl Pool {
     /// @param array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>> $securityRemovedVersions
     /// @param array<string, array<string, string>> $abandonedRemovedVersions
     pub fn new(
-        packages: Vec<Box<dyn BasePackage>>,
-        unacceptable_fixed_or_locked_packages: Vec<Box<dyn BasePackage>>,
+        packages: Vec<BasePackageHandle>,
+        unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
         removed_versions: IndexMap<String, IndexMap<String, String>>,
         removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
         security_removed_versions: IndexMap<String, IndexMap<String, Vec<PartialSecurityAdvisory>>>,
@@ -197,18 +198,18 @@ impl Pool {
     }
 
     /// @param BasePackage[] $packages
-    fn set_packages(&mut self, packages: Vec<Box<dyn BasePackage>>) {
+    fn set_packages(&mut self, packages: Vec<BasePackageHandle>) {
         let mut id: i64 = 1;
 
-        for mut package in packages {
-            *package.id_mut() = id;
+        for package in packages {
+            package.set_id(id);
             id += 1;
 
             for provided in package.get_names(true) {
                 self.package_by_name
                     .entry(provided)
                     .or_insert_with(Vec::new)
-                    .push(package.clone_box());
+                    .push(package.clone());
             }
 
             self.packages.push(package);
@@ -216,13 +217,13 @@ impl Pool {
     }
 
     /// @return BasePackage[]
-    pub fn get_packages(&self) -> &Vec<Box<dyn BasePackage>> {
+    pub fn get_packages(&self) -> &Vec<BasePackageHandle> {
         &self.packages
     }
 
     /// Retrieves the package object for a given package id.
-    pub fn package_by_id(&self, id: i64) -> &dyn BasePackage {
-        self.packages[(id - 1) as usize].as_ref()
+    pub fn package_by_id(&self, id: i64) -> BasePackageHandle {
+        self.packages[(id - 1) as usize].clone()
     }
 
     /// Searches all packages providing the given package name and match the constraint
@@ -235,7 +236,7 @@ impl Pool {
         &mut self,
         name: &str,
         constraint: Option<&AnyConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         // PHP: $key = (string) $constraint;
         let key = match constraint {
             Some(c) => c.to_string(),
@@ -243,7 +244,7 @@ impl Pool {
         };
         if let Some(by_key) = self.provider_cache.get(name) {
             if let Some(cached) = by_key.get(&key) {
-                return cached.iter().map(|p| p.clone_box()).collect();
+                return cached.clone();
             }
         }
 
@@ -251,7 +252,7 @@ impl Pool {
         self.provider_cache
             .entry(name.to_string())
             .or_insert_with(IndexMap::new)
-            .insert(key, computed.iter().map(|p| p.clone_box()).collect());
+            .insert(key, computed.clone());
         computed
     }
 
@@ -263,23 +264,23 @@ impl Pool {
         &self,
         name: &str,
         constraint: Option<&AnyConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         let Some(candidates) = self.package_by_name.get(name) else {
             return vec![];
         };
 
-        let mut matches: Vec<Box<dyn BasePackage>> = vec![];
+        let mut matches: Vec<BasePackageHandle> = vec![];
 
         for candidate in candidates {
-            if self.r#match(candidate.as_ref(), name, constraint) {
-                matches.push(candidate.clone_box());
+            if self.r#match(candidate, name, constraint) {
+                matches.push(candidate.clone());
             }
         }
 
         matches
     }
 
-    pub fn literal_to_package(&self, literal: i64) -> &dyn BasePackage {
+    pub fn literal_to_package(&self, literal: i64) -> BasePackageHandle {
         let package_id = abs(literal);
 
         self.package_by_id(package_id)
@@ -289,7 +290,7 @@ impl Pool {
     pub fn literal_to_pretty_string(
         &self,
         literal: i64,
-        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        installed_map: &IndexMap<String, BasePackageHandle>,
     ) -> String {
         let package = self.literal_to_package(literal);
 
@@ -312,7 +313,7 @@ impl Pool {
     /// @param  string              $name       Name of the package to be matched
     pub fn r#match(
         &self,
-        candidate: &dyn BasePackage,
+        candidate: &BasePackageHandle,
         name: &str,
         constraint: Option<&AnyConstraint>,
     ) -> bool {
@@ -370,17 +371,16 @@ impl Pool {
         false
     }
 
-    pub fn is_unacceptable_fixed_or_locked_package(&self, package: &dyn BasePackage) -> bool {
+    pub fn is_unacceptable_fixed_or_locked_package(&self, package: &BasePackageHandle) -> bool {
         // PHP: \in_array($package, $this->unacceptableFixedOrLockedPackages, true)
         // strict comparison checks reference identity for objects
-        let target_hash = spl_object_hash(package);
         self.unacceptable_fixed_or_locked_packages
             .iter()
-            .any(|p| spl_object_hash(p.as_ref()) == target_hash)
+            .any(|p| p.ptr_eq(package))
     }
 
     /// @return BasePackage[]
-    pub fn get_unacceptable_fixed_or_locked_packages(&self) -> &Vec<Box<dyn BasePackage>> {
+    pub fn get_unacceptable_fixed_or_locked_packages(&self) -> &Vec<BasePackageHandle> {
         &self.unacceptable_fixed_or_locked_packages
     }
 }

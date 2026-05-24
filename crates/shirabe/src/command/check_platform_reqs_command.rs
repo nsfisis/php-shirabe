@@ -113,7 +113,7 @@ impl CheckPlatformReqsCommand {
             }
         }
 
-        let root_pkg_repo = RootPackageRepository::new(composer.get_package().clone_box());
+        let root_pkg_repo = RootPackageRepository::new(composer.get_package().clone());
         let installed_repo =
             InstalledRepository::new(vec![installed_repo_base, Box::new(root_pkg_repo)]);
 
@@ -148,7 +148,7 @@ impl CheckPlatformReqsCommand {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
                         let candidate_constraint: Option<AnyConstraint> =
-                            if candidate.get_name() == require {
+                            if candidate.get_name() == *require {
                                 let c = SimpleConstraint::new(
                                     "=".to_string(),
                                     candidate.get_version().to_string(),
@@ -178,7 +178,7 @@ impl CheckPlatformReqsCommand {
                         for link in links {
                             if !link.get_constraint().matches(&candidate_constraint) {
                                 req_results.push(CheckResult {
-                                    platform_package: if candidate.get_name() == require {
+                                    platform_package: if candidate.get_name() == *require {
                                         candidate.get_pretty_name().to_string()
                                     } else {
                                         require.clone()
@@ -186,7 +186,7 @@ impl CheckPlatformReqsCommand {
                                     version: candidate_constraint.get_pretty_string().to_string(),
                                     link: Some(link.clone()),
                                     status: "<error>failed</error>".to_string(),
-                                    provider: if candidate.get_name() == require {
+                                    provider: if candidate.get_name() == *require {
                                         String::new()
                                     } else {
                                         format!(
@@ -200,7 +200,7 @@ impl CheckPlatformReqsCommand {
                         }
 
                         results.push(CheckResult {
-                            platform_package: if candidate.get_name() == require {
+                            platform_package: if candidate.get_name() == *require {
                                 candidate.get_pretty_name().to_string()
                             } else {
                                 require.clone()
@@ -208,7 +208,7 @@ impl CheckPlatformReqsCommand {
                             version: candidate_constraint.get_pretty_string().to_string(),
                             link: None,
                             status: "<info>success</info>".to_string(),
-                            provider: if candidate.get_name() == require {
+                            provider: if candidate.get_name() == *require {
                                 String::new()
                             } else {
                                 format!(

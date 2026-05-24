@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort, spl_object_hash};
+use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -14,8 +12,7 @@ use shirabe_semver::intervals::Intervals;
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 
@@ -38,7 +35,7 @@ pub struct PoolOptimizer {
     packages_to_remove: IndexMap<i64, bool>,
 
     /// @var array<int, BasePackage[]>
-    aliases_per_package: IndexMap<i64, Vec<Box<dyn BasePackage>>>,
+    aliases_per_package: IndexMap<i64, Vec<BasePackageHandle>>,
 
     /// @var array<string, array<string, string>>
     removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
@@ -94,7 +91,7 @@ impl PoolOptimizer {
         // Mark fixed or locked packages as irremovable
         for (_, package) in request.get_fixed_or_locked_packages() {
             irremovable_package_constraint_groups
-                .entry(PackageInterface::get_name(package.as_ref()).to_string())
+                .entry(package.get_name())
                 .or_insert_with(Vec::new)
                 .push(
                     SimpleConstraint::new(
@@ -130,11 +127,11 @@ impl PoolOptimizer {
 
             // Keep track of alias packages for every package so if either the alias or aliased is kept
             // we keep the others as they are a unit of packages really
-            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_alias() {
                 self.aliases_per_package
                     .entry(alias_pkg.get_alias_of().id())
                     .or_insert_with(Vec::new)
-                    .push(package.clone_box());
+                    .push(package.clone());
             }
         }
 
@@ -153,31 +150,30 @@ impl PoolOptimizer {
 
         // Mark the packages as irremovable based on the constraints
         for package in pool.get_packages() {
-            if !irremovable_package_constraints
-                .contains_key(PackageInterface::get_name(package.as_ref()))
-            {
+            if !irremovable_package_constraints.contains_key(&package.get_name()) {
                 continue;
             }
 
             let constraint = irremovable_package_constraints
-                .get(PackageInterface::get_name(package.as_ref()))
+                .get(&package.get_name())
                 .unwrap();
             if CompilingMatcher::r#match(
                 constraint,
                 SimpleConstraint::OP_EQ,
                 package.get_version().to_string(),
             ) {
-                self.mark_package_irremovable(package.as_ref());
+                self.mark_package_irremovable(package);
             }
         }
     }
 
-    fn mark_package_irremovable(&mut self, package: &dyn BasePackage) {
+    fn mark_package_irremovable(&mut self, package: &BasePackageHandle) {
         self.irremovable_packages.insert(package.id(), true);
-        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+        if let Some(alias_pkg) = package.as_alias() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked as irremovable as well
-            self.mark_package_irremovable(alias_pkg.get_alias_of());
+            let aliased: BasePackageHandle = alias_pkg.get_alias_of().into();
+            self.mark_package_irremovable(&aliased);
         }
         // PHP: foreach ($this->aliasesPerPackage[$package->id] as $aliasPackage)
         let alias_ids: Vec<i64> = self
@@ -192,14 +188,14 @@ impl PoolOptimizer {
 
     /// @return Pool Optimized pool
     fn apply_removals_to_pool(&self, pool: &Pool) -> Pool {
-        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
+        let mut packages: Vec<BasePackageHandle> = vec![];
         let mut removed_versions: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
         for package in pool.get_packages() {
             if !self.packages_to_remove.contains_key(&package.id()) {
-                packages.push(package.clone_box());
+                packages.push(package.clone());
             } else {
                 removed_versions
-                    .entry(PackageInterface::get_name(package.as_ref()).to_string())
+                    .entry(package.get_name())
                     .or_insert_with(IndexMap::new)
                     .insert(
                         package.get_version().to_string(),
@@ -210,8 +206,7 @@ impl PoolOptimizer {
 
         Pool::new(
             packages,
-            // TODO(phase-b): clone Vec<Box<BasePackage>> from getter
-            todo!("pool.get_unacceptable_fixed_or_locked_packages().clone()"),
+            pool.get_unacceptable_fixed_or_locked_packages().clone(),
             removed_versions,
             self.removed_versions_by_package.clone(),
             // TODO(phase-b): PartialSecurityAdvisory is a PHP class (no Clone). Need shared ownership rework.
@@ -227,7 +222,7 @@ impl PoolOptimizer {
     ) -> Result<()> {
         let mut identical_definitions_per_package: IndexMap<
             String,
-            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
+            IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
         > = IndexMap::new();
         let mut package_identical_definition_lookup: IndexMap<
             i64,
@@ -243,7 +238,7 @@ impl PoolOptimizer {
 
             self.mark_package_for_removal(package.id())?;
 
-            let dependency_hash = self.calculate_dependency_hash(package.as_ref());
+            let dependency_hash = self.calculate_dependency_hash(package);
 
             for package_name in package.get_names(false) {
                 if !self
@@ -315,7 +310,7 @@ impl PoolOptimizer {
                         .or_insert_with(IndexMap::new)
                         .entry(dependency_hash.clone())
                         .or_insert_with(Vec::new)
-                        .push(package.clone_box());
+                        .push(package.clone());
                     package_identical_definition_lookup
                         .entry(package.id())
                         .or_insert_with(IndexMap::new)
@@ -331,18 +326,14 @@ impl PoolOptimizer {
         }
 
         // PHP: foreach ($identicalDefinitionsPerPackage as $constraintGroups)
-        // TODO(phase-b): Box<dyn BasePackage> is not Clone; need restructuring to avoid borrow conflict.
-        let identical_clone: IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
-        > = todo!("identical_definitions_per_package.clone()");
+        let identical_clone = identical_definitions_per_package.clone();
         for (_, constraint_groups) in identical_clone.iter() {
             for (_, constraint_group) in constraint_groups.iter() {
                 for (_, packages) in constraint_group.iter() {
                     // Only one package in this constraint group has the same requirements, we're not allowed to remove that package
                     if 1 == packages.len() {
                         self.keep_package(
-                            packages[0].as_ref(),
+                            &packages[0],
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -362,7 +353,7 @@ impl PoolOptimizer {
                             .select_preferred_packages(pool, literals.clone(), None)
                     {
                         self.keep_package(
-                            pool.literal_to_package(preferred_literal),
+                            &pool.literal_to_package(preferred_literal),
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -374,7 +365,7 @@ impl PoolOptimizer {
         Ok(())
     }
 
-    fn calculate_dependency_hash(&self, package: &dyn BasePackage) -> String {
+    fn calculate_dependency_hash(&self, package: &BasePackageHandle) -> String {
         let mut hash = String::new();
 
         let hash_relevant_links: Vec<(&str, Vec<crate::package::Link>)> = vec![
@@ -447,10 +438,10 @@ impl PoolOptimizer {
     /// @param array<int, array<string, array{groupHash: string, dependencyHash: string}>> $packageIdenticalDefinitionLookup
     fn keep_package(
         &mut self,
-        package: &dyn BasePackage,
+        package: &BasePackageHandle,
         identical_definitions_per_package: &IndexMap<
             String,
-            IndexMap<String, IndexMap<String, Vec<Box<dyn BasePackage>>>>,
+            IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
         >,
         package_identical_definition_lookup: &IndexMap<
             i64,
@@ -464,11 +455,12 @@ impl PoolOptimizer {
 
         self.packages_to_remove.shift_remove(&package.id());
 
-        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+        if let Some(alias_pkg) = package.as_alias() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked to be kept as well
+            let aliased: BasePackageHandle = alias_pkg.get_alias_of().into();
             self.keep_package(
-                alias_pkg.get_alias_of(),
+                &aliased,
                 identical_definitions_per_package,
                 package_identical_definition_lookup,
             );
@@ -484,21 +476,19 @@ impl PoolOptimizer {
                         .and_then(|m| m.get(&package_group_pointers.dependency_hash));
                     if let Some(package_group) = package_group {
                         for pkg in package_group {
-                            let pkg = if let Some(alias_pkg) =
-                                pkg.as_any().downcast_ref::<AliasPackage>()
-                            {
+                            let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias() {
                                 if alias_pkg.get_pretty_version()
                                     == VersionParser::DEFAULT_BRANCH_ALIAS
                                 {
-                                    alias_pkg.get_alias_of().clone_box()
+                                    alias_pkg.get_alias_of().into()
                                 } else {
-                                    pkg.clone_box()
+                                    pkg.clone()
                                 }
                             } else {
-                                pkg.clone_box()
+                                pkg.clone()
                             };
                             self.removed_versions_by_package
-                                .entry(spl_object_hash(package))
+                                .entry(package.ptr_id().to_string())
                                 .or_insert_with(IndexMap::new)
                                 .insert(
                                     pkg.get_version().to_string(),
@@ -533,18 +523,17 @@ impl PoolOptimizer {
                             .and_then(|m| m.get(&package_group_pointers.dependency_hash));
                         if let Some(package_group) = package_group {
                             for pkg in package_group {
-                                let pkg = if let Some(alias_pkg) =
-                                    pkg.as_any().downcast_ref::<AliasPackage>()
+                                let pkg: BasePackageHandle = if let Some(alias_pkg) = pkg.as_alias()
                                 {
                                     if alias_pkg.get_pretty_version()
                                         == VersionParser::DEFAULT_BRANCH_ALIAS
                                     {
-                                        alias_pkg.get_alias_of().clone_box()
+                                        alias_pkg.get_alias_of().into()
                                     } else {
-                                        pkg.clone_box()
+                                        pkg.clone()
                                     }
                                 } else {
-                                    pkg.clone_box()
+                                    pkg.clone()
                                 };
                                 self.removed_versions_by_package
                                     .entry(format!("alias-{}", alias_id))
@@ -569,8 +558,7 @@ impl PoolOptimizer {
             return;
         }
 
-        let mut package_index: IndexMap<String, IndexMap<i64, Box<dyn BasePackage>>> =
-            IndexMap::new();
+        let mut package_index: IndexMap<String, IndexMap<i64, BasePackageHandle>> = IndexMap::new();
 
         for package in pool.get_packages() {
             let id = package.id();
@@ -580,22 +568,18 @@ impl PoolOptimizer {
                 continue;
             }
             // Do not remove a package aliased by another package, nor aliases
-            if self.aliases_per_package.contains_key(&id)
-                || package.as_any().downcast_ref::<AliasPackage>().is_some()
-            {
+            if self.aliases_per_package.contains_key(&id) || package.as_alias().is_some() {
                 continue;
             }
             // Do not remove locked packages
-            if request.is_fixed_package(package.as_ref())
-                || request.is_locked_package(todo!("package as &dyn PackageInterface"))
-            {
+            if request.is_fixed_package(&package) || request.is_locked_package(&package) {
                 continue;
             }
 
             package_index
-                .entry(PackageInterface::get_name(package.as_ref()).to_string())
+                .entry(package.get_name())
                 .or_insert_with(IndexMap::new)
-                .insert(package.id(), package.clone_box());
+                .insert(package.id(), package.clone());
         }
 
         for (_, package) in request.get_locked_packages() {

@@ -15,7 +15,6 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
-use crate::package::BasePackage;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::LoaderInterface;
@@ -387,9 +386,7 @@ impl VcsRepository {
             )?;
             match cached_package {
                 CachedPackageResult::Package(pkg) => {
-                    // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                    let pkg_pi: Box<dyn crate::package::PackageInterface> = pkg.clone_package_box();
-                    self.inner.add_package(pkg_pi)?;
+                    self.inner.add_package(pkg)?;
                     continue;
                 }
                 CachedPackageResult::Missing => {
@@ -541,10 +538,7 @@ impl VcsRepository {
                 let driver = self.driver.as_ref().unwrap();
                 let processed = self.pre_process(&**driver, data, &identifier)?;
                 let loaded = self.loader.as_ref().unwrap().load(processed, None)?;
-                // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                let loaded_pi: Box<dyn crate::package::PackageInterface> =
-                    loaded.clone_package_box();
-                self.inner.add_package(loaded_pi)?;
+                self.inner.add_package(loaded)?;
                 Ok(())
             })();
             if let Err(e) = result {
@@ -662,9 +656,7 @@ impl VcsRepository {
             )?;
             match cached_package {
                 CachedPackageResult::Package(pkg) => {
-                    // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                    let pkg_pi: Box<dyn crate::package::PackageInterface> = pkg.clone_package_box();
-                    self.inner.add_package(pkg_pi)?;
+                    self.inner.add_package(pkg)?;
                     continue;
                 }
                 CachedPackageResult::Missing => {
@@ -727,10 +719,7 @@ impl VcsRepository {
                         );
                     }
                 }
-                // TODO(phase-b): trait upcast Box<dyn BasePackage> -> Box<dyn PackageInterface>
-                let package_pi: Box<dyn crate::package::PackageInterface> =
-                    package.clone_package_box();
-                self.inner.add_package(package_pi)?;
+                self.inner.add_package(package)?;
                 Ok(())
             })();
             if let Err(e) = result {
@@ -995,5 +984,5 @@ impl VcsRepository {
 enum CachedPackageResult {
     None,
     Missing,
-    Package(Box<dyn BasePackage>),
+    Package(crate::package::PackageInterfaceHandle),
 }

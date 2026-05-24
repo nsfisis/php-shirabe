@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/Command/ArchiveCommand.php
 
-use std::any::Any;
-
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
@@ -16,8 +14,6 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
-use crate::package::BasePackage;
-use crate::package::CompletePackageInterface;
 use crate::package::archiver::ArchiveManager;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -192,17 +188,18 @@ impl ArchiveCommand {
             &owned_archive_manager
         };
 
-        let package = if let Some(name) = package_name {
-            match self.select_package(io, &name, version.as_deref())? {
-                Some(p) => p,
-                None => return Ok(1),
-            }
-        } else {
-            let _rc = self.require_composer(None, None)?;
-            crate::command::composer_full(&_rc)
-                .get_package()
-                .clone_box()
-        };
+        let package: crate::package::CompletePackageInterfaceHandle =
+            if let Some(name) = package_name {
+                match self.select_package(io, &name, version.as_deref())? {
+                    Some(p) => p,
+                    None => return Ok(1),
+                }
+            } else {
+                let _rc = self.require_composer(None, None)?;
+                // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a
+                // handle, so it cannot be shared as a CompletePackageInterfaceHandle yet.
+                todo!("share composer.get_package() as a CompletePackageInterfaceHandle")
+            };
 
         io.write_error(&format!(
             "<info>Creating the archive into \"{}\".</info>",
@@ -211,13 +208,7 @@ impl ArchiveCommand {
         // TODO(phase-b): ArchiveManager.archive needs &mut self and &mut CompletePackageInterface;
         // current composer.get_archive_manager() returns &ArchiveManager. Needs RefCell wrapper.
         let _ = archive_manager;
-        let _ = (
-            package.as_ref(),
-            format,
-            dest,
-            file_name.as_deref(),
-            ignore_filters,
-        );
+        let _ = (&package, format, dest, file_name.as_deref(), ignore_filters);
         let package_path: String = todo!("ArchiveManager.archive call");
         let fs = Filesystem::new(None);
         let short_path =
@@ -239,7 +230,7 @@ impl ArchiveCommand {
         io: &mut dyn IOInterface,
         package_name: &str,
         version: Option<&str>,
-    ) -> Result<Option<Box<dyn CompletePackageInterface>>> {
+    ) -> Result<Option<crate::package::CompletePackageInterfaceHandle>> {
         io.write_error("<info>Searching for the specified package.</info>");
 
         let mut version = version.map(|v| v.to_string());
@@ -323,7 +314,7 @@ impl ArchiveCommand {
                 None,
                 shirabe_php_shim::PhpMixed::Bool(true),
             )?;
-            let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
+            let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap().into());
 
             io.write_error(&format!(
                 "<info>Found multiple matches, selected {}.</info>",
@@ -333,7 +324,8 @@ impl ArchiveCommand {
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
             p
         } else if packages.len() == 1 {
-            let p = packages.into_iter().next().unwrap();
+            let p: crate::package::PackageInterfaceHandle =
+                packages.into_iter().next().unwrap().into();
             io.write_error(&format!(
                 "<info>Found an exact match {}.</info>",
                 p.get_pretty_string()
@@ -347,10 +339,18 @@ impl ArchiveCommand {
             return Ok(None);
         };
 
-        // TODO(phase-b): instanceof CompletePackageInterface / BasePackage runtime
-        // checks require downcast support that BasePackage trait does not yet expose.
-        let _ = &package;
-        todo!("convert Box<dyn BasePackage> into Box<dyn CompletePackageInterface>")
+        let Some(complete) = package.as_complete() else {
+            return Err(LogicException {
+                message: format!(
+                    "Expected a CompletePackageInterface instance but found {}",
+                    get_debug_type(&shirabe_php_shim::PhpMixed::Null)
+                ),
+                code: 0,
+            }
+            .into());
+        };
+
+        Ok(Some(complete))
     }
 }
 

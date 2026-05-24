@@ -639,14 +639,18 @@ impl Application {
                                         // TODO(phase-b): build_package_map needs &mut InstallationManager
                                         // but get_composer returns &Composer; skip until shared ownership is settled.
                                         let package_map: Vec<(
-                                            Box<dyn crate::package::PackageInterface>,
+                                            crate::package::PackageInterfaceHandle,
                                             Option<String>,
                                         )> = todo!(
                                             "build_package_map requires &mut InstallationManager"
                                         );
                                         let map = generator.parse_autoloads(
                                             package_map,
-                                            &*root_package,
+                                            root_package
+                                                .as_rc()
+                                                .borrow()
+                                                .as_root_package_interface()
+                                                .unwrap(),
                                             PhpMixed::Bool(false),
                                         );
 

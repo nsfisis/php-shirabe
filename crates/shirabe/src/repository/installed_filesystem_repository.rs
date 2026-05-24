@@ -6,9 +6,10 @@ use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::json::JsonFile;
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
+use crate::package::PackageInterfaceHandle;
+use crate::package::RootPackageInterfaceHandle;
 use crate::repository::AdvisoryProviderInterface;
 use crate::repository::FilesystemRepository;
 use crate::repository::InstalledRepositoryInterface;
@@ -27,7 +28,7 @@ impl InstalledFilesystemRepository {
     pub fn new(
         repository_file: JsonFile,
         dump_versions: bool,
-        root_package: Option<Box<dyn RootPackageInterface>>,
+        root_package: Option<RootPackageInterfaceHandle>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Result<Self> {
         Ok(Self {
@@ -66,7 +67,7 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
 
     fn add_package(
         &mut self,
-        package: Box<dyn crate::package::PackageInterface>,
+        package: crate::package::PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         todo!()
     }
@@ -78,7 +79,7 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
         todo!()
     }
 
-    fn get_canonical_packages(&self) -> Vec<Box<dyn crate::package::PackageInterface>> {
+    fn get_canonical_packages(&self) -> Vec<crate::package::PackageInterfaceHandle> {
         todo!()
     }
 
@@ -109,17 +110,17 @@ impl RepositoryInterface for InstalledFilesystemRepository {
         &self,
         _name: &str,
         _constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         todo!()
     }
     fn find_packages(
         &self,
         _name: &str,
         _constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         todo!()
     }
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         todo!()
     }
     fn load_packages(
@@ -127,7 +128,7 @@ impl RepositoryInterface for InstalledFilesystemRepository {
         _package_name_map: IndexMap<String, Option<AnyConstraint>>,
         _acceptable_stabilities: IndexMap<String, i64>,
         _stability_flags: IndexMap<String, i64>,
-        _already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         todo!()
     }

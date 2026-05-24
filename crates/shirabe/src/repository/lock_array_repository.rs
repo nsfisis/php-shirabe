@@ -1,7 +1,8 @@
 //! ref: composer/src/Composer/Repository/LockArrayRepository.php
 
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::ArrayRepository;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::{
@@ -17,7 +18,7 @@ pub struct LockArrayRepository {
 }
 
 impl CanonicalPackagesTrait for LockArrayRepository {
-    fn get_packages(&self) -> Vec<Box<dyn PackageInterface>> {
+    fn get_packages(&self) -> Vec<PackageInterfaceHandle> {
         todo!()
     }
 }
@@ -43,7 +44,7 @@ impl RepositoryInterface for LockArrayRepository {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         self.inner.find_package(name, constraint)
     }
 
@@ -51,11 +52,11 @@ impl RepositoryInterface for LockArrayRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         RepositoryInterface::get_packages(&self.inner)
     }
 
@@ -64,7 +65,7 @@ impl RepositoryInterface for LockArrayRepository {
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,

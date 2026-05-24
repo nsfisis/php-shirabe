@@ -6,10 +6,10 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledRepositoryInterface;
@@ -26,7 +26,7 @@ pub enum NeedleInput {
 }
 
 pub struct DependentsEntry(
-    pub Box<dyn BasePackage>,
+    pub BasePackageHandle,
     pub Link,
     pub Option<Vec<DependentsEntry>>,
 );
@@ -53,7 +53,7 @@ impl InstalledRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         let name = name.to_lowercase();
 
         let constraint: Option<AnyConstraint> = match constraint {
@@ -79,7 +79,7 @@ impl InstalledRepository {
                             .into(),
                         )
                     {
-                        matches.push(candidate);
+                        matches.push(candidate.clone());
                     }
                     continue;
                 }
@@ -98,7 +98,7 @@ impl InstalledRepository {
                         && (constraint.is_none()
                             || constraint.as_ref().unwrap().matches(link.get_constraint()))
                     {
-                        matches.push(candidate);
+                        matches.push(candidate.clone());
                         continue 'candidates;
                     }
                 }
@@ -124,10 +124,10 @@ impl InstalledRepository {
 
         let mut packages_found = packages_found.unwrap_or_else(|| needles.clone());
 
-        let mut root_package: Option<Box<dyn BasePackage>> = None;
+        let mut root_package: Option<BasePackageHandle> = None;
         for package in self.inner.get_packages() {
-            if package.as_root_package_interface().is_some() {
-                root_package = Some(package);
+            if package.as_root().is_some() {
+                root_package = Some(package.clone());
                 break;
             }
         }
@@ -150,7 +150,7 @@ impl InstalledRepository {
                             {
                                 if packages_in_tree.contains(&link.get_target().to_string()) {
                                     results.push(DependentsEntry(
-                                        package.clone_box(),
+                                        package.clone(),
                                         link.clone(),
                                         None,
                                     ));
@@ -169,7 +169,7 @@ impl InstalledRepository {
                                     vec![]
                                 };
                                 results.push(DependentsEntry(
-                                    package.clone_box(),
+                                    package.clone(),
                                     link.clone(),
                                     Some(dependents),
                                 ));
@@ -180,7 +180,7 @@ impl InstalledRepository {
                 }
             }
 
-            if package.as_root_package_interface().is_some() {
+            if package.as_root().is_some() {
                 for (k, v) in package.get_dev_requires() {
                     links.entry(k).or_insert(v);
                 }
@@ -194,11 +194,7 @@ impl InstalledRepository {
                             .map_or(true, |c| link.get_constraint().matches(c) == !invert);
                         if constraint.is_none() || matches_constraint {
                             if packages_in_tree.contains(&link.get_source().to_string()) {
-                                results.push(DependentsEntry(
-                                    package.clone_box(),
-                                    link.clone(),
-                                    None,
-                                ));
+                                results.push(DependentsEntry(package.clone(), link.clone(), None));
                                 continue;
                             }
                             packages_in_tree.push(link.get_source().to_string());
@@ -214,7 +210,7 @@ impl InstalledRepository {
                                 vec![]
                             };
                             results.push(DependentsEntry(
-                                package.clone_box(),
+                                package.clone(),
                                 link.clone(),
                                 Some(dependents),
                             ));
@@ -232,7 +228,7 @@ impl InstalledRepository {
                             None,
                         );
                         if link.get_constraint().matches(&version.into()) == invert {
-                            results.push(DependentsEntry(package.clone_box(), link.clone(), None));
+                            results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
                     }
                 }
@@ -247,7 +243,7 @@ impl InstalledRepository {
                             None,
                         );
                         if link.get_constraint().matches(&version.into()) == invert {
-                            results.push(DependentsEntry(package.clone_box(), link.clone(), None));
+                            results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
                     }
                 }
@@ -286,7 +282,7 @@ impl InstalledRepository {
                             .map(|p| format!("but {} is installed", p.get_pretty_version()))
                             .unwrap_or_else(|| "but it is missing".to_string());
                         results.push(DependentsEntry(
-                            package.clone_box(),
+                            package.clone(),
                             Link::new(
                                 package.get_name().to_string(),
                                 link.get_target().to_string(),
@@ -316,7 +312,7 @@ impl InstalledRepository {
                         )
                         .into();
 
-                        if link.get_target() != pkg.get_name() {
+                        if link.get_target() != pkg.get_name().as_str() {
                             let mut replaces_and_provides: IndexMap<String, Link> =
                                 pkg.get_replaces();
                             for (k, v) in pkg.get_provides() {
@@ -343,12 +339,12 @@ impl InstalledRepository {
                                         && !root_req.get_constraint().matches(link.get_constraint())
                                     {
                                         results.push(DependentsEntry(
-                                            package.clone_box(),
+                                            package.clone(),
                                             link.clone(),
                                             None,
                                         ));
                                         results.push(DependentsEntry(
-                                            root_pkg.clone_box(),
+                                            root_pkg.clone(),
                                             root_req.clone(),
                                             None,
                                         ));
@@ -356,13 +352,9 @@ impl InstalledRepository {
                                     }
                                 }
 
+                                results.push(DependentsEntry(package.clone(), link.clone(), None));
                                 results.push(DependentsEntry(
-                                    package.clone_box(),
-                                    link.clone(),
-                                    None,
-                                ));
-                                results.push(DependentsEntry(
-                                    root_pkg.clone_box(),
+                                    root_pkg.clone(),
                                     Link::new(
                                         root_pkg.get_name().to_string(),
                                         link.get_target().to_string(),
@@ -376,11 +368,7 @@ impl InstalledRepository {
                                     None,
                                 ));
                             } else {
-                                results.push(DependentsEntry(
-                                    package.clone_box(),
-                                    link.clone(),
-                                    None,
-                                ));
+                                results.push(DependentsEntry(package.clone(), link.clone(), None));
                             }
                         }
 
@@ -444,7 +432,7 @@ impl RepositoryInterface for InstalledRepository {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<Box<dyn BasePackage>> {
+    ) -> Option<BasePackageHandle> {
         self.inner.find_package(name, constraint)
     }
 
@@ -452,11 +440,11 @@ impl RepositoryInterface for InstalledRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<Box<dyn BasePackage>> {
+    fn get_packages(&self) -> Vec<BasePackageHandle> {
         self.inner.get_packages()
     }
 
@@ -465,7 +453,7 @@ impl RepositoryInterface for InstalledRepository {
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> LoadPackagesResult {
         self.inner.load_packages(
             package_name_map,

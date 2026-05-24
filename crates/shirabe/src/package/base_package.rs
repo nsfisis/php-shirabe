@@ -89,8 +89,6 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
         // TODO(phase-b): wire up a back-reference to the containing repository when needed.
     }
 
-    fn clone_box(&self) -> Box<dyn BasePackage>;
-
     // as_alias_package / as_complete_package_interface inherited from PackageInterface.
 
     fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::AliasPackage> {

@@ -3,19 +3,20 @@
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 
 #[derive(Debug)]
 pub struct InstallOperation {
-    pub(crate) package: Box<dyn PackageInterface>,
+    pub(crate) package: PackageInterfaceHandle,
 }
 
 impl InstallOperation {
-    pub fn new(package: Box<dyn PackageInterface>) -> Self {
+    pub fn new(package: PackageInterfaceHandle) -> Self {
         Self { package }
     }
 
-    pub fn get_package(&self) -> &dyn PackageInterface {
-        self.package.as_ref()
+    pub fn get_package(&self) -> &PackageInterfaceHandle {
+        &self.package
     }
 
     pub fn format(package: &dyn PackageInterface, lock: bool) -> String {
@@ -43,7 +44,7 @@ impl OperationInterface for InstallOperation {
     }
 
     fn show(&self, lock: bool) -> String {
-        Self::format(self.package.as_ref(), lock)
+        Self::format(self.package.as_rc().borrow().as_package_interface(), lock)
     }
 
     fn to_string(&self) -> String {

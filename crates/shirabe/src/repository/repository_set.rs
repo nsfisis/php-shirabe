@@ -24,11 +24,10 @@ use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::NullIO;
-use crate::package::AliasPackage;
-use crate::package::BasePackage;
-use crate::package::CompleteAliasPackage;
-use crate::package::CompletePackage;
-use crate::package::PackageInterface;
+use crate::package::AliasPackageHandle;
+use crate::package::BasePackageHandle;
+use crate::package::CompleteAliasPackageHandle;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledRepository;
@@ -210,11 +209,11 @@ impl RepositorySet {
         name: &str,
         constraint: Option<AnyConstraint>,
         flags: i64,
-    ) -> Vec<Box<dyn BasePackage>> {
+    ) -> Vec<BasePackageHandle> {
         let ignore_stability = (flags & Self::ALLOW_UNACCEPTABLE_STABILITIES) != 0;
         let load_from_all_repos = (flags & Self::ALLOW_SHADOWED_REPOSITORIES) != 0;
 
-        let mut packages: Vec<Vec<Box<dyn BasePackage>>> = vec![];
+        let mut packages: Vec<Vec<BasePackageHandle>> = vec![];
         if load_from_all_repos {
             for repository in &self.repositories {
                 // PHP: $repository->findPackages($name, $constraint) ?: []
@@ -260,7 +259,7 @@ impl RepositorySet {
         }
 
         // PHP: $candidates = $packages ? array_merge(...$packages) : [];
-        let candidates: Vec<Box<dyn BasePackage>> = if !packages.is_empty() {
+        let candidates: Vec<BasePackageHandle> = if !packages.is_empty() {
             packages.into_iter().flatten().collect()
         } else {
             vec![]
@@ -271,9 +270,9 @@ impl RepositorySet {
             return candidates;
         }
 
-        let mut result: Vec<Box<dyn BasePackage>> = vec![];
+        let mut result: Vec<BasePackageHandle> = vec![];
         for candidate in candidates {
-            if self.is_package_acceptable(&candidate.get_names(true), candidate.get_stability()) {
+            if self.is_package_acceptable(&candidate.get_names(true), &candidate.get_stability()) {
                 result.push(candidate);
             }
         }
@@ -312,14 +311,14 @@ impl RepositorySet {
     /// @return ($allowPartialAdvisories is true ? array{advisories: array<string, array<PartialSecurityAdvisory|SecurityAdvisory>>, unreachableRepos: array<string>} : array{advisories: array<string, array<SecurityAdvisory>>, unreachableRepos: array<string>})
     pub fn get_matching_security_advisories(
         &self,
-        packages: Vec<Box<dyn PackageInterface>>,
+        packages: Vec<PackageInterfaceHandle>,
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
     ) -> Result<SecurityAdvisoriesResult> {
         let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
         for package in packages {
             // ignore root alias versions as they are not actual package versions and should not matter when it comes to vulnerabilities
-            if let Some(alias) = package.as_any().downcast_ref::<AliasPackage>() {
+            if let Some(alias) = package.as_alias() {
                 if alias.is_root_package_alias() {
                     continue;
                 }
@@ -525,42 +524,43 @@ impl RepositorySet {
 
         self.locked = true;
 
-        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
+        let mut packages: Vec<BasePackageHandle> = vec![];
         for repository in &self.repositories {
             for mut package in repository.get_packages() {
-                let name = package.get_name().to_string();
-                let version = package.get_version().to_string();
-                packages.push(package.clone_box());
+                let name = package.get_name();
+                let version = package.get_version();
+                packages.push(package.clone());
 
                 if let Some(versions) = self.root_aliases.get(&name) {
                     if let Some(alias) = versions.get(&version) {
-                        while let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>()
-                        {
-                            package = alias_pkg.get_alias_of().clone_box();
+                        while let Some(alias_pkg) = package.as_alias() {
+                            package = alias_pkg.get_alias_of().into();
                         }
-                        let alias_package: Box<dyn BasePackage> = if package
-                            .as_any()
-                            .downcast_ref::<CompletePackage>()
-                            .is_some()
-                        {
-                            // TODO(phase-b): construct CompleteAliasPackage and box as BasePackage
-                            todo!(
-                                "new CompleteAliasPackage(package, alias.alias_normalized, alias.alias)"
-                            )
-                        } else {
-                            // TODO(phase-b): construct AliasPackage and box as BasePackage
-                            todo!("new AliasPackage(package, alias.alias_normalized, alias.alias)")
-                        };
-                        // TODO(phase-b): set_root_package_alias on the wrapper
-                        todo!("alias_package.set_root_package_alias(true)");
-                        #[allow(unreachable_code)]
+                        let alias_package: BasePackageHandle =
+                            if let Some(complete) = package.as_complete_package() {
+                                CompleteAliasPackageHandle::new(
+                                    complete,
+                                    alias.alias_normalized.clone(),
+                                    alias.alias.clone(),
+                                )
+                                .into()
+                            } else {
+                                AliasPackageHandle::new(
+                                    package.as_package().unwrap(),
+                                    alias.alias_normalized.clone(),
+                                    alias.alias.clone(),
+                                )
+                                .into()
+                            };
+                        if let Some(alias_handle) = alias_package.as_alias() {
+                            alias_handle.set_root_package_alias(true);
+                        }
                         packages.push(alias_package);
                     }
                 }
             }
         }
 
-        // TODO(phase-b): Pool::new signature
         Ok(Pool::new(
             packages,
             vec![],

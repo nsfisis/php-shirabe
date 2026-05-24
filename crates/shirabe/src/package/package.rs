@@ -570,10 +570,6 @@ impl BasePackage for Package {
     fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
         todo!()
     }
-
-    fn clone_box(&self) -> Box<dyn BasePackage> {
-        todo!()
-    }
 }
 
 impl std::fmt::Display for Package {

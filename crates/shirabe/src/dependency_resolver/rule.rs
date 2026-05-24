@@ -22,6 +22,7 @@ use crate::dependency_resolver::Rule2Literals;
 use crate::dependency_resolver::RuleSet;
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
@@ -31,7 +32,7 @@ use crate::repository::RepositorySet;
 #[derive(Debug)]
 pub enum ReasonData {
     Link(Link),
-    BasePackage(Box<dyn BasePackage>),
+    BasePackage(BasePackageHandle),
     String(String),
     Int(i64),
     RootRequire {
@@ -39,7 +40,7 @@ pub enum ReasonData {
         constraint: AnyConstraint,
     },
     Fixed {
-        package: Box<dyn BasePackage>,
+        package: BasePackageHandle,
     },
     /// Phase B placeholder for an arbitrary PHP-side value not yet mapped to a real variant.
     Mixed(PhpMixed),
@@ -231,9 +232,9 @@ impl Rule {
                 // TODO(phase-b): Request::get_locked_repository() signature
                 let locked_repo: Option<()> = todo!("request.get_locked_repository()");
                 if let Some(_locked_repo) = locked_repo {
-                    let packages: Vec<Box<dyn BasePackage>> = todo!("locked_repo.get_packages()");
+                    let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
                     for package in packages {
-                        let p: &dyn BasePackage = todo!("package as BasePackage reference");
+                        let p: &BasePackageHandle = &package;
                         if p.get_name() == link.get_target() {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
@@ -272,10 +273,10 @@ impl Rule {
                 // TODO(phase-b): Request::get_locked_repository() signature
                 let locked_repo: Option<()> = todo!("request.get_locked_repository()");
                 if let Some(_locked_repo) = locked_repo {
-                    let packages: Vec<Box<dyn BasePackage>> = todo!("locked_repo.get_packages()");
+                    let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
                     for package in packages {
-                        let p: &dyn BasePackage = todo!("package as BasePackage reference");
-                        if p.get_name() == package_name {
+                        let p: &BasePackageHandle = &package;
+                        if p.get_name() == *package_name {
                             if pool.is_unacceptable_fixed_or_locked_package(p) {
                                 return true;
                             }
@@ -300,17 +301,15 @@ impl Rule {
     }
 
     /// @internal
-    pub fn get_source_package(&self, pool: &Pool) -> Result<Box<dyn BasePackage>> {
+    pub fn get_source_package(&self, pool: &Pool) -> Result<BasePackageHandle> {
         let literals = self.get_literals();
 
         match self.get_reason() {
             r if r == RULE_PACKAGE_CONFLICT => {
-                let mut package1 = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[0]).clone_box(),
-                );
-                let mut package2 = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[1]).clone_box(),
-                );
+                let mut package1 =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
+                let mut package2 =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
 
                 let reason_data = self.get_reason_data();
                 // swap literals if they are not in the right order with package2 being the conflicter
@@ -325,9 +324,8 @@ impl Rule {
 
             r if r == RULE_PACKAGE_REQUIRES => {
                 let source_literal = literals[0];
-                let source_package = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(source_literal).clone_box(),
-                );
+                let source_package =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(source_literal));
 
                 Ok(source_package)
             }
@@ -348,7 +346,7 @@ impl Rule {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        installed_map: &IndexMap<String, BasePackageHandle>,
         _learned_pool: &Vec<Vec<Rc<RefCell<Rule>>>>,
     ) -> String {
         let mut literals = self.get_literals();
@@ -373,10 +371,10 @@ impl Rule {
                     );
                 }
 
-                let packages_non_alias: Vec<Box<dyn BasePackage>> = packages
+                let packages_non_alias: Vec<BasePackageHandle> = packages
                     .iter()
-                    .filter(|p| p.as_any().downcast_ref::<AliasPackage>().is_none())
-                    .map(|p| p.clone_box())
+                    .filter(|p| p.as_alias().is_none())
+                    .map(|p| p.clone())
                     .collect();
                 if packages_non_alias.len() == 1 {
                     let package = &packages_non_alias[0];
@@ -396,7 +394,7 @@ impl Rule {
                     constraint.get_pretty_string(),
                     self.format_packages_unique_from_packages(
                         pool,
-                        packages,
+                        packages.iter().map(|p| p.clone()).collect(),
                         is_verbose,
                         Some(constraint),
                         false
@@ -406,7 +404,7 @@ impl Rule {
 
             r if r == RULE_FIXED => {
                 let package_in = match self.get_reason_data() {
-                    ReasonData::Fixed { package } => package.clone_box(),
+                    ReasonData::Fixed { package } => package.clone(),
                     _ => return String::new(),
                 };
                 let package = self.deduplicate_default_branch_alias(package_in);
@@ -427,12 +425,10 @@ impl Rule {
             }
 
             r if r == RULE_PACKAGE_CONFLICT => {
-                let mut package1 = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[0]).clone_box(),
-                );
-                let mut package2 = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[1]).clone_box(),
-                );
+                let mut package1 =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
+                let mut package2 =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
 
                 let mut conflict_target = package1.get_pretty_string();
                 let reason_data = self.get_reason_data();
@@ -495,21 +491,21 @@ impl Rule {
             r if r == RULE_PACKAGE_REQUIRES => {
                 assert!(literals.len() > 0);
                 let source_literal = array_shift(&mut literals).unwrap();
-                let source_package = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(source_literal).clone_box(),
-                );
+                let source_package =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(source_literal));
                 let reason_data = self.get_reason_data();
                 let link = match reason_data {
                     ReasonData::Link(l) => l,
                     _ => return String::new(),
                 };
 
-                let mut requires: Vec<Box<dyn BasePackage>> = vec![];
+                let mut requires: Vec<BasePackageHandle> = vec![];
                 for literal in &literals {
-                    requires.push(pool.literal_to_package(*literal).clone_box());
+                    requires.push(pool.literal_to_package(*literal));
                 }
 
-                let text = link.get_pretty_string(&*source_package);
+                let text =
+                    link.get_pretty_string(source_package.as_rc().borrow().as_package_interface());
                 if requires.len() > 0 {
                     format!(
                         "{} -> satisfiable by {}.",
@@ -573,13 +569,13 @@ impl Rule {
                         reason_str
                     };
 
-                    let mut installed_packages: Vec<Box<dyn BasePackage>> = vec![];
-                    let mut removable_packages: Vec<Box<dyn BasePackage>> = vec![];
+                    let mut installed_packages: Vec<BasePackageHandle> = vec![];
+                    let mut removable_packages: Vec<BasePackageHandle> = vec![];
                     for literal in &literals {
                         if installed_map.contains_key(&abs(*literal).to_string()) {
-                            installed_packages.push(pool.literal_to_package(*literal).clone_box());
+                            installed_packages.push(pool.literal_to_package(*literal));
                         } else {
-                            removable_packages.push(pool.literal_to_package(*literal).clone_box());
+                            removable_packages.push(pool.literal_to_package(*literal));
                         }
                     }
 
@@ -628,7 +624,7 @@ impl Rule {
                 let rule_text = if literals.len() == 1 {
                     pool.literal_to_pretty_string(literals[0], &installed_map)
                 } else {
-                    let mut groups: IndexMap<String, Vec<Box<dyn BasePackage>>> = IndexMap::new();
+                    let mut groups: IndexMap<String, Vec<BasePackageHandle>> = IndexMap::new();
                     for literal in &literals {
                         let package = pool.literal_to_package(*literal);
                         let group = if installed_map.contains_key(&package.id().to_string()) {
@@ -644,7 +640,7 @@ impl Rule {
                         groups
                             .entry(group.to_string())
                             .or_insert_with(Vec::new)
-                            .push(self.deduplicate_default_branch_alias(package.clone_box()));
+                            .push(self.deduplicate_default_branch_alias(package.clone()));
                     }
                     let mut rule_texts: Vec<String> = vec![];
                     for (group, packages) in &groups {
@@ -654,7 +650,7 @@ impl Rule {
                             if packages.len() > 1 { " one of" } else { "" },
                             self.format_packages_unique_from_packages(
                                 pool,
-                                packages.iter().map(|p| p.clone_box()).collect(),
+                                packages.iter().map(|p| p.clone()).collect(),
                                 is_verbose,
                                 None,
                                 false,
@@ -674,9 +670,8 @@ impl Rule {
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                     return String::new();
                 }
-                let package = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[1]).clone_box(),
-                );
+                let package =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
 
                 format!(
                     "{} is an alias of {} and thus requires it to be installed too.",
@@ -692,9 +687,8 @@ impl Rule {
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
                     return String::new();
                 }
-                let package = self.deduplicate_default_branch_alias(
-                    pool.literal_to_package(literals[0]).clone_box(),
-                );
+                let package =
+                    self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
 
                 format!(
                     "{} is an alias of {} and must be installed with it.",
@@ -720,7 +714,7 @@ impl Rule {
     fn format_packages_unique_from_packages(
         &self,
         pool: &Pool,
-        packages: Vec<Box<dyn BasePackage>>,
+        packages: Vec<BasePackageHandle>,
         is_verbose: bool,
         constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
@@ -743,9 +737,9 @@ impl Rule {
         constraint: Option<&AnyConstraint>,
         use_removed_version_group: bool,
     ) -> String {
-        let mut packages: Vec<Box<dyn BasePackage>> = vec![];
+        let mut packages: Vec<BasePackageHandle> = vec![];
         for literal in literals {
-            packages.push(pool.literal_to_package(*literal).clone_box());
+            packages.push(pool.literal_to_package(*literal));
         }
         Problem::get_package_list(
             &packages,
@@ -756,13 +750,10 @@ impl Rule {
         )
     }
 
-    fn deduplicate_default_branch_alias(
-        &self,
-        package: Box<dyn BasePackage>,
-    ) -> Box<dyn BasePackage> {
-        if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+    fn deduplicate_default_branch_alias(&self, package: BasePackageHandle) -> BasePackageHandle {
+        if let Some(alias_pkg) = package.as_alias() {
             if alias_pkg.get_pretty_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                return alias_pkg.get_alias_of().clone_box();
+                return alias_pkg.get_alias_of().into();
             }
         }
 

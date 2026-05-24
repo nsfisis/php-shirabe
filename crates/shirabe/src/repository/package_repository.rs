@@ -71,8 +71,7 @@ impl PackageRepository {
                     })));
                 }
             };
-            // TODO(phase-b): add_package expects Box<dyn PackageInterface>; loader returns Box<dyn BasePackage>
-            let _ = package_loaded;
+            self.inner.add_package(package_loaded)?;
         }
         Ok(Ok(()))
     }

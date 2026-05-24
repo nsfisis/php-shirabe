@@ -9,7 +9,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
-use crate::package::CompletePackageInterface;
+use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
 use crate::repository::RepositoryFactory;
@@ -106,7 +106,7 @@ impl HomeCommand {
             'repos: for repo in &repos {
                 for package in repo.find_packages(&package_name, None) {
                     package_exists = true;
-                    if let Some(complete_pkg) = package.as_complete_package_interface() {
+                    if let Some(complete_pkg) = package.as_complete() {
                         if self.handle_package(complete_pkg, show_homepage, show_only) {
                             handled = true;
                             break 'repos;
@@ -139,7 +139,7 @@ impl HomeCommand {
 
     fn handle_package(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         show_homepage: bool,
         show_only: bool,
     ) -> bool {
@@ -208,7 +208,7 @@ impl HomeCommand {
             let composer = crate::command::composer_full(&composer);
             let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
             repos.push(Box::new(RootPackageRepository::new(
-                composer.get_package().clone_box(),
+                composer.get_package().clone(),
             )));
             // TODO(phase-b): get_local_repository / get_repositories return shared refs; needs Rc<dyn ...> migration
             return Ok(repos);

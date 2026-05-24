@@ -27,9 +27,9 @@ use crate::installer::InstallationManager;
 use crate::io::IOInterface;
 use crate::io::NullIO;
 use crate::json::JsonFile;
-use crate::package::AliasPackage;
 use crate::package::Locker;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterface;
 use crate::repository::InstalledRepositoryInterface;
 use crate::script::ScriptEvents;
@@ -267,7 +267,7 @@ impl AutoloadGenerator {
         let autoloads = self.parse_autoloads(
             package_map
                 .iter()
-                .map(|(p, s)| (p.clone_package_box(), s.clone()))
+                .map(|(p, s)| (p.clone(), s.clone()))
                 .collect(),
             root_package,
             filtered_dev_packages,
@@ -741,20 +741,24 @@ impl AutoloadGenerator {
         &self,
         installation_manager: &mut InstallationManager,
         root_package: &dyn RootPackageInterface,
-        packages: Vec<Box<dyn PackageInterface>>,
-    ) -> anyhow::Result<Vec<(Box<dyn PackageInterface>, Option<String>)>> {
+        packages: Vec<PackageInterfaceHandle>,
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
         // build package => install path map
-        let mut package_map: Vec<(Box<dyn PackageInterface>, Option<String>)> = vec![(
-            root_package.clone_as_package_interface(),
-            Some(String::new()),
-        )];
+        // TODO(phase-c): the root package needs to be available here as a shared handle;
+        // a borrowed &dyn RootPackageInterface cannot be lifted into a PackageInterfaceHandle.
+        let _ = root_package;
+        let root_package_handle: PackageInterfaceHandle =
+            todo!("root package handle for build_package_map");
+        let mut package_map: Vec<(PackageInterfaceHandle, Option<String>)> =
+            vec![(root_package_handle, Some(String::new()))];
 
         for package in packages {
-            if package.as_alias_package().is_some() {
+            if package.as_alias().is_some() {
                 continue;
             }
-            self.validate_package(&*package)?;
-            let install_path = installation_manager.get_install_path(&*package);
+            self.validate_package(package.as_rc().borrow().as_package_interface())?;
+            let install_path = installation_manager
+                .get_install_path(package.as_rc().borrow().as_package_interface());
             package_map.push((package, install_path));
         }
 
@@ -795,7 +799,7 @@ impl AutoloadGenerator {
     /// Compiles an ordered list of namespace => path mappings
     pub fn parse_autoloads(
         &self,
-        package_map: Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: &dyn RootPackageInterface,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<String, PhpMixed> {
@@ -812,7 +816,7 @@ impl AutoloadGenerator {
                 .unwrap_or_default();
             package_map
                 .into_iter()
-                .filter(|item| !dev_list.contains(&item.0.get_name().to_string()))
+                .filter(|item| !dev_list.contains(&item.0.get_name()))
                 .collect()
         } else if filtered_dev_packages.as_bool() == Some(true) {
             self.filter_package_map(package_map, root_package)
@@ -932,7 +936,7 @@ impl AutoloadGenerator {
 
     pub(crate) fn get_include_paths_file(
         &self,
-        package_map: &Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         filesystem: &Filesystem,
         base_path: &str,
         vendor_path: &str,
@@ -1083,7 +1087,7 @@ impl AutoloadGenerator {
 
     pub(crate) fn get_platform_check(
         &self,
-        package_map: &Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         check_platform: PhpMixed,
         dev_package_names: &Vec<String>,
     ) -> Option<String> {
@@ -1625,7 +1629,7 @@ impl AutoloadGenerator {
 
     pub(crate) fn parse_autoloads_type(
         &self,
-        package_map: &Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         r#type: &str,
         root_package: &dyn RootPackageInterface,
     ) -> IndexMap<String, Box<PhpMixed>> {
@@ -1794,7 +1798,10 @@ impl AutoloadGenerator {
 
                     if r#type == "files" {
                         autoloads.insert(
-                            self.get_file_identifier(&**package, &path_str),
+                            self.get_file_identifier(
+                                package.as_rc().borrow().as_package_interface(),
+                                &path_str,
+                            ),
                             Box::new(PhpMixed::String(relative_path)),
                         );
                         continue;
@@ -1830,17 +1837,17 @@ impl AutoloadGenerator {
     /// Filters out dev-dependencies
     pub(crate) fn filter_package_map(
         &self,
-        package_map: Vec<(Box<dyn PackageInterface>, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: &dyn RootPackageInterface,
-    ) -> Vec<(Box<dyn PackageInterface>, Option<String>)> {
-        let mut packages: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
+    ) -> Vec<(PackageInterfaceHandle, Option<String>)> {
+        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut include: IndexMap<String, bool> = IndexMap::new();
         let mut replaced_by: IndexMap<String, String> = IndexMap::new();
 
         for item in &package_map {
             let package = &item.0;
-            let name = package.get_name().to_string();
-            packages.insert(name.clone(), package.clone_package_box());
+            let name = package.get_name();
+            packages.insert(name.clone(), package.clone());
             for (_k, replace) in &package.get_replaces() {
                 replaced_by.insert(replace.get_target().to_string(), name.clone());
             }
@@ -1849,7 +1856,7 @@ impl AutoloadGenerator {
         // Recursive walk emulating PHP's by-reference closure capture.
         fn add(
             package: &dyn PackageInterface,
-            packages: &IndexMap<String, Box<dyn PackageInterface>>,
+            packages: &IndexMap<String, PackageInterfaceHandle>,
             include: &mut IndexMap<String, bool>,
             replaced_by: &IndexMap<String, String>,
         ) {
@@ -1861,7 +1868,12 @@ impl AutoloadGenerator {
                 if !include.contains_key(&target) {
                     include.insert(target.clone(), true);
                     if let Some(p) = packages.get(&target) {
-                        add(&**p, packages, include, replaced_by);
+                        add(
+                            p.as_rc().borrow().as_package_interface(),
+                            packages,
+                            include,
+                            replaced_by,
+                        );
                     }
                 }
             }
@@ -1892,29 +1904,29 @@ impl AutoloadGenerator {
     /// Packages of equal weight are sorted alphabetically
     pub(crate) fn sort_package_map(
         &self,
-        package_map: Vec<(Box<dyn PackageInterface>, Option<String>)>,
-    ) -> Vec<(Box<dyn PackageInterface>, Option<String>)> {
-        let mut packages: IndexMap<String, Box<dyn PackageInterface>> = IndexMap::new();
+        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+    ) -> Vec<(PackageInterfaceHandle, Option<String>)> {
+        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut paths: IndexMap<String, Option<String>> = IndexMap::new();
 
         for item in &package_map {
             let (package, path) = item;
-            let name = package.get_name().to_string();
-            packages.insert(name.clone(), package.clone_package_box());
+            let name = package.get_name();
+            packages.insert(name.clone(), package.clone());
             paths.insert(name, path.clone());
         }
 
         let sorted_packages = PackageSorter::sort_packages(
-            packages.values().map(|p| p.clone_package_box()).collect(),
+            packages.values().map(|p| p.clone()).collect(),
             IndexMap::new(),
         );
 
-        let mut sorted_package_map: Vec<(Box<dyn PackageInterface>, Option<String>)> = vec![];
+        let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<String>)> = vec![];
 
         for package in sorted_packages {
-            let name = package.get_name().to_string();
+            let name = package.get_name();
             sorted_package_map.push((
-                packages.get(&name).unwrap().clone_package_box(),
+                packages.get(&name).unwrap().clone(),
                 paths.get(&name).cloned().flatten(),
             ));
         }

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use crate::dependency_resolver::Request;
 use crate::event_dispatcher::Event;
-use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
@@ -16,8 +16,8 @@ pub struct PrePoolCreateEvent {
     stability_flags: IndexMap<String, i64>,
     root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
     root_references: IndexMap<String, String>,
-    packages: Vec<Box<dyn BasePackage>>,
-    unacceptable_fixed_packages: Vec<Box<dyn BasePackage>>,
+    packages: Vec<BasePackageHandle>,
+    unacceptable_fixed_packages: Vec<BasePackageHandle>,
 }
 
 impl PrePoolCreateEvent {
@@ -34,8 +34,8 @@ impl PrePoolCreateEvent {
         stability_flags: IndexMap<String, i64>,
         root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
         root_references: IndexMap<String, String>,
-        packages: Vec<Box<dyn BasePackage>>,
-        unacceptable_fixed_packages: Vec<Box<dyn BasePackage>>,
+        packages: Vec<BasePackageHandle>,
+        unacceptable_fixed_packages: Vec<BasePackageHandle>,
     ) -> Self {
         Self {
             inner: Event::new(name, vec![], IndexMap::new()),
@@ -76,19 +76,19 @@ impl PrePoolCreateEvent {
         &self.root_references
     }
 
-    pub fn get_packages(&self) -> &Vec<Box<dyn BasePackage>> {
+    pub fn get_packages(&self) -> &Vec<BasePackageHandle> {
         &self.packages
     }
 
-    pub fn get_unacceptable_fixed_packages(&self) -> &Vec<Box<dyn BasePackage>> {
+    pub fn get_unacceptable_fixed_packages(&self) -> &Vec<BasePackageHandle> {
         &self.unacceptable_fixed_packages
     }
 
-    pub fn set_packages(&mut self, packages: Vec<Box<dyn BasePackage>>) {
+    pub fn set_packages(&mut self, packages: Vec<BasePackageHandle>) {
         self.packages = packages;
     }
 
-    pub fn set_unacceptable_fixed_packages(&mut self, packages: Vec<Box<dyn BasePackage>>) {
+    pub fn set_unacceptable_fixed_packages(&mut self, packages: Vec<BasePackageHandle>) {
         self.unacceptable_fixed_packages = packages;
     }
 }

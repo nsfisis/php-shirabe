@@ -31,12 +31,11 @@ impl SecurityAdvisoryPoolFilter {
         repositories: Vec<Box<dyn RepositoryInterface>>,
         request: &Request,
     ) -> Pool {
-        // TODO(phase-b): port the filter() body. Blockers:
+        // TODO(phase-c): port the filter() body. Blockers:
         //   * RepositorySet::new takes 6 args; ConfigSourceInterface refactor pending
-        //   * pool.get_packages() yields Box<dyn BasePackage>, but the audit/repo APIs
-        //     expect Box<dyn PackageInterface>; needs trait-object coercion / cloning story
-        //   * Pool::new requires owned Vecs, but existing pool's getters return refs and
-        //     Box<dyn BasePackage> is not Clone (only clone_box).
+        //   * pool.get_packages() yields BasePackageHandle; widen to PackageInterfaceHandle
+        //     (via .into()) where the audit/repo APIs expect PackageInterface.
+        //   * Pool::new requires owned Vecs; clone the handles out of the existing pool.
         //   * advisory map element type mismatch (PhpMixed vs PartialSecurityAdvisory).
         let _ = (
             pool,

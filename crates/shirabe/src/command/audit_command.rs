@@ -6,7 +6,6 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
@@ -146,7 +145,7 @@ impl AuditCommand {
         &self,
         composer: &PartialComposerHandle,
         input: &dyn InputInterface,
-    ) -> Result<Vec<Box<dyn PackageInterface>>> {
+    ) -> Result<Vec<crate::package::PackageInterfaceHandle>> {
         let mut composer = crate::command::composer_full_mut(composer);
         if input.get_option("locked").as_bool().unwrap_or(false) {
             let locker = composer.get_locker().clone();

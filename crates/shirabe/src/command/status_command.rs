@@ -120,18 +120,19 @@ impl StatusCommand {
             let target_dir = composer
                 .get_installation_manager()
                 .borrow_mut()
-                .get_install_path(package.as_ref());
+                .get_install_path(package.as_rc().borrow().as_package_interface());
             let target_dir = match target_dir {
                 Some(d) => d,
                 None => continue,
             };
             // TODO(phase-b): downloader borrow lifetime tied to dm.borrow() temporary; restructure later.
             let dm_borrow = dm.borrow();
-            let downloader: &dyn crate::downloader::DownloaderInterface =
-                match dm_borrow.get_downloader_for_package(package.as_ref())? {
-                    Some(d) => d,
-                    None => continue,
-                };
+            let downloader: &dyn crate::downloader::DownloaderInterface = match dm_borrow
+                .get_downloader_for_package(package.as_rc().borrow().as_package_interface())?
+            {
+                Some(d) => d,
+                None => continue,
+            };
 
             // TODO(phase-b): isinstance checks using ChangeReportInterface/VcsCapableDownloaderInterface/DvcsDownloaderInterface
             if let Some(change_reporter) = downloader.as_change_report_interface() {
@@ -142,16 +143,20 @@ impl StatusCommand {
                     );
                 }
 
-                if let Some(changes) =
-                    change_reporter.get_local_changes(package.as_ref(), &target_dir)?
-                {
+                if let Some(changes) = change_reporter.get_local_changes(
+                    package.as_rc().borrow().as_package_interface(),
+                    &target_dir,
+                )? {
                     errors.insert(target_dir.clone(), changes);
                 }
             }
 
             if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface() {
                 if vcs_downloader
-                    .get_vcs_reference(package.as_ref(), target_dir.clone())
+                    .get_vcs_reference(
+                        package.as_rc().borrow().as_package_interface(),
+                        target_dir.clone(),
+                    )
                     .is_some()
                 {
                     let previous_ref = match package.get_installation_source().as_deref() {
@@ -160,8 +165,10 @@ impl StatusCommand {
                         _ => None,
                     };
 
-                    let current_version =
-                        guesser.guess_version(&dumper.dump(package.as_ref()), &target_dir)?;
+                    let current_version = guesser.guess_version(
+                        &dumper.dump(package.as_rc().borrow().as_package_interface()),
+                        &target_dir,
+                    )?;
 
                     if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version) {
                         if cur_version.commit.as_deref() != Some(prev_ref.as_str())
@@ -195,9 +202,10 @@ impl StatusCommand {
             }
 
             if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface() {
-                if let Some(unpushed) =
-                    dvcs_downloader.get_unpushed_changes(package.as_ref(), target_dir.clone())
-                {
+                if let Some(unpushed) = dvcs_downloader.get_unpushed_changes(
+                    package.as_rc().borrow().as_package_interface(),
+                    target_dir.clone(),
+                ) {
                     unpushed_changes.insert(target_dir, unpushed);
                 }
             }

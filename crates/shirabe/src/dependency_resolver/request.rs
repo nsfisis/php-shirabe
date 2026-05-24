@@ -5,8 +5,7 @@ use shirabe_php_shim::{LogicException, spl_object_hash, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 
-use crate::package::BasePackage;
-use crate::package::PackageInterface;
+use crate::package::BasePackageHandle;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::LockArrayRepository;
 use crate::repository::RepositoryInterface;
@@ -44,9 +43,9 @@ pub enum UpdateAllowTransitiveDeps {
 pub struct Request {
     pub(crate) locked_repository: Option<LockArrayRepository>,
     pub(crate) requires: IndexMap<String, AnyConstraint>,
-    pub(crate) fixed_packages: IndexMap<String, Box<dyn BasePackage>>,
-    pub(crate) locked_packages: IndexMap<String, Box<dyn BasePackage>>,
-    pub(crate) fixed_locked_packages: IndexMap<String, Box<dyn BasePackage>>,
+    pub(crate) fixed_packages: IndexMap<String, BasePackageHandle>,
+    pub(crate) locked_packages: IndexMap<String, BasePackageHandle>,
+    pub(crate) fixed_locked_packages: IndexMap<String, BasePackageHandle>,
     pub(crate) update_allow_list: Vec<String>,
     pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     restrict_packages: Option<Vec<String>>,
@@ -94,8 +93,8 @@ impl Request {
     /// This is used for platform packages which cannot be modified by Composer. A rule enforcing
     /// their installation is generated for dependency resolution. Partial updates with dependencies
     /// cannot in any way modify these packages.
-    pub fn fix_package(&mut self, package: Box<dyn BasePackage>) {
-        let hash = spl_object_hash(&package);
+    pub fn fix_package(&mut self, package: BasePackageHandle) {
+        let hash = package.ptr_id().to_string();
         self.fixed_packages.insert(hash, package);
     }
 
@@ -109,8 +108,8 @@ impl Request {
     /// for the solver, so if nothing requires these packages they will be removed. Additionally in
     /// a partial update these packages can be unlocked, meaning other versions can be installed if
     /// explicitly requested as part of the update.
-    pub fn lock_package(&mut self, package: Box<dyn BasePackage>) {
-        let hash = spl_object_hash(&package);
+    pub fn lock_package(&mut self, package: BasePackageHandle) {
+        let hash = package.ptr_id().to_string();
         self.locked_packages.insert(hash, package);
     }
 
@@ -120,15 +119,14 @@ impl Request {
     /// should not allow removal of any packages. At the same time lock packages there cannot simply
     /// be marked fixed, as error reporting would then report them as platform packages, so this
     /// still marks them as locked packages at the same time.
-    pub fn fix_locked_package(&mut self, package: Box<dyn BasePackage>) {
-        let hash = spl_object_hash(&package);
-        self.fixed_packages
-            .insert(hash.clone(), package.clone_box());
+    pub fn fix_locked_package(&mut self, package: BasePackageHandle) {
+        let hash = package.ptr_id().to_string();
+        self.fixed_packages.insert(hash.clone(), package.clone());
         self.fixed_locked_packages.insert(hash, package);
     }
 
-    pub fn unlock_package(&mut self, package: &dyn BasePackage) {
-        self.locked_packages.remove(&spl_object_hash(package));
+    pub fn unlock_package(&mut self, package: &BasePackageHandle) {
+        self.locked_packages.remove(&package.ptr_id().to_string());
     }
 
     pub fn set_update_allow_list(
@@ -159,33 +157,34 @@ impl Request {
         &self.requires
     }
 
-    pub fn get_fixed_packages(&self) -> &IndexMap<String, Box<dyn BasePackage>> {
+    pub fn get_fixed_packages(&self) -> &IndexMap<String, BasePackageHandle> {
         &self.fixed_packages
     }
 
-    pub fn is_fixed_package(&self, package: &dyn BasePackage) -> bool {
-        self.fixed_packages.contains_key(&spl_object_hash(package))
+    pub fn is_fixed_package(&self, package: &BasePackageHandle) -> bool {
+        self.fixed_packages
+            .contains_key(&package.ptr_id().to_string())
     }
 
-    pub fn get_locked_packages(&self) -> &IndexMap<String, Box<dyn BasePackage>> {
+    pub fn get_locked_packages(&self) -> &IndexMap<String, BasePackageHandle> {
         &self.locked_packages
     }
 
-    pub fn is_locked_package(&self, package: &dyn PackageInterface) -> bool {
-        let hash = spl_object_hash(package);
+    pub fn is_locked_package(&self, package: &BasePackageHandle) -> bool {
+        let hash = package.ptr_id().to_string();
         self.locked_packages.contains_key(&hash) || self.fixed_locked_packages.contains_key(&hash)
     }
 
-    pub fn get_fixed_or_locked_packages(&self) -> IndexMap<String, Box<dyn BasePackage>> {
-        let mut result: IndexMap<String, Box<dyn BasePackage>> = self
+    pub fn get_fixed_or_locked_packages(&self) -> IndexMap<String, BasePackageHandle> {
+        let mut result: IndexMap<String, BasePackageHandle> = self
             .fixed_packages
             .iter()
-            .map(|(k, v)| (k.clone(), v.clone_box()))
+            .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         result.extend(
             self.locked_packages
                 .iter()
-                .map(|(k, v)| (k.clone(), v.clone_box())),
+                .map(|(k, v)| (k.clone(), v.clone())),
         );
         result
     }
@@ -194,15 +193,18 @@ impl Request {
     ///       is for the installed map in the solver problems.
     ///       Some locked packages may not be in the pool,
     ///       so they have a package->id of -1
-    pub fn get_present_map(&self, package_ids: bool) -> IndexMap<String, Box<dyn BasePackage>> {
-        let mut present_map: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+    pub fn get_present_map(
+        &self,
+        package_ids: bool,
+    ) -> IndexMap<String, crate::package::BasePackageHandle> {
+        let mut present_map: IndexMap<String, crate::package::BasePackageHandle> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
             for package in RepositoryInterface::get_packages(locked_repository) {
                 let key = if package_ids {
                     package.get_id().to_string()
                 } else {
-                    spl_object_hash(&package)
+                    package.ptr_id().to_string()
                 };
                 present_map.insert(key, package);
             }
@@ -212,18 +214,18 @@ impl Request {
             let key = if package_ids {
                 package.get_id().to_string()
             } else {
-                spl_object_hash(package)
+                package.ptr_id().to_string()
             };
-            present_map.insert(key, package.clone_box());
+            present_map.insert(key, package.clone());
         }
 
         present_map
     }
 
-    pub fn get_fixed_packages_map(&self) -> IndexMap<i64, Box<dyn BasePackage>> {
-        let mut fixed_packages_map: IndexMap<i64, Box<dyn BasePackage>> = IndexMap::new();
+    pub fn get_fixed_packages_map(&self) -> IndexMap<i64, BasePackageHandle> {
+        let mut fixed_packages_map: IndexMap<i64, BasePackageHandle> = IndexMap::new();
         for (_, package) in &self.fixed_packages {
-            fixed_packages_map.insert(package.get_id(), package.clone_box());
+            fixed_packages_map.insert(package.get_id(), package.clone());
         }
         fixed_packages_map
     }

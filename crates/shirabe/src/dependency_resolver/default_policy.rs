@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php
 
-use std::any::Any;
 use std::cell::RefCell;
 
 use indexmap::IndexMap;
@@ -10,9 +9,8 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::dependency_resolver::PolicyInterface;
 use crate::dependency_resolver::Pool;
-use crate::package::AliasPackage;
-use crate::package::PackageInterface;
-use crate::package::{BasePackage, STABILITIES};
+use crate::package::BasePackageHandle;
+use crate::package::STABILITIES;
 use crate::util::Platform;
 
 #[derive(Debug)]
@@ -46,14 +44,14 @@ impl DefaultPolicy {
     pub fn compare_by_priority(
         &self,
         pool: &Pool,
-        a: &dyn BasePackage,
-        b: &dyn BasePackage,
+        a: &BasePackageHandle,
+        b: &BasePackageHandle,
         required_package: Option<String>,
         ignore_replace: bool,
     ) -> i64 {
-        if PackageInterface::get_name(a) == PackageInterface::get_name(b) {
-            let a_aliased = a.as_any().downcast_ref::<AliasPackage>().is_some();
-            let b_aliased = b.as_any().downcast_ref::<AliasPackage>().is_some();
+        if a.get_name() == b.get_name() {
+            let a_aliased = a.as_alias().is_some();
+            let b_aliased = b.as_alias().is_some();
             if a_aliased && !b_aliased {
                 return -1;
             }
@@ -73,10 +71,8 @@ impl DefaultPolicy {
             if let Some(ref required_package) = required_package {
                 if let Some(pos) = required_package.find('/') {
                     let required_vendor = &required_package[..pos];
-                    let a_is_same_vendor =
-                        PackageInterface::get_name(a).starts_with(required_vendor);
-                    let b_is_same_vendor =
-                        PackageInterface::get_name(b).starts_with(required_vendor);
+                    let a_is_same_vendor = a.get_name().starts_with(required_vendor);
+                    let b_is_same_vendor = b.get_name().starts_with(required_vendor);
                     if b_is_same_vendor != a_is_same_vendor {
                         return if a_is_same_vendor { -1 } else { 1 };
                     }
@@ -112,7 +108,7 @@ impl DefaultPolicy {
                     .iter()
                     .copied()
                     .filter(|&literal| {
-                        pool.literal_to_package(literal).get_version() == preferred_version
+                        pool.literal_to_package(literal).get_version() == *preferred_version
                     })
                     .collect();
                 if !best_literals.is_empty() {
@@ -129,10 +125,10 @@ impl DefaultPolicy {
                 continue;
             }
             let package = pool.literal_to_package(literal);
-            if self.version_compare(package, best_package, operator) {
+            if self.version_compare(&package, &best_package, operator) {
                 best_package = package;
                 best_literals = vec![literal];
-            } else if self.version_compare(package, best_package, "==") {
+            } else if self.version_compare(&package, &best_package, "==") {
                 best_literals.push(literal);
             }
         }
@@ -144,7 +140,7 @@ impl DefaultPolicy {
 
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_alias() {
                 if alias_pkg.is_root_package_alias() {
                     has_local_alias = true;
                     break;
@@ -159,7 +155,7 @@ impl DefaultPolicy {
         let mut selected = vec![];
         for &literal in &literals {
             let package = pool.literal_to_package(literal);
-            if let Some(alias_pkg) = package.as_any().downcast_ref::<AliasPackage>() {
+            if let Some(alias_pkg) = package.as_alias() {
                 if alias_pkg.is_root_package_alias() {
                     selected.push(literal);
                 }
@@ -168,9 +164,9 @@ impl DefaultPolicy {
         selected
     }
 
-    pub(crate) fn replaces(&self, source: &dyn BasePackage, target: &dyn BasePackage) -> bool {
+    pub(crate) fn replaces(&self, source: &BasePackageHandle, target: &BasePackageHandle) -> bool {
         for link in source.get_replaces().values() {
-            if link.get_target() == target.get_name() {
+            if link.get_target() == target.get_name().as_str() {
                 return true;
             }
         }
@@ -181,8 +177,8 @@ impl DefaultPolicy {
 impl PolicyInterface for DefaultPolicy {
     fn version_compare(
         &self,
-        a: &dyn PackageInterface,
-        b: &dyn PackageInterface,
+        a: &BasePackageHandle,
+        b: &BasePackageHandle,
         operator: &str,
     ) -> bool {
         if self.prefer_stable {
@@ -267,8 +263,8 @@ impl PolicyInterface for DefaultPolicy {
                 }
                 let result = self.compare_by_priority(
                     pool,
-                    pool.literal_to_package(a),
-                    pool.literal_to_package(b),
+                    &pool.literal_to_package(a),
+                    &pool.literal_to_package(b),
                     required_package.clone(),
                     true,
                 );
@@ -300,8 +296,8 @@ impl PolicyInterface for DefaultPolicy {
             }
             let result = self.compare_by_priority(
                 pool,
-                pool.literal_to_package(a),
-                pool.literal_to_package(b),
+                &pool.literal_to_package(a),
+                &pool.literal_to_package(b),
                 required_package.clone(),
                 false,
             );

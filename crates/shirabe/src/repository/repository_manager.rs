@@ -7,7 +7,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::FilterRepository;
 use crate::repository::InstalledRepositoryInterface;
 use crate::repository::RepositoryInterface;
@@ -52,13 +52,13 @@ impl RepositoryManager {
         &self,
         name: &str,
         constraint: &AnyConstraint,
-    ) -> Option<Box<dyn PackageInterface>> {
+    ) -> Option<PackageInterfaceHandle> {
         for repository in &self.repositories {
             if let Some(package) = repository.find_package(
                 name,
                 crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
             ) {
-                return Some(package.clone_package_box());
+                return Some(package.clone().into());
             }
         }
         None
@@ -68,8 +68,8 @@ impl RepositoryManager {
         &self,
         name: &str,
         constraint: &AnyConstraint,
-    ) -> Vec<Box<dyn PackageInterface>> {
-        let mut packages: Vec<Box<dyn PackageInterface>> = vec![];
+    ) -> Vec<PackageInterfaceHandle> {
+        let mut packages: Vec<PackageInterfaceHandle> = vec![];
         for repository in self.get_repositories() {
             for p in repository.find_packages(
                 name,
@@ -77,7 +77,7 @@ impl RepositoryManager {
                     constraint.clone(),
                 )),
             ) {
-                packages.push(p.clone_package_box());
+                packages.push(p.clone().into());
             }
         }
         packages

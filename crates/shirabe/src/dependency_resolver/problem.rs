@@ -19,6 +19,7 @@ use crate::dependency_resolver::Request;
 use crate::dependency_resolver::rule::{self, Rule};
 use crate::package::AliasPackage;
 use crate::package::BasePackage;
+use crate::package::BasePackageHandle;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
 use crate::package::PackageInterface;
@@ -67,7 +68,7 @@ impl Problem {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        installed_map: &IndexMap<String, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> anyhow::Result<String> {
         // TODO doesn't this entirely defeat the purpose of the problem sections? what's the point of sections?
@@ -155,7 +156,9 @@ impl Problem {
                 // TODO(phase-b): reason_data is a Link.
                 let source = rule.get_source_package(pool).unwrap();
                 let link_pretty = match rule.get_reason_data() {
-                    rule::ReasonData::Link(link) => link.get_pretty_string(source.as_ref()),
+                    rule::ReasonData::Link(link) => {
+                        link.get_pretty_string(source.as_rc().borrow().as_package_interface())
+                    }
                     _ => String::new(),
                 };
                 format!("{}//{}", source.get_pretty_string(), link_pretty)
@@ -205,7 +208,7 @@ impl Problem {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, Box<dyn BasePackage>>,
+        installed_map: &IndexMap<String, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> String {
         let mut messages: Vec<String> = Vec::new();
@@ -258,9 +261,9 @@ impl Problem {
                     .entry(pkg_key.clone())
                     .or_insert_with(IndexMap::new)
                     .insert(version_key, m2.clone());
-                let source_package = rule_ref.get_source_package(pool);
+                let source_package = rule_ref.get_source_package(pool).unwrap();
                 for (version, pretty_version) in
-                    pool.get_removed_versions_by_package(&spl_object_hash(&source_package))
+                    pool.get_removed_versions_by_package(&source_package.ptr_id().to_string())
                 {
                     templates
                         .get_mut(&template)
@@ -551,11 +554,13 @@ impl Problem {
             }
         }
 
-        let mut locked_package: Option<Box<dyn BasePackage>> = None;
+        let mut locked_package: Option<BasePackageHandle> = None;
         for (_key, package) in request.get_locked_packages() {
-            if package.get_name() == package_name {
-                locked_package = Some(package.clone_box());
-                if pool.is_unacceptable_fixed_or_locked_package(package.as_ref()) {
+            if package.get_name().as_str() == package_name {
+                locked_package = Some(package.clone());
+                // TODO(phase-c): wire Pool::is_unacceptable_fixed_or_locked_package(package) here;
+                // the locked package handle and the pool's identity check are now both handle-based.
+                if todo!("is_unacceptable_fixed_or_locked_package with a request package handle") {
                     return (
                         "- ".to_string(),
                         format!(
@@ -629,7 +634,7 @@ impl Problem {
         if packages.len() > 0 {
             let root_reqs = repository_set.get_root_requires();
             if root_reqs.contains_key(package_name) {
-                let filtered: Vec<&Box<dyn BasePackage>> = packages
+                let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
                         root_reqs[package_name].matches(
@@ -673,7 +678,7 @@ impl Problem {
             let first_pkg = packages.first().unwrap();
             for name in first_pkg.get_names(true) {
                 if temp_reqs.contains_key(&name) {
-                    let filtered: Vec<&Box<dyn BasePackage>> = packages
+                    let filtered: Vec<&BasePackageHandle> = packages
                         .iter()
                         .filter(|p| {
                             temp_reqs[&name].matches(
@@ -721,7 +726,7 @@ impl Problem {
                     lp.get_version().to_string(),
                     None,
                 ));
-                let filtered: Vec<&Box<dyn BasePackage>> = packages
+                let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
                         fixed_constraint.matches(
@@ -756,14 +761,10 @@ impl Problem {
                 }
             }
 
-            let non_locked_packages: Vec<&Box<dyn BasePackage>> = packages
-                .iter()
-                .filter(|p| {
-                    p.get_repository()
-                        .and_then(|r| r.as_any().downcast_ref::<LockArrayRepository>())
-                        .is_none()
-                })
-                .collect();
+            // TODO(phase-c): filtering out packages from a LockArrayRepository needs the handle's
+            // repository back-reference (phase-c handoff item #1), which is not yet available; keep
+            // all packages for now.
+            let non_locked_packages: Vec<&BasePackageHandle> = packages.iter().collect();
 
             if non_locked_packages.len() == 0 {
                 return (
@@ -961,7 +962,7 @@ impl Problem {
             let all_repos_packages = &packages;
             let top_package = all_repos_packages.first();
             if let Some(tp) = top_package {
-                if tp.as_root_package_interface().is_some() {
+                if tp.as_root().is_some() {
                     suffix = " See https://getcomposer.org/dep-on-root for details and assistance."
                         .to_string();
                 }
@@ -1023,7 +1024,7 @@ impl Problem {
 
     /// @internal
     pub fn get_package_list(
-        packages: &Vec<Box<dyn BasePackage>>,
+        packages: &Vec<BasePackageHandle>,
         is_verbose: bool,
         pool: Option<&Pool>,
         constraint: Option<&AnyConstraint>,
@@ -1044,7 +1045,7 @@ impl Problem {
                     versions: IndexMap::new(),
                 });
             entry.name = package.get_pretty_name().to_string();
-            let alias_suffix = if let Some(alias) = package.as_alias_package() {
+            let alias_suffix = if let Some(alias) = package.as_alias() {
                 format!(" (alias of {})", alias.get_alias_of().get_pretty_version())
             } else {
                 String::new()
@@ -1064,7 +1065,7 @@ impl Problem {
             if pool.is_some() && use_removed_version_group {
                 for (version, pretty_version) in pool
                     .unwrap()
-                    .get_removed_versions_by_package(&spl_object_hash(package.as_ref()))
+                    .get_removed_versions_by_package(&package.ptr_id().to_string())
                 {
                     entry.versions.insert(version, pretty_version);
                 }
@@ -1129,16 +1130,12 @@ impl Problem {
         let available = pool.what_provides(package_name, None);
 
         if available.len() > 0 {
-            let mut selected: Option<&Box<dyn BasePackage>> = None;
+            let mut selected: Option<&BasePackageHandle> = None;
+            // TODO(phase-c): the handle does not expose get_repository (a `RefCell`-borrowed
+            // back-reference); preferring the package from a PlatformRepository needs repository
+            // back-references on handles. Falling back to the first candidate for now.
             for pkg in &available {
-                if pkg
-                    .get_repository()
-                    .and_then(|r| r.as_any().downcast_ref::<PlatformRepository>())
-                    .is_some()
-                {
-                    selected = Some(pkg);
-                    break;
-                }
+                let _ = pkg;
             }
             if selected.is_none() {
                 selected = available.first();
@@ -1163,15 +1160,14 @@ impl Problem {
 
             let mut version: String = selected.get_pretty_version().to_string();
             let extra = selected.get_extra();
-            if selected.as_complete_package_interface().is_some()
+            if selected.as_complete().is_some()
                 && extra.contains_key("config.platform")
                 && extra["config.platform"].as_bool() == Some(true)
             {
                 let description: String = selected
-                    .as_complete_package_interface()
+                    .as_complete()
                     .and_then(|c| c.get_description())
-                    .unwrap_or("")
-                    .to_string();
+                    .unwrap_or_default();
                 version = format!("{}; {}", version, str_replace("Package ", "", &description));
             }
             return Some(version);
@@ -1226,10 +1222,10 @@ impl Problem {
         filtered
     }
 
-    fn has_multiple_names(packages: &Vec<Box<dyn BasePackage>>) -> bool {
+    fn has_multiple_names(packages: &Vec<BasePackageHandle>) -> bool {
         let mut name: Option<String> = None;
         for package in packages {
-            if name.is_none() || name.as_deref() == Some(package.get_name()) {
+            if name.is_none() || name.as_deref() == Some(package.get_name().as_str()) {
                 name = Some(package.get_name().to_string());
             } else {
                 return true;
@@ -1243,30 +1239,22 @@ impl Problem {
         pool: &Pool,
         is_verbose: bool,
         package_name: &str,
-        higher_repo_packages: &Vec<Box<dyn BasePackage>>,
-        all_repos_packages: &Vec<Box<dyn BasePackage>>,
+        higher_repo_packages: &Vec<BasePackageHandle>,
+        all_repos_packages: &Vec<BasePackageHandle>,
         reason: &str,
         constraint: Option<&AnyConstraint>,
     ) -> (String, String) {
-        let mut next_repo_packages: Vec<Box<dyn BasePackage>> = Vec::new();
-        let mut next_repo: Option<Box<dyn crate::repository::RepositoryInterface>> = None;
-
-        for package in all_repos_packages {
-            // TODO(phase-b): RepositoryInterface has no equals(); reference identity needed.
-            if next_repo.is_none() {
-                next_repo_packages.push(package.clone_box());
-                next_repo = package.get_repository().map(|r| r.clone_box());
-            } else {
-                break;
-            }
-        }
-
-        // assert(null !== $nextRepo);
-        let next_repo = next_repo.unwrap();
+        // TODO(phase-c): selecting the next repository's packages relies on each package's
+        // repository back-reference, which the handle does not yet expose (phase-c handoff
+        // item #1). Both `next_repo_packages` and `next_repo` are blocked on that decision.
+        let _ = all_repos_packages;
+        let next_repo_packages: Vec<BasePackageHandle> = Vec::new();
+        let next_repo: Box<dyn crate::repository::RepositoryInterface> =
+            todo!("repository back-reference on handle pending (phase-c handoff item #1)");
 
         if higher_repo_packages.len() > 0 {
             let top_package = higher_repo_packages.first().unwrap();
-            if top_package.as_root_package_interface().is_some() {
+            if top_package.as_root().is_some() {
                 return (
                     format!(
                         "- Root composer.json requires {}{}, it is ",
@@ -1309,7 +1297,7 @@ impl Problem {
                 )
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
-            if next_repo_packages[0].get_dist_type() == Some("path") {
+            if next_repo_packages[0].get_dist_type() == Some("path".to_string()) {
                 let transport_options = next_repo_packages[0].get_transport_options();
                 if !transport_options.contains_key("symlink")
                     || transport_options["symlink"].as_bool() != Some(false)
@@ -1367,12 +1355,10 @@ impl Problem {
                     constraint,
                     false
                 ),
-                higher_repo_packages
-                    .first()
-                    .unwrap()
-                    .get_repository()
-                    .map(|r| r.get_repo_name())
-                    .unwrap_or_default(),
+                // TODO(phase-c): the higher repo's name needs the handle's repository
+                // back-reference (phase-c handoff item #1); unreachable until `next_repo` above
+                // is resolved.
+                String::new(),
                 reason
             ),
         )

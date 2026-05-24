@@ -7,7 +7,7 @@ use shirabe_php_shim::{
     Countable, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     LogicException, PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException,
     extension_loaded, hash, http_build_query, in_array, json_decode, parse_url_all, realpath,
-    spl_object_hash, strtolower, strtr, urlencode, var_export,
+    strtolower, strtr, urlencode, var_export,
 };
 
 use shirabe_semver::compiling_matcher::CompilingMatcher;
@@ -22,7 +22,9 @@ use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::loader::ArrayLoader;
 use crate::package::version::StabilityFilter;
@@ -119,15 +121,15 @@ pub struct ComposerRepository {
 
 #[derive(Debug)]
 pub enum FindPackageReturn {
-    Package(Box<dyn BasePackage>),
-    Packages(Vec<Box<dyn BasePackage>>),
+    Package(BasePackageHandle),
+    Packages(Vec<BasePackageHandle>),
     None,
 }
 
 #[derive(Debug)]
 pub struct LoadAsyncPackagesResult {
     pub names_found: IndexMap<String, bool>,
-    pub packages: IndexMap<String, Box<dyn BasePackage>>,
+    pub packages: IndexMap<String, BasePackageHandle>,
 }
 
 impl ConfigurableRepositoryInterface for ComposerRepository {
@@ -322,7 +324,7 @@ impl ComposerRepository {
         &mut self,
         name: String,
         constraint: PhpMixed,
-    ) -> anyhow::Result<Option<Box<dyn BasePackage>>> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
@@ -343,7 +345,7 @@ impl ComposerRepository {
                     .map_or(false, |m| m.contains_key(&name))
             {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
+                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
                 return Ok(
                     match self.filter_packages(packages_vec, Some(&constraint), true) {
                         FindPackageReturn::Package(p) => Some(p),
@@ -372,7 +374,7 @@ impl ComposerRepository {
                 if name == provider_name {
                     let packages =
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
+                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
                     return Ok(
                         match self.filter_packages(packages_vec, Some(&constraint), true) {
                             FindPackageReturn::Package(p) => Some(p),
@@ -396,7 +398,7 @@ impl ComposerRepository {
         &mut self,
         name: String,
         constraint: Option<PhpMixed>,
-    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
@@ -415,7 +417,7 @@ impl ComposerRepository {
                     .map_or(false, |m| m.contains_key(&name))
             {
                 let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
+                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
                 return Ok(
                     match self.filter_packages(packages_vec, constraint.as_ref(), false) {
                         FindPackageReturn::Packages(v) => v,
@@ -440,7 +442,7 @@ impl ComposerRepository {
                 if name == provider_name {
                     let packages =
                         self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<Box<dyn BasePackage>> = packages.into_values().collect();
+                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
                     return Ok(
                         match self.filter_packages(packages_vec, constraint.as_ref(), false) {
                             FindPackageReturn::Packages(v) => v,
@@ -461,7 +463,7 @@ impl ComposerRepository {
 
     fn filter_packages(
         &self,
-        packages: Vec<Box<dyn BasePackage>>,
+        packages: Vec<BasePackageHandle>,
         constraint: Option<&AnyConstraint>,
         return_first_match: bool,
     ) -> FindPackageReturn {
@@ -477,7 +479,7 @@ impl ComposerRepository {
         }
         let constraint = constraint.unwrap();
 
-        let mut filtered_packages: Vec<Box<dyn BasePackage>> = Vec::new();
+        let mut filtered_packages: Vec<BasePackageHandle> = Vec::new();
 
         for package in packages.into_iter() {
             let pkg_constraint =
@@ -499,7 +501,7 @@ impl ComposerRepository {
         FindPackageReturn::Packages(filtered_packages)
     }
 
-    pub fn get_packages(&mut self) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
+    pub fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         let has_providers = self.has_providers()?;
 
         if self.lazy_providers_url.is_some() {
@@ -712,7 +714,7 @@ impl ComposerRepository {
         mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
@@ -724,22 +726,16 @@ impl ComposerRepository {
                 stability_flags,
                 already_loaded,
             );
-            // TODO(phase-b): repository_interface::LoadPackagesResult uses Vec<Box<dyn BasePackage>>
-            // for `packages`; this fn returns IndexMap. Reconciliation needs structural changes.
-            let _ = inner_result;
-            return Ok(LoadPackagesResult {
-                names_found: Vec::new(),
-                packages: IndexMap::new(),
-            });
+            return Ok(inner_result);
         }
 
-        let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+        let mut packages: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         if has_providers || self.has_partial_packages()? {
             let names: Vec<String> = package_name_map.keys().cloned().collect();
             for name in names {
-                let mut matches: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+                let mut matches: IndexMap<String, BasePackageHandle> = IndexMap::new();
 
                 // if a repo has no providers but only partial packages and the partial packages are missing
                 // then we don't want to call whatProvides as it would try to load from the providers and fail
@@ -752,12 +748,11 @@ impl ComposerRepository {
                     continue;
                 }
 
-                // TODO(phase-b): Box<dyn PackageInterface> is not Clone; share via Rc
                 let candidates = self.what_provides(
                     &name,
                     Some(&acceptable_stabilities),
                     Some(&stability_flags),
-                    todo!("clone of already_loaded requires sharing Box<dyn PackageInterface>"),
+                    already_loaded.clone(),
                 )?;
                 let constraint = package_name_map
                     .get(&name)
@@ -783,13 +778,13 @@ impl ComposerRepository {
                         }
                     };
                     if matches_constraint {
-                        let hash_c = spl_object_hash(&**candidate);
-                        matches.insert(hash_c, dyn_clone_box(&**candidate));
-                        if let Some(alias) = candidate.as_alias_package() {
+                        let hash_c = candidate.ptr_id().to_string();
+                        matches.insert(hash_c, candidate.clone());
+                        if let Some(alias) = candidate.as_alias() {
                             let aliased = alias.get_alias_of();
-                            let aliased_hash = spl_object_hash(aliased);
+                            let aliased_hash = aliased.ptr_id().to_string();
                             if !matches.contains_key(&aliased_hash) {
-                                matches.insert(aliased_hash, dyn_clone_box(aliased));
+                                matches.insert(aliased_hash, aliased.into());
                             }
                         }
                     }
@@ -797,12 +792,12 @@ impl ComposerRepository {
 
                 // add aliases of matched packages even if they did not match the constraint
                 for (_uid, candidate) in candidates.iter() {
-                    if let Some(alias) = candidate.as_alias_package() {
+                    if let Some(alias) = candidate.as_alias() {
                         let aliased = alias.get_alias_of();
-                        let aliased_hash = spl_object_hash(aliased);
+                        let aliased_hash = aliased.ptr_id().to_string();
                         if matches.contains_key(&aliased_hash) {
-                            let hash_c = spl_object_hash(&**candidate);
-                            matches.insert(hash_c, dyn_clone_box(&**candidate));
+                            let hash_c = candidate.ptr_id().to_string();
+                            matches.insert(hash_c, candidate.clone());
                         }
                     }
                 }
@@ -1412,8 +1407,8 @@ impl ComposerRepository {
         name: &str,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
-    ) -> anyhow::Result<IndexMap<String, Box<dyn BasePackage>>> {
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<IndexMap<String, BasePackageHandle>> {
         let mut packages_source: Option<String> = None;
         let packages: IndexMap<String, PhpMixed>;
         let loading_partial_package: bool;
@@ -1635,7 +1630,7 @@ impl ComposerRepository {
             loading_partial_package = true;
         }
 
-        let mut result: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+        let mut result: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut versions_to_load: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
         let packages_inner = packages
             .get("packages")
@@ -1749,15 +1744,13 @@ impl ComposerRepository {
         let loaded_packages = self.create_packages_flat(versions_to_load_vec, packages_source)?;
         let uids: Vec<String> = versions_to_load.keys().cloned().collect();
 
-        for (index, mut package) in loaded_packages.into_iter().enumerate() {
-            package.set_repository_self();
+        for (index, package) in loaded_packages.into_iter().enumerate() {
+            // TODO(phase-c): wire the repository back-reference onto the shared package handle.
             let uid = &uids[index];
 
-            if let Some(alias) = package.as_alias_package_mut() {
-                let aliased = alias.get_alias_of_mut();
-                aliased.set_repository_self();
-
-                result.insert(uid.clone(), dyn_clone_box(aliased));
+            if let Some(alias) = package.as_alias() {
+                let aliased = alias.get_alias_of();
+                result.insert(uid.clone(), aliased.into());
                 result.insert(format!("{}-alias", uid), package);
             } else {
                 result.insert(uid.clone(), package);
@@ -1784,10 +1777,11 @@ impl ComposerRepository {
     }
 
     /// Adds a new package to the repository
-    pub fn add_package(&mut self, mut package: Box<dyn BasePackage>) {
-        // configurePackageTransportOptions(*package);
-        self.configure_package_transport_options(&mut *package);
-        self.inner.add_package(package);
+    pub fn add_package(&mut self, package: BasePackageHandle) {
+        self.configure_package_transport_options(
+            package.as_rc().borrow_mut().as_package_interface_mut(),
+        );
+        self.inner.add_package(package.into());
     }
 
     /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
@@ -1796,11 +1790,11 @@ impl ComposerRepository {
         mut package_names: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
-        already_loaded: IndexMap<String, IndexMap<String, Box<dyn PackageInterface>>>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadAsyncPackagesResult> {
         self.load_root_server_file(None)?;
 
-        let mut packages: IndexMap<String, Box<dyn BasePackage>> = IndexMap::new();
+        let mut packages: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         if self.lazy_providers_url.is_none() {
@@ -1980,17 +1974,16 @@ impl ComposerRepository {
                 }
             }
 
-            let loaded_packages: Vec<Box<dyn BasePackage>> =
+            let loaded_packages: Vec<BasePackageHandle> =
                 ComposerRepository::create_packages_static(versions_to_load, packages_source)?;
-            for mut package in loaded_packages.into_iter() {
-                package.set_repository_self();
-                let hash_c = spl_object_hash(&*package);
-                if let Some(alias) = package.as_alias_package_mut() {
-                    let aliased_hash = spl_object_hash(alias.get_alias_of());
+            for package in loaded_packages.into_iter() {
+                // TODO(phase-c): wire the repository back-reference onto the shared package handle.
+                let hash_c = package.ptr_id().to_string();
+                if let Some(alias) = package.as_alias() {
+                    let aliased = alias.get_alias_of();
+                    let aliased_hash = aliased.ptr_id().to_string();
                     if !packages.contains_key(&aliased_hash) {
-                        alias.get_alias_of_mut().set_repository_self();
-                        let aliased_clone = dyn_clone_box(alias.get_alias_of());
-                        packages.insert(aliased_hash, aliased_clone);
+                        packages.insert(aliased_hash, aliased.into());
                     }
                 }
                 packages.insert(hash_c, package);
@@ -2716,13 +2709,13 @@ impl ComposerRepository {
         &mut self,
         packages: Vec<IndexMap<String, PhpMixed>>,
         source: Option<String>,
-    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         if packages.is_empty() {
             return Ok(vec![]);
         }
 
         let mut packages = packages;
-        let result = (|| -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
+        let result = (|| -> anyhow::Result<Vec<BasePackageHandle>> {
             for data in packages.iter_mut() {
                 if !data.contains_key("notification-url") {
                     data.insert(
@@ -2737,11 +2730,11 @@ impl ComposerRepository {
 
             let package_instances = self.loader.load_packages(packages.clone())?;
 
-            let mut results: Vec<Box<dyn BasePackage>> = Vec::new();
-            for mut package in package_instances.into_iter() {
+            let mut results: Vec<BasePackageHandle> = Vec::new();
+            for package in package_instances.into_iter() {
                 if let Some(src_type) = package.get_source_type() {
                     if let Some(mirrors) =
-                        self.source_mirrors.as_ref().and_then(|m| m.get(src_type))
+                        self.source_mirrors.as_ref().and_then(|m| m.get(&src_type))
                     {
                         let converted: Vec<IndexMap<String, PhpMixed>> = mirrors
                             .iter()
@@ -2767,8 +2760,10 @@ impl ComposerRepository {
                         .collect();
                     package.set_dist_mirrors(Some(converted));
                 }
-                self.configure_package_transport_options(&mut *package);
-                results.push(package);
+                self.configure_package_transport_options(
+                    package.as_rc().borrow_mut().as_package_interface_mut(),
+                );
+                results.push(package.into());
             }
             Ok(results)
         })();
@@ -2794,12 +2789,16 @@ impl ComposerRepository {
     fn create_packages_static(
         packages: Vec<IndexMap<String, PhpMixed>>,
         _source: Option<String>,
-    ) -> anyhow::Result<Vec<Box<dyn BasePackage>>> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         if packages.is_empty() {
             return Ok(vec![]);
         }
         let loader = ArrayLoader::new(Some(VersionParser::new()), true);
-        Ok(loader.load_packages(packages)?)
+        Ok(loader
+            .load_packages(packages)?
+            .into_iter()
+            .map(|p| p.into())
+            .collect())
     }
 
     fn fetch_file(
@@ -3484,8 +3483,4 @@ fn clone_root_data(rd: &RootData) -> RootData {
         RootData::True => RootData::True,
         RootData::Data(d) => RootData::Data(d.clone()),
     }
-}
-
-fn dyn_clone_box(_pkg: &dyn BasePackage) -> Box<dyn BasePackage> {
-    todo!()
 }
