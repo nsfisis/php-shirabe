@@ -148,9 +148,11 @@ impl Git {
         let mut last_command: PhpMixed = PhpMixed::String(String::new());
 
         // Ensure we are allowed to use this URL by config
-        self.config
-            .borrow_mut()
-            .prohibit_url_by_config(url, Some(&*self.io.borrow()), &IndexMap::new())?;
+        self.config.borrow_mut().prohibit_url_by_config(
+            url,
+            Some(&*self.io.borrow()),
+            &IndexMap::new(),
+        )?;
 
         let orig_cwd: Option<String> = if initial_clone {
             cwd.map(|s| s.to_string())

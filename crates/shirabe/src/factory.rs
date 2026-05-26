@@ -789,32 +789,6 @@ impl Factory {
                         }
                     }
 
-                    if let Some(full_composer) = composer.as_full_mut() {
-                        let global_composer = if !full_composer.is_global() {
-                            self.create_global_composer(
-                                io.clone(),
-                                &*config.borrow(),
-                                disable_plugins,
-                                disable_scripts,
-                                false,
-                            )
-                        } else {
-                            None
-                        };
-                        let mut pm = self.create_plugin_manager(
-                            &*io.borrow(),
-                            ComposerWeakHandle::from_weak(composer_weak.clone()),
-                            global_composer,
-                            disable_plugins,
-                        );
-                        if full_composer.is_global() {
-                            pm.set_running_in_global_dir(true);
-                        }
-                        pm.load_installed_plugins();
-                        full_composer
-                            .set_plugin_manager(std::rc::Rc::new(std::cell::RefCell::new(pm)));
-                    }
-
                     Ok(composer)
                 };
                 match build() {
@@ -828,6 +802,47 @@ impl Factory {
         );
         if let Some(e) = build_error {
             return Err(e);
+        }
+
+        // initialize plugin manager
+        //
+        // PluginManager::new upgrades the Composer back-reference to read its config and locker, so
+        // it must be built after Rc::new_cyclic returns; inside the closure the Rc is not yet
+        // constructed and the weak handle cannot upgrade.
+        let (is_full, is_global) = {
+            let c = composer.borrow();
+            (c.is_full(), c.is_global())
+        };
+        if is_full {
+            let global_composer = if !is_global {
+                self.create_global_composer(
+                    io.clone(),
+                    &*config.borrow(),
+                    disable_plugins,
+                    disable_scripts,
+                    false,
+                )
+            } else {
+                None
+            };
+
+            let pm = self.create_plugin_manager(
+                io.clone(),
+                ComposerWeakHandle::from_weak(std::rc::Rc::downgrade(&composer)),
+                global_composer,
+                disable_plugins,
+            );
+            let pm = std::rc::Rc::new(std::cell::RefCell::new(pm));
+            composer
+                .borrow_mut()
+                .as_full_mut()
+                .unwrap()
+                .set_plugin_manager(pm.clone());
+
+            if is_global {
+                pm.borrow_mut().set_running_in_global_dir(true);
+            }
+            pm.borrow_mut().load_installed_plugins()?;
         }
 
         if full_load {
@@ -1160,15 +1175,12 @@ impl Factory {
 
     fn create_plugin_manager(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
     ) -> PluginManager {
-        // TODO(phase-b): PluginManager::new takes ownership of Composer/PartialComposer; PHP
-        // class semantics requires Rc<RefCell<>> for shared access. Stubbed for now.
-        let _ = (io, composer, global_composer, disable_plugins);
-        todo!("PluginManager::new requires shared Composer/PartialComposer")
+        PluginManager::new(io, composer, global_composer, disable_plugins)
     }
 
     pub fn create_installation_manager(

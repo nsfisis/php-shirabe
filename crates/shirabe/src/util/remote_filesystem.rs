@@ -337,7 +337,11 @@ impl RemoteFilesystem {
                             PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
                             _ => IndexMap::new(),
                         };
-                        let _ = HttpDownloader::output_warnings(&*self.io.borrow(), origin_url, &parsed_map);
+                        let _ = HttpDownloader::output_warnings(
+                            &*self.io.borrow(),
+                            origin_url,
+                            &parsed_map,
+                        );
                     }
 
                     if [401_i64, 403].contains(&code) && retry_auth_failure {

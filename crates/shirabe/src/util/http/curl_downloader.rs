@@ -339,9 +339,11 @@ impl CurlDownloader {
         if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url).unwrap_or(false)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
-            self.config
-                .borrow_mut()
-                .prohibit_url_by_config(url, Some(&*self.io.borrow()), &options)?;
+            self.config.borrow_mut().prohibit_url_by_config(
+                url,
+                Some(&*self.io.borrow()),
+                &options,
+            )?;
         }
 
         let curl_handle = curl_init();

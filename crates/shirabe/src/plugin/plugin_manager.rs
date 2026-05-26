@@ -19,6 +19,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 use crate::composer::PartialComposerHandle;
 use crate::composer::{ComposerHandle, ComposerWeakHandle};
 use crate::event_dispatcher::EventSubscriberInterface;
+use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -39,15 +40,6 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
-
-/// Marker for the disablePlugins variant: false | "local" | "global" | true.
-#[derive(Debug, Clone, PartialEq)]
-pub enum DisablePlugins {
-    False,
-    Local,
-    Global,
-    True,
-}
 
 #[derive(Debug)]
 pub struct PluginManager {
@@ -816,7 +808,7 @@ impl PluginManager {
 
     pub fn are_plugins_disabled(&self, r#type: &str) -> bool {
         match (&self.disable_plugins, r#type) {
-            (DisablePlugins::True, _) => true,
+            (DisablePlugins::All, _) => true,
             (DisablePlugins::Local, "local") => true,
             (DisablePlugins::Global, "global") => true,
             _ => false,
@@ -824,7 +816,7 @@ impl PluginManager {
     }
 
     pub fn disable_plugins(&mut self) {
-        self.disable_plugins = DisablePlugins::True;
+        self.disable_plugins = DisablePlugins::All;
     }
 
     pub fn is_plugin_allowed(
