@@ -25,6 +25,7 @@ use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::installer::InstallerEvents;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonManipulator;
 use crate::package::base_package;
@@ -67,7 +68,7 @@ impl PackageDiscoveryTrait for RequireCommand {
         todo!()
     }
 
-    fn get_io(&self) -> &dyn IOInterface {
+    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         todo!()
     }
 
@@ -845,10 +846,12 @@ impl RequireCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        // TODO(phase-b): Installer::create takes Box<dyn IOInterface> for ownership but io is a
+        // TODO(phase-b): Installer::create takes std::rc::Rc<std::cell::RefCell<dyn IOInterface>> for ownership but io is a
         // borrowed &dyn here; needs Rc<dyn IOInterface> for proper sharing.
-        let mut install =
-            Installer::create(todo!("share io as Box<dyn IOInterface>"), &composer_handle);
+        let mut install = Installer::create(
+            todo!("share io as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>"),
+            &composer_handle,
+        );
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*composer.get_config().borrow(), input, false)?;

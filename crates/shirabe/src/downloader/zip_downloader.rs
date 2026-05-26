@@ -3,6 +3,8 @@
 use crate::downloader::ArchiveDownloader;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::IniHelper;
 use crate::util::Platform;
@@ -33,7 +35,7 @@ pub struct ZipDownloader {
 
 impl ZipDownloader {
     pub fn new(
-        io: Box<dyn crate::io::IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
         event_dispatcher: Option<

@@ -13,6 +13,7 @@ use shirabe_php_shim::{
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
@@ -31,7 +32,7 @@ pub struct GitDriver {
 impl GitDriver {
     pub fn new(
         repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -117,7 +118,7 @@ impl GitDriver {
             }
 
             let mut git_util = GitUtil::new(
-                self.inner.io.clone_box(),
+                self.inner.io.clone(),
                 self.inner.config.clone(),
                 self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
@@ -154,7 +155,7 @@ impl GitDriver {
             .unwrap_or("")
             .to_string();
         self.inner.cache = Some(Cache::new(
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             &format!(
                 "{}/{}",
                 cache_repo_dir,
@@ -183,7 +184,7 @@ impl GitDriver {
             self.root_identifier = Some("master".to_string());
 
             let mut git_util = GitUtil::new(
-                self.inner.io.clone_box(),
+                self.inner.io.clone(),
                 self.inner.config.clone(),
                 self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
@@ -399,7 +400,7 @@ impl GitDriver {
     }
 
     pub fn supports(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         _config: &Config,
         url: &str,
         deep: bool,
@@ -419,7 +420,9 @@ impl GitDriver {
                 return Ok(false);
             }
 
-            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io)));
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))));
             let mut output = String::new();
             if process.borrow_mut().execute_args(
                 &["git".to_string(), "tag".to_string()],
@@ -432,7 +435,7 @@ impl GitDriver {
             GitUtil::check_for_repo_ownership_error(
                 &process.borrow().get_error_output(),
                 &url,
-                Some(io),
+                Some(io.clone()),
             )?;
         }
 
@@ -440,7 +443,9 @@ impl GitDriver {
             return Ok(false);
         }
 
-        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io)));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+            io.clone(),
+        ))));
         // TODO(phase-b): supports() takes &Config; GitUtil now needs Rc<RefCell<Config>>.
         // Skipping clean Rc construction since we cannot reconstruct one from a borrowed &Config.
         let _ = _config;
@@ -449,7 +454,7 @@ impl GitDriver {
         ));
         #[allow(unreachable_code)]
         let mut git_util = GitUtil::new(
-            io.clone_box(),
+            io.clone(),
             todo!(),
             process.clone(),
             std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),

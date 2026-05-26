@@ -9,12 +9,13 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct GitHub {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -25,18 +26,20 @@ impl GitHub {
         r"{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+|github_pat_[a-zA-Z0-9_]+)$}";
 
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     ) -> anyhow::Result<Self> {
         let process = process.unwrap_or_else(|| {
-            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))))
         });
         let http_downloader = match http_downloader {
             Some(h) => h,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
-                &*io,
+                io.clone(),
                 &config,
                 IndexMap::new(),
             )?)),
@@ -71,7 +74,7 @@ impl GitHub {
             (),
         ) == 0
         {
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 output.trim().to_string(),
                 Some("x-oauth-basic".to_string()),
@@ -216,7 +219,7 @@ impl GitHub {
             return Ok(false);
         }
 
-        self.io.set_authentication(
+        self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
             token.clone(),
             Some("x-oauth-basic".to_string()),

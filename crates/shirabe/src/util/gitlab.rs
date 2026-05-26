@@ -9,12 +9,13 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct GitLab {
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub(crate) http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -22,18 +23,20 @@ pub struct GitLab {
 
 impl GitLab {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     ) -> anyhow::Result<Self> {
         let process = process.unwrap_or_else(|| {
-            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))))
         });
         let http_downloader = match http_downloader {
             Some(h) => h,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
-                &*io,
+                io.clone(),
                 &config,
                 IndexMap::new(),
             )?)),
@@ -76,7 +79,7 @@ impl GitLab {
             (),
         ) == 0
         {
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 output.trim().to_string(),
                 Some("oauth2".to_string()),
@@ -106,7 +109,7 @@ impl GitLab {
                 (),
             ) == 0
         {
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 token_user.trim().to_string(),
                 Some(token_password.trim().to_string()),
@@ -154,11 +157,17 @@ impl GitLab {
             // 'gitlab-ci-token' to be stored as password. Detect cases where this is reversed
             // and automatically resolve it.
             if ["private-token", "gitlab-ci-token", "oauth2"].contains(&username.as_str()) {
-                self.io
-                    .set_authentication(origin_url.to_string(), password, Some(username));
+                self.io.borrow_mut().set_authentication(
+                    origin_url.to_string(),
+                    password,
+                    Some(username),
+                );
             } else {
-                self.io
-                    .set_authentication(origin_url.to_string(), username, Some(password));
+                self.io.borrow_mut().set_authentication(
+                    origin_url.to_string(),
+                    username,
+                    Some(password),
+                );
             }
 
             return true;
@@ -311,7 +320,7 @@ impl GitLab {
                 .unwrap_or("")
                 .to_string();
 
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 access_token.clone(),
                 Some("oauth2".to_string()),
@@ -391,7 +400,7 @@ impl GitLab {
             .unwrap_or("")
             .to_string();
 
-        self.io.set_authentication(
+        self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
             access_token.clone(),
             Some("oauth2".to_string()),

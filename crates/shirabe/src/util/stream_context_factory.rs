@@ -2,7 +2,6 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::ca_bundle::CaBundle;
-use shirabe_external_packages::psr::log::LoggerInterface;
 use shirabe_php_shim::{
     HHVM_VERSION, PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION, PhpMixed,
     RuntimeException, array_replace_recursive, curl_version, extension_loaded, function_exists,
@@ -239,7 +238,9 @@ impl StreamContextFactory {
 
     pub fn get_tls_defaults(
         options: &IndexMap<String, PhpMixed>,
-        logger: Option<&dyn LoggerInterface>,
+        // `logger` was a PSR LoggerInterface; CaBundle is slated for removal so
+        // it is now an unused `()` placeholder.
+        logger: (),
     ) -> anyhow::Result<IndexMap<String, PhpMixed>, TransportException> {
         let ciphers = [
             "ECDHE-RSA-AES128-GCM-SHA256",

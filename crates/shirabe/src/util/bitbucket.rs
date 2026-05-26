@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 
@@ -17,7 +18,7 @@ fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
 
 #[derive(Debug)]
 pub struct Bitbucket {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -30,7 +31,7 @@ impl Bitbucket {
         "https://bitbucket.org/site/oauth2/access_token";
 
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -38,13 +39,13 @@ impl Bitbucket {
     ) -> anyhow::Result<Self> {
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                io.clone_box(),
+                io.clone(),
             ))))
         });
         let http_downloader = match http_downloader {
             Some(h) => h,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_http_downloader(
-                &*io,
+                io.clone(),
                 &config,
                 IndexMap::new(),
             )?)),
@@ -88,7 +89,7 @@ impl Bitbucket {
             == 0
         {
             let output_str = output.as_string().unwrap_or("").trim().to_string();
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 "x-token-auth".to_string(),
                 Some(output_str),
@@ -292,7 +293,7 @@ impl Bitbucket {
             return Ok(false);
         }
 
-        self.io.set_authentication(
+        self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
             consumer_key.clone(),
             Some(consumer_secret.clone()),
@@ -338,7 +339,7 @@ impl Bitbucket {
                 .unwrap_or_default());
         }
 
-        self.io.set_authentication(
+        self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
             consumer_key.to_string(),
             Some(consumer_secret.to_string()),

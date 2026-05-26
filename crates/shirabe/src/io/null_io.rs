@@ -2,7 +2,8 @@
 
 use crate::io::BaseIO;
 use crate::io::IOInterface;
-use shirabe_external_packages::psr::log::LoggerInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceMutable;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -18,7 +19,7 @@ impl NullIO {
     }
 }
 
-impl IOInterface for NullIO {
+impl IOInterfaceImmutable for NullIO {
     fn is_interactive(&self) -> bool {
         false
     }
@@ -109,6 +110,20 @@ impl IOInterface for NullIO {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
+    fn error(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn warning(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn debug(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+}
+
+impl IOInterfaceMutable for NullIO {
     fn set_authentication(
         &mut self,
         repository_name: String,
@@ -123,6 +138,8 @@ impl IOInterface for NullIO {
     }
 }
 
+impl IOInterface for NullIO {}
+
 impl BaseIO for NullIO {
     fn authentications(
         &self,
@@ -134,43 +151,5 @@ impl BaseIO for NullIO {
         &mut self,
     ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
         &mut self.authentications
-    }
-}
-
-impl LoggerInterface for NullIO {
-    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn alert(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn critical(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn notice(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn info(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
-        todo!()
     }
 }

@@ -22,7 +22,7 @@ pub struct XzDownloader {
 
 impl XzDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,

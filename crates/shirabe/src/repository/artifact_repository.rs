@@ -9,6 +9,7 @@ use shirabe_php_shim::{
 };
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::BasePackage;
 use crate::package::loader::ArrayLoader;
@@ -24,7 +25,7 @@ pub struct ArtifactRepository {
     pub(crate) loader: Box<dyn LoaderInterface>,
     pub(crate) lookup: String,
     pub(crate) repo_config: IndexMap<String, PhpMixed>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl std::fmt::Debug for ArtifactRepository {
@@ -39,7 +40,7 @@ impl std::fmt::Debug for ArtifactRepository {
 impl ArtifactRepository {
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
             return Err(RuntimeException {

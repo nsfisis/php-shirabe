@@ -10,6 +10,7 @@ use shirabe_php_shim::{
 };
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
@@ -21,14 +22,14 @@ use crate::util::Silencer;
 pub struct BinaryInstaller {
     pub(crate) bin_dir: String,
     pub(crate) bin_compat: String,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     vendor_dir: Option<String>,
 }
 
 impl BinaryInstaller {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         bin_dir: String,
         bin_compat: String,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,

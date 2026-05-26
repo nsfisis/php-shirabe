@@ -3,19 +3,20 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
 
 #[derive(Debug)]
 pub struct Forgejo {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 }
 
 impl Forgejo {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     ) -> Self {
@@ -107,7 +108,7 @@ impl Forgejo {
             return Ok(Ok(false));
         }
 
-        self.io.set_authentication(
+        self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
             username.clone(),
             Some(token.clone()),

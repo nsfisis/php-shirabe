@@ -13,13 +13,14 @@ use shirabe_php_shim::{
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Bitbucket;
 use crate::util::GitHub;
 use crate::util::GitLab;
 
 #[derive(Debug)]
 pub struct AuthHelper {
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var array<string, string> Map of origins to message displayed
     displayed_origin_authentications: IndexMap<String, String>,
@@ -41,7 +42,10 @@ pub enum StoreAuth {
 }
 
 impl AuthHelper {
-    pub fn new(io: Box<dyn IOInterface>, config: std::rc::Rc<std::cell::RefCell<Config>>) -> Self {
+    pub fn new(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+    ) -> Self {
         Self {
             io,
             config,
@@ -339,7 +343,7 @@ impl AuthHelper {
                     let access_token =
                         bitbucket_util.request_token(&origin, &username, &password)?;
                     if !access_token.is_empty() {
-                        self.io.set_authentication(
+                        self.io.borrow_mut().set_authentication(
                             origin.clone(),
                             "x-token-auth".to_string(),
                             Some(access_token),
@@ -452,7 +456,7 @@ impl AuthHelper {
             );
             let username = self.io.ask("      Username: ".to_string(), PhpMixed::Null);
             let password = self.io.ask_and_hide_answer("      Password: ".to_string());
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin.to_string(),
                 username.as_string().unwrap_or("").to_string(),
                 password,

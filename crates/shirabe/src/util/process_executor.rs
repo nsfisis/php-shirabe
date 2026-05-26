@@ -19,6 +19,7 @@ use shirabe_php_shim::{
 };
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::GitHub;
 use crate::util::Platform;
 
@@ -34,7 +35,7 @@ pub struct ProcessExecutor {
     /// @var string
     pub(crate) error_output: String,
     /// @var ?IOInterface
-    pub(crate) io: Option<Box<dyn IOInterface>>,
+    pub(crate) io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @phpstan-var array<int, array<string, mixed>>
     jobs: IndexMap<i64, Job>,
     /// @var int
@@ -87,11 +88,11 @@ impl ProcessExecutor {
     const GIT_CMDS_NEED_GIT_DIR: &'static [&'static [&'static str]] =
         &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
 
-    pub fn new<I: IntoProcessExecutorIo>(io: I) -> Self {
+    pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
         let mut this = Self {
             capture_output: false,
             error_output: String::new(),
-            io: io.into_process_executor_io(),
+            io,
             jobs: IndexMap::new(),
             running_jobs: 0,
             max_jobs: 10,
@@ -270,7 +271,7 @@ impl ProcessExecutor {
             })
         };
 
-        let io_for_signal = self.io.as_ref().map(|b| &**b as *const dyn IOInterface);
+        let io_for_signal = self.io.clone();
         let signal_handler = SignalHandler::create(
             vec![
                 SignalHandler::SIGINT.to_string(),
@@ -278,8 +279,7 @@ impl ProcessExecutor {
                 SignalHandler::SIGHUP.to_string(),
             ],
             Box::new(move |signal: String, _h: &SignalHandler| {
-                if let Some(io_ptr) = io_for_signal {
-                    let io = unsafe { &*io_ptr };
+                if let Some(io) = &io_for_signal {
                     io.write_error(&format!(
                         "Received {}, aborting when child process is done",
                         signal
@@ -1082,45 +1082,6 @@ impl ToTimeoutSeconds for i64 {
 impl ToTimeoutSeconds for PhpMixed {
     fn to_timeout_seconds(self) -> i64 {
         self.as_int().unwrap_or(0)
-    }
-}
-
-/// Phase B helper: accept various IO forms for `ProcessExecutor::new`.
-/// Note: clones the IO via `clone_box` for borrow forms; this is incidental
-/// to Phase B — PHP class semantics should use Rc, but that requires broader
-/// refactor. TODO(phase-b): switch to shared ownership when call sites are
-/// stabilized.
-pub trait IntoProcessExecutorIo {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>>;
-}
-
-impl IntoProcessExecutorIo for Option<Box<dyn IOInterface>> {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
-        self
-    }
-}
-
-impl IntoProcessExecutorIo for Box<dyn IOInterface> {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
-        Some(self)
-    }
-}
-
-impl IntoProcessExecutorIo for () {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
-        None
-    }
-}
-
-impl IntoProcessExecutorIo for &dyn IOInterface {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
-        Some(self.clone_box())
-    }
-}
-
-impl IntoProcessExecutorIo for &mut dyn IOInterface {
-    fn into_process_executor_io(self) -> Option<Box<dyn IOInterface>> {
-        Some(self.clone_box())
     }
 }
 

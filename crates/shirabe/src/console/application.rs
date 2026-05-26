@@ -77,6 +77,7 @@ use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonValidationException;
 use crate::util::ErrorHandler;
@@ -89,7 +90,7 @@ use crate::util::Silencer;
 pub struct Application {
     inner: BaseApplication,
     pub(crate) composer: Option<PartialComposerHandle>,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     has_plugin_commands: bool,
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
@@ -124,7 +125,8 @@ impl Application {
             date_default_timezone_set(&tz);
         }
 
-        let io: Box<dyn IOInterface> = Box::new(NullIO::new());
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
         SHUTDOWN_REGISTERED.get_or_init(|| {
             register_shutdown_function(Box::new(|| {
@@ -207,7 +209,7 @@ impl Application {
         let _ = ConsoleIO::new;
         let _ = HelperSet::new(helpers);
         // self.io stays as the NullIO that was set during construction.
-        let io_owned = self.io.clone_box();
+        let io_owned = self.io.clone();
         let _ = io_owned;
 
         // Register error handler again to pass it the IO instance
@@ -458,7 +460,7 @@ impl Application {
                             }
                         }
 
-                        let mut ghe = GithubActionError::new(self.io.clone_box());
+                        let mut ghe = GithubActionError::new(self.io.clone());
                         ghe.emit(&pe.message, file.as_deref(), line);
 
                         return Err(e);
@@ -783,7 +785,7 @@ impl Application {
 
                     Ok(see.get_code())
                 } else {
-                    let mut ghe = GithubActionError::new(self.io.clone_box());
+                    let mut ghe = GithubActionError::new(self.io.clone());
                     ghe.emit(&e.to_string(), None, None);
 
                     self.hint_common_errors(&e, output);
@@ -993,22 +995,18 @@ impl Application {
         let disable_scripts = disable_scripts.unwrap_or(self.disable_scripts_by_default);
 
         if self.composer.is_none() {
-            let io_for_factory: Box<dyn IOInterface> = if Platform::is_input_completion_process() {
-                Box::new(NullIO::new())
-            } else {
-                self.io.clone_box()
-            };
+            let io_for_factory: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+                if Platform::is_input_completion_process() {
+                    std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
+                } else {
+                    self.io.clone()
+                };
             let disable_plugins_enum = if disable_plugins {
                 crate::factory::DisablePlugins::All
             } else {
                 crate::factory::DisablePlugins::None
             };
-            match Factory::create(
-                &*io_for_factory,
-                None,
-                disable_plugins_enum,
-                disable_scripts,
-            ) {
+            match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
                 Ok(c) => self.composer = Some(c),
                 Err(e) => {
                     if e.downcast_ref::<JsonValidationException>().is_some()
@@ -1044,8 +1042,8 @@ impl Application {
         todo!()
     }
 
-    pub fn get_io(&self) -> &dyn IOInterface {
-        &*self.io
+    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.io.clone()
     }
 
     pub fn get_help(&self) -> String {
@@ -1175,7 +1173,7 @@ impl Application {
     }
 
     fn get_use_parent_dir_config_value(&self) -> PhpMixed {
-        let config = match Factory::create_config(Some(&*self.io), None) {
+        let config = match Factory::create_config(Some(self.io.clone()), None) {
             Ok(c) => c,
             Err(_) => return PhpMixed::Bool(false),
         };

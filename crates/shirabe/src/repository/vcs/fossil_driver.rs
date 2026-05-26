@@ -9,6 +9,7 @@ use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_file, is_
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
@@ -31,7 +32,7 @@ impl FossilDriver {
         // Ensure we are allowed to use this URL by config.
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &self.inner.url,
-            Some(&*self.inner.io),
+            Some(&*self.inner.io.borrow()),
             &indexmap::IndexMap::new(),
         )?;
 
@@ -289,7 +290,12 @@ impl FossilDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+        url: &str,
+        deep: bool,
+    ) -> bool {
         if Preg::is_match(
             r"#(^(?:https?|ssh)://(?:[^@]@)?(?:chiselapp\.com|fossil\.))#i",
             url,
@@ -310,7 +316,7 @@ impl FossilDriver {
                 return false;
             }
 
-            let mut process = ProcessExecutor::new(io);
+            let mut process = ProcessExecutor::new(Some(io));
             let mut output = String::new();
             if process.execute_args(
                 &["fossil", "info"].map(|s| s.to_string()).to_vec(),

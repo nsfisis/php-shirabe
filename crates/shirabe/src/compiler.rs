@@ -45,7 +45,7 @@ impl Compiler {
             shirabe_php_shim::unlink(phar_file);
         }
 
-        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())));
+        let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let command = Git::build_rev_list_command(
             &process,

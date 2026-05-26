@@ -3,6 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
@@ -61,12 +62,12 @@ impl HgDriver {
 
             self.inner.config.borrow_mut().prohibit_url_by_config(
                 &self.inner.url,
-                Some(&*self.inner.io),
+                Some(&*self.inner.io.borrow()),
                 &indexmap::IndexMap::new(),
             )?;
 
             let hg_utils = HgUtils::new(
-                &*self.inner.io,
+                self.inner.io.clone(),
                 &*self.inner.config.borrow(),
                 &self.inner.process,
             );
@@ -308,7 +309,12 @@ impl HgDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+        url: &str,
+        deep: bool,
+    ) -> bool {
         if Preg::is_match(
             r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i",
             url,
@@ -324,7 +330,7 @@ impl HgDriver {
                 return false;
             }
 
-            let mut process = crate::util::ProcessExecutor::new(io);
+            let mut process = crate::util::ProcessExecutor::new(Some(io.clone()));
             let mut output = String::new();
             if process.execute_args(
                 &["hg", "summary"].map(|s| s.to_string()).to_vec(),
@@ -340,7 +346,7 @@ impl HgDriver {
             return false;
         }
 
-        let mut process = crate::util::ProcessExecutor::new(io);
+        let mut process = crate::util::ProcessExecutor::new(Some(io));
         let mut ignored = String::new();
         let exit = process.execute_args(
             &["hg", "identify", "--", url]

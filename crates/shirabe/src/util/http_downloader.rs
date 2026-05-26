@@ -32,7 +32,7 @@ use crate::util::http::Response;
 #[derive(Debug)]
 pub struct HttpDownloader {
     /// @var IOInterface
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var array<Job>
@@ -103,7 +103,7 @@ impl HttpDownloader {
     /// @param Config      $config     The config
     /// @param mixed[]     $options    The options
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
         disable_tls: bool,
@@ -115,8 +115,7 @@ impl HttpDownloader {
         // The cafile option can be set via config.json
         let mut self_options: IndexMap<String, PhpMixed> = IndexMap::new();
         if disable_tls == false {
-            self_options =
-                StreamContextFactory::get_tls_defaults(&options, Some(&*io)).unwrap_or_default();
+            self_options = StreamContextFactory::get_tls_defaults(&options, ()).unwrap_or_default();
         }
 
         // handle the other externally set options normally.
@@ -124,7 +123,7 @@ impl HttpDownloader {
 
         let curl = if Self::is_curl_enabled() {
             Some(CurlDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 options.clone(),
                 disable_tls,
@@ -134,7 +133,7 @@ impl HttpDownloader {
         };
 
         let rfs = Some(RemoteFilesystem::new(
-            io.clone_box(),
+            io.clone(),
             config.clone(),
             options.clone(),
             disable_tls,
@@ -317,7 +316,7 @@ impl HttpDownloader {
         )
         .unwrap_or(false)
         {
-            self.io.set_authentication(
+            self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(
                     m.get(&CaptureKey::ByIndex(1))

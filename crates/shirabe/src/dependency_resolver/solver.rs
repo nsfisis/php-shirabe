@@ -29,6 +29,7 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::BasePackageHandle;
 
 #[derive(Debug)]
@@ -51,7 +52,7 @@ pub struct Solver {
 
     pub test_flag_learned_positive_literal: bool,
 
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl Solver {
@@ -61,7 +62,7 @@ impl Solver {
     pub fn new(
         policy: Box<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
         let decisions = Decisions::new(pool.clone());
         Self {

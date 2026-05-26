@@ -28,6 +28,7 @@ use crate::console::input::InputOption;
 use crate::downloader::FilesystemException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::self_update::Keys;
 use crate::self_update::Versions;
 use crate::util::Filesystem;
@@ -132,7 +133,7 @@ impl SelfUpdateCommand {
 
         let io = self.get_io();
         let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
+            Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
         ));
 
         let mut versions_util = Versions::new(config.clone(), http_downloader.clone());
@@ -142,7 +143,7 @@ impl SelfUpdateCommand {
         for channel in Versions::CHANNELS {
             if input.get_option(channel).as_bool().unwrap_or(false) {
                 requested_channel = Some(channel.to_string());
-                versions_util.set_channel(channel.to_string(), Some(io))??;
+                versions_util.set_channel(channel.to_string(), Some(&*io.borrow()))??;
                 break;
             }
         }

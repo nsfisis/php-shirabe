@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 pub struct PackageEvent {
     inner: Event,
     composer: ComposerWeakHandle,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
     local_repo: Box<dyn RepositoryInterface>,
     operations: Vec<Box<dyn OperationInterface>>,
@@ -22,7 +22,7 @@ impl PackageEvent {
     pub fn new(
         event_name: String,
         composer: ComposerWeakHandle,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
         operations: Vec<Box<dyn OperationInterface>>,
@@ -47,8 +47,8 @@ impl PackageEvent {
         &self.composer
     }
 
-    pub fn get_io(&self) -> &dyn IOInterface {
-        self.io.as_ref()
+    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.io.clone()
     }
 
     pub fn is_dev_mode(&self) -> bool {

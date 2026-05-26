@@ -12,6 +12,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -51,7 +52,7 @@ impl ForgejoDriver {
         self.forgejo_url = Some(forgejo_url);
 
         self.inner.cache = Some(Cache::new(
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             &cache_dir,
             None,
             None,

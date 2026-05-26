@@ -10,6 +10,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::script::Event as ScriptEvent;
 use crate::script::ScriptEvents;
 use crate::util::Platform;

@@ -25,6 +25,7 @@ use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package::{self, BasePackage};
 use crate::util::Filesystem;
@@ -130,7 +131,7 @@ impl ConfigCommand {
         self.auth_config_file = Some(JsonFile::new(
             auth_config_file,
             None,
-            Some(self.get_io().clone_box()),
+            Some(self.get_io().clone()),
         )?);
         // TODO(phase-b): JsonConfigSource::new takes owned JsonFile (PHP sharing semantics).
         // Skipping auth_config_source assignment until Rc<RefCell<JsonFile>> refactor lands.
@@ -257,6 +258,7 @@ impl ConfigCommand {
         {
             let config_rc = self.config.as_ref().unwrap().clone();
             self.get_io()
+                .borrow_mut()
                 .load_configuration(&mut *config_rc.borrow_mut())?;
         }
 

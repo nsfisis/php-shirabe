@@ -69,6 +69,7 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::AliasPackage;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageInterface;
@@ -104,7 +105,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct Installer {
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub(crate) package: RootPackageInterfaceHandle,
     // TODO can we get rid of the below and just use the package itself?
@@ -161,7 +162,7 @@ impl Installer {
     pub const ERROR_TRANSPORT_EXCEPTION: i64 = 100;
 
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         package: RootPackageInterfaceHandle,
         download_manager: std::rc::Rc<std::cell::RefCell<DownloadManager>>,
@@ -171,7 +172,7 @@ impl Installer {
         event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
         autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     ) -> Self {
-        let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone_box());
+        let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone());
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
         let write_lock = config.borrow_mut().get("lock").as_bool().unwrap_or(false);
 
@@ -325,7 +326,7 @@ impl Installer {
                 {
                     self.installation_manager
                         .borrow_mut()
-                        .notify_installs(&*self.io);
+                        .notify_installs(&*self.io.borrow());
                 }
                 return Err(e);
             }
@@ -343,7 +344,7 @@ impl Installer {
         {
             self.installation_manager
                 .borrow_mut()
-                .notify_installs(&*self.io);
+                .notify_installs(&*self.io.borrow());
         }
 
         if self.update {
@@ -650,7 +651,7 @@ impl Installer {
             let _ = allow_list;
         }
 
-        // TODO(phase-b): create_pool takes owned Request, Box<dyn IOInterface>, Option<Rc<...>>
+        // TODO(phase-b): create_pool takes owned Request, std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, Option<Rc<...>>
         // but locally we only have refs. PHP classes (IO, dispatcher) shouldn't Clone.
         let mut pool: Option<Pool> = {
             let _ = (&request, &self.event_dispatcher, &policy, &repository_set);
@@ -1095,7 +1096,7 @@ impl Installer {
             }
             drop(root_requires);
 
-            // TODO(phase-b): create_pool takes owned Request, Box<dyn IOInterface>, Option<Rc<...>>
+            // TODO(phase-b): create_pool takes owned Request, std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, Option<Rc<...>>
             let pool: Pool = {
                 let _ = (&request, &self.io, &self.event_dispatcher, &repository_set);
                 todo!()
@@ -1677,7 +1678,10 @@ impl Installer {
     }
 
     /// Create Installer
-    pub fn create(io: Box<dyn IOInterface>, composer: &PartialComposerHandle) -> Self {
+    pub fn create(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        composer: &PartialComposerHandle,
+    ) -> Self {
         let composer = crate::composer::composer_full(composer);
         Self::new(
             io,

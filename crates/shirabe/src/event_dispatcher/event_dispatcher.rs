@@ -31,6 +31,7 @@ use crate::installer::InstallerEvent;
 use crate::installer::PackageEvent;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PreCommandRunEvent;
 use crate::repository::RepositoryInterface;
@@ -62,7 +63,7 @@ pub enum Callable {
 #[derive(Debug)]
 pub struct EventDispatcher {
     pub(crate) composer: PartialComposerWeakHandle,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) loader: Option<ClassLoader>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub(crate) listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
@@ -76,11 +77,13 @@ pub struct EventDispatcher {
 impl EventDispatcher {
     pub fn new(
         composer: PartialComposerWeakHandle,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process.unwrap_or_else(|| {
-            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))))
         });
         let event_stack: Vec<String> = Vec::new();
         let skip_scripts_env =
@@ -609,7 +612,8 @@ impl EventDispatcher {
                             // TODO(phase-b): IOInterface needs an `as_any` shim before
                             // `instanceof ConsoleIO` can be expressed; treat io as a
                             // generic IOInterface for now.
-                            let _io_ref: &dyn IOInterface = &*self.io;
+                            let _io_ref_guard = self.io.borrow();
+                            let _io_ref: &dyn IOInterface = &*_io_ref_guard;
                             let downcast: Option<&ConsoleIO> = None;
                             let output: ConsoleOutput = if let Some(_console_io) = downcast {
                                 // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
@@ -1311,9 +1315,9 @@ impl EventDispatcher {
 
     // ---- helpers ----
 
-    fn io_clone(&self) -> Box<dyn IOInterface> {
+    fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         // TODO(phase-b): IOInterface is not Clone — placeholder until io ownership is resolved.
-        todo!("clone Box<dyn IOInterface>")
+        todo!("clone std::rc::Rc<std::cell::RefCell<dyn IOInterface>>")
     }
 
     fn composer(&self) -> PartialComposerHandle {

@@ -20,6 +20,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::BasePackage;
 use crate::package::CompletePackageInterface;
 use crate::package::PackageInterface;
@@ -40,7 +41,7 @@ pub trait PackageDiscoveryTrait {
     fn get_repository_sets_mut(&mut self) -> &mut IndexMap<String, RepositorySet>;
 
     // PHP: trait dependencies (provided by BaseCommand)
-    fn get_io(&self) -> &dyn IOInterface;
+    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
     fn try_composer(&self) -> Option<PartialComposerHandle>;
     fn require_composer(
         &self,
@@ -61,8 +62,8 @@ pub trait PackageDiscoveryTrait {
                 // TODO(phase-b): PlatformRepository::new() signature
                 Box::new(todo!("PlatformRepository::new()") as PlatformRepository),
             ];
-            let mut io_owned: Box<dyn IOInterface> = todo!("clone self.get_io() into a Box");
-            for (_, repo) in RepositoryFactory::default_repos_with_default_manager(&mut *io_owned)
+            let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
+            for (_, repo) in RepositoryFactory::default_repos_with_default_manager(io_owned)
                 .unwrap()
                 .into_iter()
             {

@@ -129,39 +129,9 @@ impl BufferIO {
     }
 }
 
-// TODO(phase-b): PHP `class BufferIO extends ConsoleIO` — delegate all IOInterface,
-// LoggerInterface, and BaseIO methods to `self.inner` (ConsoleIO).
-impl shirabe_external_packages::psr::log::LoggerInterface for BufferIO {
-    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.emergency(message, context)
-    }
-    fn alert(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.alert(message, context)
-    }
-    fn critical(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.critical(message, context)
-    }
-    fn error(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.error(message, context)
-    }
-    fn warning(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.warning(message, context)
-    }
-    fn notice(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.notice(message, context)
-    }
-    fn info(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.info(message, context)
-    }
-    fn debug(&self, message: &str, context: &[(&str, &str)]) {
-        self.inner.debug(message, context)
-    }
-    fn log(&self, level: &str, message: &str, context: &[(&str, &str)]) {
-        self.inner.log(level, message, context)
-    }
-}
-
-impl crate::io::IOInterface for BufferIO {
+// TODO(phase-b): PHP `class BufferIO extends ConsoleIO` — delegate all
+// IOInterface and BaseIO methods to `self.inner` (ConsoleIO).
+impl crate::io::IOInterfaceImmutable for BufferIO {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
     }
@@ -247,6 +217,20 @@ impl crate::io::IOInterface for BufferIO {
     ) -> indexmap::IndexMap<String, Option<String>> {
         self.inner.get_authentication(repository_name)
     }
+    fn error(&self, message: &str, context: &[(&str, &str)]) {
+        self.inner.error(message, context)
+    }
+
+    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+        self.inner.warning(message, context)
+    }
+
+    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+        self.inner.debug(message, context)
+    }
+}
+
+impl crate::io::IOInterfaceMutable for BufferIO {
     fn set_authentication(
         &mut self,
         repository_name: String,
@@ -260,6 +244,8 @@ impl crate::io::IOInterface for BufferIO {
         self.inner.load_configuration(config)
     }
 }
+
+impl crate::io::IOInterface for BufferIO {}
 
 impl crate::io::BaseIO for BufferIO {
     fn authentications(

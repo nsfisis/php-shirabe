@@ -77,8 +77,9 @@ impl UpdateCommand {
     ) -> Result<i64> {
         // TODO(phase-b): clone_box avoids the &mut self conflict with require_composer
         // below; revisit when get_io can return an Rc/Arc owned handle.
-        let io_box = self.get_io().clone_box();
-        let io: &dyn IOInterface = &*io_box;
+        let io_box = self.get_io().clone();
+        let io_ref = io_box.borrow();
+        let io: &dyn IOInterface = &*io_ref;
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
@@ -311,7 +312,7 @@ impl UpdateCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        let mut install = Installer::create(io.clone_box(), &composer_handle);
+        let mut install = Installer::create(io_box.clone(), &composer_handle);
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =

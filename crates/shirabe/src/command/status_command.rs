@@ -87,8 +87,9 @@ impl StatusCommand {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         // TODO(phase-b): release the &mut self borrow held by get_io via clone_box.
-        let io_box = self.get_io().clone_box();
-        let io: &dyn IOInterface = io_box.as_ref();
+        let io_box = self.get_io().clone();
+        let io_ref = io_box.borrow();
+        let io: &dyn IOInterface = &*io_ref;
 
         let mut errors: IndexMap<String, String> = IndexMap::new();
         let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
@@ -101,12 +102,16 @@ impl StatusCommand {
             .borrow()
             .get_process_executor()
             .map(std::rc::Rc::clone)
-            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
+            .unwrap_or_else(|| {
+                std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                    io_box.clone(),
+                ))))
+            });
         let mut guesser = VersionGuesser::new(
             composer.get_config(),
             process_executor.clone(),
             parser.clone(),
-            Some(io_box.clone_box()),
+            Some(io_box.clone()),
         );
         let dumper = ArrayDumper::new();
 

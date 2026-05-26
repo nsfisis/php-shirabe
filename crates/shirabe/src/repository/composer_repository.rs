@@ -21,6 +21,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
@@ -84,7 +85,7 @@ pub struct ComposerRepository {
     url: String,
     /// non-empty-string
     base_url: String,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
     pub(crate) cache: Cache,
@@ -141,7 +142,7 @@ impl ConfigurableRepositoryInterface for ComposerRepository {
 impl ComposerRepository {
     pub fn new(
         mut repo_config: IndexMap<String, PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &Config,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -258,10 +259,11 @@ impl ComposerRepository {
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
-        // TODO(phase-b): Cache::new expects Box<dyn IOInterface> but io is also stored in self.io;
+        // TODO(phase-b): Cache::new expects std::rc::Rc<std::cell::RefCell<dyn IOInterface>> but io is also stored in self.io;
         // need shared ownership (Rc) for IOInterface. Using todo!() placeholder.
-        let cache: Cache =
-            todo!("Cache::new requires Box<dyn IOInterface> but io is also moved into self.io");
+        let cache: Cache = todo!(
+            "Cache::new requires std::rc::Rc<std::cell::RefCell<dyn IOInterface>> but io is also moved into self.io"
+        );
         let version_parser = VersionParser::new();
         let loader = ArrayLoader::new(Some(version_parser.clone()), true);
 
@@ -2930,7 +2932,7 @@ impl ComposerRepository {
                     .as_array()
                     .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
                     .unwrap_or_default();
-                HttpDownloader::output_warnings(&*self.io, &self.url, &data_local);
+                HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data_local);
 
                 if let Some(ck) = cache_key_owned.as_ref() {
                     if !ck.is_empty() && !self.cache.is_read_only() {
@@ -3127,7 +3129,7 @@ impl ComposerRepository {
                 .as_array()
                 .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
                 .unwrap_or_default();
-            HttpDownloader::output_warnings(&*self.io, &self.url, &data);
+            HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data);
 
             let last_modified_date = response.get_header("last-modified");
             response.collect();
@@ -3305,7 +3307,7 @@ impl ComposerRepository {
             .as_array()
             .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
             .unwrap_or_default();
-        HttpDownloader::output_warnings(self.io.as_ref(), &self.url, &data);
+        HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data);
 
         let last_modified_date = response.get_header("last-modified");
         response.collect();

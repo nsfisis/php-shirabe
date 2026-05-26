@@ -15,6 +15,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::LoaderInterface;
@@ -43,7 +44,7 @@ pub struct VcsRepository {
     /// @var bool
     pub(crate) is_very_verbose: bool,
     /// @var IOInterface
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var VersionParser
@@ -87,7 +88,7 @@ impl VcsRepository {
     /// @param array<string, class-string<VcsDriverInterface>>|null $drivers
     pub fn new(
         mut repo_config: IndexMap<String, PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -158,7 +159,7 @@ impl VcsRepository {
         let is_very_verbose = io.is_very_verbose();
         let process_executor = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                io.clone_box(),
+                io.clone(),
             ))))
         });
 

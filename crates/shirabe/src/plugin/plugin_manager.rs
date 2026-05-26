@@ -21,6 +21,7 @@ use crate::composer::{ComposerHandle, ComposerWeakHandle};
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackage;
 use crate::package::Link;
 use crate::package::Locker;
@@ -51,7 +52,7 @@ pub enum DisablePlugins {
 #[derive(Debug)]
 pub struct PluginManager {
     pub(crate) composer: ComposerWeakHandle,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) global_composer: Option<PartialComposerHandle>,
     pub(crate) version_parser: VersionParser,
     pub(crate) disable_plugins: DisablePlugins,
@@ -72,7 +73,7 @@ static mut CLASS_COUNTER: i64 = 0;
 
 impl PluginManager {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: ComposerWeakHandle,
         global_composer: Option<PartialComposerHandle>,
         disable_plugins: DisablePlugins,
@@ -475,7 +476,7 @@ impl PluginManager {
                 String::new()
             }
         ));
-        plugin.activate(&self.composer_full(), &*self.io);
+        plugin.activate(&self.composer_full(), &*self.io.borrow());
 
         // TODO(plugin): if plugin is EventSubscriberInterface, hook into the event dispatcher
         // The PHP code calls $this->composer->getEventDispatcher()->addSubscriber($plugin);
@@ -502,7 +503,7 @@ impl PluginManager {
         self.io
             .write_error(&format!("Unloading plugin {}", get_class_obj(plugin)));
         let mut removed = self.plugins.remove(index);
-        removed.deactivate(&self.composer_full(), &*self.io);
+        removed.deactivate(&self.composer_full(), &*self.io.borrow());
 
         // TODO(plugin): remove_listener accepts any callable/object in PHP; here we have
         // a plugin instance and need to translate to a Callable, which is not portable
@@ -515,7 +516,7 @@ impl PluginManager {
         // TODO(plugin): plugin uninstall hook
         self.io
             .write_error(&format!("Uninstalling plugin {}", get_class_obj(plugin)));
-        plugin.uninstall(&self.composer_full(), &*self.io);
+        plugin.uninstall(&self.composer_full(), &*self.io.borrow());
     }
 
     fn load_repository(

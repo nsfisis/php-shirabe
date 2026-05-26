@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::downloader::DvcsDownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
@@ -35,14 +36,14 @@ pub struct GitDownloader {
 
 impl GitDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
         let inner = VcsDownloaderBase::new(io, config, process, fs);
         let git_util = GitUtil::new(
-            inner.io.clone_box(),
+            inner.io.clone(),
             inner.config.clone(),
             inner.process.clone(),
             inner.filesystem.clone(),

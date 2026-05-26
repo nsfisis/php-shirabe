@@ -77,7 +77,7 @@ impl PerforceDriver {
             self.inner.url.clone(),
             repo_dir,
             self.inner.process.clone(),
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
         ));
 
         Ok(())
@@ -167,9 +167,14 @@ impl PerforceDriver {
         .into())
     }
 
-    pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _config: &Config,
+        url: &str,
+        deep: bool,
+    ) -> bool {
         if deep || Preg::is_match(r"#\b(perforce|p4)\b#i", url).unwrap_or(false) {
-            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(io));
+            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(Some(io)));
         }
         false
     }

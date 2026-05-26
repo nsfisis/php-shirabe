@@ -30,6 +30,7 @@ use crate::installer::Installer;
 use crate::installer::ProjectInstaller;
 use crate::installer::SuggestedPackagesReporter;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -113,7 +114,7 @@ impl CreateProjectCommand {
     ) -> Result<i64> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
         // TODO(phase-b): get_io returns &mut Self-borrow; clone_box for an owned Box to dodge.
-        let io: Box<dyn IOInterface> = self.get_io().clone_box();
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&config.borrow(), input, true)?;
@@ -160,9 +161,8 @@ impl CreateProjectCommand {
             Some(repository_url_opt)
         };
 
-        let mut io = io;
         self.install_project(
-            &mut *io,
+            io,
             config,
             input,
             input
@@ -207,7 +207,7 @@ impl CreateProjectCommand {
     #[allow(clippy::too_many_arguments)]
     pub fn install_project(
         &mut self,
-        io: &mut dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         input: &dyn InputInterface,
         package_name: Option<String>,
@@ -247,14 +247,15 @@ impl CreateProjectCommand {
             .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);
 
         // we need to manually load the configuration to pass the auth credentials to the io interface!
-        io.load_configuration(&mut *config.borrow_mut())?;
+        io.borrow_mut()
+            .load_configuration(&mut *config.borrow_mut())?;
 
-        self.suggested_packages_reporter = Some(SuggestedPackagesReporter::new(io.clone_box()));
+        self.suggested_packages_reporter = Some(SuggestedPackagesReporter::new(io.clone()));
 
         let installed_from_vcs = if let Some(package_name) = package_name.as_ref() {
             self.install_root_package(
                 input,
-                io,
+                io.clone(),
                 &config,
                 package_name,
                 &*platform_requirement_filter,
@@ -278,8 +279,13 @@ impl CreateProjectCommand {
             unlink("composer.lock");
         }
 
-        let mut composer_handle =
-            self.create_composer_instance(input, io, None, disable_plugins, Some(disable_scripts))?;
+        let mut composer_handle = self.create_composer_instance(
+            input,
+            io.clone(),
+            None,
+            disable_plugins,
+            Some(disable_scripts),
+        )?;
 
         // add the repository to the composer.json and use it for the install run later
         if let Some(repos) = repositories.as_ref() {
@@ -287,7 +293,7 @@ impl CreateProjectCommand {
                 for (index, repo) in repos.iter().enumerate() {
                     let config = crate::command::composer_full(&composer_handle).get_config();
                     let repo_config =
-                        RepositoryFactory::config_from_string(io, &config, repo, true)?;
+                        RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                     let composer_json_repositories_config =
                         crate::command::composer_full(&composer_handle)
                             .get_config()
@@ -332,8 +338,13 @@ impl CreateProjectCommand {
                         );
                     }
 
-                    composer_handle =
-                        self.create_composer_instance(input, io, None, disable_plugins, None)?;
+                    composer_handle = self.create_composer_instance(
+                        input,
+                        io.clone(),
+                        None,
+                        disable_plugins,
+                        None,
+                    )?;
                 }
             }
         }
@@ -371,7 +382,7 @@ impl CreateProjectCommand {
                 .borrow_mut()
                 .set_output_progress(!no_progress);
 
-            let mut installer = Installer::create(io.clone_box(), &composer_handle);
+            let mut installer = Installer::create(io.clone(), &composer_handle);
             // TODO(phase-b): set_suggested_packages_reporter takes by value but PHP class
             // means shared ownership; needs Rc<SuggestedPackagesReporter> for proper sharing.
             installer
@@ -379,7 +390,7 @@ impl CreateProjectCommand {
                 .set_prefer_dist(prefer_dist)
                 .set_dev_mode(install_dev_packages)
                 .set_platform_requirement_filter(platform_requirement_filter.clone_box())
-                .set_suggested_packages_reporter(SuggestedPackagesReporter::new(io.clone_box()))
+                .set_suggested_packages_reporter(SuggestedPackagesReporter::new(io.clone()))
                 .set_optimize_autoloader(
                     config
                         .borrow_mut()
@@ -540,7 +551,7 @@ impl CreateProjectCommand {
     fn install_root_package(
         &self,
         input: &dyn InputInterface,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: &str,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
@@ -584,7 +595,7 @@ impl CreateProjectCommand {
         directory = rtrim(&directory, Some("/\\"));
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-            io.clone_box(),
+            io.clone(),
         ))));
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(process))));
         if !fs.borrow().is_absolute_path(&directory) {
@@ -704,7 +715,7 @@ impl CreateProjectCommand {
 
         let composer_handle = self.create_composer_instance(
             input,
-            io,
+            io.clone(),
             Some(config.borrow_mut().all(0)?),
             disable_plugins,
             Some(disable_scripts),
@@ -727,7 +738,7 @@ impl CreateProjectCommand {
             // TODO(phase-b): default_repos needs &mut RepositoryManager but we hold &RepositoryManager.
             let _ = rm;
             repository_set.add_repository(Box::new(CompositeRepository::new(
-                RepositoryFactory::default_repos(Some(io), Some(config.clone()), None)?
+                RepositoryFactory::default_repos(Some(io.clone()), Some(config.clone()), None)?
                     .into_iter()
                     .map(|(_, v)| v)
                     .collect(),
@@ -735,7 +746,7 @@ impl CreateProjectCommand {
         } else {
             for repo in repositories.unwrap() {
                 let mut repo_config =
-                    RepositoryFactory::config_from_string(io, &config, repo, true)?;
+                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let is_packagist_disabled = (repo_config.contains_key("packagist")
                     && repo_config.len() == 1
                     && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
@@ -767,7 +778,7 @@ impl CreateProjectCommand {
                 }
 
                 repository_set.add_repository(RepositoryFactory::create_repo(
-                    io,
+                    io.clone(),
                     &config,
                     repo_config.clone(),
                     None,
@@ -803,7 +814,7 @@ impl CreateProjectCommand {
             &stability,
             None,
             0,
-            Some(io),
+            Some(&*io.borrow()),
             PhpMixed::Bool(true),
         )?;
 
@@ -913,7 +924,7 @@ impl CreateProjectCommand {
             true,
             false,
         )?;
-        im.notify_installs(io);
+        im.notify_installs(&*io.borrow());
 
         // collect suggestions
         // TODO(phase-b): self.suggested_packages_reporter is on the outer scope via &self
@@ -947,7 +958,7 @@ impl CreateProjectCommand {
     fn create_composer_instance(
         &self,
         input: &dyn InputInterface,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<indexmap::IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,

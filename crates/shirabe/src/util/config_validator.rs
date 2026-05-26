@@ -15,13 +15,13 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct ConfigValidator {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl ConfigValidator {
     pub const CHECK_VERSION: i64 = 1;
 
-    pub fn new(io: Box<dyn IOInterface>) -> Self {
+    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
         Self { io }
     }
 
@@ -39,7 +39,7 @@ impl ConfigValidator {
         let mut lax_valid = false;
         let mut manifest: Option<IndexMap<String, PhpMixed>> = None;
 
-        // TODO(phase-b): io type mismatch (&dyn IOInterface vs Box<dyn IOInterface>)
+        // TODO(phase-b): io type mismatch (&dyn IOInterface vs std::rc::Rc<std::cell::RefCell<dyn IOInterface>>)
         let mut json =
             JsonFile::new(file.to_string(), None, None).expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {

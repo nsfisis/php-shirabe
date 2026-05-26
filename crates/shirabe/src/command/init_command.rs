@@ -23,6 +23,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::base_package::{self, BasePackage};
@@ -52,7 +53,7 @@ impl PackageDiscoveryTrait for InitCommand {
         todo!()
     }
 
-    fn get_io(&self) -> &dyn IOInterface {
+    fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         todo!()
     }
 
@@ -193,11 +194,12 @@ impl InitCommand {
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
             let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                Some(io),
+                Some(io.clone()),
                 None,
             )?));
             for repo in &repositories {
-                let repo_config = RepositoryFactory::config_from_string(io, &config, repo, true)?;
+                let repo_config =
+                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let entry = options
                     .entry("repositories".to_string())
                     .or_insert_with(|| PhpMixed::List(vec![]));
@@ -445,17 +447,20 @@ impl InitCommand {
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
             let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                Some(io),
+                Some(io.clone()),
                 None,
             )?));
-            io.load_configuration(&mut *config.borrow_mut())?;
-            let mut repo_manager = RepositoryFactory::manager(io, &config, None, None, None)?;
+            io.borrow_mut()
+                .load_configuration(&mut *config.borrow_mut())?;
+            let mut repo_manager =
+                RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
             let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
                 vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
-                let repo_config = RepositoryFactory::config_from_string(io, &config, repo, true)?;
+                let repo_config =
+                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let is_packagist_false = repo_config
                     .get("packagist")
                     .map(|v| v.as_bool() == Some(false))
@@ -471,7 +476,7 @@ impl InitCommand {
                     continue;
                 }
                 repos.push(RepositoryFactory::create_repo(
-                    io,
+                    io.clone(),
                     &config,
                     repo_config,
                     Some(&mut repo_manager),
@@ -486,7 +491,7 @@ impl InitCommand {
                     PhpMixed::String("https://repo.packagist.org".to_string()),
                 );
                 repos.push(RepositoryFactory::create_repo(
-                    io,
+                    io.clone(),
                     &config,
                     default_config,
                     Some(&mut repo_manager),
@@ -943,7 +948,7 @@ impl InitCommand {
             return self.git_config.clone().unwrap_or_default();
         }
 
-        let mut process = ProcessExecutor::new(Some(self.get_io().clone_box()));
+        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
 
         let mut output = String::new();
         if process.execute_args(

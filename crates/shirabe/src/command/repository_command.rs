@@ -17,6 +17,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 
 #[derive(Debug)]

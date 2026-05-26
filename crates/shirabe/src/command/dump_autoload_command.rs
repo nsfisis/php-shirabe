@@ -8,6 +8,7 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 

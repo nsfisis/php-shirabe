@@ -51,7 +51,7 @@ impl HhvmDetector {
             let hhvm_path = finder.find("hhvm", None, &[]);
             if let Some(hhvm_path) = hhvm_path {
                 let executor = self.process_executor.get_or_insert_with(|| {
-                    std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())))
+                    std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
                 });
                 let mut version_output = shirabe_php_shim::PhpMixed::Null;
                 let cmd = shirabe_php_shim::PhpMixed::List(

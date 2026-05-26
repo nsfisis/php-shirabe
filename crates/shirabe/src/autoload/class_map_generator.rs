@@ -6,6 +6,7 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator as Exter
 use shirabe_php_shim::PhpMixed;
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 
 #[derive(Debug)]
 pub struct ClassMapGenerator;
@@ -41,7 +42,7 @@ impl ClassMapGenerator {
     pub fn create_map(
         path: PhpMixed,
         excluded: Option<String>,
-        mut io: Option<Box<dyn IOInterface>>,
+        mut io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         namespace: Option<String>,
         autoload_type: Option<String>,
         scanned_files: &mut IndexMap<String, bool>,

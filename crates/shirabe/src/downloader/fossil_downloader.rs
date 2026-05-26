@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
@@ -18,7 +19,7 @@ pub struct FossilDownloader {
 
 impl FossilDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -46,7 +47,7 @@ impl FossilDownloader {
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(self.inner.io.as_ref()),
+            Some(&*self.inner.io.borrow()),
             &indexmap::IndexMap::new(),
         )?;
 
@@ -107,7 +108,7 @@ impl FossilDownloader {
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(self.inner.io.as_ref()),
+            Some(&*self.inner.io.borrow()),
             &indexmap::IndexMap::new(),
         )?;
 

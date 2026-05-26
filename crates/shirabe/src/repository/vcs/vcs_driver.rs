@@ -23,7 +23,7 @@ pub struct VcsDriverBase {
     pub url: String,
     pub origin_url: String,
     pub repo_config: IndexMap<String, PhpMixed>,
-    pub io: Box<dyn IOInterface>,
+    pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -34,7 +34,7 @@ pub struct VcsDriverBase {
 impl VcsDriverBase {
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,

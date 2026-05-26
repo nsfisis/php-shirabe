@@ -13,6 +13,7 @@ use shirabe_php_shim::{
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 
@@ -20,7 +21,7 @@ use crate::util::Filesystem;
 #[derive(Debug)]
 pub struct DownloadManager {
     /// @var IOInterface
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var bool
     prefer_dist: bool,
     /// @var bool
@@ -40,7 +41,7 @@ impl DownloadManager {
     /// @param bool            $preferSource prefer downloading from source
     /// @param Filesystem|null $filesystem   custom Filesystem object
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         prefer_source: bool,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {

@@ -25,6 +25,7 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
 use crate::package::Locker;
@@ -40,7 +41,7 @@ use crate::util::Platform;
 #[derive(Debug)]
 pub struct AutoloadGenerator {
     event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: Option<bool>,
     class_map_authoritative: bool,
     apcu: bool,
@@ -53,9 +54,10 @@ pub struct AutoloadGenerator {
 impl AutoloadGenerator {
     pub fn new(
         event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
-        io: Option<Box<dyn IOInterface>>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Self {
-        let io: Box<dyn IOInterface> = io.unwrap_or_else(|| Box::new(NullIO::new()));
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            io.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())));
 
         Self {
             event_dispatcher,

@@ -11,6 +11,8 @@ use shirabe_php_shim::{
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;

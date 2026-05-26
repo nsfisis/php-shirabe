@@ -9,6 +9,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
@@ -73,8 +74,9 @@ impl HomeCommand {
     ) -> Result<i64> {
         let repos = self.initialize_repos()?;
         // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone_box();
-        let io: &dyn IOInterface = io_box.as_ref();
+        let io_box = self.get_io().clone();
+        let io_ref = io_box.borrow();
+        let io: &dyn IOInterface = &*io_ref;
         let mut return_code: i64 = 0;
 
         let packages: Vec<String> = input
@@ -172,7 +174,7 @@ impl HomeCommand {
     }
 
     fn open_browser(&mut self, url: &str) {
-        let mut process = ProcessExecutor::new(Some(self.get_io().clone_box()));
+        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
         if Platform::is_windows() {
             let _ = process.execute(
                 PhpMixed::from(vec!["start", "\"web\"", "explorer", url]),

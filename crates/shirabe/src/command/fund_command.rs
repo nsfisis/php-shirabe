@@ -15,6 +15,7 @@ use shirabe_semver::constraint::MatchAllConstraint;
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::AliasPackage;
 use crate::package::CompletePackage;

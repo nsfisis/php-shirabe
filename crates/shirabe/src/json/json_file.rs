@@ -19,6 +19,7 @@ use shirabe_php_shim::{
 
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
@@ -31,7 +32,7 @@ pub struct JsonFile {
     /// @var ?HttpDownloader
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
     /// @var ?IOInterface
-    io: Option<Box<dyn IOInterface>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var string
     indent: String,
 }
@@ -69,7 +70,7 @@ impl JsonFile {
     pub fn new(
         path: String,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-        io: Option<Box<dyn IOInterface>>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Result<Self> {
         if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path).unwrap_or(false) {
             return Err(InvalidArgumentException {

@@ -67,8 +67,9 @@ impl InstallCommand {
         output: &dyn OutputInterface,
     ) -> Result<i64> {
         // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone_box();
-        let io: &dyn IOInterface = io_box.as_ref();
+        let io_box = self.get_io().clone();
+        let io_ref = io_box.borrow();
+        let io: &dyn IOInterface = &*io_ref;
 
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
@@ -114,7 +115,7 @@ impl InstallCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let mut install = Installer::create(io.clone_box(), &composer_handle);
+        let mut install = Installer::create(io_box.clone(), &composer_handle);
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =

@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
@@ -22,7 +23,7 @@ pub struct PerforceDownloader {
 
 impl PerforceDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -103,7 +104,7 @@ impl PerforceDownloader {
             url,
             path,
             self.inner.process.clone(),
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
         ));
     }
 

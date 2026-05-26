@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::downloader::MaxFileSizeExceededException;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::AuthHelper;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
@@ -34,7 +35,7 @@ pub enum GetResult {
 
 #[derive(Debug)]
 pub struct RemoteFilesystem {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     scheme: String,
     bytes_max: i64,
@@ -56,7 +57,7 @@ pub struct RemoteFilesystem {
 
 impl RemoteFilesystem {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
         disable_tls: bool,
@@ -64,8 +65,7 @@ impl RemoteFilesystem {
     ) -> Self {
         let (computed_options, disable_tls_set) = if !disable_tls {
             (
-                // TODO(phase-b): logger is None placeholder; should pass `&*io` if a Logger view is available.
-                StreamContextFactory::get_tls_defaults(&options, None)
+                StreamContextFactory::get_tls_defaults(&options, ())
                     .unwrap_or_else(|_| IndexMap::new()),
                 false,
             )
@@ -75,7 +75,7 @@ impl RemoteFilesystem {
 
         let merged = array_replace_recursive(computed_options, options);
         let auth_helper =
-            auth_helper.unwrap_or_else(|| AuthHelper::new(io.clone_box(), config.clone()));
+            auth_helper.unwrap_or_else(|| AuthHelper::new(io.clone(), config.clone()));
         Self {
             io,
             config,
@@ -292,7 +292,7 @@ impl RemoteFilesystem {
         {
             let _ = self.config.borrow_mut().prohibit_url_by_config(
                 &file_url,
-                Some(&*self.io),
+                Some(&*self.io.borrow()),
                 &indexmap::IndexMap::new(),
             );
         }
@@ -337,7 +337,7 @@ impl RemoteFilesystem {
                             PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
                             _ => IndexMap::new(),
                         };
-                        let _ = HttpDownloader::output_warnings(&*self.io, origin_url, &parsed_map);
+                        let _ = HttpDownloader::output_warnings(&*self.io.borrow(), origin_url, &parsed_map);
                     }
 
                     if [401_i64, 403].contains(&code) && retry_auth_failure {

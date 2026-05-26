@@ -468,7 +468,12 @@ impl SvnDriver {
         self.branches.as_ref().unwrap()
     }
 
-    pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _config: &Config,
+        url: &str,
+        deep: bool,
+    ) -> bool {
         let url = Self::normalize_url(url);
         if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url).unwrap_or(false) {
             return true;
@@ -479,7 +484,7 @@ impl SvnDriver {
             return false;
         }
 
-        let mut process = ProcessExecutor::new(io);
+        let mut process = ProcessExecutor::new(Some(io));
         let mut ignored_output = String::new();
         let exit = process.execute_args(
             &[

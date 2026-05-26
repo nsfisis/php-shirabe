@@ -10,6 +10,8 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
 use crate::package::Package;

@@ -12,6 +12,7 @@ use shirabe_php_shim::{
 };
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
@@ -19,7 +20,7 @@ use crate::util::Silencer;
 /// Reads/writes to a filesystem cache
 #[derive(Debug)]
 pub struct Cache {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     root: String,
     enabled: Option<bool>,
     allowlist: String,
@@ -36,7 +37,7 @@ impl Cache {
     /// @param Filesystem  $filesystem optional filesystem instance
     /// @param bool        $readOnly   whether the cache is in readOnly mode
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         cache_dir: &str,
         allowlist: Option<&str>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,

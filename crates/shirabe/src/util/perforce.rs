@@ -12,6 +12,7 @@ use shirabe_php_shim::{
 };
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
@@ -33,7 +34,7 @@ pub struct Perforce {
     pub(crate) unique_perforce_client_name: String,
     pub(crate) windows_flag: bool,
     pub(crate) command_result: String,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 }
 
@@ -45,7 +46,7 @@ impl Perforce {
         path: String,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         is_windows: bool,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
         let mut this = Self {
             path: String::new(),
@@ -76,7 +77,7 @@ impl Perforce {
         port: String,
         path: String,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
         Self::new(repo_config, port, path, process, Platform::is_windows(), io)
     }

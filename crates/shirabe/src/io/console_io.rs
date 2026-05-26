@@ -5,7 +5,6 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::psr::log::LoggerInterface;
 use shirabe_external_packages::symfony::component::console::helper::HelperSet;
 use shirabe_external_packages::symfony::component::console::helper::ProgressBar;
 use shirabe_external_packages::symfony::component::console::helper::Table;
@@ -25,6 +24,8 @@ use std::cell::RefCell;
 
 use crate::io::BaseIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceMutable;
 use crate::question::StrictConfirmationQuestion;
 use crate::util::Silencer;
 
@@ -378,49 +379,7 @@ impl ConsoleIO {
     }
 }
 
-impl LoggerInterface for ConsoleIO {
-    // TODO(phase-b): BaseIO's emergency/alert/.../log take PhpMixed and
-    // IndexMap<String, Box<PhpMixed>> while LoggerInterface takes &str and
-    // &[(&str, &str)]. Delegation requires reconciling signatures; for now,
-    // mirror NullIO and panic via todo!().
-    fn emergency(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn alert(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn critical(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn error(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn warning(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn notice(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn info(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn debug(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-
-    fn log(&self, _level: &str, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
-    }
-}
-
-impl IOInterface for ConsoleIO {
+impl IOInterfaceImmutable for ConsoleIO {
     fn is_interactive(&self) -> bool {
         self.input.is_interactive()
     }
@@ -690,6 +649,20 @@ impl IOInterface for ConsoleIO {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
+    fn error(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn warning(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+
+    fn debug(&self, _message: &str, _context: &[(&str, &str)]) {
+        todo!()
+    }
+}
+
+impl IOInterfaceMutable for ConsoleIO {
     fn set_authentication(
         &mut self,
         repository_name: String,
@@ -703,6 +676,8 @@ impl IOInterface for ConsoleIO {
         <Self as BaseIO>::load_configuration(self, config)
     }
 }
+
+impl IOInterface for ConsoleIO {}
 
 impl BaseIO for ConsoleIO {
     fn authentications(

@@ -22,6 +22,7 @@ use crate::dependency_resolver::Request;
 use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::AliasPackage;
 use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackage;
@@ -46,7 +47,7 @@ pub struct PoolBuilder {
     temporary_constraints: IndexMap<String, AnyConstraint>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pool_optimizer: Option<PoolOptimizer>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     alias_map: IndexMap<String, IndexMap<i64, AliasPackage>>,
     packages_to_load: IndexMap<String, AnyConstraint>,
     loaded_packages: IndexMap<String, AnyConstraint>,
@@ -87,7 +88,7 @@ impl PoolBuilder {
         stability_flags: IndexMap<String, i64>,
         root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
         root_references: IndexMap<String, String>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         pool_optimizer: Option<PoolOptimizer>,
         temporary_constraints: IndexMap<String, AnyConstraint>,

@@ -10,7 +10,7 @@ use shirabe_php_shim::PhpMixed;
 pub struct Event {
     inner: BaseEvent,
     composer: ComposerWeakHandle,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
     originating_event: Option<Box<BaseEvent>>,
 }
@@ -19,7 +19,7 @@ impl Event {
     pub fn new(
         name: String,
         composer: ComposerWeakHandle,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         args: Vec<String>,
         flags: IndexMap<String, PhpMixed>,
@@ -37,8 +37,8 @@ impl Event {
         &self.composer
     }
 
-    pub fn get_io(&self) -> &dyn IOInterface {
-        self.io.as_ref()
+    pub fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.io.clone()
     }
 
     pub fn is_dev_mode(&self) -> bool {

@@ -17,6 +17,7 @@ use crate::dependency_resolver::Request;
 use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::BasePackage;
 use crate::package::base_package;
@@ -510,8 +511,9 @@ impl RemoveCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        // TODO(phase-b): Installer::create expects Box<dyn IOInterface>; io here is &mut dyn IOInterface
-        let io_box: Box<dyn IOInterface> = todo!("share IOInterface as Box<dyn IOInterface>");
+        // TODO(phase-b): Installer::create expects std::rc::Rc<std::cell::RefCell<dyn IOInterface>>; io here is &mut dyn IOInterface
+        let io_box: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
+            todo!("share IOInterface as Box<dyn IOInterface>");
         let mut install = Installer::create(io_box, &composer_handle);
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);

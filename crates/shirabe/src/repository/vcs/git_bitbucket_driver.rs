@@ -15,6 +15,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -80,7 +81,7 @@ impl GitBitbucketDriver {
         self.repository = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             &implode(
                 "/",
                 &[
@@ -693,7 +694,7 @@ impl GitBitbucketDriver {
             Err(e) => {
                 // TODO(phase-b): only handle TransportException
                 let mut bitbucket_util = Bitbucket::new(
-                    self.inner.io.clone_box(),
+                    self.inner.io.clone(),
                     self.inner.config.clone(),
                     Some(self.inner.process.clone()),
                     Some(self.inner.http_downloader.clone()),

@@ -14,6 +14,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::archiver::ArchiveManager;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -111,9 +112,9 @@ impl ArchiveCommand {
             });
 
         // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let mut io_box = self.get_io().clone_box();
+        let io_box = self.get_io().clone();
         let return_code = self.archive(
-            io_box.as_mut(),
+            io_box.clone(),
             &config,
             input
                 .get_argument("package")
@@ -153,7 +154,7 @@ impl ArchiveCommand {
 
     pub fn archive(
         &mut self,
-        io: &mut dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: Option<String>,
         version: Option<String>,
@@ -173,12 +174,17 @@ impl ArchiveCommand {
             &composer_archive_manager_ref
         } else {
             let factory = Factory;
-            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(())));
+            let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
             let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-                Factory::create_http_downloader(io, config, indexmap::IndexMap::new())?,
+                Factory::create_http_downloader(io.clone(), config, indexmap::IndexMap::new())?,
             ));
-            let download_manager =
-                factory.create_download_manager(io, config, &http_downloader, &process, None)?;
+            let download_manager = factory.create_download_manager(
+                io.clone(),
+                config,
+                &http_downloader,
+                &process,
+                None,
+            )?;
             let loop_ = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
                 http_downloader.clone(),
                 Some(process),
@@ -190,7 +196,7 @@ impl ArchiveCommand {
 
         let package: crate::package::CompletePackageInterfaceHandle =
             if let Some(name) = package_name {
-                match self.select_package(io, &name, version.as_deref())? {
+                match self.select_package(io.clone(), &name, version.as_deref())? {
                     Some(p) => p,
                     None => return Ok(1),
                 }
@@ -227,7 +233,7 @@ impl ArchiveCommand {
 
     pub fn select_package(
         &mut self,
-        io: &mut dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         package_name: &str,
         version: Option<&str>,
     ) -> Result<Option<crate::package::CompletePackageInterfaceHandle>> {
@@ -253,7 +259,7 @@ impl ArchiveCommand {
             repo = CompositeRepository::new(repos);
             min_stability = composer.get_package().get_minimum_stability().to_string();
         } else {
-            let default_repos = RepositoryFactory::default_repos_with_default_manager(io)?;
+            let default_repos = RepositoryFactory::default_repos_with_default_manager(io.clone())?;
             let repo_names: Vec<String> = default_repos.keys().cloned().collect();
             io.write_error(&format!(
                 "No composer.json found in the current directory, searching packages from {}",

@@ -13,6 +13,7 @@ use shirabe_php_shim::{
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 
@@ -29,7 +30,7 @@ pub struct Svn {
     /// @var bool
     pub(crate) has_auth: Option<bool>,
     /// @var IOInterface
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var string
     pub(crate) url: String,
     /// @var bool
@@ -50,12 +51,14 @@ impl Svn {
 
     pub fn new(
         url: String,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
         let process = process.unwrap_or_else(|| {
-            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(&*io)))
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))))
         });
         Self {
             url,
@@ -95,7 +98,7 @@ impl Svn {
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
             url,
-            Some(&*self.io),
+            Some(&*self.io.borrow()),
             &indexmap::IndexMap::new(),
         )?;
 

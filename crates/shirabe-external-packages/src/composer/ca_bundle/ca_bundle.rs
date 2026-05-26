@@ -1,5 +1,3 @@
-use crate::psr::log::LoggerInterface;
-
 #[derive(Debug)]
 pub struct CaBundle;
 
@@ -8,11 +6,14 @@ impl CaBundle {
         todo!()
     }
 
-    pub fn get_system_ca_root_bundle_path(_logger: Option<&dyn LoggerInterface>) -> String {
+    // The original `$logger` parameter (PSR LoggerInterface) is replaced by a
+    // `()` placeholder: CaBundle is expected to be subsumed by a Rust TLS
+    // library and removed, so it does not need a real logger.
+    pub fn get_system_ca_root_bundle_path(_logger: ()) -> String {
         todo!()
     }
 
-    pub fn validate_ca_file(_ca_file: &str, _logger: Option<&dyn LoggerInterface>) -> bool {
+    pub fn validate_ca_file(_ca_file: &str, _logger: ()) -> bool {
         todo!()
     }
 

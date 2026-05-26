@@ -17,6 +17,7 @@ use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
@@ -26,7 +27,7 @@ use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
-    pub io: Box<dyn IOInterface>,
+    pub io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -35,13 +36,14 @@ pub struct VcsDownloaderBase {
 
 impl VcsDownloaderBase {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
     ) -> Self {
-        let process = process
-            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(()))));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
+        });
         let filesystem =
             fs.unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
@@ -72,7 +74,7 @@ impl VcsDownloaderBase {
 pub trait VcsDownloader:
     DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
 {
-    fn io(&self) -> &dyn IOInterface;
+    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
     fn io_mut(&mut self) -> &mut dyn IOInterface;
     fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
     fn config_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Config>>;
@@ -442,7 +444,7 @@ pub trait VcsDownloader:
             self.config().clone(),
             self.process().clone(),
             parser.clone(),
-            Some(self.io().clone_box()),
+            Some(self.io().clone()),
         );
         let dumper = ArrayDumper::new();
 

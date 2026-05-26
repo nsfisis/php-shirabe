@@ -5,6 +5,7 @@ use crate::installer::BinaryInstaller;
 use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
@@ -21,7 +22,7 @@ pub struct PluginInstaller {
 
 impl PluginInstaller {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: PartialComposerWeakHandle,
         fs: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         binary_installer: Option<BinaryInstaller>,

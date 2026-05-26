@@ -2,6 +2,7 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use anyhow::Result;
@@ -13,14 +14,14 @@ static VERSION: OnceLock<Option<String>> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Hg {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 }
 
 impl Hg {
     pub fn new(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &Config,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
@@ -35,7 +36,7 @@ impl Hg {
     ) -> Result<()> {
         self.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&*self.io),
+            Some(&*self.io.borrow()),
             &indexmap::IndexMap::new(),
         )?;
 

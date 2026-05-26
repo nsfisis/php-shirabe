@@ -13,6 +13,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
 

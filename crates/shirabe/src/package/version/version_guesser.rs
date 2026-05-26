@@ -37,7 +37,7 @@ pub struct VersionGuesser {
     version_parser: VersionParser,
 
     /// @var IOInterface|null
-    io: Option<Box<dyn IOInterface>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 }
 
 /// PHP: @phpstan-type Version array{version, commit, pretty_version, feature_version?, feature_pretty_version?}
@@ -55,7 +55,7 @@ impl VersionGuesser {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         version_parser: VersionParser,
-        io: Option<Box<dyn IOInterface>>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Self {
         Self {
             config,
@@ -284,7 +284,7 @@ impl VersionGuesser {
         GitUtil::check_for_repo_ownership_error(
             &self.process.borrow().get_error_output(),
             path,
-            self.io.as_deref(),
+            self.io.clone(),
         );
 
         if version.is_none() || is_detached {

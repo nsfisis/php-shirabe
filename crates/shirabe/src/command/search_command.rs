@@ -4,6 +4,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
@@ -73,8 +74,8 @@ impl SearchCommand {
             c
         } else {
             // TODO(phase-b): clone_box to release self borrow held by get_io.
-            let io_box = self.get_io().clone_box();
-            self.create_composer_instance(input, io_box.as_ref(), None, false, None)?
+            let io_box = self.get_io().clone();
+            self.create_composer_instance(input, io_box, None, false, None)?
         };
         let composer_ref = crate::command::composer_full(&composer);
         // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface but we need Box<dyn RepositoryInterface>

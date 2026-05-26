@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
@@ -18,7 +19,7 @@ pub struct HgDownloader {
 
 impl HgDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -53,7 +54,7 @@ impl HgDownloader {
         url: String,
     ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
-            &*self.inner.io,
+            self.inner.io.clone(),
             &*self.inner.config.borrow(),
             &self.inner.process,
         );
@@ -108,7 +109,7 @@ impl HgDownloader {
         url: String,
     ) -> Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
-            &*self.inner.io,
+            self.inner.io.clone(),
             &*self.inner.config.borrow(),
             &self.inner.process,
         );

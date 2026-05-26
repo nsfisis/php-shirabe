@@ -16,6 +16,7 @@ use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::base_package;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;

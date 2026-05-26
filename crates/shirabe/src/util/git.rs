@@ -15,6 +15,7 @@ use shirabe_php_shim::{
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Bitbucket;
 use crate::util::Filesystem;
 use crate::util::GitHub;
@@ -27,7 +28,7 @@ use crate::util::{AuthHelper, StoreAuth};
 
 #[derive(Debug)]
 pub struct Git {
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -39,7 +40,7 @@ static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
 
 impl Git {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -57,7 +58,7 @@ impl Git {
     pub fn check_for_repo_ownership_error(
         output: &str,
         path: &str,
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Result<()> {
         if str_contains(output, "fatal: detected dubious ownership") {
             let msg = format!(
@@ -147,11 +148,9 @@ impl Git {
         let mut last_command: PhpMixed = PhpMixed::String(String::new());
 
         // Ensure we are allowed to use this URL by config
-        self.config.borrow_mut().prohibit_url_by_config(
-            url,
-            Some(self.io.as_ref()),
-            &IndexMap::new(),
-        )?;
+        self.config
+            .borrow_mut()
+            .prohibit_url_by_config(url, Some(&*self.io.borrow()), &IndexMap::new())?;
 
         let orig_cwd: Option<String> = if initial_clone {
             cwd.map(|s| s.to_string())
@@ -238,7 +237,7 @@ impl Git {
             {
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m3) {
-                    self.io.set_authentication(
+                    self.io.borrow_mut().set_authentication(
                         m3.clone(),
                         rawurldecode(&m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()),
                         Some(rawurldecode(
@@ -386,7 +385,7 @@ impl Git {
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m1) {
                     let mut git_hub_util = GitHub::new(
-                        self.io.clone_box(),
+                        self.io.clone(),
                         self.config.clone(),
                         Some(self.process.clone()),
                         self.http_downloader.clone(),
@@ -448,7 +447,7 @@ impl Git {
             } {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
-                    self.io.clone_box(),
+                    self.io.clone(),
                     self.config.clone(),
                     Some(self.process.clone()),
                     self.http_downloader.clone(),
@@ -467,7 +466,7 @@ impl Git {
                     if !bitbucket_util.authorize_oauth(&domain) && self.io.is_interactive() {
                         bitbucket_util.authorize_oauth_interactively(&domain, Some(message));
                         let access_token = bitbucket_util.get_token();
-                        self.io.set_authentication(
+                        self.io.borrow_mut().set_authentication(
                             domain.clone(),
                             "x-token-auth".to_string(),
                             Some(access_token),
@@ -521,7 +520,7 @@ impl Git {
                         let access_token =
                             bitbucket_util.request_token(&domain, &username, &password)?;
                         if !access_token.is_empty() {
-                            self.io.set_authentication(
+                            self.io.borrow_mut().set_authentication(
                                 domain.clone(),
                                 "x-token-auth".to_string(),
                                 Some(access_token),
@@ -613,7 +612,7 @@ impl Git {
 
                 if !self.io.has_authentication(&m2) {
                     let mut git_lab_util = GitLab::new(
-                        self.io.clone_box(),
+                        self.io.clone(),
                         self.config.clone(),
                         Some(self.process.clone()),
                         self.http_downloader.clone(),
@@ -765,10 +764,12 @@ impl Git {
                         command_output.as_deref_mut(),
                     ) == 0
                     {
-                        self.io
-                            .set_authentication(m2.clone(), username, Some(password));
-                        let mut auth_helper =
-                            AuthHelper::new(self.io.clone_box(), self.config.clone());
+                        self.io.borrow_mut().set_authentication(
+                            m2.clone(),
+                            username,
+                            Some(password),
+                        );
+                        let mut auth_helper = AuthHelper::new(self.io.clone(), self.config.clone());
                         let store_auth_enum = match &store_auth {
                             PhpMixed::String(s) if s == "prompt" => StoreAuth::Prompt,
                             PhpMixed::Bool(b) => StoreAuth::Bool(*b),

@@ -7,6 +7,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::FilterRepository;
 use crate::repository::InstalledRepositoryInterface;
@@ -19,7 +20,7 @@ pub struct RepositoryManager {
     local_repository: Option<Box<dyn InstalledRepositoryInterface>>,
     repositories: Vec<Box<dyn RepositoryInterface>>,
     repository_classes: IndexMap<String, String>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -28,19 +29,22 @@ pub struct RepositoryManager {
 
 impl RepositoryManager {
     pub fn new(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) -> Self {
-        let process = process
-            .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(io))));
+        let process = process.unwrap_or_else(|| {
+            std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
+                io.clone(),
+            ))))
+        });
         Self {
             local_repository: None,
             repositories: vec![],
             repository_classes: IndexMap::new(),
-            io: io.clone_box(),
+            io,
             config,
             http_downloader,
             event_dispatcher,

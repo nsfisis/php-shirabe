@@ -27,6 +27,7 @@ use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::BufferIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
@@ -78,7 +79,7 @@ impl DiagnoseCommand {
         output: &dyn OutputInterface,
     ) -> anyhow::Result<i64> {
         let mut composer = self.try_composer(None, None);
-        let io_boxed: Box<dyn IOInterface> = self.get_io().clone_box();
+        let io_boxed: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
 
         let config: std::rc::Rc<std::cell::RefCell<Config>>;
         if let Some(ref mut c) = composer {
@@ -103,7 +104,7 @@ impl DiagnoseCommand {
                     .map(std::rc::Rc::clone)
                     .unwrap_or_else(|| {
                         std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                            io_boxed.clone_box(),
+                            io_boxed.clone(),
                         ))))
                     }),
             );
@@ -111,12 +112,13 @@ impl DiagnoseCommand {
             config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
 
             self.process = Some(std::rc::Rc::new(std::cell::RefCell::new(
-                ProcessExecutor::new(Some(io_boxed.clone_box())),
+                ProcessExecutor::new(Some(io_boxed.clone())),
             )));
         }
         // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone_box();
-        let io: &dyn IOInterface = io_box.as_ref();
+        let io_box = self.get_io().clone();
+        let io_ref = io_box.borrow();
+        let io: &dyn IOInterface = &*io_ref;
 
         let mut config_inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         config_inner.insert("secure-http".to_string(), Box::new(PhpMixed::Bool(false)));
@@ -133,7 +135,7 @@ impl DiagnoseCommand {
         );
 
         self.http_downloader = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_http_downloader(io, &config, indexmap::IndexMap::new())?,
+            Factory::create_http_downloader(io_box.clone(), &config, indexmap::IndexMap::new())?,
         )));
 
         if strpos(file!(), "phar:") == Some(0) {
@@ -295,7 +297,7 @@ impl DiagnoseCommand {
                     .collect();
                 let composer_repo = ComposerRepository::new(
                     repo_arr_unboxed,
-                    self.get_io().clone_box(),
+                    self.get_io().clone(),
                     &*config.borrow(),
                     self.http_downloader.clone().unwrap(),
                     None,
@@ -427,7 +429,7 @@ impl DiagnoseCommand {
     }
 
     fn check_composer_schema(&mut self) -> anyhow::Result<PhpMixed> {
-        let validator = ConfigValidator::new(self.get_io().clone_box());
+        let validator = ConfigValidator::new(self.get_io().clone());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
 
         if !errors.is_empty() || !warnings.is_empty() {
@@ -680,7 +682,7 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        self.get_io().set_authentication(
+        self.get_io().borrow_mut().set_authentication(
             domain.to_string(),
             token.to_string(),
             Some("x-oauth-basic".to_string()),
@@ -744,7 +746,7 @@ impl DiagnoseCommand {
         }
 
         if let Some(t) = token {
-            self.get_io().set_authentication(
+            self.get_io().borrow_mut().set_authentication(
                 domain.to_string(),
                 t.to_string(),
                 Some("x-oauth-basic".to_string()),
@@ -939,7 +941,7 @@ impl DiagnoseCommand {
         // TODO(phase-b): ComposerRepository does not implement RepositoryInterface yet
         let _composer_repo = ComposerRepository::new(
             repo_config,
-            Box::new(NullIO::new()),
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
             config,
             self.http_downloader.clone().unwrap(),
             None,

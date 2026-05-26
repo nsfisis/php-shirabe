@@ -1,15 +1,16 @@
 //! ref: composer/src/Composer/Console/GithubActionError.php
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct GithubActionError {
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl GithubActionError {
-    pub fn new(io: Box<dyn IOInterface>) -> Self {
+    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
         Self { io }
     }
 

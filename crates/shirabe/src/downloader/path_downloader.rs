@@ -19,6 +19,7 @@ use crate::downloader::FileDownloader;
 use crate::downloader::VcsCapableDownloaderInterface;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
@@ -39,7 +40,7 @@ impl PathDownloader {
     const STRATEGY_MIRROR: i64 = 20;
 
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -391,7 +392,7 @@ impl PathDownloader {
             self.inner.config.clone(),
             self.inner.process.clone(),
             parser.clone(),
-            Some(self.inner.io.clone_box()),
+            Some(self.inner.io.clone()),
         );
         let dumper = ArrayDumper::new();
 

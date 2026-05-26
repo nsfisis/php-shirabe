@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
@@ -11,7 +12,7 @@ use shirabe_external_packages::symfony::component::console::formatter::OutputFor
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {
     suggested_packages: Vec<IndexMap<String, String>>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl SuggestedPackagesReporter {
@@ -19,7 +20,7 @@ impl SuggestedPackagesReporter {
     pub const MODE_BY_PACKAGE: i64 = 2;
     pub const MODE_BY_SUGGESTION: i64 = 4;
 
-    pub fn new(io: Box<dyn IOInterface>) -> Self {
+    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
         Self {
             suggested_packages: Vec::new(),
             io,

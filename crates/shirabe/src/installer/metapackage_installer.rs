@@ -5,6 +5,7 @@ use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
@@ -14,11 +15,11 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
 
 #[derive(Debug)]
 pub struct MetapackageInstaller {
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
 impl MetapackageInstaller {
-    pub fn new(io: Box<dyn IOInterface>) -> Self {
+    pub fn new(io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) -> Self {
         Self { io }
     }
 }

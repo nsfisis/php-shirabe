@@ -9,6 +9,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 
 #[derive(Debug)]
 pub struct ExecCommand {

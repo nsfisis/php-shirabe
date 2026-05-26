@@ -44,7 +44,7 @@ impl ConfigurableRepositoryInterface for PathRepository {
 impl PathRepository {
     pub fn new(
         repo_config: IndexMap<String, PhpMixed>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -67,14 +67,14 @@ impl PathRepository {
         let url = Platform::expand_path(&url_str);
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                io.clone_box(),
+                io.clone(),
             ))))
         });
         let version_guesser = VersionGuesser::new(
             config,
             process.clone(),
             VersionParser::new(),
-            Some(io.clone_box()),
+            Some(io.clone()),
         );
         let mut options = repo_config
             .get("options")

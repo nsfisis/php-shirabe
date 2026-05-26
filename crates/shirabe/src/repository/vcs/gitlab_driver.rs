@@ -15,6 +15,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -183,7 +184,7 @@ impl GitLabDriver {
         .unwrap_or_default();
 
         self.inner.cache = Some(Cache::new(
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             &format!(
                 "{}/{}/{}/{}",
                 self.inner
@@ -768,7 +769,7 @@ impl GitLabDriver {
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
         let mut git_driver = GitDriver::new(
             repo_config,
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             self.inner.config.clone(),
             self.inner.http_downloader.clone(),
             self.inner.process.clone(),
@@ -885,7 +886,7 @@ impl GitLabDriver {
             }
             Err(e) => {
                 let mut git_lab_util = GitLab::new(
-                    self.inner.io.clone_box(),
+                    self.inner.io.clone(),
                     self.inner.config.clone(),
                     Some(self.inner.process.clone()),
                     Some(self.inner.http_downloader.clone()),

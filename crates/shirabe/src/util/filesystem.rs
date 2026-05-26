@@ -819,7 +819,7 @@ impl Filesystem {
     pub(crate) fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
         if self.process_executor.is_none() {
             self.process_executor = Some(std::rc::Rc::new(std::cell::RefCell::new(
-                ProcessExecutor::new(()),
+                ProcessExecutor::new(None),
             )));
         }
 

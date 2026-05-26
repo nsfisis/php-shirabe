@@ -8,6 +8,7 @@ use shirabe_php_shim::{
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterface;
 use crate::package::PackageInterface;
 use crate::package::RootAliasPackage;
@@ -30,7 +31,7 @@ pub struct RootPackageLoader {
     manager: std::rc::Rc<std::cell::RefCell<RepositoryManager>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     version_guesser: VersionGuesser,
-    io: Option<Box<dyn IOInterface>>,
+    io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 }
 
 impl RootPackageLoader {
@@ -39,17 +40,17 @@ impl RootPackageLoader {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: Option<VersionParser>,
         version_guesser: Option<VersionGuesser>,
-        io: Option<Box<dyn IOInterface>>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Self {
         let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {
-            let mut process_executor = ProcessExecutor::new(io.as_deref().map(|i| i.clone_box()));
+            let mut process_executor = ProcessExecutor::new(io.clone());
             process_executor.enable_async();
             VersionGuesser::new(
                 config.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(process_executor)),
                 inner.version_parser.clone(),
-                io.as_ref().map(|i| i.clone_box()),
+                io.clone(),
             )
         });
         Self {

@@ -22,6 +22,7 @@ use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
@@ -1144,7 +1145,7 @@ impl ShowCommand {
                     ),
                 );
             }
-            let io: &mut dyn IOInterface = self.get_io();
+            let io = self.get_io();
             io.write(&JsonFile::encode(
                 &PhpMixed::Array(
                     json_map
@@ -1158,7 +1159,7 @@ impl ShowCommand {
             if input.get_option("latest").as_bool() == Some(true)
                 && view_data.values().any(|v| !v.is_empty())
             {
-                let io: &mut dyn IOInterface = self.get_io();
+                let io = self.get_io();
                 if !io.is_decorated() {
                     io.write_error("Legend:");
                     io.write_error("! patch or minor release available - update recommended");
@@ -1315,7 +1316,7 @@ impl ShowCommand {
         write_release_date: bool,
         release_date_length: usize,
     ) {
-        let io: &mut dyn IOInterface = self.get_io();
+        let io = self.get_io();
         let pad_name = write_version || write_latest || write_release_date || write_description;
         let pad_version = write_latest || write_release_date || write_description;
         let pad_latest = write_description || write_release_date;
@@ -2681,7 +2682,7 @@ impl ShowCommand {
             &best_stability,
             None,
             0,
-            Some(self.get_io()),
+            Some(&*self.get_io().borrow()),
             PhpMixed::Bool(true),
         )?;
         while let Some(ref c) = candidate {

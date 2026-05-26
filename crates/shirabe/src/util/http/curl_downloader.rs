@@ -29,6 +29,7 @@ use crate::config::Config;
 use crate::downloader::MaxFileSizeExceededException;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::StreamContextFactory;
@@ -48,7 +49,7 @@ pub struct CurlDownloader {
     /// @var Job[]
     jobs: IndexMap<i64, IndexMap<String, PhpMixed>>,
     /// @var IOInterface
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var AuthHelper
@@ -122,7 +123,7 @@ static TIMEOUT_WARNING: AtomicBool = AtomicBool::new(false);
 impl CurlDownloader {
     /// @param mixed[] $options
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         _options: IndexMap<String, PhpMixed>,
         _disable_tls: bool,
@@ -340,7 +341,7 @@ impl CurlDownloader {
         {
             self.config
                 .borrow_mut()
-                .prohibit_url_by_config(url, Some(&*self.io), &options)?;
+                .prohibit_url_by_config(url, Some(&*self.io.borrow()), &options)?;
         }
 
         let curl_handle = curl_init();
@@ -1184,7 +1185,7 @@ impl CurlDownloader {
                         == Some("application/json")
                 {
                     HttpDownloader::output_warnings(
-                        &*self.io,
+                        &*self.io.borrow(),
                         job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
                         &match json_decode(response_ref.inner.get_body().unwrap_or(""), true)? {
                             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),

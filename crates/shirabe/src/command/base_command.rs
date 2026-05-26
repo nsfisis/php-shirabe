@@ -13,6 +13,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
     count, explode, in_array, is_string, max,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
@@ -27,6 +29,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::io::NullIO;
 use crate::package::version::VersionParser;
 use crate::plugin::PluginEvents;
@@ -184,9 +187,9 @@ pub trait BaseCommand {
     /// Whether or not this command is meant to call another command.
     fn is_proxy_command(&self) -> bool;
 
-    fn get_io(&mut self) -> &mut dyn IOInterface;
+    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>>;
 
-    fn set_io(&mut self, io: Box<dyn IOInterface>);
+    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>);
 
     // TODO(cli-completion): fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions);
 
@@ -201,7 +204,7 @@ pub trait BaseCommand {
     fn create_composer_instance(
         &self,
         input: &dyn InputInterface,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -254,7 +257,7 @@ pub trait BaseCommand {
 #[derive(Debug)]
 pub struct BaseCommandData {
     pub(crate) composer: Option<PartialComposerHandle>,
-    pub(crate) io: Option<Box<dyn IOInterface>>,
+    pub(crate) io: Option<Rc<RefCell<dyn IOInterface>>>,
 }
 
 pub trait HasBaseCommandData {
@@ -269,11 +272,11 @@ pub trait HasBaseCommandData {
         &mut self.base_command_data_mut().composer
     }
 
-    fn io(&self) -> Option<&dyn IOInterface> {
-        self.base_command_data().io.as_deref()
+    fn io(&self) -> Option<Rc<RefCell<dyn IOInterface>>> {
+        self.base_command_data().io.clone()
     }
 
-    fn io_mut(&mut self) -> &mut Option<Box<dyn IOInterface>> {
+    fn io_mut(&mut self) -> &mut Option<Rc<RefCell<dyn IOInterface>>> {
         &mut self.base_command_data_mut().io
     }
 }
@@ -335,16 +338,16 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         false
     }
 
-    fn get_io(&mut self) -> &mut dyn IOInterface {
+    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>> {
         if self.io().is_none() {
             // TODO(phase-b): requires inner Symfony Application access
-            *self.io_mut() = Some(Box::new(NullIO::new()));
+            *self.io_mut() = Some(Rc::new(RefCell::new(NullIO::new())));
         }
 
-        &mut **self.io_mut().as_mut().unwrap()
+        self.io().unwrap()
     }
 
-    fn set_io(&mut self, io: Box<dyn IOInterface>) {
+    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>) {
         *self.io_mut() = Some(io);
     }
 
@@ -363,9 +366,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         // TODO(phase-b): `$this instanceof SelfUpdateCommand` not representable
 
         let composer = self.try_composer(Some(disable_plugins), Some(disable_scripts));
-        // TODO(phase-b): re-borrow self for get_io after try_composer move
-        let io_ptr: *const dyn IOInterface = self.get_io();
-        let io = unsafe { &*io_ptr };
+        let io = self.get_io();
 
         let disable_plugins_kind = if disable_plugins {
             crate::factory::DisablePlugins::All
@@ -373,7 +374,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             crate::factory::DisablePlugins::None
         };
         let composer = if composer.is_none() {
-            Factory::create_global(io, disable_plugins_kind, disable_scripts)
+            Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)
         } else {
             composer
         };
@@ -476,7 +477,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn create_composer_instance(
         &self,
         input: &dyn InputInterface,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,

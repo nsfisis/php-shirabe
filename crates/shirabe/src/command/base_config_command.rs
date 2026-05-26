@@ -37,9 +37,9 @@ pub trait BaseConfigCommand: BaseCommand {
         }
 
         // TODO(phase-b): clone_box to release the &mut self borrow held by get_io.
-        let io = self.get_io().clone_box();
+        let io = self.get_io().clone();
         *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            Factory::create_config(Some(io.as_ref()), None)?,
+            Factory::create_config(Some(io.clone()), None)?,
         )));
         let config_rc = self.config().unwrap().clone();
 
@@ -62,7 +62,7 @@ pub trait BaseConfigCommand: BaseCommand {
         self.set_config_file(Some(JsonFile::new(
             config_file.clone(),
             None,
-            Some(io.clone_box()),
+            Some(io.clone()),
         )?));
         // TODO(phase-b): JsonConfigSource::new takes owned JsonFile, but PHP shares the same
         // instance with $this->configFile. Needs Rc<RefCell<JsonFile>> refactor on both sides.

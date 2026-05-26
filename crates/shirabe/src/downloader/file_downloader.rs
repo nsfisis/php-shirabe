@@ -25,6 +25,8 @@ use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceMutable;
 use crate::io::NullIO;
 use crate::package::PackageInterface;
 use crate::package::comparer::Comparer;
@@ -55,7 +57,7 @@ pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
 #[derive(Debug)]
 pub struct FileDownloader {
     /// @var IOInterface
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
     /// @var HttpDownloader
@@ -92,7 +94,7 @@ impl FileDownloader {
 
     /// Constructor.
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -102,7 +104,7 @@ impl FileDownloader {
     ) -> Self {
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                io.clone_box(),
+                io.clone(),
             ))))
         });
         let filesystem = filesystem.unwrap_or_else(|| {

@@ -28,7 +28,7 @@ pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
     pub(crate) vendor_dir: String,
     pub(crate) download_manager: Option<std::rc::Rc<std::cell::RefCell<DownloadManager>>>,
-    pub(crate) io: Box<dyn IOInterface>,
+    pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     pub(crate) r#type: Option<String>,
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     pub(crate) binary_installer: BinaryInstaller,
@@ -37,7 +37,7 @@ pub struct LibraryInstaller {
 impl LibraryInstaller {
     /// Initializes library installer.
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         composer: PartialComposerWeakHandle,
         r#type: Option<String>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,

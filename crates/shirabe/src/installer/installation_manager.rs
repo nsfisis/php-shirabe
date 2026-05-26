@@ -23,6 +23,7 @@ use crate::installer::PackageEvents;
 use crate::installer::PluginInstaller;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
@@ -39,7 +40,7 @@ pub struct InstallationManager {
     /// @var array<string, array<PackageInterface>>
     notifiable_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-    io: Box<dyn IOInterface>,
+    io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     output_progress: bool,
 }
@@ -47,7 +48,7 @@ pub struct InstallationManager {
 impl InstallationManager {
     pub fn new(
         loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> Self {
         Self {

@@ -6,6 +6,7 @@ use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
@@ -127,7 +128,7 @@ impl AuditCommand {
         let _ = ignore_severities;
         Ok(auditor
             .audit(
-                self.get_io(),
+                &mut *self.get_io().borrow_mut(),
                 &repo_set,
                 packages,
                 &audit_format,

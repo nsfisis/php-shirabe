@@ -43,6 +43,7 @@ use crate::installer::LibraryInstaller;
 use crate::installer::MetapackageInstaller;
 use crate::installer::PluginInstaller;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::Locker;
@@ -231,7 +232,7 @@ impl Factory {
     }
 
     pub fn create_config(
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         cwd: Option<&str>,
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
@@ -262,9 +263,9 @@ impl Factory {
 
         // load global config
         let global_config_path = format!("{}/config.json", config.get_str("home")?);
-        let mut file = JsonFile::new(global_config_path.clone(), None, io.map(|i| i.clone_box()))?;
+        let mut file = JsonFile::new(global_config_path.clone(), None, io.clone())?;
         if file.exists() {
-            if let Some(io_ref) = io {
+            if let Some(io_ref) = &io {
                 io_ref.write_error3(
                     &format!("Loading config file {}", file.get_path()),
                     true,
@@ -273,11 +274,11 @@ impl Factory {
             }
             // TODO(phase-b): validate_json_schema takes ownership of JsonFile; recreate it
             Self::validate_json_schema(
-                io,
+                io.clone(),
                 ValidateJsonInput::File(JsonFile::new(
                     global_config_path.clone(),
                     None,
-                    io.map(|i| i.clone_box()),
+                    io.clone(),
                 )?),
                 JsonFile::LAX_SCHEMA,
                 None,
@@ -323,9 +324,9 @@ impl Factory {
 
         // load global auth file
         let auth_file_path = format!("{}/auth.json", config.get_str("home")?);
-        let mut auth_file = JsonFile::new(auth_file_path.clone(), None, io.map(|i| i.clone_box()))?;
+        let mut auth_file = JsonFile::new(auth_file_path.clone(), None, io.clone())?;
         if auth_file.exists() {
-            if let Some(io_ref) = io {
+            if let Some(io_ref) = &io {
                 io_ref.write_error3(
                     &format!("Loading config file {}", auth_file.get_path()),
                     true,
@@ -334,12 +335,8 @@ impl Factory {
             }
             // TODO(phase-b): validate_json_schema takes ownership; recreate JsonFile
             Self::validate_json_schema(
-                io,
-                ValidateJsonInput::File(JsonFile::new(
-                    auth_file_path.clone(),
-                    None,
-                    io.map(|i| i.clone_box()),
-                )?),
+                io.clone(),
+                ValidateJsonInput::File(JsonFile::new(auth_file_path.clone(), None, io.clone())?),
                 JsonFile::AUTH_SCHEMA,
                 None,
             )?;
@@ -433,7 +430,7 @@ impl Factory {
     /// Creates a Composer instance
     pub fn create_composer(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         local_config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         cwd: Option<&str>,
@@ -465,7 +462,7 @@ impl Factory {
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
 
-            let mut file = JsonFile::new(path.clone(), None, Some(io.clone_box()))?;
+            let mut file = JsonFile::new(path.clone(), None, Some(io.clone()))?;
 
             if !file.exists() {
                 let message = if path == "./composer.json" || path == "composer.json" {
@@ -512,7 +509,7 @@ impl Factory {
         }
 
         // Load config and override with local config/auth config
-        let mut config = Self::create_config(Some(io), Some(&cwd))?;
+        let mut config = Self::create_config(Some(io.clone()), Some(&cwd))?;
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
             && realpath(&config.get_str("home")?) == realpath(&dirname(&local_config_source));
         config.merge(&local_config_data, &local_config_source);
@@ -531,7 +528,7 @@ impl Factory {
                 JsonFile::new(
                     realpath(composer_file_path).unwrap_or_default(),
                     None,
-                    Some(io.clone_box()),
+                    Some(io.clone()),
                 )?,
                 false,
             )));
@@ -542,7 +539,7 @@ impl Factory {
                     dirname(&realpath(composer_file_path).unwrap_or_default())
                 ),
                 None,
-                Some(io.clone_box()),
+                Some(io.clone()),
             )?;
             if local_auth_file.exists() {
                 io.write_error3(
@@ -566,7 +563,7 @@ impl Factory {
         }
 
         // make sure we load the auth env again over the local auth.json + composer.json config
-        Self::load_composer_auth_env(&mut config, Some(io))?;
+        Self::load_composer_auth_env(&mut config, Some(io.clone()))?;
 
         let vendor_dir = config.get_str("vendor-dir")?;
 
@@ -620,10 +617,10 @@ impl Factory {
                     }
 
                     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(
-                        Self::create_http_downloader(io, &config, IndexMap::new())?,
+                        Self::create_http_downloader(io.clone(), &config, IndexMap::new())?,
                     ));
                     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(
-                        Some(io.clone_box()),
+                        Some(io.clone()),
                     )));
                     let r#loop = std::rc::Rc::new(std::cell::RefCell::new(Loop::new(
                         http_downloader.clone(),
@@ -635,7 +632,7 @@ impl Factory {
                     let dispatcher = {
                         let mut d = EventDispatcher::new(
                             PartialComposerWeakHandle::from_weak(composer_weak.clone()),
-                            io.clone_box(),
+                            io.clone(),
                             Some(process.clone()),
                         );
                         d.set_run_scripts(!disable_scripts);
@@ -645,7 +642,7 @@ impl Factory {
 
                     // initialize repository manager
                     let rm = std::rc::Rc::new(std::cell::RefCell::new(RepositoryFactory::manager(
-                        io,
+                        io.clone(),
                         &config,
                         Some(http_downloader.clone()),
                         Some(dispatcher.clone()),
@@ -665,14 +662,14 @@ impl Factory {
                         config.clone(),
                         process.clone(),
                         parser.clone(),
-                        Some(io.clone_box()),
+                        Some(io.clone()),
                     );
                     let mut loader = self.load_root_package(
                         rm.clone(),
                         config.clone(),
                         parser,
                         guesser,
-                        io.clone_box(),
+                        io.clone(),
                     );
                     let package = loader.load(
                         local_config_data
@@ -688,7 +685,7 @@ impl Factory {
 
                     // load local repository
                     self.add_local_repository(
-                        io,
+                        io.clone(),
                         &mut rm.borrow_mut(),
                         &vendor_dir,
                         composer.get_package().clone(),
@@ -700,7 +697,7 @@ impl Factory {
                     let im = std::rc::Rc::new(std::cell::RefCell::new(
                         self.create_installation_manager(
                             r#loop.clone(),
-                            io.clone_box(),
+                            io.clone(),
                             Some(dispatcher.clone()),
                         ),
                     ));
@@ -709,7 +706,7 @@ impl Factory {
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
                         // initialize download manager
                         let dm = self.create_download_manager(
-                            io,
+                            io.clone(),
                             &config,
                             &http_downloader,
                             &process,
@@ -719,7 +716,7 @@ impl Factory {
 
                         // initialize autoload generator
                         let generator =
-                            AutoloadGenerator::new(dispatcher.clone(), Some(io.clone_box()));
+                            AutoloadGenerator::new(dispatcher.clone(), Some(io.clone()));
                         composer_full.set_autoload_generator(std::rc::Rc::new(
                             std::cell::RefCell::new(generator),
                         ));
@@ -731,7 +728,7 @@ impl Factory {
                     }
 
                     // add installers to the manager (must happen after download manager is created since they read it out of $composer)
-                    self.create_default_installers(&im, &composer, io, Some(&process));
+                    self.create_default_installers(&im, &composer, io.clone(), Some(&process));
 
                     // init locker if possible
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
@@ -754,7 +751,7 @@ impl Factory {
                             }
 
                             let locker = Locker::new(
-                                io.clone_box(),
+                                io.clone(),
                                 JsonFile::new(
                                     if lock_enabled {
                                         lock_file
@@ -762,7 +759,7 @@ impl Factory {
                                         Platform::get_dev_null()
                                     },
                                     None,
-                                    Some(io.clone_box()),
+                                    Some(io.clone()),
                                 )?,
                                 im.clone(),
                                 &file_get_contents(composer_file_path).unwrap_or_default(),
@@ -781,12 +778,8 @@ impl Factory {
                                 448,
                             );
                             let locker = Locker::new(
-                                io.clone_box(),
-                                JsonFile::new(
-                                    Platform::get_dev_null(),
-                                    None,
-                                    Some(io.clone_box()),
-                                )?,
+                                io.clone(),
+                                JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,
                                 im.clone(),
                                 &lock_contents,
                                 process.clone(),
@@ -799,7 +792,7 @@ impl Factory {
                     if let Some(full_composer) = composer.as_full_mut() {
                         let global_composer = if !full_composer.is_global() {
                             self.create_global_composer(
-                                io,
+                                io.clone(),
                                 &*config.borrow(),
                                 disable_plugins,
                                 disable_scripts,
@@ -809,7 +802,7 @@ impl Factory {
                             None
                         };
                         let mut pm = self.create_plugin_manager(
-                            io,
+                            &*io.borrow(),
                             ComposerWeakHandle::from_weak(composer_weak.clone()),
                             global_composer,
                             disable_plugins,
@@ -857,19 +850,19 @@ impl Factory {
     }
 
     pub fn create_global(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
     ) -> Option<PartialComposerHandle> {
         let factory = Self;
 
-        let config = Self::create_config(Some(io), None).ok()?;
+        let config = Self::create_config(Some(io.clone()), None).ok()?;
         factory.create_global_composer(io, &config, disable_plugins, disable_scripts, true)
     }
 
     fn add_local_repository(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         rm: &mut RepositoryManager,
         vendor_dir: &str,
         root_package: RootPackageInterfaceHandle,
@@ -883,7 +876,7 @@ impl Factory {
                 JsonFile::new(
                     format!("{}/composer/installed.json", vendor_dir),
                     None,
-                    Some(io.clone_box()),
+                    Some(io.clone()),
                 )
                 .expect("installed.json path is always valid"),
                 true,
@@ -896,7 +889,7 @@ impl Factory {
 
     fn create_global_composer(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &Config,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -913,7 +906,7 @@ impl Factory {
         };
 
         match self.create_composer(
-            io,
+            io.clone(),
             Some(LocalConfigInput::Path(format!(
                 "{}/composer.json",
                 config.get_str("home").ok()?
@@ -937,7 +930,7 @@ impl Factory {
 
     pub fn create_download_manager(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: &std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -950,7 +943,7 @@ impl Factory {
             .unwrap_or(0);
         let cache = if cache_files_ttl > 0 {
             let mut cache = Cache::new(
-                io.clone_box(),
+                io.clone(),
                 &config.borrow_mut().get_str("cache-files-dir")?,
                 Some("a-z0-9_./"),
                 None,
@@ -972,7 +965,7 @@ impl Factory {
             process.clone(),
         ))));
 
-        let mut dm = DownloadManager::new(io.clone_box(), false, Some(fs.clone()));
+        let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         let preferred = config.borrow_mut().get("preferred-install");
         match preferred.as_string() {
             Some("dist") => {
@@ -1006,7 +999,7 @@ impl Factory {
         dm.set_downloader(
             "git",
             Box::new(GitDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 Some(process.clone()),
                 Some(fs.clone()),
@@ -1015,7 +1008,7 @@ impl Factory {
         dm.set_downloader(
             "svn",
             Box::new(SvnDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
@@ -1024,7 +1017,7 @@ impl Factory {
         dm.set_downloader(
             "fossil",
             Box::new(FossilDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
@@ -1033,7 +1026,7 @@ impl Factory {
         dm.set_downloader(
             "hg",
             Box::new(HgDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
@@ -1042,7 +1035,7 @@ impl Factory {
         dm.set_downloader(
             "perforce",
             Box::new(PerforceDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
@@ -1051,7 +1044,7 @@ impl Factory {
         dm.set_downloader(
             "zip",
             Box::new(ZipDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1063,7 +1056,7 @@ impl Factory {
         dm.set_downloader(
             "rar",
             Box::new(RarDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1075,7 +1068,7 @@ impl Factory {
         dm.set_downloader(
             "tar",
             Box::new(TarDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1087,7 +1080,7 @@ impl Factory {
         dm.set_downloader(
             "gzip",
             Box::new(GzipDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1099,7 +1092,7 @@ impl Factory {
         dm.set_downloader(
             "xz",
             Box::new(XzDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1111,7 +1104,7 @@ impl Factory {
         dm.set_downloader(
             "phar",
             Box::new(PharDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1123,7 +1116,7 @@ impl Factory {
         dm.set_downloader(
             "file",
             Box::new(FileDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1135,7 +1128,7 @@ impl Factory {
         dm.set_downloader(
             "path",
             Box::new(PathDownloader::new(
-                io.clone_box(),
+                io.clone(),
                 config.clone(),
                 http_downloader.clone(),
                 event_dispatcher.cloned(),
@@ -1181,7 +1174,7 @@ impl Factory {
     pub fn create_installation_manager(
         &self,
         r#loop: std::rc::Rc<std::cell::RefCell<Loop>>,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     ) -> InstallationManager {
         InstallationManager::new(r#loop, io, event_dispatcher)
@@ -1191,7 +1184,7 @@ impl Factory {
         &self,
         im: &std::rc::Rc<std::cell::RefCell<InstallationManager>>,
         composer: &PartialOrFullComposer,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         process: Option<&std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
     ) {
         let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
@@ -1221,7 +1214,7 @@ impl Factory {
         // TODO(phase-b): BinaryInstaller is a PHP class so it can't be cloned. Sharing requires
         // Rc<RefCell<BinaryInstaller>>; for now construct one per installer.
         let _binary_installer = BinaryInstaller::new(
-            io.clone_box(),
+            io.clone(),
             bin_dir.clone(),
             bin_compat.clone(),
             Some(fs.clone()),
@@ -1251,13 +1244,13 @@ impl Factory {
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         parser: VersionParser,
         guesser: VersionGuesser,
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> RootPackageLoader {
         RootPackageLoader::new(rm, config, Some(parser), Some(guesser), Some(io))
     }
 
     pub fn create(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
@@ -1296,7 +1289,7 @@ impl Factory {
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`
     pub fn create_http_downloader(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<HttpDownloader> {
@@ -1366,7 +1359,7 @@ impl Factory {
                 array_replace_recursive(http_downloader_options, options.clone());
         }
         let http_downloader_result: anyhow::Result<HttpDownloader> = Ok(HttpDownloader::new(
-            io.clone_box(),
+            io.clone(),
             config.clone(),
             http_downloader_options,
             disable_tls,
@@ -1402,7 +1395,7 @@ impl Factory {
 
     fn load_composer_auth_env(
         config: &mut Config,
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
         let composer_auth_env = Platform::get_env("COMPOSER_AUTH");
         let composer_auth_env_str = match composer_auth_env {
@@ -1420,7 +1413,7 @@ impl Factory {
             }));
         }
 
-        if let Some(io_ref) = io {
+        if let Some(io_ref) = &io {
             io_ref.write_error3(
                 "Loading auth config from COMPOSER_AUTH",
                 true,
@@ -1468,7 +1461,7 @@ impl Factory {
     }
 
     fn validate_json_schema(
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         file_or_data: ValidateJsonInput,
         schema: i64,
         source: Option<&str>,

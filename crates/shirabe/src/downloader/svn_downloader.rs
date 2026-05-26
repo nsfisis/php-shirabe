@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
@@ -23,7 +24,7 @@ pub struct SvnDownloader {
 
 impl SvnDownloader {
     pub fn new(
-        io: Box<dyn IOInterface>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         fs: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -44,7 +45,7 @@ impl SvnDownloader {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
             url.to_string(),
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
@@ -126,7 +127,7 @@ impl SvnDownloader {
 
         let mut util = SvnUtil::new(
             url.to_string(),
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
@@ -186,7 +187,7 @@ impl SvnDownloader {
     ) -> anyhow::Result<String> {
         let mut util = SvnUtil::new(
             base_url.to_string(),
-            self.inner.io.clone_box(),
+            self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
@@ -381,7 +382,7 @@ impl SvnDownloader {
 
             let mut util = SvnUtil::new(
                 base_url,
-                self.inner.io.clone_box(),
+                self.inner.io.clone(),
                 self.inner.config.clone(),
                 Some(self.inner.process.clone()),
             );
