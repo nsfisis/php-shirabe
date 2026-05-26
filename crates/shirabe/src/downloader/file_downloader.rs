@@ -28,7 +28,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::IOInterfaceMutable;
 use crate::io::NullIO;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
 use crate::plugin::PluginEvents;
 use crate::plugin::PostFileDownloadEvent;
@@ -156,9 +156,9 @@ impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         if package.get_dist_url().is_none() {
@@ -169,14 +169,14 @@ impl DownloaderInterface for FileDownloader {
             .into());
         }
 
-        let cache_key_generator = |package: &dyn PackageInterface, key: &str| -> String {
+        let cache_key_generator = |package: PackageInterfaceHandle, key: &str| -> String {
             let cache_key = hash("sha1", key);
 
             format!(
                 "{}/{}.{}",
                 package.get_name(),
                 cache_key,
-                package.get_dist_type().unwrap_or("")
+                package.get_dist_type().unwrap_or_default()
             )
         };
 
@@ -185,8 +185,8 @@ impl DownloaderInterface for FileDownloader {
         // @var array<array{base: non-empty-string, processed: non-empty-string, cacheKey: string}> $urls
         let mut urls: Vec<UrlEntry> = vec![];
         for url in dist_urls {
-            let processed_url = self.process_url(package, &url)?;
-            let cache_key = cache_key_generator(package, &processed_url);
+            let processed_url = self.process_url(package.clone(), &url)?;
+            let cache_key = cache_key_generator(package.clone(), &processed_url);
             urls.push(UrlEntry {
                 base: url,
                 processed: processed_url,
@@ -199,7 +199,7 @@ impl DownloaderInterface for FileDownloader {
         }
         debug_assert!(urls.len() > 0);
 
-        let file_name = self.get_file_name(package, path);
+        let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         let dir_of_file = shirabe_php_shim::dirname(&file_name);
         self.filesystem
@@ -312,7 +312,7 @@ impl DownloaderInterface for FileDownloader {
                         if file_exists(&file_name) {
                             self.filesystem.borrow().unlink(&file_name)?;
                         }
-                        self.clear_last_cache_write(package);
+                        self.clear_last_cache_write(package.clone());
 
                         if e.downcast_ref::<IrrecoverableDownloadException>().is_some() {
                             return Err(e);
@@ -429,9 +429,9 @@ impl DownloaderInterface for FileDownloader {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(Some(PhpMixed::Null))
     }
@@ -440,11 +440,11 @@ impl DownloaderInterface for FileDownloader {
     async fn cleanup(
         &self,
         _type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        let file_name = self.get_file_name(package, path);
+        let file_name = self.get_file_name(package.clone(), path);
         if file_exists(&file_name) {
             self.filesystem.borrow_mut().unlink(&file_name)?;
         }
@@ -471,7 +471,7 @@ impl DownloaderInterface for FileDownloader {
 
         if let Some(paths) = self
             .additional_cleanup_paths
-            .get(package.get_name())
+            .get(&package.get_name())
             .cloned()
         {
             for path_to_clean in &paths {
@@ -494,13 +494,15 @@ impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         if output {
-            self.io
-                .write_error(&format!("  - {}", InstallOperation::format(package, false)));
+            self.io.write_error(&format!(
+                "  - {}",
+                InstallOperation::format(package.clone(), false)
+            ));
         }
 
         let vendor_dir = self
@@ -526,11 +528,11 @@ impl DownloaderInterface for FileDownloader {
         }
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
-            &self.get_file_name(package, path),
+            &self.get_file_name(package.clone(), path),
             &format!(
                 "{}/{}",
                 path,
-                self.get_dist_path(package, PATHINFO_BASENAME)
+                self.get_dist_path(package.clone(), PATHINFO_BASENAME)
             ),
         )?;
 
@@ -554,14 +556,14 @@ impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.io.write_error(&format!(
             "  - {}{}",
-            UpdateOperation::format(initial, target, false),
-            self.get_install_operation_appendix(target, path)
+            UpdateOperation::format(initial.clone(), target.clone(), false),
+            self.get_install_operation_appendix(target.clone(), path)
         ));
 
         // PHP: return $this->remove($initial, $path, false)->then(fn () => $this->install($target, $path, false));
@@ -572,7 +574,7 @@ impl DownloaderInterface for FileDownloader {
     /// @inheritDoc
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -604,7 +606,7 @@ impl ChangeReportInterface for FileDownloader {
     /// @throws \RuntimeException
     fn get_local_changes(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {
         // TODO(phase-b): swap self.io to NullIO and restore — needs a take/swap helper
@@ -626,14 +628,18 @@ impl ChangeReportInterface for FileDownloader {
             tokio::runtime::Runtime::new()
                 .unwrap()
                 .block_on(self.download(
-                    package,
+                    package.clone(),
                     &format!("{}_compare", target_dir),
                     None,
                     false,
                 ))?;
             tokio::runtime::Runtime::new()
                 .unwrap()
-                .block_on(self.install(package, &format!("{}_compare", target_dir), false))?;
+                .block_on(self.install(
+                    package.clone(),
+                    &format!("{}_compare", target_dir),
+                    false,
+                ))?;
 
             let mut comparer = Comparer::new();
             comparer.set_source(format!("{}_compare", target_dir));
@@ -677,11 +683,11 @@ impl ChangeReportInterface for FileDownloader {
 
 impl FileDownloader {
     /// @param PATHINFO_EXTENSION|PATHINFO_BASENAME $component
-    fn get_dist_path(&self, package: &dyn PackageInterface, component: i64) -> String {
+    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
         pathinfo(
             PhpMixed::String(
                 parse_url(
-                    &strtr(package.get_dist_url().unwrap_or(""), "\\", "/"),
+                    &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
                     PHP_URL_PATH,
                 )
                 .as_string()
@@ -695,24 +701,24 @@ impl FileDownloader {
         .to_string()
     }
 
-    pub(crate) fn clear_last_cache_write(&self, package: &dyn PackageInterface) {
+    pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
         let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
-        if self.cache.is_some() && last_cache_writes.contains_key(package.get_name()) {
-            let key = last_cache_writes.get(package.get_name()).unwrap().clone();
+        if self.cache.is_some() && last_cache_writes.contains_key(&package.get_name()) {
+            let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
             self.cache.as_ref().unwrap().borrow_mut().remove(&key);
-            last_cache_writes.shift_remove(package.get_name());
+            last_cache_writes.shift_remove(&package.get_name());
         }
     }
 
-    pub(crate) fn add_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
+    pub(crate) fn add_cleanup_path(&mut self, package: PackageInterfaceHandle, path: &str) {
         self.additional_cleanup_paths
-            .entry(package.get_name().to_string())
+            .entry(package.get_name())
             .or_insert_with(Vec::new)
             .push(path.to_string());
     }
 
-    pub(crate) fn remove_cleanup_path(&mut self, package: &dyn PackageInterface, path: &str) {
-        if let Some(paths) = self.additional_cleanup_paths.get_mut(package.get_name()) {
+    pub(crate) fn remove_cleanup_path(&mut self, package: PackageInterfaceHandle, path: &str) {
+        if let Some(paths) = self.additional_cleanup_paths.get_mut(&package.get_name()) {
             // PHP: array_search($path, ..., true)
             let idx = paths.iter().position(|p| p == path);
             if let Some(i) = idx {
@@ -723,10 +729,10 @@ impl FileDownloader {
     }
 
     /// Gets file name for specific package
-    pub(crate) fn get_file_name(&self, package: &dyn PackageInterface, _path: &str) -> String {
-        let extension = self.get_dist_path(package, PATHINFO_EXTENSION);
+    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &str) -> String {
+        let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
-            package.get_dist_type().unwrap_or("").to_string()
+            package.get_dist_type().unwrap_or_default()
         } else {
             extension
         };
@@ -752,14 +758,14 @@ impl FileDownloader {
     /// Gets appendix message to add to the "- Upgrading x" string being output on update
     fn get_install_operation_appendix(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
     ) -> String {
         String::new()
     }
 
     /// Process the download url
-    pub(crate) fn process_url(&self, package: &dyn PackageInterface, url: &str) -> Result<String> {
+    pub(crate) fn process_url(&self, package: PackageInterfaceHandle, url: &str) -> Result<String> {
         if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
             return Err(RuntimeException {
                 message: "You must enable the openssl extension to download files via https"
@@ -774,7 +780,7 @@ impl FileDownloader {
             url = UrlUtil::update_dist_reference(
                 &*self.config.borrow(),
                 url,
-                package.get_dist_reference().unwrap(),
+                &package.get_dist_reference().unwrap(),
             );
         }
 

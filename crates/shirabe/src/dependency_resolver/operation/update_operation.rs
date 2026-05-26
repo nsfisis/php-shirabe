@@ -20,17 +20,17 @@ impl UpdateOperation {
         }
     }
 
-    pub fn get_initial_package(&self) -> &PackageInterfaceHandle {
-        &self.initial_package
+    pub fn get_initial_package(&self) -> PackageInterfaceHandle {
+        self.initial_package.clone()
     }
 
-    pub fn get_target_package(&self) -> &PackageInterfaceHandle {
-        &self.target_package
+    pub fn get_target_package(&self) -> PackageInterfaceHandle {
+        self.target_package.clone()
     }
 
     pub fn format(
-        initial_package: &dyn PackageInterface,
-        target_package: &dyn PackageInterface,
+        initial_package: PackageInterfaceHandle,
+        target_package: PackageInterfaceHandle,
         lock: bool,
     ) -> String {
         let mut from_version = initial_package
@@ -90,8 +90,8 @@ impl OperationInterface for UpdateOperation {
 
     fn show(&self, lock: bool) -> String {
         Self::format(
-            self.initial_package.as_rc().borrow().as_package_interface(),
-            self.target_package.as_rc().borrow().as_package_interface(),
+            self.initial_package.clone(),
+            self.target_package.clone(),
             lock,
         )
     }

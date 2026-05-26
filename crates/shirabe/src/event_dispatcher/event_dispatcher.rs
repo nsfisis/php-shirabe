@@ -1289,11 +1289,7 @@ impl EventDispatcher {
         // (PhpMixed in this port).
         let map = generator.parse_autoloads(
             package_map,
-            package
-                .as_rc()
-                .borrow()
-                .as_root_package_interface()
-                .unwrap(),
+            package.clone(),
             shirabe_php_shim::PhpMixed::Null,
         );
 

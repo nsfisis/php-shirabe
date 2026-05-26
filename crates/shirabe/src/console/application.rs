@@ -648,11 +648,7 @@ impl Application {
                                         );
                                         let map = generator.parse_autoloads(
                                             package_map,
-                                            root_package
-                                                .as_rc()
-                                                .borrow()
-                                                .as_root_package_interface()
-                                                .unwrap(),
+                                            root_package.clone(),
                                             PhpMixed::Bool(false),
                                         );
 

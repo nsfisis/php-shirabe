@@ -117,7 +117,7 @@ impl LockTransaction {
             }
 
             if update_mirrors && !self.present_map.contains_key(&package.ptr_id().to_string()) {
-                let updated = self.update_mirror_and_urls(package);
+                let updated = self.update_mirror_and_urls(package.clone());
                 packages.push(updated);
             } else {
                 packages.push(package.clone());
@@ -127,7 +127,7 @@ impl LockTransaction {
         packages
     }
 
-    fn update_mirror_and_urls(&self, package: &PackageInterfaceHandle) -> PackageInterfaceHandle {
+    fn update_mirror_and_urls(&self, package: PackageInterfaceHandle) -> PackageInterfaceHandle {
         for present_package in self.present_map.values() {
             if package.get_name() != present_package.get_name() {
                 continue;

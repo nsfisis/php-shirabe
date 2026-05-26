@@ -20,7 +20,7 @@ use crate::downloader::VcsCapableDownloaderInterface;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
@@ -63,9 +63,9 @@ impl PathDownloader {
 
     pub async fn download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(&path);
@@ -125,7 +125,7 @@ impl PathDownloader {
 
     pub async fn install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -144,11 +144,11 @@ impl PathDownloader {
 
         if realpath(&path).as_deref() == Some(&real_url) {
             if output {
-                let appendix = self.get_install_operation_appendix(package, &path)?;
+                let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.write_error3(
                     &format!(
                         "  - {}{}",
-                        InstallOperation::format(package, false),
+                        InstallOperation::format(package.clone(), false),
                         appendix
                     ),
                     true,
@@ -296,7 +296,7 @@ impl PathDownloader {
 
     pub async fn remove(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -314,7 +314,7 @@ impl PathDownloader {
                 self.inner.io.write_error3(
                     &format!(
                         "  - {}, source is still present in {}",
-                        UninstallOperation::format(package, false),
+                        UninstallOperation::format(package.clone(), false),
                         path
                     ),
                     true,
@@ -371,7 +371,7 @@ impl PathDownloader {
                 self.inner.io.write_error3(
                     &format!(
                         "  - {}, source is still present in {}",
-                        UninstallOperation::format(package, false),
+                        UninstallOperation::format(package.clone(), false),
                         path
                     ),
                     true,
@@ -385,7 +385,7 @@ impl PathDownloader {
         self.inner.remove(package, &path, output).await
     }
 
-    pub fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
+    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
@@ -396,7 +396,7 @@ impl PathDownloader {
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package);
+        let package_config = dumper.dump(package.clone());
         let package_version = guesser.guess_version(&package_config, &path);
         if let Ok(Some(version)) = package_version {
             return version.commit;
@@ -407,7 +407,7 @@ impl PathDownloader {
 
     pub(crate) fn get_install_operation_appendix(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<String> {
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
@@ -529,7 +529,7 @@ impl PathDownloader {
 }
 
 impl VcsCapableDownloaderInterface for PathDownloader {
-    fn get_vcs_reference(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
         PathDownloader::get_vcs_reference(self, package, &path)
     }
 }
@@ -546,9 +546,9 @@ impl DownloaderInterface for PathDownloader {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         self.inner
@@ -559,9 +559,9 @@ impl DownloaderInterface for PathDownloader {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .prepare(r#type, package, path, prev_package)
@@ -570,7 +570,7 @@ impl DownloaderInterface for PathDownloader {
 
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -579,8 +579,8 @@ impl DownloaderInterface for PathDownloader {
 
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
@@ -588,7 +588,7 @@ impl DownloaderInterface for PathDownloader {
 
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -598,9 +598,9 @@ impl DownloaderInterface for PathDownloader {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .cleanup(r#type, package, path, prev_package)

@@ -24,9 +24,10 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterfa
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::CompletePackageInterface;
+use crate::package::CompletePackageInterfaceHandle;
 use crate::package::Link;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -397,7 +398,7 @@ impl ShowCommand {
                     .get_packages();
                 let packages = RepositoryUtils::filter_required_packages(
                     &local_packages,
-                    root_pkg.as_rc().borrow().as_package_interface(),
+                    root_pkg.clone().into(),
                     false,
                     Vec::new(),
                 );
@@ -545,13 +546,8 @@ impl ShowCommand {
 
             let mut exit_code: i64 = 0;
             if input.get_option("tree").as_bool() == Some(true) {
-                let package_ref = package.as_rc().borrow();
-                let array_tree = self.generate_package_tree(
-                    package_ref.as_package_interface(),
-                    &*installed_repo,
-                    &*repos,
-                );
-                drop(package_ref);
+                let array_tree =
+                    self.generate_package_tree(package.clone().into(), &*installed_repo, &*repos);
 
                 if format == "json" {
                     let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -579,9 +575,8 @@ impl ShowCommand {
 
             let mut latest_package: Option<crate::package::PackageInterfaceHandle> = None;
             if input.get_option("latest").as_bool() == Some(true) {
-                let package_ref = package.as_rc().borrow();
                 latest_package = self.find_latest_package(
-                    package_ref.as_package_interface(),
+                    package.clone().into(),
                     composer.as_ref().unwrap(),
                     &platform_repo,
                     input.get_option("major-only").as_bool().unwrap_or(false),
@@ -626,25 +621,21 @@ impl ShowCommand {
                 return Ok(exit_code);
             }
 
-            let package_ref = package.as_rc().borrow();
-            let package_dyn = package_ref
-                .as_complete_package_interface()
-                .expect("single_package is a CompletePackageInterface");
-            let latest_ref = latest_package.as_ref().map(|p| p.as_rc().borrow());
-            let latest_dyn: Option<&dyn PackageInterface> =
-                latest_ref.as_ref().map(|r| r.as_package_interface());
             if format == "json" {
                 self.print_package_info_as_json(
-                    package_dyn,
+                    package.clone(),
                     &versions_map,
                     &*installed_repo,
-                    latest_dyn,
+                    latest_package,
                 )?;
             } else {
-                self.print_package_info(package_dyn, &versions_map, &*installed_repo, latest_dyn)?;
+                self.print_package_info(
+                    package.clone(),
+                    &versions_map,
+                    &*installed_repo,
+                    latest_package,
+                )?;
             }
-            drop(latest_ref);
-            drop(package_ref);
 
             return Ok(exit_code);
         }
@@ -670,9 +661,8 @@ impl ShowCommand {
                     ),
                     true,
                 ) {
-                    let package_ref = package.as_rc().borrow();
                     array_tree.push(self.generate_package_tree(
-                        package_ref.as_package_interface(),
+                        package.clone(),
                         &*installed_repo,
                         &*repos,
                     ));
@@ -844,9 +834,8 @@ impl ShowCommand {
                         if let PackageOrName::Pkg(package) = package_or_name {
                             if !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())?
                             {
-                                let package_ref = package.as_rc().borrow();
                                 let latest = self.find_latest_package(
-                                    package_ref.as_package_interface(),
+                                    package.clone(),
                                     composer.as_ref().unwrap(),
                                     &platform_repo,
                                     show_major_only,
@@ -854,7 +843,6 @@ impl ShowCommand {
                                     show_patch_only,
                                     &*platform_req_filter,
                                 )?;
-                                drop(package_ref);
                                 if latest.is_none() {
                                     continue;
                                 }
@@ -956,9 +944,7 @@ impl ShowCommand {
                             );
                             package_view_data.insert(
                                 "source".to_string(),
-                                match PackageInfo::get_view_source_url(
-                                    package.as_rc().borrow().as_package_interface(),
-                                ) {
+                                match PackageInfo::get_view_source_url(package.clone()) {
                                     Some(s) => PhpMixed::String(s),
                                     None => PhpMixed::Null,
                                 },
@@ -1007,14 +993,8 @@ impl ShowCommand {
                                 latest_version_str =
                                     latest_version_str.trim_start_matches('v').to_string();
                             }
-                            let latest_ref = latest.as_rc().borrow();
-                            let package_ref = package.as_rc().borrow();
-                            let update_status = Self::get_update_status(
-                                latest_ref.as_package_interface(),
-                                package_ref.as_package_interface(),
-                            );
-                            drop(package_ref);
-                            drop(latest_ref);
+                            let update_status =
+                                Self::get_update_status(latest.clone(), package.clone());
                             latest_length = latest_length.max(latest_version_str.len());
                             package_view_data
                                 .insert("latest".to_string(), PhpMixed::String(latest_version_str));
@@ -1480,8 +1460,8 @@ impl ShowCommand {
     /// @return array|string|string[]
     pub(crate) fn get_version_style(
         &self,
-        latest_package: &dyn PackageInterface,
-        package: &dyn PackageInterface,
+        latest_package: PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> String {
         Self::update_status_to_version_style(&Self::get_update_status(latest_package, package))
             .to_string()
@@ -1539,9 +1519,7 @@ impl ShowCommand {
             }
 
             // select an exact match if it is in the installed repo and no specific version was required
-            if version.is_null()
-                && installed_repo.has_package(p.as_rc().borrow().as_package_interface())
-            {
+            if version.is_null() && installed_repo.has_package(p.clone()) {
                 matched_package = Some(p.clone());
             }
 
@@ -1575,14 +1553,18 @@ impl ShowCommand {
     /// Prints package info.
     pub(crate) fn print_package_info(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &InstalledRepository,
-        latest_package: Option<&dyn PackageInterface>,
+        latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        self.print_meta(package, versions, installed_repo, latest_package);
-        self.print_links(package, Link::TYPE_REQUIRE, None);
-        self.print_links(package, Link::TYPE_DEV_REQUIRE, Some("requires (dev)"));
+        self.print_meta(package.clone(), versions, installed_repo, latest_package);
+        self.print_links(package.clone(), Link::TYPE_REQUIRE, None);
+        self.print_links(
+            package.clone(),
+            Link::TYPE_DEV_REQUIRE,
+            Some("requires (dev)"),
+        );
 
         if !package.get_suggests().is_empty() {
             self.get_io().write("\n<info>suggests</info>");
@@ -1592,8 +1574,8 @@ impl ShowCommand {
             }
         }
 
-        self.print_links(package, Link::TYPE_PROVIDE, None);
-        self.print_links(package, Link::TYPE_CONFLICT, None);
+        self.print_links(package.clone(), Link::TYPE_PROVIDE, None);
+        self.print_links(package.clone(), Link::TYPE_CONFLICT, None);
         self.print_links(package, Link::TYPE_REPLACE, None);
         Ok(())
     }
@@ -1601,13 +1583,13 @@ impl ShowCommand {
     /// Prints package metadata.
     pub(crate) fn print_meta(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &InstalledRepository,
-        latest_package: Option<&dyn PackageInterface>,
+        latest_package: Option<PackageInterfaceHandle>,
     ) {
-        let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
-            && installed_repo.has_package(package.as_package_interface());
+        let is_installed_package = !PlatformRepository::is_platform_package(&package.get_name())
+            && installed_repo.has_package(package.clone().into());
 
         self.get_io().write(&format!(
             "<info>name</info>     : {}",
@@ -1615,12 +1597,12 @@ impl ShowCommand {
         ));
         self.get_io().write(&format!(
             "<info>descrip.</info> : {}",
-            package.get_description().unwrap_or("")
+            package.get_description().unwrap_or_default()
         ));
         let keywords = package.get_keywords();
         self.get_io()
             .write(&format!("<info>keywords</info> : {}", keywords.join(", ")));
-        self.print_versions(package, versions, installed_repo);
+        self.print_versions(package.clone(), versions, installed_repo);
         if is_installed_package {
             if let Some(rd) = package.get_release_date() {
                 let rel = self.get_relative_time(&rd);
@@ -1631,8 +1613,8 @@ impl ShowCommand {
                 ));
             }
         }
-        let latest = if let Some(latest) = latest_package {
-            let style = self.get_version_style(latest, package.as_package_interface());
+        let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
+            let style = self.get_version_style(latest.clone(), package.clone().into());
             let released_time = match latest.get_release_date() {
                 None => String::new(),
                 Some(rd) => {
@@ -1649,26 +1631,26 @@ impl ShowCommand {
             ));
             latest
         } else {
-            package.as_package_interface()
+            package.clone().into()
         };
         self.get_io()
             .write(&format!("<info>type</info>     : {}", package.get_type()));
-        self.print_licenses(package);
+        self.print_licenses(package.clone());
         self.get_io().write(&format!(
             "<info>homepage</info> : {}",
-            package.get_homepage().unwrap_or("")
+            package.get_homepage().unwrap_or_default()
         ));
         self.get_io().write(&format!(
             "<info>source</info>   : [{}] <comment>{}</comment> {}",
-            package.get_source_type().unwrap_or(""),
-            package.get_source_url().unwrap_or(""),
-            package.get_source_reference().unwrap_or("")
+            package.get_source_type().unwrap_or_default(),
+            package.get_source_url().unwrap_or_default(),
+            package.get_source_reference().unwrap_or_default()
         ));
         self.get_io().write(&format!(
             "<info>dist</info>     : [{}] <comment>{}</comment> {}",
-            package.get_dist_type().unwrap_or(""),
-            package.get_dist_url().unwrap_or(""),
-            package.get_dist_reference().unwrap_or("")
+            package.get_dist_type().unwrap_or_default(),
+            package.get_dist_url().unwrap_or_default(),
+            package.get_dist_reference().unwrap_or_default()
         ));
         if is_installed_package {
             // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares by ref.
@@ -1691,7 +1673,7 @@ impl ShowCommand {
             package.get_names(true).join(", ")
         ));
 
-        if let Some(c) = latest.as_complete_package_interface() {
+        if let Some(c) = latest.as_complete() {
             if c.is_abandoned() {
                 let replacement = match c.get_replacement_package() {
                     Some(rp) => format!(" The author suggests using the {} package instead.", rp),
@@ -1759,7 +1741,7 @@ impl ShowCommand {
     /// Prints all available versions of this package and highlights the installed one if any.
     pub(crate) fn print_versions(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &InstalledRepository,
     ) {
@@ -1767,7 +1749,7 @@ impl ShowCommand {
         versions_keys = Semver::rsort(versions_keys);
 
         // highlight installed version
-        let installed_packages = installed_repo.find_packages(package.get_name(), None);
+        let installed_packages = installed_repo.find_packages(&package.get_name(), None);
         if !installed_packages.is_empty() {
             for installed_package in installed_packages.iter() {
                 let installed_version = installed_package.get_pretty_version();
@@ -1792,7 +1774,7 @@ impl ShowCommand {
     /// print link objects
     pub(crate) fn print_links(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         link_type: &str,
         title: Option<&str>,
     ) {
@@ -1813,7 +1795,7 @@ impl ShowCommand {
     }
 
     /// Prints the licenses of a package with metadata
-    pub(crate) fn print_licenses(&mut self, package: &dyn CompletePackageInterface) {
+    pub(crate) fn print_licenses(&mut self, package: CompletePackageInterfaceHandle) {
         let spdx_licenses = SpdxLicenses::new();
 
         let licenses = package.get_license();
@@ -1846,10 +1828,10 @@ impl ShowCommand {
     /// Prints package info in JSON format.
     pub(crate) fn print_package_info_as_json(
         &mut self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
         installed_repo: &InstalledRepository,
-        latest_package: Option<&dyn PackageInterface>,
+        latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
         json.insert(
@@ -1858,7 +1840,7 @@ impl ShowCommand {
         );
         json.insert(
             "description".to_string(),
-            PhpMixed::String(package.get_description().unwrap_or("").to_string()),
+            PhpMixed::String(package.get_description().unwrap_or_default()),
         );
         let keywords: Vec<PhpMixed> = package
             .get_keywords()
@@ -1876,7 +1858,7 @@ impl ShowCommand {
         json.insert(
             "homepage".to_string(),
             match package.get_homepage() {
-                Some(h) => PhpMixed::String(h.to_string()),
+                Some(h) => PhpMixed::String(h),
                 None => PhpMixed::Null,
             },
         );
@@ -1892,31 +1874,31 @@ impl ShowCommand {
         );
 
         json = Self::append_versions(json, versions);
-        json = Self::append_licenses(json, package);
+        json = Self::append_licenses(json, package.clone());
 
-        let latest = if let Some(latest) = latest_package {
+        let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
             json.insert(
                 "latest".to_string(),
                 PhpMixed::String(latest.get_pretty_version().to_string()),
             );
             latest
         } else {
-            package.as_package_interface()
+            package.clone().into()
         };
 
         if package.get_source_type().is_some() {
             let mut src: IndexMap<String, PhpMixed> = IndexMap::new();
             src.insert(
                 "type".to_string(),
-                PhpMixed::String(package.get_source_type().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_source_type().unwrap_or_default()),
             );
             src.insert(
                 "url".to_string(),
-                PhpMixed::String(package.get_source_url().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_source_url().unwrap_or_default()),
             );
             src.insert(
                 "reference".to_string(),
-                PhpMixed::String(package.get_source_reference().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_source_reference().unwrap_or_default()),
             );
             json.insert(
                 "source".to_string(),
@@ -1928,15 +1910,15 @@ impl ShowCommand {
             let mut dst: IndexMap<String, PhpMixed> = IndexMap::new();
             dst.insert(
                 "type".to_string(),
-                PhpMixed::String(package.get_dist_type().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_dist_type().unwrap_or_default()),
             );
             dst.insert(
                 "url".to_string(),
-                PhpMixed::String(package.get_dist_url().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_dist_url().unwrap_or_default()),
             );
             dst.insert(
                 "reference".to_string(),
-                PhpMixed::String(package.get_dist_reference().unwrap_or("").to_string()),
+                PhpMixed::String(package.get_dist_reference().unwrap_or_default()),
             );
             json.insert(
                 "dist".to_string(),
@@ -1944,8 +1926,8 @@ impl ShowCommand {
             );
         }
 
-        if !PlatformRepository::is_platform_package(package.get_name())
-            && installed_repo.has_package(package.as_package_interface())
+        if !PlatformRepository::is_platform_package(&package.get_name())
+            && installed_repo.has_package(package.clone().into())
         {
             // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares by ref.
             let _ = self.require_composer(None, None)?;
@@ -1966,7 +1948,7 @@ impl ShowCommand {
             }
         }
 
-        if let Some(c) = latest.as_complete_package_interface() {
+        if let Some(c) = latest.as_complete() {
             if c.is_abandoned() {
                 json.insert(
                     "replacement".to_string(),
@@ -2000,7 +1982,7 @@ impl ShowCommand {
             );
         }
 
-        json = Self::append_autoload(json, package);
+        json = Self::append_autoload(json, package.clone());
 
         if !package.get_include_paths().is_empty() {
             json.insert(
@@ -2057,7 +2039,7 @@ impl ShowCommand {
 
     fn append_licenses(
         mut json: IndexMap<String, PhpMixed>,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         let licenses = package.get_license();
         if !licenses.is_empty() {
@@ -2092,7 +2074,7 @@ impl ShowCommand {
 
     fn append_autoload(
         mut json: IndexMap<String, PhpMixed>,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         let autoload_config = package.get_autoload();
         if !autoload_config.is_empty() {
@@ -2148,10 +2130,10 @@ impl ShowCommand {
 
     fn append_links(
         mut json: IndexMap<String, PhpMixed>,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         for link_type in Link::types().iter() {
-            json = Self::append_link(json, package, link_type);
+            json = Self::append_link(json, package.clone(), link_type);
         }
 
         json
@@ -2159,7 +2141,7 @@ impl ShowCommand {
 
     fn append_link(
         mut json: IndexMap<String, PhpMixed>,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         link_type: &str,
     ) -> IndexMap<String, PhpMixed> {
         let links = package.get_links_for_type(link_type);
@@ -2285,7 +2267,7 @@ impl ShowCommand {
     /// Generate the package tree
     pub(crate) fn generate_package_tree(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         installed_repo: &InstalledRepository,
         remote_repos: &dyn RepositoryInterface,
     ) -> IndexMap<String, PhpMixed> {
@@ -2354,8 +2336,8 @@ impl ShowCommand {
             "description".to_string(),
             PhpMixed::String(
                 package
-                    .as_complete_package_interface()
-                    .map(|c| c.get_description().unwrap_or("").to_string())
+                    .as_complete()
+                    .map(|c| c.get_description().unwrap_or_default())
                     .unwrap_or_default(),
             ),
         );
@@ -2518,8 +2500,8 @@ impl ShowCommand {
     }
 
     fn get_update_status(
-        latest_package: &dyn PackageInterface,
-        package: &dyn PackageInterface,
+        latest_package: PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> String {
         if latest_package.get_full_pretty_version(true, 0)
             == package.get_full_pretty_version(true, 0)
@@ -2532,7 +2514,7 @@ impl ShowCommand {
             constraint = format!("^{}", constraint);
         }
         if !latest_package.get_version().is_empty()
-            && Semver::satisfies(latest_package.get_version(), &constraint)
+            && Semver::satisfies(&latest_package.get_version(), &constraint)
         {
             // it needs an immediate semver-compliant upgrade
             return "semver-safe-update".to_string();
@@ -2559,7 +2541,7 @@ impl ShowCommand {
     /// Given a package, this finds the latest package matching it
     fn find_latest_package(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         composer: &PartialComposerHandle,
         platform_repo: &PlatformRepository,
         major_only: bool,
@@ -2587,7 +2569,7 @@ impl ShowCommand {
             .get_minimum_stability()
             .to_string();
         let flags = composer_ref.get_package().get_stability_flags();
-        if let Some(flag_value) = flags.get(name) {
+        if let Some(flag_value) = flags.get(&name) {
             let key_map: IndexMap<String, String> = base_package::STABILITIES
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -2605,7 +2587,7 @@ impl ShowCommand {
 
         let mut target_version: Option<String> = None;
         if package.get_version().starts_with("dev-") {
-            target_version = Some(package.get_version().to_string());
+            target_version = Some(package.get_version());
 
             // dev-x branches are considered to be on the latest major version always, do not look up for a new commit as that is deemed a minor upgrade (albeit risky)
             if major_only {
@@ -2618,7 +2600,7 @@ impl ShowCommand {
             if major_only
                 && Preg::is_match3(
                     r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}",
-                    package.get_version(),
+                    &package.get_version(),
                     Some(&mut groups),
                 )?
             {
@@ -2644,7 +2626,7 @@ impl ShowCommand {
             }
 
             if patch_only {
-                let trimmed_version = Preg::replace(r"{(\.0)+$}D", "", package.get_version())?;
+                let trimmed_version = Preg::replace(r"{(\.0)+$}D", "", &package.get_version())?;
                 let parts_needed = if trimmed_version.starts_with('0') {
                     4
                 } else {
@@ -2658,26 +2640,26 @@ impl ShowCommand {
             }
         }
 
-        let show_warnings_box: Box<dyn Fn(&dyn PackageInterface) -> bool>;
+        let show_warnings_box: Box<dyn Fn(PackageInterfaceHandle) -> bool>;
         if self.get_io().is_verbose() {
-            show_warnings_box = Box::new(|_p: &dyn PackageInterface| -> bool { true });
+            show_warnings_box = Box::new(|_p: PackageInterfaceHandle| -> bool { true });
         } else {
-            let package_version = package.get_version().to_string();
-            show_warnings_box = Box::new(move |candidate: &dyn PackageInterface| -> bool {
+            let package_version = package.get_version();
+            show_warnings_box = Box::new(move |candidate: PackageInterfaceHandle| -> bool {
                 if candidate.get_version().starts_with("dev-")
                     || package_version.starts_with("dev-")
                 {
                     return false;
                 }
 
-                version_compare(candidate.get_version(), &package_version, "<=")
+                version_compare(&candidate.get_version(), &package_version, "<=")
             });
         }
         // TODO(phase-b): platform_req_filter needs to be Option<Box<dyn ...>>; current code holds &dyn.
         let _ = platform_req_filter;
         let _ = show_warnings_box;
         let mut candidate = version_selector.find_best_candidate(
-            name,
+            &name,
             target_version.as_deref(),
             &best_stability,
             None,

@@ -2,7 +2,6 @@
 
 use crate::downloader::DownloadManager;
 use crate::installer::InstallerInterface;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
@@ -39,15 +38,15 @@ impl InstallerInterface for ProjectInstaller {
     fn is_installed(
         &self,
         _repo: &dyn InstalledRepositoryInterface,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
     ) -> bool {
         false
     }
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let install_path = &self.install_path;
         if std::path::Path::new(install_path).exists()
@@ -72,8 +71,8 @@ impl InstallerInterface for ProjectInstaller {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
@@ -84,8 +83,8 @@ impl InstallerInterface for ProjectInstaller {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
@@ -96,22 +95,19 @@ impl InstallerInterface for ProjectInstaller {
     async fn install(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download_manager
             .borrow()
-            .install(
-                package.as_rc().borrow().as_package_interface(),
-                &self.install_path,
-            )
+            .install(package, &self.install_path)
             .await
     }
 
     async fn update(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        _initial: &PackageInterfaceHandle,
-        _target: &PackageInterfaceHandle,
+        _initial: PackageInterfaceHandle,
+        _target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),
@@ -123,7 +119,7 @@ impl InstallerInterface for ProjectInstaller {
     async fn uninstall(
         &mut self,
         _repo: &mut dyn InstalledRepositoryInterface,
-        _package: &PackageInterfaceHandle,
+        _package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Err(InvalidArgumentException {
             message: "not supported".to_string(),
@@ -132,7 +128,7 @@ impl InstallerInterface for ProjectInstaller {
         .into())
     }
 
-    fn get_install_path(&self, _package: &dyn PackageInterface) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         Some(self.install_path.clone())
     }
 }

@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/RootPackageRepository.php
 
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::repository::ArrayRepository;
@@ -32,7 +31,7 @@ impl shirabe_php_shim::Countable for RootPackageRepository {
 }
 
 impl RepositoryInterface for RootPackageRepository {
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }
 

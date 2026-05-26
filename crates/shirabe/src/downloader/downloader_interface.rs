@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Downloader/DownloaderInterface.php
 
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use shirabe_php_shim::PhpMixed;
 
 #[async_trait::async_trait(?Send)]
@@ -9,18 +9,18 @@ pub trait DownloaderInterface: std::fmt::Debug {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Convenience for the PHP default `$output = true` overload.
     async fn download3(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download(package, path, prev_package, true).await
     }
@@ -28,14 +28,14 @@ pub trait DownloaderInterface: std::fmt::Debug {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -43,7 +43,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
     /// Convenience for the PHP default `$output = true` overload.
     async fn install2(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.install(package, path, true).await
@@ -51,14 +51,14 @@ pub trait DownloaderInterface: std::fmt::Debug {
 
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -66,7 +66,7 @@ pub trait DownloaderInterface: std::fmt::Debug {
     /// Convenience for the PHP default `$output = true` overload.
     async fn remove2(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.remove(package, path, true).await
@@ -75,9 +75,9 @@ pub trait DownloaderInterface: std::fmt::Debug {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.

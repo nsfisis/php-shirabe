@@ -114,11 +114,7 @@ impl LicensesCommand {
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 RepositoryUtils::filter_required_packages(
                     &repo.get_packages(),
-                    composer
-                        .get_package()
-                        .as_rc()
-                        .borrow()
-                        .as_package_interface(),
+                    composer.get_package().clone().into(),
                     false,
                     vec![],
                 )
@@ -160,9 +156,7 @@ impl LicensesCommand {
                     PhpMixed::String("Licenses".to_string()),
                 ]);
                 for package in &packages {
-                    let link = PackageInfo::get_view_source_or_homepage_url(
-                        package.as_rc().borrow().as_package_interface(),
-                    );
+                    let link = PackageInfo::get_view_source_or_homepage_url(package.clone());
                     let name = if let Some(link) = link {
                         format!(
                             "<href={}>{}</>",

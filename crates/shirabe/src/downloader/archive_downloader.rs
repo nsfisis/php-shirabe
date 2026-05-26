@@ -13,7 +13,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 
@@ -25,7 +25,7 @@ pub trait ArchiveDownloader {
 
     async fn extract(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>>;
@@ -33,11 +33,11 @@ pub trait ArchiveDownloader {
     async fn prepare(
         &mut self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.cleanup_executed_mut().remove(package.get_name());
+        self.cleanup_executed_mut().remove(&package.get_name());
         self.inner_mut()
             .prepare(r#type, package, path, prev_package)
             .await
@@ -46,12 +46,11 @@ pub trait ArchiveDownloader {
     async fn cleanup(
         &mut self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.cleanup_executed_mut()
-            .insert(package.get_name().to_string(), true);
+        self.cleanup_executed_mut().insert(package.get_name(), true);
         self.inner_mut()
             .cleanup(r#type, package, path, prev_package)
             .await
@@ -63,15 +62,15 @@ pub trait ArchiveDownloader {
     /// @throws \UnexpectedValueException
     async fn install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         if output {
             self.inner().io.write_error(&format!(
                 "  - {}{}",
-                InstallOperation::format(package, false),
-                self.get_install_operation_appendix(package, path)
+                InstallOperation::format(package.clone(), false),
+                self.get_install_operation_appendix(package.clone(), path)
             ));
         }
 
@@ -113,22 +112,26 @@ pub trait ArchiveDownloader {
             }
         };
 
-        self.inner_mut().add_cleanup_path(package, &temporary_dir);
+        self.inner_mut()
+            .add_cleanup_path(package.clone(), &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
-            self.inner_mut().add_cleanup_path(package, path);
+            self.inner_mut().add_cleanup_path(package.clone(), path);
         }
 
         self.inner_mut()
             .filesystem
             .borrow_mut()
             .ensure_directory_exists(&temporary_dir);
-        let file_name = self.inner().get_file_name(package, path);
+        let file_name = self.inner().get_file_name(package.clone(), path);
 
-        match self.extract(package, &file_name, &temporary_dir).await {
+        match self
+            .extract(package.clone(), &file_name, &temporary_dir)
+            .await
+        {
             Err(e) => {
-                install_cleanup(self.inner_mut(), package, path, &temporary_dir)?;
+                install_cleanup(self.inner_mut(), package.clone(), path, &temporary_dir)?;
                 Err(e)
             }
             Ok(_) => {
@@ -184,7 +187,7 @@ pub trait ArchiveDownloader {
                         from = content_dir.first().unwrap().get_pathname();
                     }
 
-                    rename_recursively(&self.inner().filesystem, package, &from, path)?;
+                    rename_recursively(&self.inner().filesystem, package.clone(), &from, path)?;
                 }
 
                 self.inner()
@@ -193,7 +196,7 @@ pub trait ArchiveDownloader {
                     .remove_directory_async(&temporary_dir)
                     .await?;
                 self.inner_mut()
-                    .remove_cleanup_path(package, &temporary_dir);
+                    .remove_cleanup_path(package.clone(), &temporary_dir);
                 self.inner_mut().remove_cleanup_path(package, path);
 
                 Ok(None)
@@ -202,19 +205,23 @@ pub trait ArchiveDownloader {
     }
 
     /// @inheritDoc
-    fn get_install_operation_appendix(&self, _package: &dyn PackageInterface, _path: &str) -> &str {
+    fn get_install_operation_appendix(
+        &self,
+        _package: PackageInterfaceHandle,
+        _path: &str,
+    ) -> &str {
         ": Extracting archive"
     }
 }
 
 fn install_cleanup(
     inner: &mut FileDownloader,
-    package: &dyn PackageInterface,
+    package: PackageInterfaceHandle,
     path: &str,
     temporary_dir: &str,
 ) -> Result<()> {
     // remove cache if the file was corrupted
-    inner.clear_last_cache_write(package);
+    inner.clear_last_cache_write(package.clone());
 
     // clean up
     inner
@@ -224,7 +231,7 @@ fn install_cleanup(
     if is_dir(path) && realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
         inner.filesystem.borrow_mut().remove_directory(path)?;
     }
-    inner.remove_cleanup_path(package, temporary_dir);
+    inner.remove_cleanup_path(package.clone(), temporary_dir);
     let realpath = realpath(path);
     if let Some(realpath) = realpath {
         inner.remove_cleanup_path(package, &realpath);
@@ -253,7 +260,7 @@ fn get_folder_content(dir: &str) -> Vec<SplFileInfo> {
 /// put the source into the target e.g. src/ => target/src/ (assuming target exists) instead of src/ => target/
 fn rename_recursively(
     filesystem: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    package: &dyn PackageInterface,
+    package: PackageInterfaceHandle,
     from: &str,
     to: &str,
 ) -> Result<()> {
@@ -277,7 +284,7 @@ fn rename_recursively(
             }
             rename_recursively(
                 filesystem,
-                package,
+                package.clone(),
                 &file,
                 &format!("{}/{}", to, basename(&file)),
             )?;

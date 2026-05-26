@@ -7,7 +7,6 @@ use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use anyhow::Result;
@@ -33,15 +32,15 @@ impl InstallerInterface for MetapackageInstaller {
     fn is_installed(
         &self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> bool {
-        repo.has_package(package)
+        repo.has_package(package.clone())
     }
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -49,8 +48,8 @@ impl InstallerInterface for MetapackageInstaller {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -58,8 +57,8 @@ impl InstallerInterface for MetapackageInstaller {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -67,18 +66,15 @@ impl InstallerInterface for MetapackageInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         self.io.write_error3(
-            &format!(
-                "  - {}",
-                InstallOperation::format(package.as_rc().borrow().as_package_interface(), false)
-            ),
+            &format!("  - {}", InstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
 
-        repo.add_package(package.clone());
+        repo.add_package(package);
 
         Ok(None)
     }
@@ -86,10 +82,10 @@ impl InstallerInterface for MetapackageInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &PackageInterfaceHandle,
-        target: &PackageInterfaceHandle,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(initial.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -100,18 +96,14 @@ impl InstallerInterface for MetapackageInstaller {
         self.io.write_error3(
             &format!(
                 "  - {}",
-                UpdateOperation::format(
-                    initial.as_rc().borrow().as_package_interface(),
-                    target.as_rc().borrow().as_package_interface(),
-                    false
-                )
+                UpdateOperation::format(initial.clone(), target.clone(), false)
             ),
             true,
             io_interface::NORMAL,
         );
 
-        repo.remove_package(initial.as_rc().borrow().as_package_interface());
-        repo.add_package(target.clone());
+        repo.remove_package(initial.clone());
+        repo.add_package(target);
 
         Ok(None)
     }
@@ -119,9 +111,9 @@ impl InstallerInterface for MetapackageInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,
@@ -130,20 +122,17 @@ impl InstallerInterface for MetapackageInstaller {
         }
 
         self.io.write_error3(
-            &format!(
-                "  - {}",
-                UninstallOperation::format(package.as_rc().borrow().as_package_interface(), false)
-            ),
+            &format!("  - {}", UninstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
 
-        repo.remove_package(package.as_rc().borrow().as_package_interface());
+        repo.remove_package(package.clone());
 
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: &dyn PackageInterface) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
         None
     }
 }

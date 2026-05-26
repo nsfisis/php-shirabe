@@ -10,7 +10,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
@@ -37,10 +37,10 @@ impl SvnDownloader {
 
     pub(crate) async fn do_download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
@@ -62,23 +62,26 @@ impl SvnDownloader {
 
     pub(crate) async fn do_install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = package.get_source_reference();
 
-        let repo = package.get_repository();
-        if let Some(repo) = repo {
-            if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
-                let repo_config = vcs_repo.get_repo_config();
-                if repo_config.contains_key("svn-cache-credentials") {
-                    if let Some(val) = repo_config
-                        .get("svn-cache-credentials")
-                        .and_then(|v| v.as_bool())
-                    {
-                        self.cache_credentials = val;
+        {
+            let package_ref = package.as_rc().borrow();
+            let repo = package_ref.as_package_interface().get_repository();
+            if let Some(repo) = repo {
+                if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
+                    let repo_config = vcs_repo.get_repo_config();
+                    if repo_config.contains_key("svn-cache-credentials") {
+                        if let Some(val) = repo_config
+                            .get("svn-cache-credentials")
+                            .and_then(|v| v.as_bool())
+                        {
+                            self.cache_credentials = val;
+                        }
                     }
                 }
             }
@@ -106,8 +109,8 @@ impl SvnDownloader {
 
     pub(crate) async fn do_update(
         &mut self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -137,7 +140,7 @@ impl SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(" Checking out {}", r#ref.unwrap_or_default()),
+            &format!(" Checking out {}", r#ref.clone().unwrap_or_default()),
             true,
             io_interface::NORMAL,
         );
@@ -155,7 +158,7 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub fn get_local_changes(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
+    pub fn get_local_changes(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
         if !self.has_metadata_repository(path) {
             return None;
         }
@@ -178,7 +181,7 @@ impl SvnDownloader {
 
     pub(crate) fn execute(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         base_url: &str,
         command: Vec<String>,
         url: &str,
@@ -204,11 +207,11 @@ impl SvnDownloader {
 
     pub(crate) async fn clean_changes(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let changes = self.get_local_changes(package, path);
+        let changes = self.get_local_changes(package.clone(), path);
         if changes.is_none() {
             return Ok(None);
         }
@@ -440,9 +443,9 @@ impl DownloaderInterface for SvnDownloader {
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
@@ -451,16 +454,16 @@ impl DownloaderInterface for SvnDownloader {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
     async fn install(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -469,8 +472,8 @@ impl DownloaderInterface for SvnDownloader {
 
     async fn update(
         &self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        _target: PackageInterfaceHandle,
         _path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
@@ -478,7 +481,7 @@ impl DownloaderInterface for SvnDownloader {
 
     async fn remove(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -488,9 +491,9 @@ impl DownloaderInterface for SvnDownloader {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }

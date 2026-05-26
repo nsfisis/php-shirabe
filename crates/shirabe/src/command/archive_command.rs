@@ -201,10 +201,9 @@ impl ArchiveCommand {
                     None => return Ok(1),
                 }
             } else {
-                let _rc = self.require_composer(None, None)?;
-                // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a
-                // handle, so it cannot be shared as a CompletePackageInterfaceHandle yet.
-                todo!("share composer.get_package() as a CompletePackageInterfaceHandle")
+                let rc = self.require_composer(None, None)?;
+                let composer = crate::command::composer_full(&rc);
+                composer.get_package().clone().into()
             };
 
         io.write_error(&format!(

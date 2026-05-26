@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/LockArrayRepository.php
 
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::ArrayRepository;
 use crate::repository::CanonicalPackagesTrait;
@@ -36,7 +35,7 @@ impl Countable for LockArrayRepository {
 }
 
 impl RepositoryInterface for LockArrayRepository {
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }
 

@@ -272,7 +272,7 @@ impl Pool {
         let mut matches: Vec<BasePackageHandle> = vec![];
 
         for candidate in candidates {
-            if self.r#match(candidate, name, constraint) {
+            if self.r#match(candidate.clone(), name, constraint) {
                 matches.push(candidate.clone());
             }
         }
@@ -313,7 +313,7 @@ impl Pool {
     /// @param  string              $name       Name of the package to be matched
     pub fn r#match(
         &self,
-        candidate: &BasePackageHandle,
+        candidate: BasePackageHandle,
         name: &str,
         constraint: Option<&AnyConstraint>,
     ) -> bool {
@@ -371,12 +371,12 @@ impl Pool {
         false
     }
 
-    pub fn is_unacceptable_fixed_or_locked_package(&self, package: &BasePackageHandle) -> bool {
+    pub fn is_unacceptable_fixed_or_locked_package(&self, package: BasePackageHandle) -> bool {
         // PHP: \in_array($package, $this->unacceptableFixedOrLockedPackages, true)
         // strict comparison checks reference identity for objects
         self.unacceptable_fixed_or_locked_packages
             .iter()
-            .any(|p| p.ptr_eq(package))
+            .any(|p| p.ptr_eq(&package))
     }
 
     /// @return BasePackage[]

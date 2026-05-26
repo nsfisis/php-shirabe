@@ -3,11 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
-use crate::package::RootPackage;
-use crate::package::RootPackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
 
 #[derive(Debug)]
@@ -18,7 +14,7 @@ impl ArrayDumper {
         Self
     }
 
-    pub fn dump(&self, package: &dyn PackageInterface) -> IndexMap<String, PhpMixed> {
+    pub fn dump(&self, package: PackageInterfaceHandle) -> IndexMap<String, PhpMixed> {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert(
             "name".to_string(),
@@ -49,7 +45,7 @@ impl ArrayDumper {
             source.insert(
                 "url".to_string(),
                 Box::new(PhpMixed::String(
-                    package.get_source_url().unwrap_or("").to_string(),
+                    package.get_source_url().unwrap_or_default(),
                 )),
             );
             if let Some(reference) = package.get_source_reference() {
@@ -90,9 +86,7 @@ impl ArrayDumper {
             );
             dist.insert(
                 "url".to_string(),
-                Box::new(PhpMixed::String(
-                    package.get_dist_url().unwrap_or("").to_string(),
-                )),
+                Box::new(PhpMixed::String(package.get_dist_url().unwrap_or_default())),
             );
             if let Some(reference) = package.get_dist_reference() {
                 dist.insert(
@@ -134,7 +128,7 @@ impl ArrayDumper {
         for (type_name, opts) in SUPPORTED_LINK_TYPES.iter() {
             // TODO(phase-b): PackageInterface needs get_links_by_method to mimic PHP magic call
             let links: Vec<crate::package::Link> = Vec::new();
-            let _ = (&opts.method, package);
+            let _ = (&opts.method, &package);
             if links.is_empty() {
                 continue;
             }
@@ -262,7 +256,7 @@ impl ArrayDumper {
             );
         }
 
-        if let Some(complete_pkg) = package.as_any().downcast_ref::<CompletePackage>() {
+        if let Some(complete_pkg) = package.as_complete() {
             if let Some(archive_name) = complete_pkg.get_archive_name() {
                 let entry = data
                     .entry("archive".to_string())
@@ -423,7 +417,7 @@ impl ArrayDumper {
             }
         }
 
-        if let Some(root_pkg) = package.as_any().downcast_ref::<RootPackage>() {
+        if let Some(root_pkg) = package.as_root() {
             let minimum_stability = root_pkg.get_minimum_stability();
             if !minimum_stability.is_empty() {
                 data.insert(

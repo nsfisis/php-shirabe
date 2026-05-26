@@ -2,7 +2,7 @@
 
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
@@ -41,8 +41,8 @@ impl SuggestedPackagesReporter {
         self
     }
 
-    pub fn add_suggestions_from_package(&mut self, package: &dyn PackageInterface) -> &mut Self {
-        let source = package.get_pretty_name().to_string();
+    pub fn add_suggestions_from_package(&mut self, package: PackageInterfaceHandle) -> &mut Self {
+        let source = package.get_pretty_name();
         for (target, reason) in package.get_suggests() {
             self.add_package(source.clone(), target.clone(), reason.clone());
         }
@@ -54,9 +54,10 @@ impl SuggestedPackagesReporter {
         &self,
         mode: i64,
         installed_repo: Option<&InstalledRepository>,
-        only_dependents_of: Option<&dyn PackageInterface>,
+        only_dependents_of: Option<PackageInterfaceHandle>,
     ) {
-        let suggested_packages = self.get_filtered_suggestions(installed_repo, only_dependents_of);
+        let suggested_packages =
+            self.get_filtered_suggestions(installed_repo, only_dependents_of.clone());
 
         let mut suggesters: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
         let mut suggested: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
@@ -142,7 +143,7 @@ impl SuggestedPackagesReporter {
     pub fn output_minimalistic(
         &self,
         installed_repo: Option<&InstalledRepository>,
-        only_dependents_of: Option<&dyn PackageInterface>,
+        only_dependents_of: Option<PackageInterfaceHandle>,
     ) {
         let suggested_packages = self.get_filtered_suggestions(installed_repo, only_dependents_of);
         if !suggested_packages.is_empty() {
@@ -156,7 +157,7 @@ impl SuggestedPackagesReporter {
     fn get_filtered_suggestions(
         &self,
         installed_repo: Option<&InstalledRepository>,
-        only_dependents_of: Option<&dyn PackageInterface>,
+        only_dependents_of: Option<PackageInterfaceHandle>,
     ) -> Vec<IndexMap<String, String>> {
         let suggested_packages = self.get_packages();
         let mut installed_names: Vec<String> = Vec::new();
@@ -168,13 +169,14 @@ impl SuggestedPackagesReporter {
 
         let mut source_filter: Vec<String> = Vec::new();
         if let Some(only_dependents_of) = only_dependents_of {
-            source_filter = only_dependents_of
-                .get_requires()
+            let requires = only_dependents_of.get_requires();
+            let dev_requires = only_dependents_of.get_dev_requires();
+            source_filter = requires
                 .values()
-                .chain(only_dependents_of.get_dev_requires().values())
+                .chain(dev_requires.values())
                 .map(|link| link.get_target().to_string())
                 .collect();
-            source_filter.push(only_dependents_of.get_name().to_string());
+            source_filter.push(only_dependents_of.get_name());
         }
 
         let mut suggestions: Vec<IndexMap<String, String>> = Vec::new();

@@ -162,18 +162,18 @@ impl PoolOptimizer {
                 SimpleConstraint::OP_EQ,
                 package.get_version().to_string(),
             ) {
-                self.mark_package_irremovable(package);
+                self.mark_package_irremovable(package.clone());
             }
         }
     }
 
-    fn mark_package_irremovable(&mut self, package: &BasePackageHandle) {
+    fn mark_package_irremovable(&mut self, package: BasePackageHandle) {
         self.irremovable_packages.insert(package.id(), true);
         if let Some(alias_pkg) = package.as_alias() {
             // recursing here so aliasesPerPackage for the aliasOf can be checked
             // and all its aliases marked as irremovable as well
             let aliased: BasePackageHandle = alias_pkg.get_alias_of().into();
-            self.mark_package_irremovable(&aliased);
+            self.mark_package_irremovable(aliased);
         }
         // PHP: foreach ($this->aliasesPerPackage[$package->id] as $aliasPackage)
         let alias_ids: Vec<i64> = self
@@ -238,7 +238,7 @@ impl PoolOptimizer {
 
             self.mark_package_for_removal(package.id())?;
 
-            let dependency_hash = self.calculate_dependency_hash(package);
+            let dependency_hash = self.calculate_dependency_hash(package.clone());
 
             for package_name in package.get_names(false) {
                 if !self
@@ -333,7 +333,7 @@ impl PoolOptimizer {
                     // Only one package in this constraint group has the same requirements, we're not allowed to remove that package
                     if 1 == packages.len() {
                         self.keep_package(
-                            &packages[0],
+                            packages[0].clone(),
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -353,7 +353,7 @@ impl PoolOptimizer {
                             .select_preferred_packages(pool, literals.clone(), None)
                     {
                         self.keep_package(
-                            &pool.literal_to_package(preferred_literal),
+                            pool.literal_to_package(preferred_literal),
                             &identical_definitions_per_package,
                             &package_identical_definition_lookup,
                         );
@@ -365,7 +365,7 @@ impl PoolOptimizer {
         Ok(())
     }
 
-    fn calculate_dependency_hash(&self, package: &BasePackageHandle) -> String {
+    fn calculate_dependency_hash(&self, package: BasePackageHandle) -> String {
         let mut hash = String::new();
 
         let hash_relevant_links: Vec<(&str, Vec<crate::package::Link>)> = vec![
@@ -438,7 +438,7 @@ impl PoolOptimizer {
     /// @param array<int, array<string, array{groupHash: string, dependencyHash: string}>> $packageIdenticalDefinitionLookup
     fn keep_package(
         &mut self,
-        package: &BasePackageHandle,
+        package: BasePackageHandle,
         identical_definitions_per_package: &IndexMap<
             String,
             IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
@@ -460,7 +460,7 @@ impl PoolOptimizer {
             // and all its aliases marked to be kept as well
             let aliased: BasePackageHandle = alias_pkg.get_alias_of().into();
             self.keep_package(
-                &aliased,
+                aliased,
                 identical_definitions_per_package,
                 package_identical_definition_lookup,
             );
@@ -572,7 +572,9 @@ impl PoolOptimizer {
                 continue;
             }
             // Do not remove locked packages
-            if request.is_fixed_package(&package) || request.is_locked_package(&package) {
+            if request.is_fixed_package(package.clone())
+                || request.is_locked_package(package.clone())
+            {
                 continue;
             }
 

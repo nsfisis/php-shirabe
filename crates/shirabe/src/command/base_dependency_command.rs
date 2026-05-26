@@ -337,9 +337,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     package.get_pretty_version().to_string()
                 };
-                let package_url = PackageInfo::get_view_source_or_homepage_url(
-                    package.as_rc().borrow().as_package_interface(),
-                );
+                let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
                 let name_with_link = match &package_url {
                     Some(url) => format!(
                         "<href={}>{}</>",
@@ -414,9 +412,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     package.get_pretty_version().to_string()
                 };
-            let package_url = PackageInfo::get_view_source_or_homepage_url(
-                package.as_rc().borrow().as_package_interface(),
-            );
+            let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
             let name_with_link = match &package_url {
                 Some(url) => format!(
                     "<href={}>{}</>",

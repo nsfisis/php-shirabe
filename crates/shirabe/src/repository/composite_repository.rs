@@ -6,7 +6,6 @@ use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
@@ -32,7 +31,7 @@ impl CompositeRepository {
         &self.repositories
     }
 
-    pub fn remove_package(&mut self, _package: &dyn PackageInterface) {
+    pub fn remove_package(&mut self, _package: PackageInterfaceHandle) {
         // TODO(phase-b): only call remove_package on WritableRepositoryInterface implementors;
         // requires a downcast helper such as `as_writable() -> Option<&mut dyn WritableRepositoryInterface>` on RepositoryInterface.
         for _repository in &mut self.repositories {
@@ -67,9 +66,9 @@ impl RepositoryInterface for CompositeRepository {
         format!("composite repo ({})", names.join(", "))
     }
 
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         for repository in &self.repositories {
-            if repository.has_package(package) {
+            if repository.has_package(package.clone()) {
                 return true;
             }
         }

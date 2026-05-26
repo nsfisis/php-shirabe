@@ -78,7 +78,6 @@ use crate::package::Locker;
 use crate::package::Package;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootAliasPackage;
 use crate::package::RootPackageInterface;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::base_package::{self, BasePackage};
@@ -360,9 +359,7 @@ impl Installer {
             ]);
             if is_fresh_install {
                 self.suggested_packages_reporter
-                    .add_suggestions_from_package(
-                        self.package.as_rc().borrow().as_package_interface(),
-                    );
+                    .add_suggestions_from_package(self.package.clone().into());
             }
             self.suggested_packages_reporter
                 .output_minimalistic(Some(&installed_repo), None);
@@ -413,11 +410,7 @@ impl Installer {
             self.autoload_generator.borrow_mut().dump(
                 &*self.config.borrow(),
                 self.repository_manager.borrow().get_local_repository(),
-                self.package
-                    .as_rc()
-                    .borrow()
-                    .as_root_package_interface()
-                    .unwrap(),
+                self.package.clone(),
                 &mut *self.installation_manager.borrow_mut(),
                 "composer",
                 self.optimize_autoloader,
@@ -432,11 +425,9 @@ impl Installer {
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
             for package in repository_manager.get_local_repository().get_packages() {
-                // TODO(phase-c): InstallationManager APIs still take &dyn PackageInterface; bridge
-                // the handle until they migrate to handles.
                 self.installation_manager
                     .borrow_mut()
-                    .ensure_binaries_presence(package.as_rc().borrow().as_package_interface());
+                    .ensure_binaries_presence(package.clone());
             }
         }
 
@@ -635,11 +626,7 @@ impl Installer {
 
         let fixed_root_package = self.fixed_root_package.clone();
         let mut request = self.create_request(
-            fixed_root_package
-                .as_rc()
-                .borrow()
-                .as_root_package_interface()
-                .unwrap(),
+            fixed_root_package,
             &platform_repo,
             locked_repository.as_ref(),
         );
@@ -835,9 +822,7 @@ impl Installer {
             // collect suggestions
             if let Some(io) = operation.as_install_operation() {
                 self.suggested_packages_reporter
-                    .add_suggestions_from_package(
-                        io.get_package().as_rc().borrow().as_package_interface(),
-                    );
+                    .add_suggestions_from_package(io.get_package());
             }
 
             // output op if lock file is enabled, but alias op only in debug verbosity
@@ -929,7 +914,7 @@ impl Installer {
         let dumper = ArrayDumper::new();
         for pkg in lock_transaction.get_new_lock_packages(false, false) {
             let loaded = loader.load(
-                dumper.dump(pkg.as_rc().borrow().as_package_interface()),
+                dumper.dump(pkg.clone()),
                 Some("Composer\\Package\\CompletePackage".to_string()),
             )?;
             result_repo.add_package(loaded)?;
@@ -938,15 +923,7 @@ impl Installer {
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
         repository_set.add_repository(Box::new(result_repo))?;
 
-        let mut request = self.create_request(
-            self.fixed_root_package
-                .as_rc()
-                .borrow()
-                .as_root_package_interface()
-                .unwrap(),
-            platform_repo,
-            None,
-        );
+        let mut request = self.create_request(self.fixed_root_package.clone(), platform_repo, None);
         self.require_packages_for_update(&mut request, locked_repository, false)?;
 
         let pool = repository_set.create_pool_with_all_packages()?;
@@ -1028,15 +1005,8 @@ impl Installer {
 
             // creating requirements request
             let fixed_root_package = self.fixed_root_package.clone();
-            let mut request = self.create_request(
-                fixed_root_package
-                    .as_rc()
-                    .borrow()
-                    .as_root_package_interface()
-                    .unwrap(),
-                &platform_repo,
-                Some(&locked_repository),
-            );
+            let mut request =
+                self.create_request(fixed_root_package, &platform_repo, Some(&locked_repository));
 
             if !self.locker.borrow_mut().is_fresh()? {
                 self.io.write_error3(
@@ -1047,14 +1017,10 @@ impl Installer {
             }
 
             let package_for_missing = self.package.clone();
-            let missing_requirement_info = self.locker.borrow_mut().get_missing_requirement_info(
-                package_for_missing
-                    .as_rc()
-                    .borrow()
-                    .as_root_package_interface()
-                    .unwrap(),
-                self.dev_mode,
-            )?;
+            let missing_requirement_info = self
+                .locker
+                .borrow_mut()
+                .get_missing_requirement_info(package_for_missing, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
                 self.io.write_error(&missing_requirement_info.join("\n"));
 
@@ -1463,7 +1429,7 @@ impl Installer {
 
     fn create_request(
         &self,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
         platform_repo: &PlatformRepository,
         locked_repository: Option<&LockArrayRepository>,
     ) -> Request {
@@ -1472,11 +1438,11 @@ impl Installer {
         let _ = locked_repository;
         let mut request = Request::new(None);
 
-        // TODO(phase-c): request.fix_package wants a BasePackageHandle; root_package is only a
-        // borrowed &dyn RootPackageInterface here and cannot be lifted back into a handle.
-        let _ = root_package;
+        // TODO(phase-c): request.fix_package wants a BasePackageHandle; root_package is wired in
+        // once Request migrates to handles.
         // request.fix_package(root_package);
-        if let Some(_alias) = root_package.as_any().downcast_ref::<RootAliasPackage>() {
+        let root_package_handle: PackageInterfaceHandle = root_package.clone().into();
+        if let Some(_alias) = root_package_handle.as_root_alias_package() {
             // request.fix_package(alias.get_alias_of());
         }
 

@@ -12,7 +12,6 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackageHandle;
 use crate::package::PackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
 use crate::package::version::VersionParser;
@@ -96,7 +95,7 @@ impl ArrayRepository {
     }
 
     /// Removes package from repository.
-    pub fn remove_package(&self, package: &dyn PackageInterface) {
+    pub fn remove_package(&self, package: PackageInterfaceHandle) {
         let package_id = package.get_unique_name();
 
         let mut packages_borrow = self.packages.borrow_mut();
@@ -367,7 +366,7 @@ impl RepositoryInterface for ArrayRepository {
         matches.into_values().collect()
     }
 
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         if self.package_map.borrow().is_none() {
             let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
             for repo_package in self.get_packages() {

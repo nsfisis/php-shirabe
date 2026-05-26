@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Version/VersionBumper.php
 
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
@@ -18,7 +18,7 @@ impl VersionBumper {
     pub fn bump_requirement(
         &self,
         constraint: &AnyConstraint,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> Result<String> {
         let parser = VersionParser::new();
         let pretty_constraint = constraint.get_pretty_string();
@@ -33,7 +33,7 @@ impl VersionBumper {
             let _ = &parser;
             let loader = ArrayLoader::new(None, false);
             let dumper = ArrayDumper::new();
-            let dumped = dumper.dump(package);
+            let dumped = dumper.dump(package.clone());
             let extra = loader.get_branch_alias(&dumped)?;
 
             if extra.is_none() || extra.as_deref() == Some(VersionParser::DEFAULT_BRANCH_ALIAS) {

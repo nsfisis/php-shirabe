@@ -234,10 +234,6 @@ impl std::fmt::Display for RootPackage {
 }
 
 impl PackageInterface for RootPackage {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn get_name(&self) -> &str {
         todo!()
     }

@@ -14,7 +14,7 @@ use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 
 /// Downloaders manager.
@@ -130,7 +130,7 @@ impl DownloadManager {
     ///                                           wrong type
     pub fn get_downloader_for_package(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<&dyn DownloaderInterface>> {
         let installation_source = package.get_installation_source();
 
@@ -138,10 +138,10 @@ impl DownloadManager {
             return Ok(None);
         }
 
-        let downloader = if installation_source == Some("dist") {
-            self.get_downloader(package.get_dist_type().unwrap_or(""))?
-        } else if installation_source == Some("source") {
-            self.get_downloader(package.get_source_type().unwrap_or(""))?
+        let downloader = if installation_source.as_deref() == Some("dist") {
+            self.get_downloader(&package.get_dist_type().unwrap_or_default())?
+        } else if installation_source.as_deref() == Some("source") {
+            self.get_downloader(&package.get_source_type().unwrap_or_default())?
         } else {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -153,14 +153,14 @@ impl DownloadManager {
             .into());
         };
 
-        if installation_source != Some(&downloader.get_installation_source()) {
+        if installation_source.as_deref() != Some(&downloader.get_installation_source()) {
             return Err(LogicException {
                 message: sprintf(
                     "Downloader \"%s\" is a %s type downloader and can not be used to download %s for package %s",
                     &[
                         PhpMixed::String(shirabe_php_shim::get_class_obj(downloader)),
                         PhpMixed::String(downloader.get_installation_source()),
-                        PhpMixed::String(installation_source.unwrap_or("").to_string()),
+                        PhpMixed::String(installation_source.clone().unwrap_or_default()),
                         PhpMixed::String(package.to_string()),
                     ],
                 ),
@@ -197,16 +197,16 @@ impl DownloadManager {
     /// @throws \RuntimeException
     pub async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         target_dir: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&dirname(&target_dir));
 
-        let mut sources = self.get_available_sources(package, prev_package)?;
+        let mut sources = self.get_available_sources(package.clone(), prev_package.clone())?;
 
         // PHP closure: uses recursive variable $download and captures $sources by reference
         // TODO(phase-b): recursive closure with mutable shared state needs Rc<RefCell<>> or similar
@@ -231,7 +231,7 @@ impl DownloadManager {
             // TODO(phase-b): &mut on shared package — PHP mutates by reference
             todo!("package.set_installation_source(Some(source.clone()))");
 
-            let downloader = match self.get_downloader_for_package(package)? {
+            let downloader = match self.get_downloader_for_package(package.clone())? {
                 Some(d) => d,
                 None => {
                     return Ok(None);
@@ -240,7 +240,7 @@ impl DownloadManager {
 
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let result = match downloader
-                .download3(package, &target_dir, prev_package)
+                .download3(package.clone(), &target_dir, prev_package.clone())
                 .await
             {
                 Ok(r) => r,
@@ -290,12 +290,12 @@ impl DownloadManager {
     pub async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         target_dir: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        if let Some(downloader) = self.get_downloader_for_package(package)? {
+        if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
                 .prepare(r#type, package, &target_dir, prev_package)
                 .await;
@@ -314,11 +314,11 @@ impl DownloadManager {
     /// @throws \RuntimeException
     pub async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         target_dir: &str,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        if let Some(downloader) = self.get_downloader_for_package(package)? {
+        if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader.install2(package, &target_dir).await;
         }
 
@@ -335,13 +335,13 @@ impl DownloadManager {
     /// @throws \InvalidArgumentException if initial package is not installed
     pub async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         target_dir: &str,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        let downloader = self.get_downloader_for_package(target)?;
-        let initial_downloader = self.get_downloader_for_package(initial)?;
+        let downloader = self.get_downloader_for_package(target.clone())?;
+        let initial_downloader = self.get_downloader_for_package(initial.clone())?;
 
         // no downloaders present means update from metapackage to metapackage, nothing to do
         if initial_downloader.is_none() && downloader.is_none() {
@@ -362,7 +362,7 @@ impl DownloadManager {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             match downloader
                 .unwrap()
-                .update(initial, target, &target_dir)
+                .update(initial.clone(), target.clone(), &target_dir)
                 .await
             {
                 Ok(p) => return Ok(p),
@@ -404,11 +404,11 @@ impl DownloadManager {
     /// @phpstan-return PromiseInterface<void|null>
     pub async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         target_dir: &str,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        if let Some(downloader) = self.get_downloader_for_package(package)? {
+        if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader.remove2(package, &target_dir).await;
         }
 
@@ -425,12 +425,12 @@ impl DownloadManager {
     pub async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         target_dir: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
-        if let Some(downloader) = self.get_downloader_for_package(package)? {
+        if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
                 .cleanup(r#type, package, &target_dir, prev_package)
                 .await;
@@ -444,14 +444,14 @@ impl DownloadManager {
     /// @param PackageInterface $package package instance
     pub(crate) fn resolve_package_install_preference(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> String {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = format!(
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", &preg_quote(pattern, None)),
             );
-            if Preg::is_match(&pattern_regex, package.get_name()).unwrap_or(false) {
+            if Preg::is_match(&pattern_regex, &package.get_name()).unwrap_or(false) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
                     return "dist".to_string();
                 }
@@ -471,8 +471,8 @@ impl DownloadManager {
     /// @phpstan-return array<'dist'|'source'>&non-empty-array
     fn get_available_sources(
         &self,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Vec<String>> {
         let source_type = package.get_source_type();
         let dist_type = package.get_dist_type();
@@ -498,7 +498,7 @@ impl DownloadManager {
             // if we are updating, we want to keep the same source as the previously installed package (if available in the new one)
             let prev_source = prev.get_installation_source();
             if in_array(
-                PhpMixed::String(prev_source.unwrap_or("").to_string()),
+                PhpMixed::String(prev_source.clone().unwrap_or_default()),
                 &PhpMixed::List(
                     sources
                         .iter()
@@ -509,10 +509,10 @@ impl DownloadManager {
             )
                 // unless the previous package was stable dist (by default) and the new package is dev, then we allow the new default to take over
                 && !(!prev.is_dev()
-                    && prev.get_installation_source() == Some("dist")
+                    && prev.get_installation_source().as_deref() == Some("dist")
                     && package.is_dev())
             {
-                let prev_source_owned = prev_source.unwrap_or("").to_string();
+                let prev_source_owned = prev_source.unwrap_or_default();
                 usort(&mut sources, move |a: &String, b: &String| -> i64 {
                     if *a == prev_source_owned { -1 } else { 1 }
                 });
@@ -523,7 +523,8 @@ impl DownloadManager {
 
         // reverse sources in case dist is the preferred source for this package
         if !self.prefer_source
-            && (self.prefer_dist || "dist" == self.resolve_package_install_preference(package))
+            && (self.prefer_dist
+                || "dist" == self.resolve_package_install_preference(package.clone()))
         {
             sources = array_reverse(&sources, false);
         }

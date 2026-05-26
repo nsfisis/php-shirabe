@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Installer/NoopInstaller.php
 
 use crate::installer::InstallerInterface;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
@@ -18,15 +17,15 @@ impl InstallerInterface for NoopInstaller {
     fn is_installed(
         &self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> bool {
-        repo.has_package(package)
+        repo.has_package(package.clone())
     }
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -34,8 +33,8 @@ impl InstallerInterface for NoopInstaller {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -43,8 +42,8 @@ impl InstallerInterface for NoopInstaller {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
-        _prev_package: Option<&dyn PackageInterface>,
+        _package: PackageInterfaceHandle,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -52,9 +51,9 @@ impl InstallerInterface for NoopInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(package.clone()) {
             repo.add_package(package.clone());
         }
 
@@ -64,10 +63,10 @@ impl InstallerInterface for NoopInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &PackageInterfaceHandle,
-        target: &PackageInterfaceHandle,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.has_package(initial.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -75,8 +74,8 @@ impl InstallerInterface for NoopInstaller {
             .into());
         }
 
-        repo.remove_package(initial.as_rc().borrow().as_package_interface());
-        if !repo.has_package(target.as_rc().borrow().as_package_interface()) {
+        repo.remove_package(initial.clone());
+        if !repo.has_package(target.clone()) {
             repo.add_package(target.clone());
         }
 
@@ -86,28 +85,28 @@ impl InstallerInterface for NoopInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,
             }
             .into());
         }
-        repo.remove_package(package.as_rc().borrow().as_package_interface());
+        repo.remove_package(package.clone());
 
         Ok(None)
     }
 
-    fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         let target_dir = package.get_target_dir();
         let pretty_name = package.get_pretty_name();
 
         Some(if let Some(dir) = target_dir {
             format!("{}/{}", pretty_name, dir)
         } else {
-            pretty_name.to_string()
+            pretty_name
         })
     }
 }

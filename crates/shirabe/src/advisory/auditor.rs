@@ -16,7 +16,6 @@ use crate::io::ConsoleIO;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterfaceHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::base_package::BasePackage;
@@ -603,7 +602,7 @@ impl Auditor {
                 io.write_error(&sprintf(
                     "%s is abandoned. %s.",
                     &[
-                        PhpMixed::String(self.get_package_name_with_link_for_complete(pkg)),
+                        PhpMixed::String(self.get_package_name_with_link_for_complete(pkg.clone())),
                         PhpMixed::String(replacement),
                     ],
                 ));
@@ -643,7 +642,7 @@ impl Auditor {
             table.add_row(ConsoleIO::sanitize(
                 PhpMixed::List(vec![
                     Box::new(PhpMixed::String(
-                        self.get_package_name_with_link_for_complete(pkg),
+                        self.get_package_name_with_link_for_complete(pkg.clone()),
                     )),
                     Box::new(PhpMixed::String(replacement)),
                 ]),
@@ -656,8 +655,8 @@ impl Auditor {
         Ok(())
     }
 
-    fn get_package_name_with_link(&self, package: &dyn PackageInterface) -> String {
-        let package_url = PackageInfo::get_view_source_or_homepage_url(package);
+    fn get_package_name_with_link(&self, package: PackageInterfaceHandle) -> String {
+        let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
 
         if package_url.is_some() {
             format!(
@@ -666,7 +665,7 @@ impl Auditor {
                 package.get_pretty_name()
             )
         } else {
-            package.get_pretty_name().to_string()
+            package.get_pretty_name()
         }
     }
 
@@ -674,11 +673,9 @@ impl Auditor {
     // upcast to PackageInterface (e.g. via an as_package_interface() trait method)
     fn get_package_name_with_link_for_complete(
         &self,
-        package: &CompletePackageInterfaceHandle,
+        package: CompletePackageInterfaceHandle,
     ) -> String {
-        let _ = package;
-        // PackageInfo::get_view_source_or_homepage_url(package.as_rc().borrow().as_package_interface())
-        String::new()
+        self.get_package_name_with_link(package.into())
     }
 
     fn get_severity(&self, advisory: &SecurityAdvisory) -> String {

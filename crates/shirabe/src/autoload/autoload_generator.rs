@@ -31,7 +31,7 @@ use crate::json::JsonFile;
 use crate::package::Locker;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::script::ScriptEvents;
 use crate::util::Filesystem;
@@ -126,7 +126,7 @@ impl AutoloadGenerator {
         &mut self,
         config: &Config,
         local_repo: &dyn InstalledRepositoryInterface,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
         installation_manager: &mut InstallationManager,
         target_dir: &str,
         scan_psr_packages: bool,
@@ -247,7 +247,7 @@ impl AutoloadGenerator {
         let dev_package_names = local_repo.get_dev_package_names();
         let package_map = self.build_package_map(
             installation_manager,
-            root_package,
+            root_package.clone(),
             local_repo.get_canonical_packages(),
         )?;
         let filtered_dev_packages: PhpMixed = if self.dev_mode.unwrap_or(false) {
@@ -271,7 +271,7 @@ impl AutoloadGenerator {
                 .iter()
                 .map(|(p, s)| (p.clone(), s.clone()))
                 .collect(),
-            root_package,
+            root_package.clone(),
             filtered_dev_packages,
         );
 
@@ -742,15 +742,11 @@ impl AutoloadGenerator {
     pub fn build_package_map(
         &self,
         installation_manager: &mut InstallationManager,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
     ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
         // build package => install path map
-        // TODO(phase-c): the root package needs to be available here as a shared handle;
-        // a borrowed &dyn RootPackageInterface cannot be lifted into a PackageInterfaceHandle.
-        let _ = root_package;
-        let root_package_handle: PackageInterfaceHandle =
-            todo!("root package handle for build_package_map");
+        let root_package_handle: PackageInterfaceHandle = root_package.into();
         let mut package_map: Vec<(PackageInterfaceHandle, Option<String>)> =
             vec![(root_package_handle, Some(String::new()))];
 
@@ -758,9 +754,8 @@ impl AutoloadGenerator {
             if package.as_alias().is_some() {
                 continue;
             }
-            self.validate_package(package.as_rc().borrow().as_package_interface())?;
-            let install_path = installation_manager
-                .get_install_path(package.as_rc().borrow().as_package_interface());
+            self.validate_package(package.clone())?;
+            let install_path = installation_manager.get_install_path(package.clone());
             package_map.push((package, install_path));
         }
 
@@ -768,7 +763,7 @@ impl AutoloadGenerator {
     }
 
     /// Throws InvalidArgumentException if the package has illegal settings.
-    pub(crate) fn validate_package(&self, package: &dyn PackageInterface) -> anyhow::Result<()> {
+    pub(crate) fn validate_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         let autoload = package.get_autoload();
         if autoload
             .get("psr-4")
@@ -802,7 +797,7 @@ impl AutoloadGenerator {
     pub fn parse_autoloads(
         &self,
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<String, PhpMixed> {
         let mut package_map = package_map;
@@ -821,7 +816,7 @@ impl AutoloadGenerator {
                 .filter(|item| !dev_list.contains(&item.0.get_name()))
                 .collect()
         } else if filtered_dev_packages.as_bool() == Some(true) {
-            self.filter_package_map(package_map, root_package)
+            self.filter_package_map(package_map, root_package.clone())
         } else {
             package_map
         };
@@ -829,15 +824,21 @@ impl AutoloadGenerator {
         sorted_package_map.push(root_package_map);
 
         // TODO(phase-b): psr-0/4/classmap should use reverse_sorted_map (root first) for correct precedence
-        let mut psr0 = self.parse_autoloads_type(&sorted_package_map, "psr-0", root_package);
-        let mut psr4 = self.parse_autoloads_type(&sorted_package_map, "psr-4", root_package);
-        let classmap = self.parse_autoloads_type(&sorted_package_map, "classmap", root_package);
+        let mut psr0 =
+            self.parse_autoloads_type(&sorted_package_map, "psr-0", root_package.clone());
+        let mut psr4 =
+            self.parse_autoloads_type(&sorted_package_map, "psr-4", root_package.clone());
+        let classmap =
+            self.parse_autoloads_type(&sorted_package_map, "classmap", root_package.clone());
 
         // sorted (i.e. dependents first) for files to ensure that dependencies are loaded/available once a file is included
-        let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package);
+        let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package.clone());
         // using sorted here but it does not really matter as all are excluded equally
-        let exclude =
-            self.parse_autoloads_type(&sorted_package_map, "exclude-from-classmap", root_package);
+        let exclude = self.parse_autoloads_type(
+            &sorted_package_map,
+            "exclude-from-classmap",
+            root_package.clone(),
+        );
 
         psr0.sort_by(|k1, _, k2, _| k2.cmp(k1));
         psr4.sort_by(|k1, _, k2, _| k2.cmp(k1));
@@ -1633,7 +1634,7 @@ impl AutoloadGenerator {
         &self,
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         r#type: &str,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
     ) -> IndexMap<String, Box<PhpMixed>> {
         let mut autoloads: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
         let mut numeric_index: i64 = 0;
@@ -1800,10 +1801,7 @@ impl AutoloadGenerator {
 
                     if r#type == "files" {
                         autoloads.insert(
-                            self.get_file_identifier(
-                                package.as_rc().borrow().as_package_interface(),
-                                &path_str,
-                            ),
+                            self.get_file_identifier(package.clone(), &path_str),
                             Box::new(PhpMixed::String(relative_path)),
                         );
                         continue;
@@ -1831,7 +1829,11 @@ impl AutoloadGenerator {
         autoloads
     }
 
-    pub(crate) fn get_file_identifier(&self, package: &dyn PackageInterface, path: &str) -> String {
+    pub(crate) fn get_file_identifier(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> String {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
         hash("md5", &format!("{}:{}", package.get_name(), path))
     }
@@ -1840,7 +1842,7 @@ impl AutoloadGenerator {
     pub(crate) fn filter_package_map(
         &self,
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
-        root_package: &dyn RootPackageInterface,
+        root_package: RootPackageInterfaceHandle,
     ) -> Vec<(PackageInterfaceHandle, Option<String>)> {
         let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut include: IndexMap<String, bool> = IndexMap::new();
@@ -1857,7 +1859,7 @@ impl AutoloadGenerator {
 
         // Recursive walk emulating PHP's by-reference closure capture.
         fn add(
-            package: &dyn PackageInterface,
+            package: PackageInterfaceHandle,
             packages: &IndexMap<String, PackageInterfaceHandle>,
             include: &mut IndexMap<String, bool>,
             replaced_by: &IndexMap<String, String>,
@@ -1870,18 +1872,13 @@ impl AutoloadGenerator {
                 if !include.contains_key(&target) {
                     include.insert(target.clone(), true);
                     if let Some(p) = packages.get(&target) {
-                        add(
-                            p.as_rc().borrow().as_package_interface(),
-                            packages,
-                            include,
-                            replaced_by,
-                        );
+                        add(p.clone(), packages, include, replaced_by);
                     }
                 }
             }
         }
         add(
-            RootPackageInterface::as_package_interface(root_package),
+            root_package.clone().into(),
             &packages,
             &mut include,
             &replaced_by,

@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package::{self};
 use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
@@ -159,7 +158,7 @@ impl shirabe_php_shim::Countable for FilterRepository {
 }
 
 impl RepositoryInterface for FilterRepository {
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.repo.has_package(package)
     }
 

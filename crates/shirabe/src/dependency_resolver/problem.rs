@@ -156,9 +156,7 @@ impl Problem {
                 // TODO(phase-b): reason_data is a Link.
                 let source = rule.get_source_package(pool).unwrap();
                 let link_pretty = match rule.get_reason_data() {
-                    rule::ReasonData::Link(link) => {
-                        link.get_pretty_string(source.as_rc().borrow().as_package_interface())
-                    }
+                    rule::ReasonData::Link(link) => link.get_pretty_string(source.clone()),
                     _ => String::new(),
                 };
                 format!("{}//{}", source.get_pretty_string(), link_pretty)
@@ -558,9 +556,7 @@ impl Problem {
         for (_key, package) in request.get_locked_packages() {
             if package.get_name().as_str() == package_name {
                 locked_package = Some(package.clone());
-                // TODO(phase-c): wire Pool::is_unacceptable_fixed_or_locked_package(package) here;
-                // the locked package handle and the pool's identity check are now both handle-based.
-                if todo!("is_unacceptable_fixed_or_locked_package with a request package handle") {
+                if pool.is_unacceptable_fixed_or_locked_package(package.clone()) {
                     return (
                         "- ".to_string(),
                         format!(
@@ -807,9 +803,9 @@ impl Problem {
             }
 
             if pool.is_security_removed_package_version(package_name, constraint) {
-                // TODO(phase-b): get_matching_security_advisories needs Vec<Box<dyn PackageInterface>>
+                // TODO(phase-b): get_matching_security_advisories needs Vec<PackageInterfaceHandle>
                 // and SecurityAdvisory.inner.advisory_id is on the private inner field.
-                // Convert packages to PackageInterface boxes and adjust SecurityAdvisory accessor first.
+                // Convert packages to PackageInterfaceHandle and adjust SecurityAdvisory accessor first.
                 let _ = repository_set;
                 let advisories_list: Vec<String> = pool
                     .get_security_advisory_identifiers_for_package_version(package_name, constraint)

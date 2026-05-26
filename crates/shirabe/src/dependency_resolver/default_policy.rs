@@ -44,8 +44,8 @@ impl DefaultPolicy {
     pub fn compare_by_priority(
         &self,
         pool: &Pool,
-        a: &BasePackageHandle,
-        b: &BasePackageHandle,
+        a: BasePackageHandle,
+        b: BasePackageHandle,
         required_package: Option<String>,
         ignore_replace: bool,
     ) -> i64 {
@@ -61,10 +61,10 @@ impl DefaultPolicy {
         }
 
         if !ignore_replace {
-            if self.replaces(a, b) {
+            if self.replaces(a.clone(), b.clone()) {
                 return 1;
             }
-            if self.replaces(b, a) {
+            if self.replaces(b.clone(), a.clone()) {
                 return -1;
             }
 
@@ -125,10 +125,10 @@ impl DefaultPolicy {
                 continue;
             }
             let package = pool.literal_to_package(literal);
-            if self.version_compare(&package, &best_package, operator) {
+            if self.version_compare(package.clone(), best_package.clone(), operator) {
                 best_package = package;
                 best_literals = vec![literal];
-            } else if self.version_compare(&package, &best_package, "==") {
+            } else if self.version_compare(package.clone(), best_package.clone(), "==") {
                 best_literals.push(literal);
             }
         }
@@ -164,7 +164,7 @@ impl DefaultPolicy {
         selected
     }
 
-    pub(crate) fn replaces(&self, source: &BasePackageHandle, target: &BasePackageHandle) -> bool {
+    pub(crate) fn replaces(&self, source: BasePackageHandle, target: BasePackageHandle) -> bool {
         for link in source.get_replaces().values() {
             if link.get_target() == target.get_name().as_str() {
                 return true;
@@ -175,12 +175,7 @@ impl DefaultPolicy {
 }
 
 impl PolicyInterface for DefaultPolicy {
-    fn version_compare(
-        &self,
-        a: &BasePackageHandle,
-        b: &BasePackageHandle,
-        operator: &str,
-    ) -> bool {
+    fn version_compare(&self, a: BasePackageHandle, b: BasePackageHandle, operator: &str) -> bool {
         if self.prefer_stable {
             let stab_a = a.get_stability().to_string();
             let stab_b = b.get_stability().to_string();
@@ -263,8 +258,8 @@ impl PolicyInterface for DefaultPolicy {
                 }
                 let result = self.compare_by_priority(
                     pool,
-                    &pool.literal_to_package(a),
-                    &pool.literal_to_package(b),
+                    pool.literal_to_package(a),
+                    pool.literal_to_package(b),
                     required_package.clone(),
                     true,
                 );
@@ -296,8 +291,8 @@ impl PolicyInterface for DefaultPolicy {
             }
             let result = self.compare_by_priority(
                 pool,
-                &pool.literal_to_package(a),
-                &pool.literal_to_package(b),
+                pool.literal_to_package(a),
+                pool.literal_to_package(b),
                 required_package.clone(),
                 false,
             );

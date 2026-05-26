@@ -15,8 +15,6 @@ use crate::repository::RepositoryInterface;
 /// @phpstan-type DevAutoloadRules array{psr-0?: array<string, string|string[]>, psr-4?: array<string, string|string[]>, classmap?: list<string>, files?: list<string>}
 /// @phpstan-type PhpExtConfig     array{extension-name?: string, priority?: int, support-zts?: bool, support-nts?: bool, build-path?: string|null, download-url-method?: string|list<string>, os-families?: non-empty-list<non-empty-string>, os-families-exclude?: non-empty-list<non-empty-string>, configure-options?: list<array{name: string, description?: string}>}
 pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
-    fn as_any(&self) -> &dyn std::any::Any;
-
     /// Returns the package's name without version info, thus not a unique identifier
     ///
     /// @return string package name

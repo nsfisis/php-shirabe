@@ -47,10 +47,8 @@ impl SuggestsCommand {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
-        // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a
-        // RootPackageInterfaceHandle, so it cannot be shared into RootPackageRepository::new yet.
         let root_package_handle: crate::package::RootPackageInterfaceHandle =
-            todo!("share composer.get_package() as a RootPackageInterfaceHandle");
+            composer.get_package().clone();
         let mut installed_repos: Vec<Box<dyn RepositoryInterface>> =
             vec![Box::new(RootPackageRepository::new(root_package_handle))];
 
@@ -97,16 +95,14 @@ impl SuggestsCommand {
 
         let filter = input.get_argument("packages");
         let mut packages = RepositoryInterface::get_packages(&installed_repo);
-        // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a handle,
-        // so it cannot be shared into the package list yet.
         let root_pkg_as_base: crate::package::BasePackageHandle =
-            todo!("share composer.get_package() as a BasePackageHandle");
+            composer.get_package().clone().into();
         packages.push(root_pkg_as_base);
         for package in &packages {
             if !empty(&filter) && !in_array(PhpMixed::String(package.get_name()), &filter, false) {
                 continue;
             }
-            reporter.add_suggestions_from_package(package.as_rc().borrow().as_package_interface());
+            reporter.add_suggestions_from_package(package.clone());
         }
 
         let mut mode = SuggestedPackagesReporter::MODE_BY_PACKAGE;
@@ -121,12 +117,9 @@ impl SuggestsCommand {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
-        let only_dependents_of: Option<&dyn crate::package::PackageInterface> =
+        let only_dependents_of: Option<crate::package::PackageInterfaceHandle> =
             if empty(&filter) && !input.get_option("all").as_bool().unwrap_or(false) {
-                // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; need conversion to &dyn PackageInterface
-                Some(todo!(
-                    "convert RootPackageInterface to &dyn PackageInterface"
-                ))
+                Some(composer.get_package().clone().into())
             } else {
                 None
             };

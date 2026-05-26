@@ -976,9 +976,7 @@ impl RequireCommand {
             } else {
                 requirements.insert(
                     package_name.clone(),
-                    version_selector.find_recommended_require_version(
-                        package.as_rc().borrow().as_package_interface(),
-                    )?,
+                    version_selector.find_recommended_require_version(package.clone())?,
                 );
             }
             self.get_io().write_error3(

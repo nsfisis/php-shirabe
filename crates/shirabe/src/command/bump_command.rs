@@ -255,10 +255,7 @@ impl BumpCommand {
                     package = alias.get_alias_of().into();
                 }
 
-                let bumped = bumper.bump_requirement(
-                    link.get_constraint(),
-                    package.as_rc().borrow().as_package_interface(),
-                )?;
+                let bumped = bumper.bump_requirement(link.get_constraint(), package.clone())?;
 
                 if bumped == current_constraint {
                     continue;

@@ -125,7 +125,7 @@ impl Request {
         self.fixed_locked_packages.insert(hash, package);
     }
 
-    pub fn unlock_package(&mut self, package: &BasePackageHandle) {
+    pub fn unlock_package(&mut self, package: BasePackageHandle) {
         self.locked_packages.remove(&package.ptr_id().to_string());
     }
 
@@ -161,7 +161,7 @@ impl Request {
         &self.fixed_packages
     }
 
-    pub fn is_fixed_package(&self, package: &BasePackageHandle) -> bool {
+    pub fn is_fixed_package(&self, package: BasePackageHandle) -> bool {
         self.fixed_packages
             .contains_key(&package.ptr_id().to_string())
     }
@@ -170,7 +170,7 @@ impl Request {
         &self.locked_packages
     }
 
-    pub fn is_locked_package(&self, package: &BasePackageHandle) -> bool {
+    pub fn is_locked_package(&self, package: BasePackageHandle) -> bool {
         let hash = package.ptr_id().to_string();
         self.locked_packages.contains_key(&hash) || self.fixed_locked_packages.contains_key(&hash)
     }

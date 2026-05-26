@@ -1387,7 +1387,7 @@ impl ComposerRepository {
         Ok(vec![])
     }
 
-    fn configure_package_transport_options(&self, package: &mut dyn PackageInterface) {
+    fn configure_package_transport_options(&self, package: PackageInterfaceHandle) {
         for url in package.get_dist_urls() {
             if url.starts_with(&self.base_url) {
                 package.set_transport_options(self.options.clone());
@@ -1780,9 +1780,7 @@ impl ComposerRepository {
 
     /// Adds a new package to the repository
     pub fn add_package(&mut self, package: BasePackageHandle) {
-        self.configure_package_transport_options(
-            package.as_rc().borrow_mut().as_package_interface_mut(),
-        );
+        self.configure_package_transport_options(package.clone());
         self.inner.add_package(package.into());
     }
 
@@ -2762,9 +2760,7 @@ impl ComposerRepository {
                         .collect();
                     package.set_dist_mirrors(Some(converted));
                 }
-                self.configure_package_transport_options(
-                    package.as_rc().borrow_mut().as_package_interface_mut(),
-                );
+                self.configure_package_transport_options(package.clone());
                 results.push(package.into());
             }
             Ok(results)

@@ -15,7 +15,6 @@ use crate::installer::BinaryInstaller;
 use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use crate::util::Filesystem;
@@ -100,8 +99,8 @@ impl LibraryInstaller {
     }
 
     /// Make sure binaries are installed for a given package.
-    pub fn ensure_binaries_presence(&mut self, package: &dyn PackageInterface) {
-        let install_path = self.get_install_path(package).unwrap();
+    pub fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+        let install_path = self.get_install_path(package.clone()).unwrap();
         self.binary_installer
             .install_binaries(package, &install_path, false);
     }
@@ -110,8 +109,8 @@ impl LibraryInstaller {
     ///
     /// It is used for BC as getInstallPath tends to be overridden by
     /// installer plugins but not getPackageBasePath
-    pub(crate) fn get_package_base_path(&self, package: &dyn PackageInterface) -> String {
-        let install_path = self.get_install_path(package).unwrap();
+    pub(crate) fn get_package_base_path(&self, package: PackageInterfaceHandle) -> String {
+        let install_path = self.get_install_path(package.clone()).unwrap();
         let target_dir = package.get_target_dir();
 
         if let Some(target_dir) = target_dir {
@@ -135,9 +134,9 @@ impl LibraryInstaller {
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn install_code(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        let download_path = self.get_install_path(package).unwrap();
+        let download_path = self.get_install_path(package.clone()).unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -149,11 +148,11 @@ impl LibraryInstaller {
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn update_code(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        let initial_download_path = self.get_install_path(initial).unwrap();
-        let target_download_path = self.get_install_path(target).unwrap();
+        let initial_download_path = self.get_install_path(initial.clone()).unwrap();
+        let target_download_path = self.get_install_path(target.clone()).unwrap();
         if target_download_path != initial_download_path {
             // if the target and initial dirs intersect, we force a remove + install
             // to avoid the rename wiping the target dir as part of the initial dir cleanup
@@ -180,9 +179,9 @@ impl LibraryInstaller {
     /// @phpstan-return PromiseInterface<void|null>|null
     pub(crate) async fn remove_code(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        let download_path = self.get_package_base_path(package);
+        let download_path = self.get_package_base_path(package.clone());
 
         self.get_download_manager()
             .borrow()
@@ -229,9 +228,9 @@ impl InstallerInterface for LibraryInstaller {
     fn is_installed(
         &self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> bool {
-        if !repo.has_package(package) {
+        if !repo.has_package(package.clone()) {
             return false;
         }
 
@@ -258,12 +257,12 @@ impl InstallerInterface for LibraryInstaller {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package).unwrap();
+        let download_path = self.get_install_path(package.clone()).unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -274,12 +273,12 @@ impl InstallerInterface for LibraryInstaller {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package).unwrap();
+        let download_path = self.get_install_path(package.clone()).unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -290,12 +289,12 @@ impl InstallerInterface for LibraryInstaller {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
-        let download_path = self.get_install_path(package).unwrap();
+        let download_path = self.get_install_path(package.clone()).unwrap();
 
         self.get_download_manager()
             .borrow()
@@ -306,35 +305,23 @@ impl InstallerInterface for LibraryInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
-        let download_path = self
-            .get_install_path(package.as_rc().borrow().as_package_interface())
-            .unwrap();
+        let download_path = self.get_install_path(package.clone()).unwrap();
 
         // remove the binaries if it appears the package files are missing
-        if !Filesystem::is_readable(&download_path)
-            && repo.has_package(package.as_rc().borrow().as_package_interface())
-        {
-            self.binary_installer
-                .remove_binaries(package.as_rc().borrow().as_package_interface());
+        if !Filesystem::is_readable(&download_path) && repo.has_package(package.clone()) {
+            self.binary_installer.remove_binaries(package.clone());
         }
 
-        let _ = self
-            .install_code(package.as_rc().borrow().as_package_interface())
-            .await?;
+        let _ = self.install_code(package.clone()).await?;
 
-        let install_path = self
-            .get_install_path(package.as_rc().borrow().as_package_interface())
-            .unwrap();
-        self.binary_installer.install_binaries(
-            package.as_rc().borrow().as_package_interface(),
-            &install_path,
-            true,
-        );
-        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+        let install_path = self.get_install_path(package.clone()).unwrap();
+        self.binary_installer
+            .install_binaries(package.clone(), &install_path, true);
+        if !repo.has_package(package.clone()) {
             repo.add_package(package.clone());
         }
 
@@ -344,10 +331,10 @@ impl InstallerInterface for LibraryInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &PackageInterfaceHandle,
-        target: &PackageInterfaceHandle,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(initial.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(initial.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", initial),
                 code: 0,
@@ -358,25 +345,14 @@ impl InstallerInterface for LibraryInstaller {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
 
-        self.binary_installer
-            .remove_binaries(initial.as_rc().borrow().as_package_interface());
-        let _ = self
-            .update_code(
-                initial.as_rc().borrow().as_package_interface(),
-                target.as_rc().borrow().as_package_interface(),
-            )
-            .await?;
+        self.binary_installer.remove_binaries(initial.clone());
+        let _ = self.update_code(initial.clone(), target.clone()).await?;
 
-        let install_path = self
-            .get_install_path(target.as_rc().borrow().as_package_interface())
-            .unwrap();
-        self.binary_installer.install_binaries(
-            target.as_rc().borrow().as_package_interface(),
-            &install_path,
-            true,
-        );
-        repo.remove_package(initial.as_rc().borrow().as_package_interface());
-        if !repo.has_package(target.as_rc().borrow().as_package_interface()) {
+        let install_path = self.get_install_path(target.clone()).unwrap();
+        self.binary_installer
+            .install_binaries(target.clone(), &install_path, true);
+        repo.remove_package(initial.clone());
+        if !repo.has_package(target.clone()) {
             repo.add_package(target.clone());
         }
 
@@ -386,9 +362,9 @@ impl InstallerInterface for LibraryInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
-        if !repo.has_package(package.as_rc().borrow().as_package_interface()) {
+        if !repo.has_package(package.clone()) {
             return Err(InvalidArgumentException {
                 message: format!("Package is not installed: {}", package),
                 code: 0,
@@ -396,15 +372,11 @@ impl InstallerInterface for LibraryInstaller {
             .into());
         }
 
-        let _ = self
-            .remove_code(package.as_rc().borrow().as_package_interface())
-            .await?;
+        let _ = self.remove_code(package.clone()).await?;
 
-        let download_path =
-            self.get_package_base_path(package.as_rc().borrow().as_package_interface());
-        self.binary_installer
-            .remove_binaries(package.as_rc().borrow().as_package_interface());
-        repo.remove_package(package.as_rc().borrow().as_package_interface());
+        let download_path = self.get_package_base_path(package.clone());
+        self.binary_installer.remove_binaries(package.clone());
+        repo.remove_package(package.clone());
 
         if strpos(&package.get_name(), "/").map_or(false, |pos| pos != 0) {
             let package_vendor_dir = dirname(&download_path);
@@ -421,7 +393,7 @@ impl InstallerInterface for LibraryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         // TODO(phase-b): initialize_vendor_dir requires &mut self
         // self.initialize_vendor_dir();
 
@@ -449,7 +421,7 @@ impl InstallerInterface for LibraryInstaller {
 }
 
 impl BinaryPresenceInterface for LibraryInstaller {
-    fn ensure_binaries_presence(&self, _package: &dyn PackageInterface) {
+    fn ensure_binaries_presence(&self, _package: PackageInterfaceHandle) {
         // TODO(phase-b): trait takes &self but LibraryInstaller::ensure_binaries_presence
         // requires &mut self due to BinaryInstaller::install_binaries(&mut self, ...).
         // Revisit the trait or use interior mutability.

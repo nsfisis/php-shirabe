@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/RepositoryUtils.php
 
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::repository::CompositeRepository;
 use crate::repository::FilterRepository;
 use crate::repository::RepositoryInterface;
@@ -13,7 +12,7 @@ pub struct RepositoryUtils;
 impl RepositoryUtils {
     pub fn filter_required_packages(
         packages: &[crate::package::BasePackageHandle],
-        requirer: &dyn PackageInterface,
+        requirer: crate::package::PackageInterfaceHandle,
         include_require_dev: bool,
         mut bucket: Vec<crate::package::BasePackageHandle>,
     ) -> Vec<crate::package::BasePackageHandle> {

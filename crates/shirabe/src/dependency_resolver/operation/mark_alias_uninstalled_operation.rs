@@ -2,21 +2,21 @@
 
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::AliasPackage;
+use crate::package::AliasPackageHandle;
 use crate::package::PackageInterface;
 
 #[derive(Debug)]
 pub struct MarkAliasUninstalledOperation {
-    pub(crate) package: AliasPackage,
+    pub(crate) package: AliasPackageHandle,
 }
 
 impl MarkAliasUninstalledOperation {
-    pub fn new(package: AliasPackage) -> Self {
+    pub fn new(package: AliasPackageHandle) -> Self {
         Self { package }
     }
 
-    pub fn get_package(&self) -> &AliasPackage {
-        &self.package
+    pub fn get_package(&self) -> AliasPackageHandle {
+        self.package.clone()
     }
 }
 
@@ -36,12 +36,9 @@ impl OperationInterface for MarkAliasUninstalledOperation {
     fn show(&self, _lock: bool) -> String {
         format!(
             "Marking <info>{}</info> (<comment>{}</comment>) as uninstalled, alias of <info>{}</info> (<comment>{}</comment>)",
-            PackageInterface::get_pretty_name(&self.package),
-            PackageInterface::get_full_pretty_version(
-                &self.package,
-                true,
-                <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
-            ),
+            self.package.get_pretty_name(),
+            self.package
+                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV),
             self.package.get_alias_of().get_pretty_name(),
             self.package
                 .get_alias_of()

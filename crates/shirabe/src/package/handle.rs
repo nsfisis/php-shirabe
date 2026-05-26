@@ -142,9 +142,6 @@ impl AnyPackage {
 macro_rules! delegate_package_interface_to_inner {
     ($Type:ty, $field:ident) => {
         impl crate::package::PackageInterface for $Type {
-            fn as_any(&self) -> &dyn std::any::Any {
-                self
-            }
             fn get_name(&self) -> &str {
                 self.$field.get_name()
             }

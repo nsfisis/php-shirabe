@@ -234,9 +234,9 @@ impl Rule {
                 if let Some(_locked_repo) = locked_repo {
                     let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
                     for package in packages {
-                        let p: &BasePackageHandle = &package;
+                        let p = package.clone();
                         if p.get_name() == link.get_target() {
-                            if pool.is_unacceptable_fixed_or_locked_package(p) {
+                            if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
                                 return true;
                             }
                             if !link.get_constraint().matches(
@@ -250,8 +250,7 @@ impl Rule {
                                 return true;
                             }
                             // required package was locked but has been unlocked and still matches
-                            if !request.is_locked_package(todo!("package as &dyn PackageInterface"))
-                            {
+                            if !request.is_locked_package(p) {
                                 return true;
                             }
                             break;
@@ -275,9 +274,9 @@ impl Rule {
                 if let Some(_locked_repo) = locked_repo {
                     let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
                     for package in packages {
-                        let p: &BasePackageHandle = &package;
+                        let p = package.clone();
                         if p.get_name() == *package_name {
-                            if pool.is_unacceptable_fixed_or_locked_package(p) {
+                            if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
                                 return true;
                             }
                             if !constraint.matches(
@@ -378,8 +377,7 @@ impl Rule {
                     .collect();
                 if packages_non_alias.len() == 1 {
                     let package = &packages_non_alias[0];
-                    // TODO(phase-b): request.is_locked_package signature
-                    if request.is_locked_package(todo!("package as &dyn PackageInterface")) {
+                    if request.is_locked_package(package.clone()) {
                         return format!(
                             "{} is locked to version {} and an update of this package was not requested.",
                             package.get_pretty_name(),
@@ -409,7 +407,7 @@ impl Rule {
                 };
                 let package = self.deduplicate_default_branch_alias(package_in);
 
-                if request.is_locked_package(todo!("package as &dyn PackageInterface")) {
+                if request.is_locked_package(package.clone()) {
                     return format!(
                         "{} is locked to version {} and an update of this package was not requested.",
                         package.get_pretty_name(),
@@ -504,8 +502,7 @@ impl Rule {
                     requires.push(pool.literal_to_package(*literal));
                 }
 
-                let text =
-                    link.get_pretty_string(source_package.as_rc().borrow().as_package_interface());
+                let text = link.get_pretty_string(source_package.clone());
                 if requires.len() > 0 {
                     format!(
                         "{} -> satisfiable by {}.",

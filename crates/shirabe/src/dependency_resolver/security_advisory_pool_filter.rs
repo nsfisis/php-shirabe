@@ -5,7 +5,7 @@ use crate::advisory::Auditor;
 use crate::advisory::PartialSecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
-use crate::package::PackageInterface;
+use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
@@ -51,7 +51,7 @@ impl SecurityAdvisoryPoolFilter {
     /// @return list<PartialSecurityAdvisory|SecurityAdvisory>
     fn get_matching_advisories(
         &self,
-        package: &dyn PackageInterface,
+        package: BasePackageHandle,
         advisory_map: &IndexMap<String, Vec<PartialSecurityAdvisory>>,
     ) -> Vec<PartialSecurityAdvisory> {
         if package.is_dev() {

@@ -5,7 +5,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::ProcessExecutor;
@@ -31,10 +31,10 @@ impl HgDownloader {
 
     pub(crate) async fn do_download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
         url: String,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process).is_none() {
             return Err(RuntimeException {
@@ -49,7 +49,7 @@ impl HgDownloader {
 
     pub(crate) async fn do_install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
         url: String,
     ) -> Result<Option<PhpMixed>> {
@@ -103,8 +103,8 @@ impl HgDownloader {
 
     pub(crate) async fn do_update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: String,
         url: String,
     ) -> Result<Option<PhpMixed>> {
@@ -154,7 +154,7 @@ impl HgDownloader {
 
     pub fn get_local_changes(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
     ) -> Option<String> {
         if !std::path::Path::new(&format!("{}/.hg", path)).is_dir() {
@@ -229,9 +229,9 @@ impl DownloaderInterface for HgDownloader {
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
         todo!()
@@ -240,16 +240,16 @@ impl DownloaderInterface for HgDownloader {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
     async fn install(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -258,8 +258,8 @@ impl DownloaderInterface for HgDownloader {
 
     async fn update(
         &self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        _target: PackageInterfaceHandle,
         _path: &str,
     ) -> Result<Option<PhpMixed>> {
         todo!()
@@ -267,7 +267,7 @@ impl DownloaderInterface for HgDownloader {
 
     async fn remove(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -277,9 +277,9 @@ impl DownloaderInterface for HgDownloader {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         todo!()
     }

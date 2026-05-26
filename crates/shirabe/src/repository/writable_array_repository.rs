@@ -52,7 +52,10 @@ impl WritableArrayRepository {
         self.inner.add_package(package)
     }
 
-    pub fn remove_package(&mut self, package: &dyn crate::package::PackageInterface) -> Result<()> {
+    pub fn remove_package(
+        &mut self,
+        package: crate::package::PackageInterfaceHandle,
+    ) -> Result<()> {
         let _ = package;
         // TODO(phase-b): delegate to ArrayRepository once it implements remove_package
         Ok(())

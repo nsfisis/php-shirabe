@@ -16,6 +16,7 @@ use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
 use crate::util::Platform;
@@ -59,10 +60,10 @@ impl GitDownloader {
 
     pub(crate) async fn do_download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         _path: &str,
         url: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         // Do not create an extra local cache when repository is already local
         if Filesystem::is_local_path(url) {
@@ -109,17 +110,18 @@ impl GitDownloader {
                 io_interface::DEBUG,
             );
             let r#ref = package.get_source_reference();
+            let pretty_version = package.get_pretty_version();
             if self.git_util.fetch_ref_or_sync_mirror(
                 url,
                 &cache_path,
-                r#ref.unwrap_or(""),
-                Some(package.get_pretty_version()),
+                r#ref.as_deref().unwrap_or(""),
+                Some(&pretty_version),
             )? && is_dir(&cache_path)
             {
                 self.cached_packages
                     .entry(package.get_id())
                     .or_insert_with(IndexMap::new)
-                    .insert(r#ref.unwrap_or("").to_string(), true);
+                    .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
             }
         } else if git_version.is_none() {
             return Err(RuntimeException {
@@ -134,7 +136,7 @@ impl GitDownloader {
 
     pub(crate) async fn do_install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -150,7 +152,7 @@ impl GitDownloader {
                 .unwrap_or(""),
             Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
         );
-        let r#ref = package.get_source_reference().unwrap_or("").to_string();
+        let r#ref = package.get_source_reference().unwrap_or_default();
 
         let msg;
         let commands: Vec<Vec<String>>;
@@ -265,14 +267,15 @@ impl GitDownloader {
             .run_commands(commands, url, Some(&path), true, None)?;
 
         let source_url = package.get_source_url();
-        if url != source_url.unwrap_or("") && source_url.is_some() {
-            self.update_origin_url(&path, source_url.unwrap());
+        if Some(url) != source_url.as_deref() && source_url.is_some() {
+            self.update_origin_url(&path, source_url.as_deref().unwrap());
         } else {
             self.set_push_url(&path, url);
         }
 
+        let pretty_version = package.get_pretty_version();
         if let Some(new_ref) =
-            self.update_to_commit(package, &path, &r#ref, package.get_pretty_version())?
+            self.update_to_commit(package.clone(), &path, &r#ref, &pretty_version)?
         {
             if package.get_dist_reference() == package.get_source_reference() {
                 // TODO(phase-b): set_dist_reference requires &mut PackageInterface
@@ -287,8 +290,8 @@ impl GitDownloader {
 
     pub(crate) async fn do_update(
         &mut self,
-        _initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -315,7 +318,7 @@ impl GitDownloader {
                 .unwrap_or(""),
             Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
         );
-        let r#ref = target.get_source_reference().unwrap_or("").to_string();
+        let r#ref = target.get_source_reference().unwrap_or_default();
 
         let msg;
         let remote_url;
@@ -395,8 +398,9 @@ impl GitDownloader {
         self.git_util
             .run_commands(vec![command], url, Some(&path), false, None)?;
 
+        let pretty_version = target.get_pretty_version();
         if let Some(new_ref) =
-            self.update_to_commit(target, &path, &r#ref, target.get_pretty_version())?
+            self.update_to_commit(target.clone(), &path, &r#ref, &pretty_version)?
         {
             if target.get_dist_reference() == target.get_source_reference() {
                 // TODO(phase-b): set_dist_reference requires &mut PackageInterface
@@ -438,20 +442,24 @@ impl GitDownloader {
                     .cloned()
                     .unwrap_or_default();
                 if origin_url == composer_url
-                    && Some(composer_url.as_str()) != target.get_source_url()
+                    && Some(composer_url.as_str()) != target.get_source_url().as_deref()
                 {
                     update_origin_url = true;
                 }
             }
         }
         if update_origin_url && target.get_source_url().is_some() {
-            self.update_origin_url(&path, target.get_source_url().unwrap());
+            self.update_origin_url(&path, &target.get_source_url().unwrap());
         }
 
         Ok(None)
     }
 
-    pub fn get_local_changes(&self, _package: &dyn PackageInterface, path: &str) -> Option<String> {
+    pub fn get_local_changes(
+        &self,
+        _package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Option<String> {
         GitUtil::clean_env(&self.inner.process);
         if !self.has_metadata_repository(path) {
             return None;
@@ -492,7 +500,7 @@ impl GitDownloader {
 
     pub fn get_unpushed_changes(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         path: &str,
     ) -> Option<String> {
         GitUtil::clean_env(&self.inner.process);
@@ -686,14 +694,14 @@ impl GitDownloader {
 
     pub(crate) async fn clean_changes(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         update: bool,
     ) -> Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
 
-        let unpushed = self.get_unpushed_changes(package, &path);
+        let unpushed = self.get_unpushed_changes(package.clone(), &path);
         if let Some(unpushed) = unpushed.as_deref() {
             if self.inner.io.is_interactive()
                 || self
@@ -715,7 +723,7 @@ impl GitDownloader {
             }
         }
 
-        let changes = match self.get_local_changes(package, &path) {
+        let changes = match self.get_local_changes(package.clone(), &path) {
             Some(c) => c,
             None => return Ok(None),
         };
@@ -727,7 +735,10 @@ impl GitDownloader {
             }
             if discard_changes.as_string() == Some("stash") {
                 if !update {
-                    return self.inner.clean_changes(package, &path, update).await;
+                    return self
+                        .inner
+                        .clean_changes(package.clone(), &path, update)
+                        .await;
                 }
 
                 return self.stash_changes(&path).await;
@@ -892,7 +903,7 @@ impl GitDownloader {
     /// @return null|string       if a string is returned, it is the commit reference that was checked out if the original could not be found
     pub(crate) fn update_to_commit(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         reference: &str,
         pretty_version: &str,
@@ -1351,7 +1362,11 @@ impl GitDownloader {
 }
 
 impl DvcsDownloaderInterface for GitDownloader {
-    fn get_unpushed_changes(&self, package: &dyn PackageInterface, path: String) -> Option<String> {
+    fn get_unpushed_changes(
+        &self,
+        package: PackageInterfaceHandle,
+        path: String,
+    ) -> Option<String> {
         GitDownloader::get_unpushed_changes(self, package, &path)
     }
 }
@@ -1367,9 +1382,9 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
@@ -1378,16 +1393,16 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }
 
     async fn install(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -1396,8 +1411,8 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
 
     async fn update(
         &self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        _target: PackageInterfaceHandle,
         _path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
@@ -1405,7 +1420,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
 
     async fn remove(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -1415,9 +1430,9 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         todo!()
     }

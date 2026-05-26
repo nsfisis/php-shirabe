@@ -6,7 +6,6 @@ use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterface;
@@ -47,7 +46,7 @@ impl PluginInstaller {
         &mut self,
         e: anyhow::Error,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<()> {
         self.inner.io.write_error(&format!(
             "Plugin initialization failed ({}), uninstalling plugin",
@@ -72,7 +71,7 @@ impl InstallerInterface for PluginInstaller {
     fn is_installed(
         &self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> bool {
         self.inner.is_installed(repo, package)
     }
@@ -80,8 +79,8 @@ impl InstallerInterface for PluginInstaller {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         if (r#type == "install" || r#type == "update")
             && !self
@@ -104,8 +103,8 @@ impl InstallerInterface for PluginInstaller {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         let extra = package.get_extra();
         let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
@@ -125,7 +124,7 @@ impl InstallerInterface for PluginInstaller {
     async fn install(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         self.inner.install(repo, package).await?;
 
@@ -139,8 +138,8 @@ impl InstallerInterface for PluginInstaller {
     async fn update(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        initial: &PackageInterfaceHandle,
-        target: &PackageInterfaceHandle,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(repo, initial, target).await?;
 
@@ -155,12 +154,12 @@ impl InstallerInterface for PluginInstaller {
     async fn uninstall(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<Option<PhpMixed>> {
         // TODO(plugin): uninstall package from plugin manager
         self.get_plugin_manager()
             .borrow_mut()
-            .uninstall_package(package.as_rc().borrow().as_package_interface());
+            .uninstall_package(package.clone());
 
         self.inner.uninstall(repo, package).await
     }
@@ -168,13 +167,13 @@ impl InstallerInterface for PluginInstaller {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
-        prev_package: Option<&dyn PackageInterface>,
+        package: PackageInterfaceHandle,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 
-    fn get_install_path(&self, package: &dyn PackageInterface) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         self.inner.get_install_path(package)
     }
 }

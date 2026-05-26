@@ -6,6 +6,7 @@ use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::Filesystem;
 use crate::util::Perforce;
@@ -36,17 +37,17 @@ impl PerforceDownloader {
 
     pub(crate) async fn do_download(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: String,
         _url: String,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(None)
     }
 
     pub async fn do_install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: String,
         url: String,
     ) -> Result<Option<PhpMixed>> {
@@ -83,13 +84,14 @@ impl PerforceDownloader {
         None
     }
 
-    pub fn init_perforce(&mut self, package: &dyn PackageInterface, path: String, url: String) {
+    pub fn init_perforce(&mut self, package: PackageInterfaceHandle, path: String, url: String) {
         if self.perforce.is_some() {
             self.perforce.as_mut().unwrap().initialize_path(&path);
             return;
         }
 
-        let repository = package.get_repository();
+        let package_rc = package.as_rc().borrow();
+        let repository = package_rc.as_package_interface().get_repository();
         let repo_config: Option<IndexMap<String, PhpMixed>> = if let Some(repo) = repository {
             if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
                 Some(self.get_repo_config(vcs_repo))
@@ -99,6 +101,7 @@ impl PerforceDownloader {
         } else {
             None
         };
+        drop(package_rc);
         self.perforce = Some(Perforce::create(
             repo_config.unwrap_or_default(),
             url,
@@ -114,8 +117,8 @@ impl PerforceDownloader {
 
     pub(crate) async fn do_update(
         &mut self,
-        _initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: String,
         url: String,
     ) -> Result<Option<PhpMixed>> {
@@ -124,7 +127,7 @@ impl PerforceDownloader {
 
     pub fn get_local_changes(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: String,
     ) -> Option<String> {
         self.inner
@@ -168,9 +171,9 @@ impl DownloaderInterface for PerforceDownloader {
 
     async fn download(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
         todo!()
@@ -179,16 +182,16 @@ impl DownloaderInterface for PerforceDownloader {
     async fn prepare(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         todo!()
     }
 
     async fn install(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -197,8 +200,8 @@ impl DownloaderInterface for PerforceDownloader {
 
     async fn update(
         &self,
-        _initial: &dyn PackageInterface,
-        _target: &dyn PackageInterface,
+        _initial: PackageInterfaceHandle,
+        _target: PackageInterfaceHandle,
         _path: &str,
     ) -> Result<Option<PhpMixed>> {
         todo!()
@@ -206,7 +209,7 @@ impl DownloaderInterface for PerforceDownloader {
 
     async fn remove(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -216,9 +219,9 @@ impl DownloaderInterface for PerforceDownloader {
     async fn cleanup(
         &self,
         _type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
-        _prev_package: Option<&dyn PackageInterface>,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         todo!()
     }

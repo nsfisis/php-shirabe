@@ -20,7 +20,7 @@ use crate::package::CompleteAliasPackage;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
@@ -766,9 +766,7 @@ impl Locker {
                 .into());
             }
 
-            let mut spec = self
-                .dumper
-                .dump(package.as_rc().borrow().as_package_interface());
+            let mut spec = self.dumper.dump(package.clone());
             spec.shift_remove("version_normalized");
 
             // always move time to the end of the package definition
@@ -778,8 +776,7 @@ impl Locker {
                 && package.get_installation_source() == Some("source".to_string())
             {
                 // use the exact commit time of the current reference if it's a dev package
-                let pkg_time =
-                    self.get_package_time(package.as_rc().borrow().as_package_interface())?;
+                let pkg_time = self.get_package_time(package.clone())?;
                 pkg_time.map(PhpMixed::String).or(time)
             } else {
                 time
@@ -823,7 +820,7 @@ impl Locker {
     }
 
     /// Returns the packages's datetime for its source reference.
-    fn get_package_time(&mut self, package: &dyn PackageInterface) -> Result<Option<String>> {
+    fn get_package_time(&mut self, package: PackageInterfaceHandle) -> Result<Option<String>> {
         if !function_exists("proc_open") {
             return Ok(None);
         }
@@ -831,7 +828,7 @@ impl Locker {
         let path = self
             .installation_manager
             .borrow_mut()
-            .get_install_path(package);
+            .get_install_path(package.clone());
         if path.is_none() {
             return Ok(None);
         }
@@ -841,7 +838,7 @@ impl Locker {
 
         if path.is_some()
             && in_array(
-                PhpMixed::String(source_type.unwrap_or("").to_string()),
+                PhpMixed::String(source_type.clone().unwrap_or_default()),
                 &PhpMixed::List(vec![
                     Box::new(PhpMixed::String("git".to_string())),
                     Box::new(PhpMixed::String("hg".to_string())),
@@ -852,9 +849,8 @@ impl Locker {
             let source_ref = package
                 .get_source_reference()
                 .or_else(|| package.get_dist_reference())
-                .unwrap_or("")
-                .to_string();
-            match source_type.unwrap_or("") {
+                .unwrap_or_default();
+            match source_type.as_deref().unwrap_or("") {
                 "git" => {
                     GitUtil::clean_env(&self.process);
 
@@ -934,7 +930,7 @@ impl Locker {
     /// @return array<string>
     pub fn get_missing_requirement_info(
         &mut self,
-        package: &dyn RootPackageInterface,
+        package: RootPackageInterfaceHandle,
         include_dev: bool,
     ) -> Result<Vec<String>> {
         let mut missing_requirement_info: Vec<String> = vec![];

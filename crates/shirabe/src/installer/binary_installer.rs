@@ -11,7 +11,7 @@ use shirabe_php_shim::{
 
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
@@ -48,11 +48,11 @@ impl BinaryInstaller {
 
     pub fn install_binaries(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         install_path: &str,
         warn_on_overwrite: bool,
     ) {
-        let binaries = self.get_binaries(package);
+        let binaries = self.get_binaries(package.clone());
         if binaries.is_empty() {
             return;
         }
@@ -123,7 +123,7 @@ impl BinaryInstaller {
             }
 
             if bin_compat == "full" {
-                self.install_full_binaries(&bin_path, &link, bin, package);
+                self.install_full_binaries(&bin_path, &link, bin, package.clone());
             } else {
                 self.install_unixy_proxy_binaries(&bin_path, &link);
             }
@@ -134,7 +134,7 @@ impl BinaryInstaller {
         }
     }
 
-    pub fn remove_binaries(&mut self, package: &dyn PackageInterface) {
+    pub fn remove_binaries(&mut self, package: PackageInterfaceHandle) {
         self.initialize_bin_dir();
 
         let binaries = self.get_binaries(package);
@@ -192,7 +192,7 @@ impl BinaryInstaller {
     }
 
     /// @return string[]
-    pub(crate) fn get_binaries(&self, package: &dyn PackageInterface) -> Vec<String> {
+    pub(crate) fn get_binaries(&self, package: PackageInterfaceHandle) -> Vec<String> {
         package.get_binaries()
     }
 
@@ -201,7 +201,7 @@ impl BinaryInstaller {
         bin_path: &str,
         link: &str,
         bin: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) {
         let mut link = link.to_string();
         // add unixy support for cygwin and similar environments

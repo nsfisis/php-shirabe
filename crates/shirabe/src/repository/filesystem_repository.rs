@@ -16,9 +16,7 @@ use shirabe_php_shim::{
 use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManager;
 use crate::json::JsonFile;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterface;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
@@ -219,9 +217,8 @@ impl FilesystemRepository {
         let mut install_paths: IndexMap<String, Option<String>> = IndexMap::new();
 
         for package in self.inner.get_canonical_packages() {
-            let mut pkg_array = dumper.dump(package.as_rc().borrow().as_package_interface());
-            let path = installation_manager
-                .get_install_path(package.as_rc().borrow().as_package_interface());
+            let mut pkg_array = dumper.dump(package.clone());
+            let path = installation_manager.get_install_path(package.clone());
             let mut install_path: Option<String> = None;
             if let Some(path_str) = &path {
                 if !path_str.is_empty() {
@@ -508,11 +505,7 @@ impl FilesystemRepository {
             "root".to_string(),
             PhpMixed::Array(
                 self.dump_root_package(
-                    current_root
-                        .as_rc()
-                        .borrow()
-                        .as_root_package_interface()
-                        .expect("current_root is a RootPackageInterface"),
+                    current_root.clone(),
                     install_paths,
                     dev_mode,
                     repo_dir,
@@ -532,7 +525,7 @@ impl FilesystemRepository {
             }
 
             let dumped = self.dump_installed_package(
-                package.as_rc().borrow().as_package_interface(),
+                package.clone(),
                 install_paths,
                 repo_dir,
                 &dev_packages,
@@ -633,7 +626,7 @@ impl FilesystemRepository {
     /// @return array{pretty_version: string, version: string, reference: string|null, type: string, install_path: string, aliases: string[], dev_requirement: bool}
     fn dump_installed_package(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         install_paths: &IndexMap<String, Option<String>>,
         repo_dir: &str,
         dev_packages: &PhpMixed,
@@ -648,8 +641,8 @@ impl FilesystemRepository {
         }
         if reference.is_none() {
             // PHP: ($package->getSourceReference() ?: $package->getDistReference()) ?: null;
-            let source = package.get_source_reference().unwrap_or("");
-            let dist = package.get_dist_reference().unwrap_or("");
+            let source = package.get_source_reference().unwrap_or_default();
+            let dist = package.get_dist_reference().unwrap_or_default();
             let combined = if !source.is_empty() {
                 source.to_string()
             } else {
@@ -662,7 +655,7 @@ impl FilesystemRepository {
             };
         }
 
-        let install_path = if package.as_root_package_interface().is_some() {
+        let install_path = if package.as_root().is_some() {
             let to = self.filesystem.borrow_mut().normalize_path(
                 &realpath(&Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
             );
@@ -672,7 +665,7 @@ impl FilesystemRepository {
                     .find_shortest_path(repo_dir, &to, true, false),
             )
         } else {
-            install_paths.get(package.get_name()).cloned().flatten()
+            install_paths.get(&package.get_name()).cloned().flatten()
         };
 
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -708,7 +701,7 @@ impl FilesystemRepository {
             PhpMixed::Bool(
                 dev_packages
                     .as_array()
-                    .map(|m| m.contains_key(package.get_name()))
+                    .map(|m| m.contains_key(&package.get_name()))
                     .unwrap_or(false),
             ),
         );
@@ -721,13 +714,18 @@ impl FilesystemRepository {
     /// @return array{name: string, pretty_version: string, version: string, reference: string|null, type: string, install_path: string, aliases: string[], dev: bool}
     fn dump_root_package(
         &self,
-        package: &dyn RootPackageInterface,
+        package: RootPackageInterfaceHandle,
         install_paths: &IndexMap<String, Option<String>>,
         dev_mode: bool,
         repo_dir: &str,
         dev_packages: &PhpMixed,
     ) -> IndexMap<String, PhpMixed> {
-        let data = self.dump_installed_package(package, install_paths, repo_dir, dev_packages);
+        let data = self.dump_installed_package(
+            package.clone().into(),
+            install_paths,
+            repo_dir,
+            dev_packages,
+        );
 
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert(

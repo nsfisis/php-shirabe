@@ -15,11 +15,11 @@ impl UninstallOperation {
         Self { package }
     }
 
-    pub fn get_package(&self) -> &PackageInterfaceHandle {
-        &self.package
+    pub fn get_package(&self) -> PackageInterfaceHandle {
+        self.package.clone()
     }
 
-    pub fn format(package: &dyn PackageInterface, _lock: bool) -> String {
+    pub fn format(package: PackageInterfaceHandle, _lock: bool) -> String {
         format!(
             "Removing <info>{}</info> (<comment>{}</comment>)",
             package.get_pretty_name(),
@@ -43,7 +43,7 @@ impl OperationInterface for UninstallOperation {
     }
 
     fn show(&self, lock: bool) -> String {
-        Self::format(self.package.as_rc().borrow().as_package_interface(), lock)
+        Self::format(self.package.clone(), lock)
     }
 
     fn to_string(&self) -> String {

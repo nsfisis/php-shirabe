@@ -21,9 +21,7 @@ use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilt
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::BasePackage;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
 use crate::repository::CompositeRepository;
@@ -576,7 +574,7 @@ pub trait PackageDiscoveryTrait {
                             &format!(
                                 "Package %s has requirements incompatible with your PHP version, PHP extensions and Composer version{}",
                                 self.get_platform_exception_details(
-                                    candidate.as_rc().borrow().as_package_interface(),
+                                    candidate.clone(),
                                     platform_repo,
                                 ),
                             ),
@@ -673,7 +671,7 @@ pub trait PackageDiscoveryTrait {
                             &format!(
                                 "Could not find package %s in any version matching your PHP version, PHP extensions and Composer version{}%s",
                                 self.get_platform_exception_details(
-                                    candidate.as_rc().borrow().as_package_interface(),
+                                    candidate.clone(),
                                     platform_repo,
                                 ),
                             ),
@@ -781,9 +779,7 @@ pub trait PackageDiscoveryTrait {
             if fixed {
                 package.get_pretty_version().to_string()
             } else {
-                version_selector.find_recommended_require_version(
-                    package.as_rc().borrow().as_package_interface(),
-                )?
+                version_selector.find_recommended_require_version(package.clone())?
             },
         ))
     }
@@ -846,7 +842,7 @@ pub trait PackageDiscoveryTrait {
 
     fn get_platform_exception_details(
         &self,
-        candidate: &dyn PackageInterface,
+        candidate: PackageInterfaceHandle,
         platform_repo: Option<&PlatformRepository>,
     ) -> String {
         let mut details: Vec<String> = vec![];

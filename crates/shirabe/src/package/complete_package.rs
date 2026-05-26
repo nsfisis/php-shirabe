@@ -153,10 +153,6 @@ impl CompletePackageInterface for CompletePackage {
 }
 
 impl PackageInterface for CompletePackage {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn get_name(&self) -> &str {
         todo!()
     }

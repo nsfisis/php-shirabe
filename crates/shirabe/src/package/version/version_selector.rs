@@ -16,7 +16,7 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
@@ -252,14 +252,15 @@ impl VersionSelector {
 
     pub fn find_recommended_require_version(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> anyhow::Result<String> {
         if package.get_name().starts_with("ext-") {
             let php_version = format!(
                 "{}.{}.{}",
                 PHP_MAJOR_VERSION, PHP_MINOR_VERSION, PHP_RELEASE_VERSION
             );
-            let ext_parts: Vec<&str> = package.get_version().splitn(4, '.').collect();
+            let package_version = package.get_version();
+            let ext_parts: Vec<&str> = package_version.splitn(4, '.').collect();
             let ext_version = ext_parts[..3.min(ext_parts.len())].join(".");
             if php_version == ext_version {
                 return Ok("*".to_string());
@@ -270,14 +271,14 @@ impl VersionSelector {
         if !package.is_dev() {
             return self.transform_version(
                 &version,
-                package.get_pretty_version(),
-                package.get_stability(),
+                &package.get_pretty_version(),
+                &package.get_stability(),
             );
         }
 
         let loader = ArrayLoader::new(Some(self.get_parser().clone()), false);
         let dumper = ArrayDumper::new();
-        let extra = loader.get_branch_alias(&dumper.dump(package))?;
+        let extra = loader.get_branch_alias(&dumper.dump(package.clone()))?;
         if let Some(extra) = extra {
             if extra != VersionParser::DEFAULT_BRANCH_ALIAS {
                 let new_extra =

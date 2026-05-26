@@ -134,25 +134,24 @@ impl InstallationManager {
     pub fn is_package_installed(
         &mut self,
         repo: &dyn InstalledRepositoryInterface,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
     ) -> Result<bool> {
         if let Some(alias) = package.as_alias() {
             let alias_of: PackageInterfaceHandle = alias.get_alias_of().into();
             return Ok(
-                repo.has_package(package.as_rc().borrow().as_package_interface())
-                    && self.is_package_installed(repo, &alias_of)?,
+                repo.has_package(package.clone()) && self.is_package_installed(repo, alias_of)?
             );
         }
 
         Ok(self
             .get_installer(&package.get_type())?
-            .is_installed(repo, package.as_rc().borrow().as_package_interface()))
+            .is_installed(repo, package.clone()))
     }
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
-    pub fn ensure_binaries_presence(&mut self, package: &dyn PackageInterface) {
-        let installer = self.get_installer(package.get_type());
+    pub fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+        let installer = self.get_installer(&package.get_type());
         let installer = match installer {
             Ok(i) => i,
             Err(_e) => {
@@ -212,7 +211,7 @@ impl InstallationManager {
                 // TODO(phase-b): instanceof downcasts for UpdateOperation/InstallOperation
                 let is_update_or_install = false;
                 if is_update_or_install {
-                    let package: Option<&dyn PackageInterface> = None;
+                    let package: Option<PackageInterfaceHandle> = None;
                     let _ = package;
                     let extra: IndexMap<String, PhpMixed> = IndexMap::new();
                     if extra
@@ -307,8 +306,8 @@ impl InstallationManager {
                 continue;
             }
 
-            let package: &dyn PackageInterface;
-            let initial_package: Option<&dyn PackageInterface>;
+            let package: PackageInterfaceHandle;
+            let initial_package: Option<PackageInterfaceHandle>;
             // TODO(phase-b): downcast for UpdateOperation / Install/Mark/Uninstall variants
             let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
@@ -325,7 +324,7 @@ impl InstallationManager {
                 package = operation.get_package();
                 initial_package = None;
             }
-            let installer = self.get_installer(package.get_type())?;
+            let installer = self.get_installer(&package.get_type())?;
 
             // TODO(phase-b): closure captures installer + package; needs Rc-shared installer/package
             let _ = installer;
@@ -349,7 +348,7 @@ impl InstallationManager {
             if op_type != "uninstall" {
                 // TODO(phase-c-promise): PHP collects every download and runs them concurrently via
                 // Loop::wait; the single-threaded loop awaits each serially instead.
-                let installer = self.get_installer(package.get_type())?;
+                let installer = self.get_installer(&package.get_type())?;
                 installer.download(package, initial_package).await?;
             }
         }
@@ -450,8 +449,8 @@ impl InstallationManager {
                 continue;
             }
 
-            let package: &dyn PackageInterface;
-            let initial_package: Option<&dyn PackageInterface>;
+            let package: PackageInterfaceHandle;
+            let initial_package: Option<PackageInterfaceHandle>;
             let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
                 if let Some(_u) = update_op {
@@ -488,7 +487,7 @@ impl InstallationManager {
             let _dispatcher = self.event_dispatcher.as_ref();
             let _io = self.io.as_ref();
 
-            let installer = self.get_installer(package.get_type())?;
+            let installer = self.get_installer(&package.get_type())?;
             // TODO(phase-c-promise): PHP chains prepare()->then(install/update/uninstall)->then(cleanup
             // + repo.write); the single-threaded loop awaits prepare and leaves the rest as phase-b work.
             installer
@@ -526,8 +525,8 @@ impl InstallationManager {
     /// Executes download operation.
     ///
     /// @phpstan-return PromiseInterface<void|null>|null
-    pub async fn download(&mut self, package: &dyn PackageInterface) -> Option<PhpMixed> {
-        let installer = self.get_installer(package.get_type()).ok()?;
+    pub async fn download(&mut self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
+        let installer = self.get_installer(&package.get_type()).ok()?;
         let promise = installer.cleanup("install", package, None).await.ok()?;
 
         promise
@@ -541,11 +540,11 @@ impl InstallationManager {
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &InstallOperation,
     ) -> Option<PhpMixed> {
-        let package = operation.get_package().clone();
+        let package = operation.get_package();
         let package_type = package.get_type();
         let installer = self.get_installer(&package_type).ok()?;
-        let promise = installer.install(repo, &package).await.ok()?;
-        self.mark_for_notification(&package);
+        let promise = installer.install(repo, package.clone()).await.ok()?;
+        self.mark_for_notification(package.clone());
 
         promise
     }
@@ -566,19 +565,19 @@ impl InstallationManager {
 
         let promise = if initial_type == target_type {
             let installer = self.get_installer(&initial_type).ok()?;
-            let promise = installer.update(repo, &initial, &target).await.ok()?;
-            self.mark_for_notification(&target);
+            let promise = installer.update(repo, initial, target.clone()).await.ok()?;
+            self.mark_for_notification(target.clone());
             promise
         } else {
             // PHP: uninstall initial, then install target via the target-type installer.
             let _ = self
                 .get_installer(&initial_type)
                 .ok()?
-                .uninstall(repo, &initial)
+                .uninstall(repo, initial)
                 .await
                 .ok()?;
             let installer = self.get_installer(&target_type).ok()?;
-            installer.install(repo, &target).await.ok()?
+            installer.install(repo, target).await.ok()?
         };
 
         promise
@@ -592,11 +591,11 @@ impl InstallationManager {
         repo: &mut dyn InstalledRepositoryInterface,
         operation: &UninstallOperation,
     ) -> Option<PhpMixed> {
-        let package = operation.get_package().clone();
+        let package = operation.get_package();
         let package_type = package.get_type();
         let installer = self.get_installer(&package_type).ok()?;
 
-        installer.uninstall(repo, &package).await.ok()?
+        installer.uninstall(repo, package).await.ok()?
     }
 
     /// Executes markAliasInstalled operation.
@@ -607,11 +606,8 @@ impl InstallationManager {
     ) {
         let package = operation.get_package();
 
-        if !repo.has_package(package) {
-            // TODO(phase-c): MarkAliasInstalledOperation::get_package() yields a borrowed
-            // &AliasPackage; add_package now wants a shared PackageInterfaceHandle.
-            let package_handle: PackageInterfaceHandle = todo!();
-            repo.add_package(package_handle);
+        if !repo.has_package(package.clone().into()) {
+            repo.add_package(package.into());
         }
     }
 
@@ -623,14 +619,14 @@ impl InstallationManager {
     ) {
         let package = operation.get_package();
 
-        repo.remove_package(package);
+        repo.remove_package(package.clone().into());
     }
 
     /// Returns the installation path of a package
     ///
     /// @return string|null absolute path to install to, which does not end with a slash, or null if the package does not have anything installed on disk
-    pub fn get_install_path(&mut self, package: &dyn PackageInterface) -> Option<String> {
-        let installer = self.get_installer(package.get_type()).ok()?;
+    pub fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
+        let installer = self.get_installer(&package.get_type()).ok()?;
 
         installer.get_install_path(package)
     }
@@ -767,7 +763,7 @@ impl InstallationManager {
         self.reset();
     }
 
-    fn mark_for_notification(&mut self, package: &PackageInterfaceHandle) {
+    fn mark_for_notification(&mut self, package: PackageInterfaceHandle) {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
                 .entry(notification_url)

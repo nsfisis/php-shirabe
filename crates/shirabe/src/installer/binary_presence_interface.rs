@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Installer/BinaryPresenceInterface.php
 
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 
 pub trait BinaryPresenceInterface {
-    fn ensure_binaries_presence(&self, package: &dyn PackageInterface);
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle);
 }

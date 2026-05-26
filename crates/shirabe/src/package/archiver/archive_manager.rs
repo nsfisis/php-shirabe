@@ -10,6 +10,7 @@ use shirabe_php_shim::{
 use crate::downloader::DownloadManager;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterface;
+use crate::package::CompletePackageInterfaceHandle;
 use crate::package::RootPackageInterface;
 use crate::package::archiver::ArchiverInterface;
 use crate::package::archiver::PharArchiver;
@@ -57,11 +58,11 @@ impl ArchiveManager {
 
     pub fn get_package_filename_parts(
         &self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
     ) -> anyhow::Result<IndexMap<String, String>> {
         let base_name = match package.get_archive_name() {
             Some(name) => name.to_string(),
-            None => Preg::replace("#[^a-z0-9-_]#i", "-", package.get_name())?,
+            None => Preg::replace("#[^a-z0-9-_]#i", "-", &package.get_name())?,
         };
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
@@ -89,7 +90,7 @@ impl ArchiveManager {
         }
 
         if let Some(source_reference) = package.get_source_reference() {
-            let hash = shirabe_php_shim::hash("sha1", source_reference);
+            let hash = shirabe_php_shim::hash("sha1", &source_reference);
             parts.insert("source_reference".to_string(), hash[..6].to_string());
         }
 
@@ -108,7 +109,7 @@ impl ArchiveManager {
 
     pub fn get_package_filename(
         &self,
-        package: &dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
     ) -> anyhow::Result<String> {
         let parts = self.get_package_filename_parts(package)?;
         Ok(self.get_package_filename_from_parts(&parts))
@@ -116,7 +117,7 @@ impl ArchiveManager {
 
     pub fn archive(
         &mut self,
-        package: &mut dyn CompletePackageInterface,
+        package: CompletePackageInterfaceHandle,
         format: String,
         target_dir: String,
         file_name: Option<String>,
@@ -152,7 +153,7 @@ impl ArchiveManager {
 
         let mut filesystem = Filesystem::new(None);
 
-        let is_root = package.as_root_package_interface().is_some();
+        let is_root = package.as_rc().borrow().is_root();
         let source_path: String;
 
         if is_root {
@@ -169,7 +170,7 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .download(package, &source_path, None)
+                            .download(package.clone().into(), &source_path, None)
                             .await
                             .map(|_| ())
                     })),
@@ -179,7 +180,7 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .install(package, &source_path)
+                            .install(package.clone().into(), &source_path)
                             .await
                             .map(|_| ())
                     })),
@@ -219,7 +220,7 @@ impl ArchiveManager {
 
         let supported_formats = self.get_supported_formats();
         let package_name_parts = match file_name {
-            None => self.get_package_filename_parts(package)?,
+            None => self.get_package_filename_parts(package.clone())?,
             Some(f) => {
                 let mut parts = IndexMap::new();
                 parts.insert("base".to_string(), f);

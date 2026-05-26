@@ -164,7 +164,7 @@ impl PoolBuilder {
             for locked_package in
                 CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
             {
-                if !self.is_update_allowed(locked_package.as_rc().borrow().as_package_interface()) {
+                if !self.is_update_allowed(locked_package.clone()) {
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
                     // regular packages. We mark them specially so they can be reloaded fully including update propagation
@@ -221,7 +221,7 @@ impl PoolBuilder {
                     &package.get_stability(),
                 )
             {
-                self.load_package(request, &repositories, &package, false)?;
+                self.load_package(request, &repositories, package.clone(), false)?;
             } else {
                 self.unacceptable_fixed_or_locked_packages.push(package);
             }
@@ -578,7 +578,7 @@ impl PoolBuilder {
                     }
                     let _ = (pkg_name, pkg_version);
                     let propagate = !self.path_repo_unlocked.contains_key(&package.get_name());
-                    self.load_package(request, repositories, package, propagate)?;
+                    self.load_package(request, repositories, package.clone(), propagate)?;
                 }
             }
 
@@ -612,7 +612,7 @@ impl PoolBuilder {
         &mut self,
         request: &mut Request,
         repositories: &Vec<Box<dyn RepositoryInterface>>,
-        package: &BasePackageHandle,
+        package: BasePackageHandle,
         propagate_update: bool,
     ) -> anyhow::Result<()> {
         let index = self.index_counter;
@@ -805,10 +805,10 @@ impl PoolBuilder {
     }
 
     /// Checks whether the update allow list allows this package in the lock file to be updated
-    fn is_update_allowed(&self, package: &dyn PackageInterface) -> bool {
+    fn is_update_allowed(&self, package: PackageInterfaceHandle) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if Preg::is_match3(&pattern_regexp, package.get_name(), None).unwrap_or(false) {
+            if Preg::is_match3(&pattern_regexp, &package.get_name(), None).unwrap_or(false) {
                 return true;
             }
         }
@@ -927,7 +927,7 @@ impl PoolBuilder {
                 .map(|(i, p)| (*i, p.clone()))
                 .collect();
             for (index, package) in &entries {
-                self.remove_loaded_package(request, repositories, package, *index);
+                self.remove_loaded_package(request, repositories, package.clone(), *index);
             }
         }
 
@@ -945,8 +945,13 @@ impl PoolBuilder {
                 // PHP uses array_search with strict identity; map to pointer comparison.
                 let index_opt = pkgs.iter().position(|p| p.ptr_eq(locked_package));
                 if let Some(index) = index_opt {
-                    request.unlock_package(locked_package);
-                    self.remove_loaded_package(request, repositories, locked_package, index as i64);
+                    request.unlock_package(locked_package.clone());
+                    self.remove_loaded_package(
+                        request,
+                        repositories,
+                        locked_package.clone(),
+                        index as i64,
+                    );
 
                     // make sure that any requirements for this package by other locked or fixed packages are now
                     // also loaded, as they were previously ignored because the locked (now unlocked) package already
@@ -1025,7 +1030,7 @@ impl PoolBuilder {
         &mut self,
         _request: &Request,
         repositories: &Vec<Box<dyn RepositoryInterface>>,
-        package: &BasePackageHandle,
+        package: BasePackageHandle,
         index: i64,
     ) {
         let repos_box: Vec<Box<dyn RepositoryInterface>> =

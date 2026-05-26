@@ -6,7 +6,7 @@ use crate::downloader::ArchiveDownloader;
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::IniHelper;
@@ -50,7 +50,7 @@ impl RarDownloader {
 
     pub(crate) async fn extract(
         &mut self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -151,9 +151,9 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         self.inner
@@ -164,9 +164,9 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .prepare(r#type, package, path, prev_package)
@@ -175,7 +175,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -184,8 +184,8 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
@@ -193,7 +193,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
 
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -203,9 +203,9 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .cleanup(r#type, package, path, prev_package)

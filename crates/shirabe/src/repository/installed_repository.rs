@@ -8,7 +8,6 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackageHandle;
 use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 use crate::repository::CompositeRepository;
@@ -424,7 +423,7 @@ impl RepositoryInterface for InstalledRepository {
         format!("installed repo ({})", names.join(", "))
     }
 
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }
 

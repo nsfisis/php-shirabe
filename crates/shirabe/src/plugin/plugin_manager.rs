@@ -26,9 +26,8 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackage;
 use crate::package::Link;
 use crate::package::Locker;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterface;
+use crate::package::RootPackageInterfaceHandle;
 use crate::package::base_package::{self, BasePackage};
 use crate::package::version::VersionParser;
 use crate::plugin::Capable;
@@ -140,17 +139,7 @@ impl PluginManager {
             // The root package borrow is also tied to `self.composer`; clone the package handle
             // (shared Rc) for the same reason as above.
             let root_package = self.composer_full().borrow().get_package().clone();
-            self.load_repository(
-                &*repo,
-                false,
-                Some(
-                    root_package
-                        .as_rc()
-                        .borrow()
-                        .as_root_package_interface()
-                        .unwrap(),
-                ),
-            )?;
+            self.load_repository(&*repo, false, Some(root_package))?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
@@ -216,7 +205,7 @@ impl PluginManager {
     /// Register a plugin package, activate it etc.
     pub fn register_package(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         fail_on_missing_classes: bool,
         is_global_plugin: bool,
     ) -> anyhow::Result<()> {
@@ -272,8 +261,8 @@ impl PluginManager {
             }
 
             if package.get_name() == "symfony/flex"
-                && Preg::is_match3("{^[0-9.]+$}", package.get_version(), None).unwrap_or(false)
-                && version_compare(package.get_version(), "1.9.8", "<")
+                && Preg::is_match3("{^[0-9.]+$}", &package.get_version(), None).unwrap_or(false)
+                && version_compare(&package.get_version(), "1.9.8", "<")
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
                     package.get_name(),
@@ -288,7 +277,7 @@ impl PluginManager {
             .get("plugin-optional")
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
-        if !self.is_plugin_allowed(package.get_name(), is_global_plugin, plugin_optional, true)? {
+        if !self.is_plugin_allowed(&package.get_name(), is_global_plugin, plugin_optional, true)? {
             self.io.write_error(&format!(
                 "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
                 package.get_name(),
@@ -306,7 +295,7 @@ impl PluginManager {
         // The remainder of the function is mirrored as references but performs no actual loading.
         let _old_installer_plugin = package.get_type() == "composer-installer";
 
-        if self.registered_plugins.contains_key(package.get_name()) {
+        if self.registered_plugins.contains_key(&package.get_name()) {
             return Ok(());
         }
 
@@ -354,15 +343,15 @@ impl PluginManager {
     }
 
     /// Deactivates a plugin package
-    pub fn deactivate_package(&mut self, package: &dyn PackageInterface) {
+    pub fn deactivate_package(&mut self, package: PackageInterfaceHandle) {
         // TODO(plugin): deactivation flow
-        if !self.registered_plugins.contains_key(package.get_name()) {
+        if !self.registered_plugins.contains_key(&package.get_name()) {
             return;
         }
 
         let plugins = self
             .registered_plugins
-            .shift_remove(package.get_name())
+            .shift_remove(&package.get_name())
             .unwrap_or_default();
         for plugin in plugins {
             match plugin {
@@ -381,15 +370,15 @@ impl PluginManager {
     }
 
     /// Uninstall a plugin package
-    pub fn uninstall_package(&mut self, package: &dyn PackageInterface) {
+    pub fn uninstall_package(&mut self, package: PackageInterfaceHandle) {
         // TODO(plugin): uninstall flow
-        if !self.registered_plugins.contains_key(package.get_name()) {
+        if !self.registered_plugins.contains_key(&package.get_name()) {
             return;
         }
 
         let plugins = self
             .registered_plugins
-            .shift_remove(package.get_name())
+            .shift_remove(&package.get_name())
             .unwrap_or_default();
         for plugin in plugins {
             match plugin {
@@ -418,7 +407,7 @@ impl PluginManager {
         &mut self,
         mut plugin: Box<dyn PluginInterface>,
         is_global_plugin: bool,
-        source_package: Option<&dyn PackageInterface>,
+        source_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         // TODO(plugin): plugin activation
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
@@ -431,13 +420,13 @@ impl PluginManager {
                 E_USER_DEPRECATED,
             );
         } else {
-            let sp = source_package.unwrap();
+            let sp = source_package.as_ref().unwrap();
             let plugin_optional = sp
                 .get_extra()
                 .get("plugin-optional")
                 .map(|v| v.as_bool() == Some(true))
                 .unwrap_or(false);
-            if !self.is_plugin_allowed(sp.get_name(), is_global_plugin, plugin_optional, true)? {
+            if !self.is_plugin_allowed(&sp.get_name(), is_global_plugin, plugin_optional, true)? {
                 self.io.write_error(&format!(
                     "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
                     get_class_obj(&*plugin),
@@ -453,7 +442,7 @@ impl PluginManager {
         }
 
         let mut details: Vec<String> = vec![];
-        if let Some(sp) = source_package {
+        if let Some(sp) = source_package.as_ref() {
             details.push(format!("from {}", sp.get_name()));
         }
         if is_global_plugin || self.running_in_global_dir {
@@ -515,7 +504,7 @@ impl PluginManager {
         &mut self,
         repo: &dyn RepositoryInterface,
         is_global_repo: bool,
-        root_package: Option<&dyn RootPackageInterface>,
+        root_package: Option<RootPackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         // TODO(plugin): repository scan for plugin packages
         let packages = repo.get_packages();
@@ -544,7 +533,7 @@ impl PluginManager {
             let bucket: Vec<crate::package::BasePackageHandle> = vec![];
             RepositoryUtils::filter_required_packages(
                 packages.as_slice(),
-                root_package.unwrap() as &dyn PackageInterface,
+                root_package.unwrap().into(),
                 true,
                 bucket,
             )
@@ -579,18 +568,10 @@ impl PluginManager {
             }
 
             if "composer-plugin" == package.get_type() {
-                self.register_package(
-                    package.as_rc().borrow().as_package_interface(),
-                    false,
-                    is_global_repo,
-                )?;
+                self.register_package(package.clone(), false, is_global_repo)?;
             // Backward compatibility
             } else if "composer-installer" == package.get_type() {
-                self.register_package(
-                    package.as_rc().borrow().as_package_interface(),
-                    false,
-                    is_global_repo,
-                )?;
+                self.register_package(package.clone(), false, is_global_repo)?;
             }
             let _ = cp;
         }
@@ -612,10 +593,10 @@ impl PluginManager {
                 continue;
             }
             if "composer-plugin" == package.get_type() {
-                self.deactivate_package(package.as_rc().borrow().as_package_interface());
+                self.deactivate_package(package.clone());
             // Backward compatibility
             } else if "composer-installer" == package.get_type() {
-                self.deactivate_package(package.as_rc().borrow().as_package_interface());
+                self.deactivate_package(package.clone());
             }
         }
     }
@@ -624,7 +605,7 @@ impl PluginManager {
         &self,
         installed_repo: &InstalledRepository,
         mut collected: IndexMap<String, PackageInterfaceHandle>,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
     ) -> IndexMap<String, PackageInterfaceHandle> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in &package.get_requires() {
@@ -636,7 +617,7 @@ impl PluginManager {
                     collected = self.collect_dependencies(
                         installed_repo,
                         collected,
-                        required_package.as_rc().borrow().as_package_interface(),
+                        required_package.clone().into(),
                     );
                 }
             }
@@ -646,7 +627,11 @@ impl PluginManager {
     }
 
     /// Retrieves the path a package is installed to.
-    fn get_install_path(&mut self, package: &dyn PackageInterface, global: bool) -> Option<String> {
+    fn get_install_path(
+        &mut self,
+        package: PackageInterfaceHandle,
+        global: bool,
+    ) -> Option<String> {
         if !global {
             return self
                 .composer_full()

@@ -50,7 +50,7 @@ impl RuleSetGenerator {
     /// one requirement of the package A.
     fn create_require_rule(
         &self,
-        package: &PackageInterfaceHandle,
+        package: PackageInterfaceHandle,
         providers: &[PackageInterfaceHandle],
         reason: i64,
         reason_data: PhpMixed,
@@ -59,7 +59,7 @@ impl RuleSetGenerator {
 
         for provider in providers {
             // self fulfilling rule?
-            if provider.ptr_eq(package) {
+            if provider.ptr_eq(&package) {
                 return None;
             }
             literals.push(provider.get_id());
@@ -92,13 +92,13 @@ impl RuleSetGenerator {
     /// and B the provider.
     fn create_rule2_literals(
         &self,
-        issuer: &PackageInterfaceHandle,
-        provider: &PackageInterfaceHandle,
+        issuer: PackageInterfaceHandle,
+        provider: PackageInterfaceHandle,
         reason: i64,
         reason_data: PhpMixed,
     ) -> Option<Rule2Literals> {
         // ignore self conflict
-        if issuer.ptr_eq(provider) {
+        if issuer.ptr_eq(&provider) {
             return None;
         }
 
@@ -172,7 +172,7 @@ impl RuleSetGenerator {
                 let alias_of: PackageInterfaceHandle = alias_pkg.get_alias_of().into();
                 work_queue.push_back(alias_of.clone());
                 let rule = self.create_require_rule(
-                    &package,
+                    package.clone(),
                     &[alias_of.clone()],
                     rule::RULE_PACKAGE_ALIAS,
                     PhpMixed::Null, // reasonData: $package (BasePackage)
@@ -181,7 +181,7 @@ impl RuleSetGenerator {
 
                 // aliases must be installed with their main package, so create a rule the other way around as well
                 let inverse_rule = self.create_require_rule(
-                    &alias_of,
+                    alias_of.clone(),
                     &[package.clone()],
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
                     PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
@@ -218,7 +218,7 @@ impl RuleSetGenerator {
                     .collect();
 
                 let rule = self.create_require_rule(
-                    &package,
+                    package.clone(),
                     &possible_requires,
                     rule::RULE_PACKAGE_REQUIRES,
                     PhpMixed::Null, // reasonData: $link (Link)
@@ -274,8 +274,8 @@ impl RuleSetGenerator {
                     let conflict_name_matches = conflict.get_name() == link.get_target();
                     if !conflict_is_alias || conflict_name_matches {
                         let rule = self.create_rule2_literals(
-                            package,
-                            conflict,
+                            package.clone(),
+                            conflict.clone(),
                             rule::RULE_PACKAGE_CONFLICT,
                             PhpMixed::Null, // reasonData: $link (Link)
                         );

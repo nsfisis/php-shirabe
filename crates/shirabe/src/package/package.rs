@@ -579,9 +579,6 @@ impl std::fmt::Display for Package {
 }
 
 impl PackageInterface for Package {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
     fn get_name(&self) -> &str {
         todo!()
     }

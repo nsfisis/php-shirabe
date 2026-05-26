@@ -18,7 +18,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
@@ -61,7 +61,7 @@ impl VcsDownloaderBase {
     /// already verified that no local changes exist.
     pub async fn clean_changes(
         &self,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         _path: &str,
         _update: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -88,16 +88,16 @@ pub trait VcsDownloader:
     /// Downloads data needed to run an install/update later
     async fn do_download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         url: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>>;
 
     /// Downloads specific package into specific folder.
     async fn do_install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> Result<Option<PhpMixed>>;
@@ -105,8 +105,8 @@ pub trait VcsDownloader:
     /// Updates specific package in specific folder from initial to target version.
     async fn do_update(
         &mut self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
         url: &str,
     ) -> Result<Option<PhpMixed>>;
@@ -124,9 +124,9 @@ pub trait VcsDownloader:
 
     async fn download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException {
@@ -143,8 +143,9 @@ pub trait VcsDownloader:
 
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Option<PhpMixed>> =
-                self.do_download(package, path, &url, prev_package).await;
+            let attempt: Result<Option<PhpMixed>> = self
+                .do_download(package.clone(), path, &url, prev_package.clone())
+                .await;
             match attempt {
                 Ok(promise) => return Ok(promise),
                 Err(e) => {
@@ -190,12 +191,12 @@ pub trait VcsDownloader:
     async fn prepare(
         &mut self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         if r#type == "update" {
-            self.clean_changes(prev_package.unwrap(), path, true)
+            self.clean_changes(prev_package.clone().unwrap(), path, true)
                 .await?;
             self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
@@ -213,12 +214,13 @@ pub trait VcsDownloader:
     async fn cleanup(
         &mut self,
         r#type: &str,
-        _package: &dyn PackageInterface,
+        _package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         if r#type == "update"
             && prev_package
+                .clone()
                 .map(|p| {
                     self.has_cleaned_changes()
                         .contains_key(&p.get_unique_name())
@@ -235,7 +237,7 @@ pub trait VcsDownloader:
 
     async fn install(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
@@ -250,7 +252,7 @@ pub trait VcsDownloader:
         }
 
         self.io_mut().write_error3(
-            &format!("  - {}: ", InstallOperation::format(package, false)),
+            &format!("  - {}: ", InstallOperation::format(package.clone(), false)),
             false,
             io_interface::NORMAL,
         );
@@ -258,7 +260,8 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Option<PhpMixed>> = self.do_install(package, path, &url).await;
+            let attempt: Result<Option<PhpMixed>> =
+                self.do_install(package.clone(), path, &url).await;
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
@@ -303,8 +306,8 @@ pub trait VcsDownloader:
 
     async fn update(
         &mut self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
@@ -319,7 +322,10 @@ pub trait VcsDownloader:
         }
 
         self.io_mut().write_error3(
-            &format!("  - {}: ", UpdateOperation::format(initial, target, false),),
+            &format!(
+                "  - {}: ",
+                UpdateOperation::format(initial.clone(), target.clone(), false),
+            ),
             false,
             io_interface::NORMAL,
         );
@@ -329,8 +335,9 @@ pub trait VcsDownloader:
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-            let attempt: Result<Option<PhpMixed>> =
-                self.do_update(initial, target, path, &url).await;
+            let attempt: Result<Option<PhpMixed>> = self
+                .do_update(initial.clone(), target.clone(), path, &url)
+                .await;
             match attempt {
                 Ok(_) => {
                     exception = None;
@@ -369,20 +376,14 @@ pub trait VcsDownloader:
         // print the commit logs if in verbose mode and VCS metadata is present
         // because in case of missing metadata code would trigger another exception
         if exception.is_none() && self.io().is_verbose() && self.has_metadata_repository(path) {
+            let initial_ref = initial.get_source_reference().unwrap_or_default();
+            let target_ref = target.get_source_reference().unwrap_or_default();
             let mut message = "Pulling in changes:";
-            let mut logs = self.get_commit_logs(
-                initial.get_source_reference().unwrap_or(""),
-                target.get_source_reference().unwrap_or(""),
-                path,
-            );
+            let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path);
 
             if trim(&logs, None) == "" {
                 message = "Rolling back changes:";
-                logs = self.get_commit_logs(
-                    target.get_source_reference().unwrap_or(""),
-                    initial.get_source_reference().unwrap_or(""),
-                    path,
-                );
+                logs = self.get_commit_logs(&target_ref, &initial_ref, path);
             }
 
             if trim(&logs, None) != "" {
@@ -413,7 +414,7 @@ pub trait VcsDownloader:
 
     async fn remove(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.io_mut().write_error3(
@@ -438,7 +439,7 @@ pub trait VcsDownloader:
         Ok(None)
     }
 
-    fn get_vcs_reference(&self, package: &dyn PackageInterface, path: &str) -> Option<String> {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
             self.config().clone(),
@@ -448,7 +449,7 @@ pub trait VcsDownloader:
         );
         let dumper = ArrayDumper::new();
 
-        let package_config = dumper.dump(package);
+        let package_config = dumper.dump(package.clone());
         let mut guesser = guesser;
         if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
             return package_version.commit.clone();
@@ -463,7 +464,7 @@ pub trait VcsDownloader:
     ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
     async fn clean_changes(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         _update: bool,
     ) -> Result<Option<PhpMixed>> {

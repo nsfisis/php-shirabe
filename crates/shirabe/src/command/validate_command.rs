@@ -217,7 +217,7 @@ impl ValidateCommand {
                 let path = composer
                     .get_installation_manager()
                     .borrow_mut()
-                    .get_install_path(package.as_rc().borrow().as_package_interface());
+                    .get_install_path(package.clone());
                 let path = match path {
                     Some(p) => p,
                     None => continue,

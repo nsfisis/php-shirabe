@@ -31,7 +31,7 @@ pub trait OperationInterface: std::fmt::Debug {
 
     /// PHP duck-typed accessor. Only InstallOperation/UninstallOperation/MarkAlias*Operation
     /// expose this; UpdateOperation has getInitialPackage()/getTargetPackage() instead.
-    fn get_package(&self) -> &dyn crate::package::PackageInterface {
+    fn get_package(&self) -> crate::package::PackageInterfaceHandle {
         todo!("get_package is not available on this operation type")
     }
 }

@@ -1243,7 +1243,7 @@ impl Factory {
         im: &mut InstallationManager,
     ) -> anyhow::Result<()> {
         for package in repo.get_packages() {
-            if !im.is_package_installed(repo, &package)? {
+            if !im.is_package_installed(repo, package.clone())? {
                 let _ = package;
             }
         }

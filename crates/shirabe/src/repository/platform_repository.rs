@@ -1903,7 +1903,7 @@ impl PlatformRepository {
 
     // ---- helpers ----
 
-    fn is_complete_package(_package: &dyn PackageInterface) -> bool {
+    fn is_complete_package(_package: PackageInterfaceHandle) -> bool {
         // TODO(phase-b): use Any-style downcasting once the trait carries it.
         true
     }
@@ -1950,7 +1950,7 @@ impl shirabe_php_shim::Countable for PlatformRepository {
 }
 
 impl crate::repository::RepositoryInterface for PlatformRepository {
-    fn has_package(&self, package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }
 

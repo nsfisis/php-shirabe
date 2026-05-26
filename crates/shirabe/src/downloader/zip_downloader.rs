@@ -5,7 +5,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use anyhow::Result;
@@ -62,9 +62,9 @@ impl ZipDownloader {
 
     pub async fn download(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         {
@@ -202,7 +202,7 @@ impl ZipDownloader {
 
     async fn extract_with_system_unzip(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -282,7 +282,7 @@ impl ZipDownloader {
         match process_result {
             Ok(process) => {
                 if !process.is_successful() {
-                    if self.cleanup_executed.contains_key(package.get_name()) {
+                    if self.cleanup_executed.contains_key(&package.get_name()) {
                         return Err(RuntimeException {
                             message: format!(
                                 "Failed to extract {} as the installation was aborted by another package operation.",
@@ -337,7 +337,7 @@ impl ZipDownloader {
         is_last_chance: bool,
         file: &str,
         path: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         executable: &str,
     ) -> Result<Option<PhpMixed>> {
         if is_last_chance {
@@ -390,17 +390,19 @@ impl ZipDownloader {
                         substr(&file_get_contents(file).unwrap_or_default(), -100, None).as_bytes()
                     )
                 ));
-                if strlen(package.get_dist_url().unwrap_or("")) > 0 {
+                if strlen(&package.get_dist_url().unwrap_or_default()) > 0 {
                     self.inner.io.write_error(&format!(
                         "Origin URL: {}",
-                        self.inner
-                            .process_url(package, package.get_dist_url().unwrap_or(""))?
+                        self.inner.process_url(
+                            package.clone(),
+                            &package.get_dist_url().unwrap_or_default()
+                        )?
                     ));
                     let headers = {
                         let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
                             .lock()
                             .unwrap();
-                        match response_headers.get(package.get_name()) {
+                        match response_headers.get(&package.get_name()) {
                             Some(list) => PhpMixed::List(
                                 list.iter()
                                     .map(|s| Box::new(PhpMixed::String(s.clone())))
@@ -422,7 +424,7 @@ impl ZipDownloader {
 
     async fn extract_with_zip_archive(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -521,7 +523,7 @@ impl ZipDownloader {
 
     pub(crate) async fn extract(
         &mut self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -562,9 +564,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         self.inner
@@ -575,9 +577,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .prepare(r#type, package, path, prev_package)
@@ -586,7 +588,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -595,8 +597,8 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
@@ -604,7 +606,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -614,9 +616,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .cleanup(r#type, package, path, prev_package)

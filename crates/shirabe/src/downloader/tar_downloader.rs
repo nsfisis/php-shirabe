@@ -7,7 +7,7 @@ use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
@@ -47,7 +47,7 @@ impl TarDownloader {
 
     pub(crate) async fn extract(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         file: &str,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
@@ -66,9 +66,9 @@ impl DownloaderInterface for TarDownloader {
 
     async fn download(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
         self.inner
@@ -79,9 +79,9 @@ impl DownloaderInterface for TarDownloader {
     async fn prepare(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .prepare(r#type, package, path, prev_package)
@@ -90,7 +90,7 @@ impl DownloaderInterface for TarDownloader {
 
     async fn install(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -99,8 +99,8 @@ impl DownloaderInterface for TarDownloader {
 
     async fn update(
         &self,
-        initial: &dyn PackageInterface,
-        target: &dyn PackageInterface,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.update(initial, target, path).await
@@ -108,7 +108,7 @@ impl DownloaderInterface for TarDownloader {
 
     async fn remove(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
@@ -118,9 +118,9 @@ impl DownloaderInterface for TarDownloader {
     async fn cleanup(
         &self,
         r#type: &str,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
-        prev_package: Option<&dyn PackageInterface>,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         self.inner
             .cleanup(r#type, package, path, prev_package)

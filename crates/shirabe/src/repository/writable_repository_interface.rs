@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/WritableRepositoryInterface.php
 
 use crate::installer::InstallationManager;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::RepositoryInterface;
 use anyhow::Result;
@@ -11,7 +10,7 @@ pub trait WritableRepositoryInterface: RepositoryInterface {
 
     fn add_package(&mut self, package: PackageInterfaceHandle) -> Result<()>;
 
-    fn remove_package(&mut self, package: &dyn PackageInterface) -> Result<()>;
+    fn remove_package(&mut self, package: PackageInterfaceHandle) -> Result<()>;
 
     fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle>;
 

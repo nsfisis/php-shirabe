@@ -2,12 +2,12 @@
 
 use anyhow::Result;
 
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 
 pub trait ChangeReportInterface {
     fn get_local_changes(
         &self,
-        package: &dyn PackageInterface,
+        package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>>;
 }

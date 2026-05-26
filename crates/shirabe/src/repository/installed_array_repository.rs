@@ -5,7 +5,6 @@ use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackageHandle;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::AdvisoryProviderInterface;
 use crate::repository::InstalledRepositoryInterface;
@@ -64,7 +63,7 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
 
     fn remove_package(
         &mut self,
-        package: &dyn crate::package::PackageInterface,
+        package: crate::package::PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         todo!()
     }
@@ -93,7 +92,7 @@ impl Countable for InstalledArrayRepository {
 }
 
 impl RepositoryInterface for InstalledArrayRepository {
-    fn has_package(&self, _package: &dyn PackageInterface) -> bool {
+    fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
         todo!()
     }
     fn find_package(

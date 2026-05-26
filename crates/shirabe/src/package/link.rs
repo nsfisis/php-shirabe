@@ -3,7 +3,7 @@
 use shirabe_php_shim::UnexpectedValueException;
 use shirabe_semver::constraint::AnyConstraint;
 
-use crate::package::PackageInterface;
+use crate::package::PackageInterfaceHandle;
 
 pub struct Link {
     pub(crate) source: String,
@@ -121,7 +121,7 @@ impl Link {
         )
     }
 
-    pub fn get_pretty_string(&self, source_package: &dyn PackageInterface) -> String {
+    pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> String {
         format!(
             "{} {} {} {}",
             source_package.get_pretty_string(),

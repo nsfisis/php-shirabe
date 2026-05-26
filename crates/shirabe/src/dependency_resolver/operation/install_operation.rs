@@ -15,11 +15,11 @@ impl InstallOperation {
         Self { package }
     }
 
-    pub fn get_package(&self) -> &PackageInterfaceHandle {
-        &self.package
+    pub fn get_package(&self) -> PackageInterfaceHandle {
+        self.package.clone()
     }
 
-    pub fn format(package: &dyn PackageInterface, lock: bool) -> String {
+    pub fn format(package: PackageInterfaceHandle, lock: bool) -> String {
         format!(
             "{}<info>{}</info> (<comment>{}</comment>)",
             if lock { "Locking " } else { "Installing " },
@@ -44,7 +44,7 @@ impl OperationInterface for InstallOperation {
     }
 
     fn show(&self, lock: bool) -> String {
-        Self::format(self.package.as_rc().borrow().as_package_interface(), lock)
+        Self::format(self.package.clone(), lock)
     }
 
     fn to_string(&self) -> String {
