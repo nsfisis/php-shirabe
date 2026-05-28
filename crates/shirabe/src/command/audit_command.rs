@@ -157,9 +157,9 @@ impl AuditCommand {
                 }.into());
             }
             return Ok(CanonicalPackagesTrait::get_packages(
-                &locker.get_locked_repository(
-                    !input.get_option("no-dev").as_bool().unwrap_or(false),
-                )?,
+                &*locker
+                    .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?
+                    .borrow(),
             ));
         }
 

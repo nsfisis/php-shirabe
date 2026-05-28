@@ -143,12 +143,11 @@ impl BumpCommand {
                 .as_bool()
                 .unwrap_or(true);
         let repo: crate::repository::RepositoryInterfaceHandle = if !has_lock_file_disabled {
-            crate::repository::RepositoryInterfaceHandle::new(
-                composer
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(true)?,
-            )
+            composer
+                .get_locker()
+                .borrow_mut()
+                .get_locked_repository(true)?
+                .into()
         } else if composer.get_locker().borrow_mut().is_locked() {
             if !composer.get_locker().borrow_mut().is_fresh()? {
                 io.write_error3(
@@ -158,12 +157,11 @@ impl BumpCommand {
                 );
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
-            crate::repository::RepositoryInterfaceHandle::new(
-                composer
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(true)?,
-            )
+            composer
+                .get_locker()
+                .borrow_mut()
+                .get_locked_repository(true)?
+                .into()
         } else {
             composer
                 .get_repository_manager()

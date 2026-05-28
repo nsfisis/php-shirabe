@@ -71,9 +71,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }));
             }
 
-            repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                locker.get_locked_repository(true)?,
-            ));
+            repos.push(locker.get_locked_repository(true)?.into());
             let platform_overrides: IndexMap<String, PhpMixed> = locker
                 .get_platform_overrides()?
                 .into_iter()

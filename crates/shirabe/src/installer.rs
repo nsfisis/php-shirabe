@@ -91,7 +91,6 @@ use crate::repository::CompositeRepository;
 use crate::repository::InstalledArrayRepository;
 use crate::repository::InstalledRepository;
 use crate::repository::InstalledRepositoryInterface;
-use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryManager;
@@ -343,11 +342,11 @@ impl Installer {
         }
 
         if self.update {
-            let locked_repository_handle = crate::repository::RepositoryInterfaceHandle::new(
-                self.locker
-                    .borrow_mut()
-                    .get_locked_repository(self.dev_mode)?,
-            );
+            let locked_repository_handle: crate::repository::RepositoryInterfaceHandle = self
+                .locker
+                .borrow_mut()
+                .get_locked_repository(self.dev_mode)?
+                .into();
             let installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
                 crate::repository::RepositoryInterfaceHandle::new(self.create_platform_repo(false)),
@@ -365,7 +364,7 @@ impl Installer {
 
         // Find abandoned packages and warn user
         let locked_repository = self.locker.borrow_mut().get_locked_repository(true)?;
-        for package in CanonicalPackagesTrait::get_packages(&locked_repository) {
+        for package in CanonicalPackagesTrait::get_packages(&*locked_repository.borrow()) {
             let complete = match package.as_complete_package() {
                 Some(p) if p.is_abandoned() => p,
                 _ => continue,
@@ -489,7 +488,10 @@ impl Installer {
 
         if audit_config.audit {
             let (packages, target) = if self.update && !self.install {
-                (locked_repository.get_canonical_packages(), "locked")
+                (
+                    locked_repository.borrow().get_canonical_packages(),
+                    "locked",
+                )
             } else {
                 (
                     self.repository_manager
@@ -561,10 +563,11 @@ impl Installer {
         let platform_repo = self.create_platform_repo(true);
         let aliases = self.get_root_aliases(true);
 
-        let mut locked_repository: Option<LockArrayRepository> = None;
+        let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
 
-        let mut try_load_locked =
-            || -> anyhow::Result<Result<Option<LockArrayRepository>, ParsingException>> {
+        let mut try_load_locked = || -> anyhow::Result<
+            Result<Option<crate::repository::LockArrayRepositoryHandle>, ParsingException>,
+        > {
                 if self.locker.borrow_mut().is_locked() {
                     match self.locker.borrow_mut().get_locked_repository(true) {
                         Ok(r) => Ok(Ok(Some(r))),
@@ -620,14 +623,8 @@ impl Installer {
         for repository in repositories {
             repository_set.add_repository(repository.clone())?;
         }
-        if let Some(ref _lr) = locked_repository {
-            // TODO(phase-c): LockArrayRepository is held by value and is not Clone; share it as a
-            // RepositoryInterfaceHandle so it can be added here without copying.
-            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new::<
-                crate::repository::LockArrayRepository,
-            >(todo!(
-                "share locked LockArrayRepository as a handle"
-            )))?;
+        if let Some(ref lr) = locked_repository {
+            repository_set.add_repository(lr.clone().into())?;
         }
 
         let fixed_root_package = self.fixed_root_package.clone();
@@ -911,7 +908,7 @@ impl Installer {
         platform_repo: &PlatformRepository,
         aliases: &Vec<IndexMap<String, String>>,
         policy: &dyn PolicyInterface,
-        locked_repository: Option<&LockArrayRepository>,
+        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
         if self.package.get_dev_requires().is_empty() {
             return Ok(0);
@@ -1005,19 +1002,15 @@ impl Installer {
             // creating repository set
             let policy = self.create_policy(false, None);
             // use aliases from lock file only, so empty root aliases here
+            let locked_repo_borrow = locked_repository.borrow();
             let mut repository_set = self.create_repository_set(
                 false,
                 &platform_repo,
                 &vec![],
-                Some(&locked_repository),
+                Some(&*locked_repo_borrow),
             );
-            // TODO(phase-c): LockArrayRepository is held by value and is not Clone; share it as a
-            // RepositoryInterfaceHandle so it can be added here without copying.
-            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new::<
-                crate::repository::LockArrayRepository,
-            >(todo!(
-                "share locked LockArrayRepository as a handle"
-            )))?;
+            drop(locked_repo_borrow);
+            repository_set.add_repository(locked_repository.clone().into())?;
 
             // creating requirements request
             let fixed_root_package = self.fixed_root_package.clone();
@@ -1051,7 +1044,7 @@ impl Installer {
                 }
             }
 
-            for package in RepositoryInterface::get_packages(&locked_repository) {
+            for package in RepositoryInterface::get_packages(&*locked_repository.borrow()) {
                 request.fix_locked_package(package.clone());
             }
 
@@ -1121,8 +1114,9 @@ impl Installer {
         // TODO in how far do we need to do anything here to ensure dev packages being updated to latest in lock without version change are treated correctly?
         let local_repo_transaction = {
             let local_repo_ref = local_repo.borrow();
+            let locked_repo_ref = locked_repository.borrow();
             LocalRepoTransaction::new(
-                &locked_repository,
+                &*locked_repo_ref,
                 local_repo_ref.as_installed_repository_interface().unwrap(),
             )
         };
@@ -1400,7 +1394,7 @@ impl Installer {
     fn create_policy(
         &mut self,
         for_update: bool,
-        locked_repo: Option<&LockArrayRepository>,
+        locked_repo: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> DefaultPolicy {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
@@ -1420,7 +1414,7 @@ impl Installer {
         let mut preferred_versions: Option<IndexMap<String, String>> = None;
         if for_update && self.minimal_update && locked_repo.is_some() {
             let mut versions: IndexMap<String, String> = IndexMap::new();
-            for pkg in CanonicalPackagesTrait::get_packages(locked_repo.unwrap()) {
+            for pkg in CanonicalPackagesTrait::get_packages(&*locked_repo.unwrap().borrow()) {
                 if pkg.as_alias().is_some()
                     || (self.update_allow_list.is_some()
                         && self
@@ -1448,19 +1442,14 @@ impl Installer {
         &self,
         root_package: RootPackageInterfaceHandle,
         platform_repo: &PlatformRepository,
-        locked_repository: Option<&LockArrayRepository>,
+        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> Request {
-        // TODO(phase-b): Request::new takes Option<LockArrayRepository> (owned). PHP class
-        // shouldn't Clone. Passing None for now.
-        let _ = locked_repository;
-        let mut request = Request::new(None);
+        let mut request = Request::new(locked_repository.cloned());
 
-        // TODO(phase-c): request.fix_package wants a BasePackageHandle; root_package is wired in
-        // once Request migrates to handles.
-        // request.fix_package(root_package);
         let root_package_handle: PackageInterfaceHandle = root_package.clone().into();
-        if let Some(_alias) = root_package_handle.as_root_alias_package() {
-            // request.fix_package(alias.get_alias_of());
+        request.fix_package(root_package_handle.clone());
+        if let Some(alias) = root_package_handle.as_root_alias_package() {
+            request.fix_package(alias.get_alias_of().into());
         }
 
         let mut fixed_packages = platform_repo.get_packages();
@@ -1499,7 +1488,7 @@ impl Installer {
     fn require_packages_for_update(
         &mut self,
         request: &mut Request,
-        locked_repository: Option<&LockArrayRepository>,
+        locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
         include_dev_requires: bool,
     ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
@@ -1520,7 +1509,9 @@ impl Installer {
                 IndexMap::new()
             };
 
-            for locked_package in CanonicalPackagesTrait::get_packages(locked_repository.unwrap()) {
+            for locked_package in
+                CanonicalPackagesTrait::get_packages(&*locked_repository.unwrap().borrow())
+            {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias().is_none()

@@ -32,7 +32,7 @@ use crate::package::version::StabilityFilter;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledRepository;
 use crate::repository::InstalledRepositoryInterface;
-use crate::repository::LockArrayRepository;
+use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::{AdvisoryProviderInterface, PartialOrSecurityAdvisory};
 use crate::repository::{FindPackageConstraint, RepositoryInterface, RepositoryInterfaceHandle};
@@ -573,7 +573,7 @@ impl RepositorySet {
     pub fn create_pool_for_package(
         &mut self,
         package_name: &str,
-        locked_repo: Option<LockArrayRepository>,
+        locked_repo: Option<LockArrayRepositoryHandle>,
     ) -> Result<Pool> {
         // TODO unify this with above in some simpler version without "request"?
         self.create_pool_for_packages(vec![package_name.to_string()], locked_repo)
@@ -583,7 +583,7 @@ impl RepositorySet {
     pub fn create_pool_for_packages(
         &mut self,
         package_names: Vec<String>,
-        locked_repo: Option<LockArrayRepository>,
+        locked_repo: Option<LockArrayRepositoryHandle>,
     ) -> Result<Pool> {
         let mut request = Request::new(locked_repo);
 

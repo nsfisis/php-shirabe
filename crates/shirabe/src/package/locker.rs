@@ -28,7 +28,7 @@ use crate::package::version::VersionParser;
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::FindPackageConstraint;
 use crate::repository::InstalledRepository;
-use crate::repository::LockArrayRepository;
+use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
@@ -182,10 +182,14 @@ impl Locker {
     }
 
     /// Searches and returns an array of locked packages, retrieved from registered repositories.
-    pub fn get_locked_repository(&mut self, with_dev_reqs: bool) -> Result<LockArrayRepository> {
+    pub fn get_locked_repository(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> Result<LockArrayRepositoryHandle> {
         let lock_data = self.get_lock_data()?;
         // TODO(phase-b): LockArrayRepository has no `new` constructor yet
-        let mut packages: LockArrayRepository = todo!("LockArrayRepository::new(vec![])");
+        let mut packages: LockArrayRepositoryHandle =
+            todo!("LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![]))");
 
         let mut locked_packages = lock_data
             .get("packages")
@@ -936,13 +940,13 @@ impl Locker {
         let mut missing_requirement_info: Vec<String> = vec![];
         let mut missing_requirements = false;
         let mut sets: Vec<SetEntry> = vec![SetEntry {
-            repo: Box::new(self.get_locked_repository(false)?),
+            repo: self.get_locked_repository(false)?,
             method: "getRequires".to_string(),
             description: "Required".to_string(),
         }];
         if include_dev == true {
             sets.push(SetEntry {
-                repo: Box::new(self.get_locked_repository(true)?),
+                repo: self.get_locked_repository(true)?,
                 method: "getDevRequires".to_string(),
                 description: "Required (in require-dev)".to_string(),
             });
@@ -1045,7 +1049,7 @@ impl Locker {
 }
 
 struct SetEntry {
-    repo: Box<LockArrayRepository>,
+    repo: LockArrayRepositoryHandle,
     method: String,
     description: String,
 }

@@ -10,8 +10,8 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
-    FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, ProviderInfo,
-    RepositoryInterface, SearchResult, WritableRepositoryInterface,
+    FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
+    ProviderInfo, RepositoryInterface, SearchResult, WritableRepositoryInterface,
 };
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.
@@ -168,6 +168,65 @@ impl PartialEq for RepositoryInterfaceHandle {
 impl Eq for RepositoryInterfaceHandle {}
 
 impl std::hash::Hash for RepositoryInterfaceHandle {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ptr_id().hash(state);
+    }
+}
+
+/// Typed shared handle over `LockArrayRepository`. Preserves the PHP `?LockArrayRepository`
+/// typing where a `RepositoryInterfaceHandle` would be too wide.
+#[derive(Debug, Clone)]
+pub struct LockArrayRepositoryHandle(Rc<RefCell<LockArrayRepository>>);
+
+impl LockArrayRepositoryHandle {
+    pub fn new(repository: LockArrayRepository) -> Self {
+        let rc: Rc<RefCell<LockArrayRepository>> = Rc::new(RefCell::new(repository));
+        let rc_dyn: Rc<RefCell<dyn RepositoryInterface>> = rc.clone();
+        rc.borrow().set_self_handle(Rc::downgrade(&rc_dyn));
+        Self(rc)
+    }
+
+    pub fn from_rc(rc: Rc<RefCell<LockArrayRepository>>) -> Self {
+        Self(rc)
+    }
+
+    pub fn as_rc(&self) -> &Rc<RefCell<LockArrayRepository>> {
+        &self.0
+    }
+
+    pub fn borrow(&self) -> Ref<'_, LockArrayRepository> {
+        self.0.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<'_, LockArrayRepository> {
+        self.0.borrow_mut()
+    }
+
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    pub fn ptr_id(&self) -> usize {
+        Rc::as_ptr(&self.0) as *const () as usize
+    }
+}
+
+impl From<LockArrayRepositoryHandle> for RepositoryInterfaceHandle {
+    fn from(h: LockArrayRepositoryHandle) -> Self {
+        let rc: Rc<RefCell<dyn RepositoryInterface>> = h.0;
+        RepositoryInterfaceHandle::from_rc(rc)
+    }
+}
+
+impl PartialEq for LockArrayRepositoryHandle {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for LockArrayRepositoryHandle {}
+
+impl std::hash::Hash for LockArrayRepositoryHandle {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ptr_id().hash(state);
     }

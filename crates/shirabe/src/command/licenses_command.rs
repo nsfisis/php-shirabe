@@ -106,7 +106,7 @@ impl LicensesCommand {
             }
             let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
-            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&repo)
+            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&*repo.borrow())
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();

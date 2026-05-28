@@ -72,12 +72,11 @@ impl CheckPlatformReqsCommand {
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            crate::repository::RepositoryInterfaceHandle::new(
-                composer
-                    .get_locker()
-                    .borrow_mut()
-                    .get_locked_repository(!no_dev)?,
-            )
+            composer
+                .get_locker()
+                .borrow_mut()
+                .get_locked_repository(!no_dev)?
+                .into()
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
@@ -87,12 +86,11 @@ impl CheckPlatformReqsCommand {
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                crate::repository::RepositoryInterfaceHandle::new(
-                    composer
-                        .get_locker()
-                        .borrow_mut()
-                        .get_locked_repository(!no_dev)?,
-                )
+                composer
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(!no_dev)?
+                    .into()
             } else {
                 if no_dev {
                     remove_packages = local_repo.get_dev_package_names();

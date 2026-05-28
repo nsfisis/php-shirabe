@@ -71,7 +71,7 @@ impl SuggestsCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
-            installed_repos.push(RepositoryInterfaceHandle::new(locked_repo));
+            installed_repos.push(locked_repo.into());
         } else {
             // TODO(phase-b): Config::get returns PhpMixed; need to coerce to IndexMap<String, PhpMixed>
             let _platform_cfg = composer.get_config().borrow().get("platform");

@@ -284,7 +284,8 @@ impl ShowCommand {
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
             if locker.is_locked() {
-                let lr_handle = RepositoryInterfaceHandle::new(locker.get_locked_repository(true)?);
+                let lr_handle: RepositoryInterfaceHandle =
+                    locker.get_locked_repository(true)?.into();
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     lr_handle.clone(),
                     local_repo,
@@ -348,7 +349,7 @@ impl ShowCommand {
             let mut locker = locker_rc.borrow_mut();
             let lr =
                 locker.get_locked_repository(input.get_option("no-dev").as_bool() != Some(true))?;
-            let lr_handle = RepositoryInterfaceHandle::new(lr);
+            let lr_handle: RepositoryInterfaceHandle = lr.into();
             if input.get_option("self").as_bool() == Some(true) {
                 // TODO(phase-b): LockArrayRepository needs add_package via WritableRepositoryInterface;
                 // skipping the insertion here keeps compile clean.

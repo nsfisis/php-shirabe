@@ -933,18 +933,17 @@ impl RequireCommand {
             ),
             None,
         )?;
-        // TODO(phase-b): get_locked_repository returns LockArrayRepository (owned) and
-        // get_local_repository returns &dyn InstalledRepositoryInterface; need a common
-        // interface for find_package.
-        let locked_repo;
-        let repo: &dyn RepositoryInterface = if locker_is_locked {
-            locked_repo = composer
+        let repo: crate::repository::RepositoryInterfaceHandle = if locker_is_locked {
+            composer
                 .get_locker()
                 .borrow_mut()
-                .get_locked_repository(true)?;
-            &locked_repo
+                .get_locked_repository(true)?
+                .into()
         } else {
-            todo!("convert &dyn InstalledRepositoryInterface to &dyn RepositoryInterface")
+            composer
+                .get_repository_manager()
+                .borrow()
+                .get_local_repository()
         };
         for package_name in requirements_to_update {
             let mut package = repo.find_package(

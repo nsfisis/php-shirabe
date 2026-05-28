@@ -212,6 +212,7 @@ impl UpdateCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(true)?
+                .borrow()
                 .get_canonical_packages()
             {
                 if package.is_dev() {
@@ -500,10 +501,11 @@ impl UpdateCommand {
         let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 CanonicalPackagesTrait::get_packages(
-                    &composer_ref
+                    &*composer_ref
                         .get_locker()
                         .borrow_mut()
-                        .get_locked_repository(true)?,
+                        .get_locked_repository(true)?
+                        .borrow(),
                 )
             } else {
                 let _ = composer_ref

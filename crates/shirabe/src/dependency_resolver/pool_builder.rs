@@ -34,7 +34,6 @@ use crate::package::version::StabilityFilter;
 use crate::plugin::PluginEvents;
 use crate::plugin::PrePoolCreateEvent;
 use crate::repository::CanonicalPackagesTrait;
-use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
@@ -163,9 +162,10 @@ impl PoolBuilder {
                 .into());
             }
 
-            for locked_package in
-                CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
-            {
+            let locked_packages = CanonicalPackagesTrait::get_packages(
+                &*request.get_locked_repository().unwrap().borrow(),
+            );
+            for locked_package in locked_packages {
                 if !self.is_update_allowed(locked_package.clone()) {
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
@@ -491,13 +491,9 @@ impl PoolBuilder {
         for (repo_index, repository) in repositories.iter().enumerate() {
             // these repos have their packages fixed or locked if they need to be loaded so we
             // never need to load anything else from them
-            // TODO(phase-c): PHP compares `$request->getLockedRepository() === $repository` by
-            // strict identity, but `Request.locked_repository` is held by value, not as a handle.
-            // This approximates the check by matching any `LockArrayRepository` when the request
-            // has a locked repository set. Tighten to `ptr_eq` once `Request` stores the locked
-            // repository as `RepositoryInterfaceHandle`.
-            let is_locked_repo =
-                request.get_locked_repository().is_some() && repository.is::<LockArrayRepository>();
+            let is_locked_repo = request
+                .get_locked_repository()
+                .map_or(false, |h| repository.ptr_eq(&h.into()));
             if repository.is::<PlatformRepository>() || is_locked_repo {
                 continue;
             }
@@ -826,9 +822,9 @@ impl PoolBuilder {
 
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
             // update pattern matches a locked package? => all good
-            for package in
-                CanonicalPackagesTrait::get_packages(request.get_locked_repository().unwrap())
-            {
+            for package in CanonicalPackagesTrait::get_packages(
+                &*request.get_locked_repository().unwrap().borrow(),
+            ) {
                 if Preg::is_match3(&pattern_regexp, &package.get_name(), None).unwrap_or(false) {
                     continue 'outer;
                 }

@@ -6,8 +6,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 use crate::package::BasePackageHandle;
-use crate::repository::CanonicalPackagesTrait;
-use crate::repository::LockArrayRepository;
+use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::RepositoryInterface;
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
@@ -41,7 +40,7 @@ pub enum UpdateAllowTransitiveDeps {
 
 #[derive(Debug)]
 pub struct Request {
-    pub(crate) locked_repository: Option<LockArrayRepository>,
+    pub(crate) locked_repository: Option<LockArrayRepositoryHandle>,
     pub(crate) requires: IndexMap<String, AnyConstraint>,
     pub(crate) fixed_packages: IndexMap<String, BasePackageHandle>,
     pub(crate) locked_packages: IndexMap<String, BasePackageHandle>,
@@ -52,7 +51,7 @@ pub struct Request {
 }
 
 impl Request {
-    pub fn new(locked_repository: Option<LockArrayRepository>) -> Self {
+    pub fn new(locked_repository: Option<LockArrayRepositoryHandle>) -> Self {
         Self {
             locked_repository,
             requires: IndexMap::new(),
@@ -200,7 +199,7 @@ impl Request {
         let mut present_map: IndexMap<String, crate::package::BasePackageHandle> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
-            for package in RepositoryInterface::get_packages(locked_repository) {
+            for package in RepositoryInterface::get_packages(&*locked_repository.borrow()) {
                 let key = if package_ids {
                     package.get_id().to_string()
                 } else {
@@ -230,8 +229,8 @@ impl Request {
         fixed_packages_map
     }
 
-    pub fn get_locked_repository(&self) -> Option<&LockArrayRepository> {
-        self.locked_repository.as_ref()
+    pub fn get_locked_repository(&self) -> Option<LockArrayRepositoryHandle> {
+        self.locked_repository.clone()
     }
 
     /// Restricts the pool builder from loading other packages than those listed here.

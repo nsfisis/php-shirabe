@@ -202,6 +202,7 @@ impl RemoveCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(true)?
+                .borrow()
                 .get_packages();
 
             let mut required: IndexMap<String, bool> = IndexMap::new();
