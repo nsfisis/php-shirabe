@@ -129,30 +129,28 @@ impl PluginManager {
             // TODO(phase-b): PHP returns a shared object reference; we clone the repository
             // box here to side-step a borrow conflict between `&self.composer` and
             // `&mut self`. The Rust port should eventually share via Rc<RefCell<_>>.
-            let repo: Box<dyn RepositoryInterface> = self
+            let repo = self
                 .composer_full()
                 .borrow()
                 .get_repository_manager()
                 .borrow()
-                .get_local_repository()
-                .clone_box();
+                .get_local_repository();
             // The root package borrow is also tied to `self.composer`; clone the package handle
             // (shared Rc) for the same reason as above.
             let root_package = self.composer_full().borrow().get_package().clone();
-            self.load_repository(&*repo, false, Some(root_package))?;
+            self.load_repository(&*repo.borrow(), false, Some(root_package))?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
-            let repo: Box<dyn RepositoryInterface> = self
+            let repo = self
                 .global_composer
                 .as_ref()
                 .unwrap()
                 .borrow_partial()
                 .get_repository_manager()
                 .borrow()
-                .get_local_repository()
-                .clone_box();
-            self.load_repository(&*repo, true, None)?;
+                .get_local_repository();
+            self.load_repository(&*repo.borrow(), true, None)?;
         }
         Ok(())
     }
@@ -161,27 +159,25 @@ impl PluginManager {
     pub fn deactivate_installed_plugins(&mut self) {
         // TODO(plugin): deactivation is part of the plugin API
         if !self.are_plugins_disabled("local") {
-            let repo: Box<dyn RepositoryInterface> = self
+            let repo = self
                 .composer_full()
                 .borrow()
                 .get_repository_manager()
                 .borrow()
-                .get_local_repository()
-                .clone_box();
-            self.deactivate_repository(&*repo, false);
+                .get_local_repository();
+            self.deactivate_repository(&*repo.borrow(), false);
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
-            let repo: Box<dyn RepositoryInterface> = self
+            let repo = self
                 .global_composer
                 .as_ref()
                 .unwrap()
                 .borrow_partial()
                 .get_repository_manager()
                 .borrow()
-                .get_local_repository()
-                .clone_box();
-            self.deactivate_repository(&*repo, true);
+                .get_local_repository();
+            self.deactivate_repository(&*repo.borrow(), true);
         }
     }
 

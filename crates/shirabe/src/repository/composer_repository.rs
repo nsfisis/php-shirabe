@@ -38,6 +38,8 @@ use crate::repository::ConfigurableRepositoryInterface;
 use crate::repository::LoadPackagesResult;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::repository::RepositorySecurityException;
 use crate::repository::{PartialOrSecurityAdvisory, SecurityAdvisoryResult};
 use crate::repository::{SEARCH_FULLTEXT, SEARCH_VENDOR};
@@ -78,6 +80,9 @@ pub struct ProviderListingEntry {
 #[derive(Debug)]
 pub struct ComposerRepository {
     inner: ArrayRepository,
+    /// Weak reference to the outermost repository handle wrapping this `ComposerRepository`,
+    /// injected via `set_self_handle`. Used to wire package -> repository back-references.
+    self_weak: std::cell::RefCell<Option<RepositoryInterfaceWeakHandle>>,
     /// @phpstan-var array{url: string, options?: mixed[], type?: 'composer', allow_ssl_downgrade?: bool}
     repo_config: IndexMap<String, PhpMixed>,
     options: IndexMap<String, PhpMixed>,
@@ -274,6 +279,7 @@ impl ComposerRepository {
 
         let mut this = Self {
             inner: inner?,
+            self_weak: std::cell::RefCell::new(None),
             repo_config,
             options,
             url,
@@ -1745,13 +1751,20 @@ impl ComposerRepository {
             versions_to_load.values().cloned().collect();
         let loaded_packages = self.create_packages_flat(versions_to_load_vec, packages_source)?;
         let uids: Vec<String> = versions_to_load.keys().cloned().collect();
+        let self_handle = self.self_handle();
 
         for (index, package) in loaded_packages.into_iter().enumerate() {
-            // TODO(phase-c): wire the repository back-reference onto the shared package handle.
+            if let Some(h) = self_handle.as_ref() {
+                package.set_repository(h.clone())?;
+            }
             let uid = &uids[index];
 
             if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
+                if let Some(h) = self_handle.as_ref() {
+                    let aliased_pkg: PackageInterfaceHandle = aliased.clone().into();
+                    aliased_pkg.set_repository(h.clone())?;
+                }
                 result.insert(uid.clone(), aliased.into());
                 result.insert(format!("{}-alias", uid), package);
             } else {
@@ -1782,6 +1795,21 @@ impl ComposerRepository {
     pub fn add_package(&mut self, package: BasePackageHandle) {
         self.configure_package_transport_options(package.clone());
         self.inner.add_package(package.into());
+    }
+
+    /// Forwards the outermost handle's weak to the inner `ArrayRepository` so that packages added
+    /// through `add_package` get the back-reference to this `ComposerRepository` wrapper.
+    pub fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        *self.self_weak.borrow_mut() = Some(weak.clone());
+        self.inner.set_self_handle(weak);
+    }
+
+    fn self_handle(&self) -> Option<RepositoryInterfaceHandle> {
+        self.self_weak
+            .borrow()
+            .as_ref()
+            .and_then(std::rc::Weak::upgrade)
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 
     /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
@@ -1976,11 +2004,18 @@ impl ComposerRepository {
 
             let loaded_packages: Vec<BasePackageHandle> =
                 ComposerRepository::create_packages_static(versions_to_load, packages_source)?;
+            let self_handle = self.self_handle();
             for package in loaded_packages.into_iter() {
-                // TODO(phase-c): wire the repository back-reference onto the shared package handle.
+                if let Some(h) = self_handle.as_ref() {
+                    package.set_repository(h.clone())?;
+                }
                 let hash_c = package.ptr_id().to_string();
                 if let Some(alias) = package.as_alias() {
                     let aliased = alias.get_alias_of();
+                    if let Some(h) = self_handle.as_ref() {
+                        let aliased_pkg: PackageInterfaceHandle = aliased.clone().into();
+                        aliased_pkg.set_repository(h.clone())?;
+                    }
                     let aliased_hash = aliased.ptr_id().to_string();
                     if !packages.contains_key(&aliased_hash) {
                         packages.insert(aliased_hash, aliased.into());

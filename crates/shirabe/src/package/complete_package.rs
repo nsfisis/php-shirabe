@@ -311,13 +311,13 @@ impl PackageInterface for CompletePackage {
 
     fn set_repository(
         &mut self,
-        repository: Box<dyn crate::repository::RepositoryInterface>,
+        repository: crate::repository::RepositoryInterfaceHandle,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.inner.set_repository(repository)
     }
 
-    fn get_repository(&self) -> Option<&dyn crate::repository::RepositoryInterface> {
-        todo!()
+    fn get_repository(&self) -> Option<crate::repository::RepositoryInterfaceHandle> {
+        self.inner.get_repository()
     }
 
     fn get_binaries(&self) -> Vec<String> {

@@ -635,13 +635,12 @@ impl UpdateCommand {
             .get_repository_manager()
             .borrow()
             .get_repositories();
-        let _ = |repository: &Box<dyn RepositoryInterface>| -> bool {
-            repository
-                .as_any()
-                .downcast_ref::<PlatformRepository>()
-                .is_none()
+        let _ = |repository: &crate::repository::RepositoryInterfaceHandle| -> bool {
+            !repository.is::<PlatformRepository>()
         };
-        repository_set.add_repository(Box::new(CompositeRepository::new(Vec::new())))?;
+        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            CompositeRepository::new(Vec::new()),
+        ))?;
         let _ = array_filter::<i64, fn(&i64) -> bool>;
 
         VersionSelector::new(repository_set, None)

@@ -93,7 +93,22 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
         None
     }
 
+    fn as_installed_repository_interface_mut(
+        &mut self,
+    ) -> Option<&mut dyn crate::repository::InstalledRepositoryInterface> {
+        None
+    }
+
     fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Injects this repository's own weak handle so that `add_package` can wire package ->
+    /// repository back-references (PHP `setRepository($this)`). Called once when the repository is
+    /// wrapped in a [`RepositoryInterfaceHandle`](crate::repository::RepositoryInterfaceHandle).
+    /// Wrapper repositories forward the same weak (the outermost handle) to their inner
+    /// `ArrayRepository`.
+    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+        let _ = weak;
+    }
 
     fn clone_box(&self) -> Box<dyn RepositoryInterface> {
         todo!()

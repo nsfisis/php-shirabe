@@ -74,8 +74,7 @@ impl AuditCommand {
             .borrow()
             .get_repositories()
         {
-            // TODO(phase-b): repositories are shared (PHP class semantics); needs Rc wrapper
-            repo_set.add_repository(repo.clone_box())?;
+            repo_set.add_repository(repo.clone())?;
         }
 
         let audit_config = AuditConfig::from_config(

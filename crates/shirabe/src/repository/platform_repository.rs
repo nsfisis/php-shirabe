@@ -2012,4 +2012,8 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
+    }
 }

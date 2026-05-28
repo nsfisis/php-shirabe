@@ -6,7 +6,6 @@ use crate::advisory::PartialSecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::package::BasePackageHandle;
-use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -28,7 +27,7 @@ impl SecurityAdvisoryPoolFilter {
     pub fn filter(
         &self,
         pool: Pool,
-        repositories: Vec<Box<dyn RepositoryInterface>>,
+        repositories: Vec<crate::repository::RepositoryInterfaceHandle>,
         request: &Request,
     ) -> Pool {
         // TODO(phase-c): port the filter() body. Blockers:

@@ -3,6 +3,7 @@
 use crate::installer::InstallationManager;
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceWeakHandle;
 use anyhow::Result;
 use shirabe_php_shim::Countable;
 
@@ -50,6 +51,10 @@ impl WritableArrayRepository {
 
     pub fn add_package(&mut self, package: crate::package::PackageInterfaceHandle) -> Result<()> {
         self.inner.add_package(package)
+    }
+
+    pub fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 
     pub fn remove_package(

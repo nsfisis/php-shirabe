@@ -133,7 +133,18 @@ impl RepositoryInterface for InstalledArrayRepository {
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None
     }
+    fn as_installed_repository_interface(&self) -> Option<&dyn InstalledRepositoryInterface> {
+        Some(self)
+    }
+    fn as_installed_repository_interface_mut(
+        &mut self,
+    ) -> Option<&mut dyn InstalledRepositoryInterface> {
+        Some(self)
+    }
     fn as_any(&self) -> &dyn std::any::Any {
         todo!()
+    }
+    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }

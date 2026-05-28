@@ -203,15 +203,15 @@ impl HomeCommand {
         }
     }
 
-    fn initialize_repos(&mut self) -> Result<Vec<Box<dyn RepositoryInterface>>> {
+    fn initialize_repos(&mut self) -> Result<Vec<crate::repository::RepositoryInterfaceHandle>> {
         let composer = self.try_composer(None, None);
 
         if let Some(composer) = composer {
             let composer = crate::command::composer_full(&composer);
-            let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
-            repos.push(Box::new(RootPackageRepository::new(
-                composer.get_package().clone(),
-            )));
+            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![];
+            repos.push(crate::repository::RepositoryInterfaceHandle::new(
+                RootPackageRepository::new(composer.get_package().clone()),
+            ));
             // TODO(phase-b): get_local_repository / get_repositories return shared refs; needs Rc<dyn ...> migration
             return Ok(repos);
         }

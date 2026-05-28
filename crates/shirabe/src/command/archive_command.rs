@@ -247,13 +247,12 @@ impl ArchiveCommand {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
-            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
-                vec![local_repo.clone_box()];
+            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![local_repo];
             repos.extend(
                 repository_manager
                     .get_repositories()
                     .iter()
-                    .map(|r| r.clone_box()),
+                    .map(|r| r.clone()),
             );
             repo = CompositeRepository::new(repos);
             min_stability = composer.get_package().get_minimum_stability().to_string();
@@ -299,7 +298,7 @@ impl ArchiveCommand {
             IndexMap::new(),
             IndexMap::new(),
         );
-        repo_set.add_repository(Box::new(repo))?;
+        repo_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(repo))?;
         let parser = VersionParser::new();
         let constraint: Option<shirabe_semver::constraint::AnyConstraint> = match version.as_deref()
         {

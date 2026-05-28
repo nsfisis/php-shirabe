@@ -455,8 +455,10 @@ impl InitCommand {
             let mut repo_manager =
                 RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
-            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> =
-                vec![Box::new(PlatformRepository::new(vec![], IndexMap::new())?)];
+            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
+                vec![crate::repository::RepositoryInterfaceHandle::new(
+                    PlatformRepository::new(vec![], IndexMap::new())?,
+                )];
             let mut create_default_packagist_repo = true;
             for repo in &repositories {
                 let repo_config =

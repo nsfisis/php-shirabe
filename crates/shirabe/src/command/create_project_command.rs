@@ -304,7 +304,7 @@ impl CreateProjectCommand {
                     let _ = &composer_json_repositories_config;
                     let placeholder_existing: IndexMap<
                         String,
-                        Box<dyn crate::repository::RepositoryInterface>,
+                        crate::repository::RepositoryInterfaceHandle,
                     > = IndexMap::new();
                     let name = RepositoryFactory::generate_repository_name(
                         &PhpMixed::Int(index as i64),
@@ -737,12 +737,14 @@ impl CreateProjectCommand {
         if repositories.is_none() {
             // TODO(phase-b): default_repos needs &mut RepositoryManager but we hold &RepositoryManager.
             let _ = rm;
-            repository_set.add_repository(Box::new(CompositeRepository::new(
-                RepositoryFactory::default_repos(Some(io.clone()), Some(config.clone()), None)?
-                    .into_iter()
-                    .map(|(_, v)| v)
-                    .collect(),
-            )));
+            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+                CompositeRepository::new(
+                    RepositoryFactory::default_repos(Some(io.clone()), Some(config.clone()), None)?
+                        .into_iter()
+                        .map(|(_, v)| v)
+                        .collect(),
+                ),
+            ))?;
         } else {
             for repo in repositories.unwrap() {
                 let mut repo_config =

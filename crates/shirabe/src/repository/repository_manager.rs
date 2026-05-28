@@ -10,15 +10,14 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::FilterRepository;
-use crate::repository::InstalledRepositoryInterface;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct RepositoryManager {
-    local_repository: Option<Box<dyn InstalledRepositoryInterface>>,
-    repositories: Vec<Box<dyn RepositoryInterface>>,
+    local_repository: Option<RepositoryInterfaceHandle>,
+    repositories: Vec<RepositoryInterfaceHandle>,
     repository_classes: IndexMap<String, String>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -62,7 +61,7 @@ impl RepositoryManager {
                 name,
                 crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
             ) {
-                return Some(package.clone().into());
+                return Some(package.into());
             }
         }
         None
@@ -81,17 +80,17 @@ impl RepositoryManager {
                     constraint.clone(),
                 )),
             ) {
-                packages.push(p.clone().into());
+                packages.push(p);
             }
         }
         packages
     }
 
-    pub fn add_repository(&mut self, repository: Box<dyn RepositoryInterface>) {
+    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
         self.repositories.push(repository);
     }
 
-    pub fn prepend_repository(&mut self, repository: Box<dyn RepositoryInterface>) {
+    pub fn prepend_repository(&mut self, repository: RepositoryInterfaceHandle) {
         self.repositories.insert(0, repository);
     }
 
@@ -100,7 +99,7 @@ impl RepositoryManager {
         r#type: &str,
         config: IndexMap<String, PhpMixed>,
         name: Option<&str>,
-    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
             return Err(InvalidArgumentException {
                 message: format!("Repository type is not registered: {}", r#type),
@@ -140,7 +139,10 @@ impl RepositoryManager {
         let repository = self.create_repository_by_class(&class, cleaned_config)?;
 
         if let Some(filter_config) = filter_config {
-            return Ok(Box::new(FilterRepository::new(repository, filter_config)?));
+            return Ok(RepositoryInterfaceHandle::new(FilterRepository::new(
+                repository,
+                filter_config,
+            )?));
         }
 
         Ok(repository)
@@ -150,7 +152,7 @@ impl RepositoryManager {
         &self,
         _class: &str,
         _config: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    ) -> anyhow::Result<RepositoryInterfaceHandle> {
         todo!("Phase B: dynamic class instantiation by class name")
     }
 
@@ -159,15 +161,15 @@ impl RepositoryManager {
             .insert(r#type.to_string(), class.to_string());
     }
 
-    pub fn get_repositories(&self) -> &Vec<Box<dyn RepositoryInterface>> {
+    pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
         &self.repositories
     }
 
-    pub fn set_local_repository(&mut self, repository: Box<dyn InstalledRepositoryInterface>) {
+    pub fn set_local_repository(&mut self, repository: RepositoryInterfaceHandle) {
         self.local_repository = Some(repository);
     }
 
-    pub fn get_local_repository(&self) -> &dyn InstalledRepositoryInterface {
-        self.local_repository.as_ref().unwrap().as_ref()
+    pub fn get_local_repository(&self) -> RepositoryInterfaceHandle {
+        self.local_repository.clone().unwrap()
     }
 }

@@ -261,10 +261,12 @@ impl RequireCommand {
             .unwrap_or_default();
         // initialize self.repos as it is used by the PackageDiscoveryTrait
         let platform_repo = PlatformRepository::new(vec![], platform_overrides_map)?;
-        let mut combined: Vec<Box<dyn crate::repository::RepositoryInterface>> = vec![
-            // TODO(phase-b): PlatformRepository should be shared via Rc; use placeholder until
-            // CompositeRepository accepts shared references
-            Box::new(todo!("share platform_repo with PlatformRepository") as PlatformRepository),
+        let mut combined: Vec<crate::repository::RepositoryInterfaceHandle> = vec![
+            // TODO(phase-c): share this platform_repo as a handle instead of constructing a
+            // separate one; PlatformRepository is held by value here for the requirement below.
+            crate::repository::RepositoryInterfaceHandle::new::<PlatformRepository>(todo!(
+                "share platform_repo with PlatformRepository"
+            )),
         ];
         for _repo in repos {
             // TODO(phase-b): repos are borrowed from RepositoryManager; need to take ownership

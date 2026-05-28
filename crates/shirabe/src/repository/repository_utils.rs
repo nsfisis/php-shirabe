@@ -3,7 +3,7 @@
 use crate::package::Link;
 use crate::repository::CompositeRepository;
 use crate::repository::FilterRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use indexmap::IndexMap;
 use std::any::Any;
 
@@ -39,23 +39,31 @@ impl RepositoryUtils {
     }
 
     pub fn flatten_repositories(
-        repo: Box<dyn RepositoryInterface>,
+        repo: RepositoryInterfaceHandle,
         unwrap_filter_repos: bool,
-    ) -> Vec<Box<dyn RepositoryInterface>> {
-        let repo: Box<dyn RepositoryInterface> = if unwrap_filter_repos {
-            if let Some(filter_repo) = repo.as_any().downcast_ref::<FilterRepository>() {
-                filter_repo.get_repository().clone_box()
-            } else {
-                repo
-            }
+    ) -> Vec<RepositoryInterfaceHandle> {
+        let repo: RepositoryInterfaceHandle = if unwrap_filter_repos {
+            let unwrapped = {
+                let r = repo.borrow();
+                r.as_any()
+                    .downcast_ref::<FilterRepository>()
+                    .map(|filter_repo| filter_repo.get_repository())
+            };
+            unwrapped.unwrap_or(repo)
         } else {
             repo
         };
 
-        if let Some(composite_repo) = repo.as_any().downcast_ref::<CompositeRepository>() {
+        let nested = {
+            let r = repo.borrow();
+            r.as_any()
+                .downcast_ref::<CompositeRepository>()
+                .map(|composite_repo| composite_repo.get_repositories().clone())
+        };
+        if let Some(nested) = nested {
             let mut repos = Vec::new();
-            for r in composite_repo.get_repositories() {
-                for r2 in Self::flatten_repositories(r.clone_box(), unwrap_filter_repos) {
+            for r in nested {
+                for r2 in Self::flatten_repositories(r, unwrap_filter_repos) {
                     repos.push(r2);
                 }
             }

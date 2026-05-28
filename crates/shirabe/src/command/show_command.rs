@@ -40,6 +40,7 @@ use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
@@ -198,13 +199,13 @@ impl ShowCommand {
         let make_platform_repo = || -> anyhow::Result<PlatformRepository> {
             PlatformRepository::new(vec![], platform_overrides.clone())
         };
-        let mut locked_repo: Option<Box<dyn RepositoryInterface>> = None;
+        let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
 
         // The single-package $package binding from PHP gets surfaced here.
         let mut single_package: Option<crate::package::CompletePackageInterfaceHandle> = None;
         let mut versions_map: IndexMap<String, String> = IndexMap::new();
-        let installed_repo: Box<InstalledRepository>;
-        let repos: Box<dyn RepositoryInterface>;
+        let installed_repo: RepositoryInterfaceHandle;
+        let repos: RepositoryInterfaceHandle;
 
         if input.get_option("self").as_bool() == Some(true)
             && input.get_option("installed").as_bool() != Some(true)
@@ -227,95 +228,95 @@ impl ShowCommand {
                 }
                 .into());
             }
-            installed_repo = Box::new(InstalledRepository::new(vec![Box::new(
-                RootPackageRepository::new(package.clone()),
-            )]));
-            repos = Box::new(InstalledRepository::new(vec![Box::new(
-                RootPackageRepository::new(package.clone()),
-            )]));
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
+            ]));
+            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
+            ]));
             // TODO(phase-c): need to convert the root package handle to a CompletePackageInterfaceHandle
             single_package = todo!("convert package to CompletePackageInterfaceHandle");
         } else if input.get_option("platform").as_bool() == Some(true) {
-            installed_repo = Box::new(InstalledRepository::new(vec![Box::new(
-                make_platform_repo()?,
-            )]));
-            repos = Box::new(InstalledRepository::new(vec![Box::new(
-                make_platform_repo()?,
-            )]));
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(make_platform_repo()?),
+            ]));
+            repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(make_platform_repo()?),
+            ]));
         } else if input.get_option("available").as_bool() == Some(true) {
-            let mut ir = InstalledRepository::new(vec![Box::new(make_platform_repo()?)]);
+            let mut ir = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(
+                make_platform_repo()?,
+            )]);
             if let Some(ref composer) = composer {
                 let composer = crate::command::composer_full(composer);
-                repos = Box::new(CompositeRepository::new(
+                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     composer
                         .get_repository_manager()
                         .borrow()
                         .get_repositories()
                         .iter()
-                        .map(|r| r.clone_box())
+                        .map(|r| r.clone())
                         .collect(),
                 ));
                 ir.add_repository(
                     composer
                         .get_repository_manager()
                         .borrow()
-                        .get_local_repository()
-                        .clone_box(),
-                );
-                installed_repo = Box::new(ir);
+                        .get_local_repository(),
+                )?;
+                installed_repo = RepositoryInterfaceHandle::new(ir);
             } else {
                 let default_repos =
                     RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
                 let names: Vec<String> = default_repos.keys().cloned().collect();
-                repos = Box::new(CompositeRepository::new(
+                repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
                 self.get_io().write_error(&format!(
                     "No composer.json found in the current directory, showing available packages from {}",
                     names.join(", ")
                 ));
-                installed_repo = Box::new(ir);
+                installed_repo = RepositoryInterfaceHandle::new(ir);
             }
         } else if input.get_option("all").as_bool() == Some(true) && composer.is_some() {
             let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
-            let local_repo_cloned = composer_ref
+            let local_repo = composer_ref
                 .get_repository_manager()
                 .borrow()
-                .get_local_repository()
-                .clone_box();
+                .get_local_repository();
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
             if locker.is_locked() {
-                let lr = locker.get_locked_repository(true)?;
-                installed_repo = Box::new(InstalledRepository::new(vec![
-                    lr.clone_box(),
-                    local_repo_cloned,
-                    Box::new(make_platform_repo()?),
+                let lr_handle = RepositoryInterfaceHandle::new(locker.get_locked_repository(true)?);
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    lr_handle.clone(),
+                    local_repo,
+                    RepositoryInterfaceHandle::new(make_platform_repo()?),
                 ]));
-                // TODO(phase-b): wrap lr (LockArrayRepository) as Box<dyn RepositoryInterface>
-                locked_repo = Some(todo!("share lr as Box<dyn RepositoryInterface>"));
-                let _ = lr;
+                locked_repo = Some(lr_handle);
             } else {
-                installed_repo = Box::new(InstalledRepository::new(vec![
-                    local_repo_cloned,
-                    Box::new(make_platform_repo()?),
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    local_repo,
+                    RepositoryInterfaceHandle::new(make_platform_repo()?),
                 ]));
             }
-            let mut composite_input: Vec<Box<dyn RepositoryInterface>> = vec![Box::new(
-                FilterRepository::new(installed_repo.clone_box(), {
-                    let mut m = IndexMap::new();
-                    m.insert("canonical".to_string(), PhpMixed::Bool(false));
-                    m
-                })?,
-            )];
+            let mut composite_input: Vec<RepositoryInterfaceHandle> =
+                vec![RepositoryInterfaceHandle::new(FilterRepository::new(
+                    installed_repo.clone(),
+                    {
+                        let mut m = IndexMap::new();
+                        m.insert("canonical".to_string(), PhpMixed::Bool(false));
+                        m
+                    },
+                )?)];
             for r in composer_ref
                 .get_repository_manager()
                 .borrow()
                 .get_repositories()
             {
-                composite_input.push(r.clone_box());
+                composite_input.push(r.clone());
             }
-            repos = Box::new(CompositeRepository::new(composite_input));
+            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
         } else if input.get_option("all").as_bool() == Some(true) {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
@@ -324,15 +325,14 @@ impl ShowCommand {
                 "No composer.json found in the current directory, showing available packages from {}",
                 names.join(", ")
             ));
-            installed_repo = Box::new(InstalledRepository::new(vec![Box::new(
-                make_platform_repo()?,
-            )]));
-            let mut composite_input: Vec<Box<dyn RepositoryInterface>> =
-                vec![installed_repo.clone_box()];
+            installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                RepositoryInterfaceHandle::new(make_platform_repo()?),
+            ]));
+            let mut composite_input: Vec<RepositoryInterfaceHandle> = vec![installed_repo.clone()];
             for (_k, v) in default_repos.into_iter() {
                 composite_input.push(v);
             }
-            repos = Box::new(CompositeRepository::new(composite_input));
+            repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
         } else if input.get_option("locked").as_bool() == Some(true) {
             if composer.is_none()
                 || !crate::command::composer_full_mut(composer.as_ref().unwrap())
@@ -349,18 +349,19 @@ impl ShowCommand {
             let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
-            let mut lr =
+            let lr =
                 locker.get_locked_repository(input.get_option("no-dev").as_bool() != Some(true))?;
+            let lr_handle = RepositoryInterfaceHandle::new(lr);
             if input.get_option("self").as_bool() == Some(true) {
                 // TODO(phase-b): LockArrayRepository needs add_package via WritableRepositoryInterface;
                 // skipping the insertion here keeps compile clean.
-                let _ = &mut lr;
+                let _ = &lr_handle;
             }
-            installed_repo = Box::new(InstalledRepository::new(vec![lr.clone_box()]));
-            repos = Box::new(InstalledRepository::new(vec![lr.clone_box()]));
-            // TODO(phase-b): wrap lr (LockArrayRepository) as Box<dyn RepositoryInterface>
-            locked_repo = Some(todo!("share lr as Box<dyn RepositoryInterface>"));
-            let _ = lr;
+            installed_repo =
+                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle.clone()]));
+            repos =
+                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle.clone()]));
+            locked_repo = Some(lr_handle);
         } else {
             // --installed / default case
             // TODO(phase-b): PHP shares the Composer object by reference. Phase B
@@ -382,13 +383,13 @@ impl ShowCommand {
             };
             let root_pkg = composer_local.get_package();
 
-            let root_repo: Box<dyn RepositoryInterface> =
+            let root_repo: RepositoryInterfaceHandle =
                 if input.get_option("self").as_bool() == Some(true) {
-                    Box::new(RootPackageRepository::new(
+                    RepositoryInterfaceHandle::new(RootPackageRepository::new(
                         composer_local.get_package().clone(),
                     ))
                 } else {
-                    Box::new(InstalledArrayRepository::new()?)
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
                 };
             if input.get_option("no-dev").as_bool() == Some(true) {
                 let local_packages = composer_local
@@ -404,23 +405,28 @@ impl ShowCommand {
                 );
                 let cloned: Vec<crate::package::PackageInterfaceHandle> =
                     packages.into_iter().map(|p| p.into()).collect();
-                installed_repo = Box::new(InstalledRepository::new(vec![
-                    root_repo.clone_box(),
-                    Box::new(InstalledArrayRepository::new_with_packages(cloned)?),
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    root_repo.clone(),
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
+                        cloned,
+                    )?),
                 ]));
-                repos = Box::new(InstalledRepository::new(vec![
+                repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     root_repo,
-                    Box::new(InstalledArrayRepository::new_with_packages(Vec::new())?),
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(
+                        Vec::new(),
+                    )?),
                 ]));
             } else {
                 let repository_manager = composer_local.get_repository_manager().clone();
                 let repository_manager = repository_manager.borrow();
                 let lr = repository_manager.get_local_repository();
-                installed_repo = Box::new(InstalledRepository::new(vec![
-                    root_repo.clone_box(),
-                    lr.clone_box(),
+                installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
+                    root_repo.clone(),
+                    lr.clone(),
                 ]));
-                repos = Box::new(InstalledRepository::new(vec![root_repo, lr.clone_box()]));
+                repos =
+                    RepositoryInterfaceHandle::new(InstalledRepository::new(vec![root_repo, lr]));
             }
 
             if installed_repo.get_packages().is_empty() {
@@ -475,8 +481,12 @@ impl ShowCommand {
             versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
         } else if let Some(ref pf) = package_filter {
             if !pf.contains('*') {
-                let (matched_package, vers) =
-                    self.get_package(&*installed_repo, &*repos, pf, input.get_argument("version"))?;
+                let (matched_package, vers) = self.get_package(
+                    &*installed_repo.borrow(),
+                    &repos,
+                    pf,
+                    input.get_argument("version"),
+                )?;
 
                 if let Some(ref pkg) = matched_package {
                     if input.get_option("direct").as_bool() == Some(true) {
@@ -546,8 +556,11 @@ impl ShowCommand {
 
             let mut exit_code: i64 = 0;
             if input.get_option("tree").as_bool() == Some(true) {
-                let array_tree =
-                    self.generate_package_tree(package.clone().into(), &*installed_repo, &*repos);
+                let array_tree = self.generate_package_tree(
+                    package.clone().into(),
+                    &*installed_repo.borrow(),
+                    &repos,
+                );
 
                 if format == "json" {
                     let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -625,14 +638,14 @@ impl ShowCommand {
                 self.print_package_info_as_json(
                     package.clone(),
                     &versions_map,
-                    &*installed_repo,
+                    &*installed_repo.borrow(),
                     latest_package,
                 )?;
             } else {
                 self.print_package_info(
                     package.clone(),
                     &versions_map,
-                    &*installed_repo,
+                    &*installed_repo.borrow(),
                     latest_package,
                 )?;
             }
@@ -663,8 +676,8 @@ impl ShowCommand {
                 ) {
                     array_tree.push(self.generate_package_tree(
                         package.clone(),
-                        &*installed_repo,
-                        &*repos,
+                        &*installed_repo.borrow(),
+                        &repos,
                     ));
                 }
             }
@@ -715,13 +728,13 @@ impl ShowCommand {
             input.set_option("path", PhpMixed::Bool(false));
         }
 
-        for repo in RepositoryUtils::flatten_repositories(repos.clone_box(), false) {
+        for repo in RepositoryUtils::flatten_repositories(repos.clone(), false) {
             // TODO(phase-b): InstalledRepository needs as_repository_interface / get_repositories
             // wired through; placeholder classification until then.
-            let r#type = if Self::same_repository(&*repo, &platform_repo) {
+            let r#type = if Self::same_repository(&*repo.borrow(), &platform_repo) {
                 "platform"
             } else if let Some(ref lr) = locked_repo {
-                if Self::same_repository_dyn(&*repo, &**lr) {
+                if Self::same_repository_dyn(&*repo.borrow(), &*lr.borrow()) {
                     "locked"
                 } else {
                     "available"
@@ -776,7 +789,7 @@ impl ShowCommand {
                         }
                     }
                 }
-                if Self::same_repository(&*repo, &platform_repo) {
+                if Self::same_repository(&*repo.borrow(), &platform_repo) {
                     for (name, p) in platform_repo.get_disabled_packages() {
                         packages
                             .entry(type_owned.clone())
@@ -1470,8 +1483,8 @@ impl ShowCommand {
     /// finds a package by name and version if provided
     pub(crate) fn get_package(
         &mut self,
-        installed_repo: &InstalledRepository,
-        repos: &dyn RepositoryInterface,
+        installed_repo: &dyn RepositoryInterface,
+        repos: &RepositoryInterfaceHandle,
         name: &str,
         version: PhpMixed,
     ) -> anyhow::Result<(
@@ -1498,7 +1511,7 @@ impl ShowCommand {
             IndexMap::new(),
         );
         repository_set.allow_installed_repositories(true);
-        repository_set.add_repository(repos.clone_box())?;
+        repository_set.add_repository(repos.clone())?;
 
         let mut matched_package: Option<crate::package::PackageInterfaceHandle> = None;
         let mut versions: IndexMap<String, String> = IndexMap::new();
@@ -1555,7 +1568,7 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &InstalledRepository,
+        installed_repo: &dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         self.print_meta(package.clone(), versions, installed_repo, latest_package);
@@ -1585,7 +1598,7 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &InstalledRepository,
+        installed_repo: &dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) {
         let is_installed_package = !PlatformRepository::is_platform_package(&package.get_name())
@@ -1743,7 +1756,7 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &InstalledRepository,
+        installed_repo: &dyn RepositoryInterface,
     ) {
         let mut versions_keys: Vec<String> = versions.keys().cloned().collect();
         versions_keys = Semver::rsort(versions_keys);
@@ -1830,7 +1843,7 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &InstalledRepository,
+        installed_repo: &dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -2268,8 +2281,8 @@ impl ShowCommand {
     pub(crate) fn generate_package_tree(
         &mut self,
         package: PackageInterfaceHandle,
-        installed_repo: &InstalledRepository,
-        remote_repos: &dyn RepositoryInterface,
+        installed_repo: &dyn RepositoryInterface,
+        remote_repos: &RepositoryInterfaceHandle,
     ) -> IndexMap<String, PhpMixed> {
         let requires = {
             let mut r: IndexMap<String, Link> = package.get_requires().clone();
@@ -2425,8 +2438,8 @@ impl ShowCommand {
         &mut self,
         name: &str,
         link: &Link,
-        installed_repo: &InstalledRepository,
-        remote_repos: &dyn RepositoryInterface,
+        installed_repo: &dyn RepositoryInterface,
+        remote_repos: &RepositoryInterfaceHandle,
         packages_in_tree: &[PhpMixed],
     ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
         let mut children: Vec<IndexMap<String, PhpMixed>> = Vec::new();
@@ -2693,13 +2706,13 @@ impl ShowCommand {
                 IndexMap::new(),
                 IndexMap::new(),
             );
-            rs.add_repository(Box::new(CompositeRepository::new(
+            rs.add_repository(RepositoryInterfaceHandle::new(CompositeRepository::new(
                 composer
                     .get_repository_manager()
                     .borrow()
                     .get_repositories()
                     .iter()
-                    .map(|r| r.clone_box())
+                    .map(|r| r.clone())
                     .collect(),
             )))?;
             self.repository_set = Some(rs);

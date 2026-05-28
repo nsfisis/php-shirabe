@@ -219,7 +219,7 @@ impl ReinstallCommand {
             uninstall_operations,
             install_operations,
             dev_mode,
-            local_repo,
+            local_repo.clone(),
             &installation_manager,
         );
         // installation_manager.execute(local_repo_mut, uninstall_ops_boxed, dev_mode, true, false);

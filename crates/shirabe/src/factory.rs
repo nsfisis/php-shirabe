@@ -886,7 +886,7 @@ impl Factory {
         let fs = process
             .map(|p| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(Some(p.clone())))));
 
-        rm.set_local_repository(Box::new(
+        rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
             InstalledFilesystemRepository::new(
                 JsonFile::new(
                     format!("{}/composer/installed.json", vendor_dir),

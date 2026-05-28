@@ -12,7 +12,7 @@ use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
 use crate::repository::FilesystemRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryManager;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
@@ -102,7 +102,7 @@ impl RepositoryFactory {
         repository: &str,
         allow_filesystem: bool,
         rm: Option<&mut RepositoryManager>,
-    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let repo_config =
             Self::config_from_string(io.clone(), config, repository, allow_filesystem)?;
         Self::create_repo(io, config, repo_config, rm)
@@ -113,7 +113,7 @@ impl RepositoryFactory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repo_config: IndexMap<String, PhpMixed>,
         rm: Option<&mut RepositoryManager>,
-    ) -> anyhow::Result<Box<dyn RepositoryInterface>> {
+    ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let mut owned_rm;
         let rm = if let Some(rm) = rm {
             rm
@@ -145,7 +145,7 @@ impl RepositoryFactory {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut RepositoryManager>,
-    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
+    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
         let config = match config {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
@@ -233,7 +233,7 @@ impl RepositoryFactory {
 
     pub fn default_repos_with_default_manager(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
+    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
             Some(io.clone()),
             None,
@@ -247,8 +247,8 @@ impl RepositoryFactory {
     fn create_repos(
         rm: &mut RepositoryManager,
         repo_configs: Vec<PhpMixed>,
-    ) -> anyhow::Result<IndexMap<String, Box<dyn RepositoryInterface>>> {
-        let mut repo_map: IndexMap<String, Box<dyn RepositoryInterface>> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
+        let mut repo_map: IndexMap<String, RepositoryInterfaceHandle> = IndexMap::new();
 
         for (index, repo) in repo_configs.into_iter().enumerate() {
             match &repo {
@@ -290,7 +290,7 @@ impl RepositoryFactory {
                             .to_string();
                         // TODO(phase-b): FilesystemRepository does not yet implement
                         // RepositoryInterface; once it does, construct it from JsonFile here.
-                        let created: Box<dyn RepositoryInterface> =
+                        let created: RepositoryInterfaceHandle =
                             todo!("FilesystemRepository as dyn RepositoryInterface");
                         repo_map.insert(name, created);
                     } else {
@@ -323,7 +323,7 @@ impl RepositoryFactory {
     pub fn generate_repository_name(
         index: &PhpMixed,
         repo: &IndexMap<String, PhpMixed>,
-        existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>,
+        existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
         let mut name = match index {
             PhpMixed::Int(_) => {
@@ -344,7 +344,7 @@ impl RepositoryFactory {
     fn generate_repository_name_indexed(
         index: usize,
         repo: &IndexMap<String, PhpMixed>,
-        existing_repos: &IndexMap<String, Box<dyn RepositoryInterface>>,
+        existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
             Preg::replace("{^https?://}i", "", url).unwrap_or_else(|_| url.to_string())

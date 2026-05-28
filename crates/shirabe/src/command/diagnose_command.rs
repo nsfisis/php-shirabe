@@ -946,7 +946,7 @@ impl DiagnoseCommand {
             self.http_downloader.clone().unwrap(),
             None,
         )?;
-        let composer_repo_as_repo: Box<dyn crate::repository::RepositoryInterface> =
+        let composer_repo_as_repo: crate::repository::RepositoryInterfaceHandle =
             todo!("ComposerRepository as RepositoryInterface");
         repo_set.add_repository(composer_repo_as_repo)?;
 

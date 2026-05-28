@@ -9,7 +9,7 @@ use crate::package::CompletePackageInterface;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 
 #[derive(Debug)]
 pub struct RootPackage {
@@ -351,11 +351,11 @@ impl PackageInterface for RootPackage {
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
         todo!()
     }
-    fn set_repository(&mut self, _repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
-        todo!()
+    fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
+        self.inner.set_repository(repository)
     }
-    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        todo!()
+    fn get_repository(&self) -> Option<RepositoryInterfaceHandle> {
+        self.inner.get_repository()
     }
     fn get_binaries(&self) -> Vec<String> {
         todo!()

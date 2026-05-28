@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::package::Link;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 
 /// Defines the essential information a package has that is used during solving/installation
 ///
@@ -244,10 +244,10 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>>;
 
     /// Stores a reference to the repository that owns the package
-    fn set_repository(&mut self, repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()>;
+    fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()>;
 
     /// Returns a reference to the repository that owns the package
-    fn get_repository(&self) -> Option<&dyn RepositoryInterface>;
+    fn get_repository(&self) -> Option<RepositoryInterfaceHandle>;
 
     /// Returns the package binaries
     ///

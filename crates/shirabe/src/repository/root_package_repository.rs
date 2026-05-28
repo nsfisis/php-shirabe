@@ -4,6 +4,7 @@ use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::repository::ArrayRepository;
+use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::repository::{ProviderInfo, RepositoryInterface, SearchResult};
 use indexmap::IndexMap;
 
@@ -84,5 +85,9 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }

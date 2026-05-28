@@ -11,14 +11,13 @@ use crate::package::Link;
 use crate::package::PackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 
 #[derive(Debug)]
 pub struct AliasPackage {
     id: i64,
     name: String,
     pretty_name: String,
-    repository: Option<Box<dyn RepositoryInterface>>,
 
     /// @var string
     pub(crate) version: String,
@@ -64,7 +63,6 @@ impl AliasPackage {
             id: -1,
             name: alias_name.to_lowercase(),
             pretty_name: alias_name,
-            repository: None,
             version,
             pretty_version,
             dev,
@@ -452,12 +450,12 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_pretty_string()
     }
 
-    fn set_repository(&mut self, repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
+    fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         self.alias_of.set_repository(repository)
     }
 
-    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        todo!("AliasPackage::get_repository cannot return a borrow across the aliasOf handle")
+    fn get_repository(&self) -> Option<RepositoryInterfaceHandle> {
+        self.alias_of.get_repository()
     }
 }
 
@@ -486,15 +484,17 @@ impl BasePackage for AliasPackage {
         &mut self.pretty_name
     }
 
-    fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository.as_deref()
+    fn repository_opt(&self) -> Option<RepositoryInterfaceHandle> {
+        // PHP `AliasPackage::getRepository()` delegates to `$this->aliasOf->getRepository()`.
+        self.alias_of.get_repository()
     }
 
-    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {
-        todo!()
+    fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle) {
+        let _ = self.alias_of.set_repository(repository);
     }
 
-    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
-        todo!()
+    fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle> {
+        // AliasPackage holds no repository of its own; never mutate the aliased package here.
+        None
     }
 }

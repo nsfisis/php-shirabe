@@ -16,7 +16,8 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RootPackageRepository;
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceHandle, SearchResult,
 };
 
 pub enum NeedleInput {
@@ -36,7 +37,7 @@ pub struct InstalledRepository {
 }
 
 impl InstalledRepository {
-    pub fn new(repositories: Vec<Box<dyn RepositoryInterface>>) -> Self {
+    pub fn new(repositories: Vec<RepositoryInterfaceHandle>) -> Self {
         let mut this = Self {
             inner: CompositeRepository::new(vec![]),
         };
@@ -381,25 +382,21 @@ impl InstalledRepository {
         results
     }
 
-    pub fn add_repository(
-        &mut self,
-        repository: Box<dyn RepositoryInterface>,
-    ) -> anyhow::Result<()> {
-        // TODO(phase-b): cannot Any::is::<dyn InstalledRepositoryInterface>; replace with a
-        // dedicated downcast/marker method on RepositoryInterface.
-        if repository.as_any().is::<LockArrayRepository>()
-            || repository.as_any().is::<RootPackageRepository>()
-            || repository.as_any().is::<PlatformRepository>()
+    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
+        if repository.is::<LockArrayRepository>()
+            || repository.is::<RootPackageRepository>()
+            || repository.is::<PlatformRepository>()
         {
             self.inner.add_repository(repository);
             return Ok(());
         }
 
+        let type_name = std::any::type_name_of_val(&*repository.borrow()).to_string();
+        let repo_name = repository.get_repo_name();
         Err(anyhow::anyhow!(LogicException {
             message: format!(
                 "An InstalledRepository can not contain a repository of type {} ({})",
-                std::any::type_name_of_val(&*repository),
-                repository.get_repo_name(),
+                type_name, repo_name,
             ),
             code: 0,
         }))

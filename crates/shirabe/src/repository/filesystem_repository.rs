@@ -78,6 +78,10 @@ impl FilesystemRepository {
         self.dev_mode
     }
 
+    pub fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
+    }
+
     pub fn get_repo_name(&self) -> String {
         format!("file ({})", self.file.get_path())
     }

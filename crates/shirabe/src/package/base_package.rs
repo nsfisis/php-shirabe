@@ -8,7 +8,7 @@ use shirabe_php_shim::{LogicException, UnexpectedValueException, preg_quote};
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 
 pub struct SupportedLinkType {
     pub description: &'static str,
@@ -79,15 +79,9 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn name_mut(&mut self) -> &mut String;
     fn pretty_name(&self) -> &str;
     fn pretty_name_mut(&mut self) -> &mut String;
-    fn repository_opt(&self) -> Option<&dyn RepositoryInterface>;
-    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>);
-    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>>;
-
-    /// PHP `setRepository($this)` from the containing repository — Rust port marker until
-    /// the borrow story for repository-package back-references is finalized in phase B.
-    fn set_repository_self(&mut self) {
-        // TODO(phase-b): wire up a back-reference to the containing repository when needed.
-    }
+    fn repository_opt(&self) -> Option<RepositoryInterfaceHandle>;
+    fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle);
+    fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle>;
 
     // as_alias_package / as_complete_package_interface inherited from PackageInterface.
 
@@ -104,8 +98,7 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
 
     fn is_platform(&self) -> bool {
         self.repository_opt()
-            .and_then(|r| r.as_any().downcast_ref::<PlatformRepository>())
-            .is_some()
+            .map_or(false, |r| r.is::<PlatformRepository>())
     }
 
     fn equals(&self, _package: &dyn PackageInterface) -> bool {

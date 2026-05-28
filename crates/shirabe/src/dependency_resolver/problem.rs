@@ -1127,11 +1127,14 @@ impl Problem {
 
         if available.len() > 0 {
             let mut selected: Option<&BasePackageHandle> = None;
-            // TODO(phase-c): the handle does not expose get_repository (a `RefCell`-borrowed
-            // back-reference); preferring the package from a PlatformRepository needs repository
-            // back-references on handles. Falling back to the first candidate for now.
             for pkg in &available {
-                let _ = pkg;
+                if pkg
+                    .get_repository()
+                    .map_or(false, |r| r.is::<PlatformRepository>())
+                {
+                    selected = Some(pkg);
+                    break;
+                }
             }
             if selected.is_none() {
                 selected = available.first();
@@ -1240,13 +1243,23 @@ impl Problem {
         reason: &str,
         constraint: Option<&AnyConstraint>,
     ) -> (String, String) {
-        // TODO(phase-c): selecting the next repository's packages relies on each package's
-        // repository back-reference, which the handle does not yet expose (phase-c handoff
-        // item #1). Both `next_repo_packages` and `next_repo` are blocked on that decision.
-        let _ = all_repos_packages;
-        let next_repo_packages: Vec<BasePackageHandle> = Vec::new();
-        let next_repo: Box<dyn crate::repository::RepositoryInterface> =
-            todo!("repository back-reference on handle pending (phase-c handoff item #1)");
+        let mut next_repo_packages: Vec<BasePackageHandle> = Vec::new();
+        let mut next_repo: Option<crate::repository::RepositoryInterfaceHandle> = None;
+        for package in all_repos_packages {
+            let pkg_repo = package.get_repository();
+            let same_repo = match (&next_repo, &pkg_repo) {
+                (None, _) => true,
+                (Some(nr), Some(pr)) => nr.ptr_eq(pr),
+                _ => false,
+            };
+            if same_repo {
+                next_repo_packages.push(package.clone());
+                next_repo = pkg_repo;
+            } else {
+                break;
+            }
+        }
+        let next_repo = next_repo.expect("next_repo must be set");
 
         if higher_repo_packages.len() > 0 {
             let top_package = higher_repo_packages.first().unwrap();
@@ -1274,11 +1287,7 @@ impl Problem {
             }
         }
 
-        if next_repo
-            .as_any()
-            .downcast_ref::<LockArrayRepository>()
-            .is_some()
-        {
+        if next_repo.is::<LockArrayRepository>() {
             let singular = higher_repo_packages.len() == 1;
 
             let mut suggestion = format!(
@@ -1351,10 +1360,11 @@ impl Problem {
                     constraint,
                     false
                 ),
-                // TODO(phase-c): the higher repo's name needs the handle's repository
-                // back-reference (phase-c handoff item #1); unreachable until `next_repo` above
-                // is resolved.
-                String::new(),
+                higher_repo_packages
+                    .first()
+                    .and_then(|p| p.get_repository())
+                    .map(|r| r.get_repo_name())
+                    .unwrap_or_default(),
                 reason
             ),
         )

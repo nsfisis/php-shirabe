@@ -8,16 +8,17 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceHandle, SearchResult,
 };
 
 #[derive(Debug)]
 pub struct CompositeRepository {
-    repositories: Vec<Box<dyn RepositoryInterface>>,
+    repositories: Vec<RepositoryInterfaceHandle>,
 }
 
 impl CompositeRepository {
-    pub fn new(repositories: Vec<Box<dyn RepositoryInterface>>) -> Self {
+    pub fn new(repositories: Vec<RepositoryInterfaceHandle>) -> Self {
         let mut this = Self {
             repositories: vec![],
         };
@@ -27,7 +28,7 @@ impl CompositeRepository {
         this
     }
 
-    pub fn get_repositories(&self) -> &Vec<Box<dyn RepositoryInterface>> {
+    pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
         &self.repositories
     }
 
@@ -39,10 +40,17 @@ impl CompositeRepository {
         }
     }
 
-    pub fn add_repository(&mut self, repository: Box<dyn RepositoryInterface>) {
-        if let Some(composite) = repository.as_any().downcast_ref::<CompositeRepository>() {
-            for repo in composite.get_repositories() {
-                self.repositories.push(repo.clone_box());
+    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
+        let nested: Option<Vec<RepositoryInterfaceHandle>> = {
+            let repo_ref = repository.borrow();
+            repo_ref
+                .as_any()
+                .downcast_ref::<CompositeRepository>()
+                .map(|composite| composite.get_repositories().clone())
+        };
+        if let Some(nested) = nested {
+            for repo in nested {
+                self.repositories.push(repo);
             }
         } else {
             self.repositories.push(repository);
@@ -163,6 +171,6 @@ impl RepositoryInterface for CompositeRepository {
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
+        self
     }
 }

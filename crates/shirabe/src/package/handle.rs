@@ -273,11 +273,11 @@ macro_rules! delegate_package_interface_to_inner {
             }
             fn set_repository(
                 &mut self,
-                repository: Box<dyn crate::repository::RepositoryInterface>,
+                repository: crate::repository::RepositoryInterfaceHandle,
             ) -> anyhow::Result<()> {
                 self.$field.set_repository(repository)
             }
-            fn get_repository(&self) -> Option<&dyn crate::repository::RepositoryInterface> {
+            fn get_repository(&self) -> Option<crate::repository::RepositoryInterfaceHandle> {
                 self.$field.get_repository()
             }
             fn get_binaries(&self) -> Vec<String> {
@@ -588,12 +588,16 @@ macro_rules! impl_package_interface_handle {
 
             pub fn set_repository(
                 &self,
-                repository: Box<dyn crate::repository::RepositoryInterface>,
+                repository: crate::repository::RepositoryInterfaceHandle,
             ) -> anyhow::Result<()> {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_repository(repository)
+            }
+
+            pub fn get_repository(&self) -> Option<crate::repository::RepositoryInterfaceHandle> {
+                self.0.borrow().as_package_interface().get_repository()
             }
 
             pub fn get_binaries(&self) -> Vec<String> {

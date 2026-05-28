@@ -60,7 +60,7 @@ impl FundCommand {
             repository_manager
                 .get_repositories()
                 .iter()
-                .map(|r| r.clone_box())
+                .map(|r| r.clone())
                 .collect(),
         );
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();

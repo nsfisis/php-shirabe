@@ -5,7 +5,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::base_package::{self};
 use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceHandle, SearchResult,
 };
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -18,12 +19,12 @@ pub struct FilterRepository {
     only: Option<String>,
     exclude: Option<String>,
     canonical: bool,
-    repo: Box<dyn RepositoryInterface>,
+    repo: RepositoryInterfaceHandle,
 }
 
 impl FilterRepository {
     pub fn new(
-        repo: Box<dyn RepositoryInterface>,
+        repo: RepositoryInterfaceHandle,
         options: IndexMap<String, PhpMixed>,
     ) -> Result<Self> {
         let mut only: Option<String> = None;
@@ -126,8 +127,8 @@ impl FilterRepository {
         })
     }
 
-    pub fn get_repository(&self) -> &dyn RepositoryInterface {
-        self.repo.as_ref()
+    pub fn get_repository(&self) -> RepositoryInterfaceHandle {
+        self.repo.clone()
     }
 
     fn is_allowed(&self, name: &str) -> bool {
@@ -254,7 +255,13 @@ impl RepositoryInterface for FilterRepository {
     }
 
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
-        self.repo.as_advisory_provider()
+        // FilterRepository is itself an advisory provider (it filters), but only meaningfully so
+        // when the wrapped repository provides advisories.
+        if self.repo.borrow().as_advisory_provider().is_some() {
+            Some(self)
+        } else {
+            None
+        }
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -264,7 +271,8 @@ impl RepositoryInterface for FilterRepository {
 
 impl AdvisoryProviderInterface for FilterRepository {
     fn has_security_advisories(&self) -> bool {
-        if let Some(advisory_repo) = self.repo.as_advisory_provider() {
+        let repo = self.repo.borrow();
+        if let Some(advisory_repo) = repo.as_advisory_provider() {
             advisory_repo.has_security_advisories()
         } else {
             false
@@ -276,7 +284,8 @@ impl AdvisoryProviderInterface for FilterRepository {
         mut package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
-        if let Some(advisory_repo) = self.repo.as_advisory_provider() {
+        let repo = self.repo.borrow();
+        if let Some(advisory_repo) = repo.as_advisory_provider() {
             package_constraint_map.retain(|name, _| self.is_allowed(name));
             advisory_repo.get_security_advisories(package_constraint_map, allow_partial_advisories)
         } else {

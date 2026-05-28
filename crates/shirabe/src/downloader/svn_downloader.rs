@@ -70,10 +70,10 @@ impl SvnDownloader {
         let r#ref = package.get_source_reference();
 
         {
-            let package_ref = package.as_rc().borrow();
-            let repo = package_ref.as_package_interface().get_repository();
+            let repo = package.get_repository();
             if let Some(repo) = repo {
-                if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
+                let repo_ref = repo.borrow();
+                if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
                     let repo_config = vcs_repo.get_repo_config();
                     if repo_config.contains_key("svn-cache-credentials") {
                         if let Some(val) = repo_config

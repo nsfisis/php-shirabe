@@ -1,17 +1,20 @@
 //! ref: composer/src/Composer/Package/Package.php
 
+use std::rc::Rc;
+
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::composer::util::ComposerMirror;
-use shirabe_php_shim::{E_USER_DEPRECATED, PhpMixed, strpos, trigger_error};
+use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
 
 use crate::package::BasePackage;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::RepositoryInterfaceWeakHandle;
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
@@ -26,7 +29,8 @@ pub struct Package {
     id: i64,
     name: String,
     pretty_name: String,
-    repository: Option<Box<dyn RepositoryInterface>>,
+    /// Back-reference to the owning repository. `Weak` breaks the repository -> packages cycle.
+    repository: Option<RepositoryInterfaceWeakHandle>,
 
     pub(crate) r#type: Option<String>,
     pub(crate) target_dir: Option<String>,
@@ -559,16 +563,22 @@ impl BasePackage for Package {
         &mut self.pretty_name
     }
 
-    fn repository_opt(&self) -> Option<&dyn RepositoryInterface> {
-        self.repository.as_deref()
+    fn repository_opt(&self) -> Option<RepositoryInterfaceHandle> {
+        self.repository
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 
-    fn set_repository_box(&mut self, repository: Box<dyn RepositoryInterface>) {
-        todo!()
+    fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle) {
+        self.repository = Some(repository.downgrade());
     }
 
-    fn take_repository(&mut self) -> Option<Box<dyn RepositoryInterface>> {
-        todo!()
+    fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle> {
+        self.repository
+            .take()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
 }
 
@@ -696,11 +706,24 @@ impl PackageInterface for Package {
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
         todo!()
     }
-    fn set_repository(&mut self, _repository: Box<dyn RepositoryInterface>) -> anyhow::Result<()> {
-        todo!()
+    fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
+        if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade()) {
+            if !Rc::ptr_eq(&existing, repository.as_rc()) {
+                return Err(LogicException {
+                    message: "A package can only be added to one repository".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+        }
+        self.repository = Some(repository.downgrade());
+        Ok(())
     }
-    fn get_repository(&self) -> Option<&dyn RepositoryInterface> {
-        todo!()
+    fn get_repository(&self) -> Option<RepositoryInterfaceHandle> {
+        self.repository
+            .as_ref()
+            .and_then(|w| w.upgrade())
+            .map(RepositoryInterfaceHandle::from_rc)
     }
     fn get_binaries(&self) -> Vec<String> {
         todo!()

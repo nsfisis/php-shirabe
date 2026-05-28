@@ -35,7 +35,7 @@ use crate::repository::InstalledRepositoryInterface;
 use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::{AdvisoryProviderInterface, PartialOrSecurityAdvisory};
-use crate::repository::{FindPackageConstraint, RepositoryInterface};
+use crate::repository::{FindPackageConstraint, RepositoryInterface, RepositoryInterfaceHandle};
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {
@@ -66,7 +66,7 @@ pub struct RepositorySet {
     pub(crate) root_references: IndexMap<String, String>,
 
     /// @var RepositoryInterface[]
-    pub(crate) repositories: Vec<Box<dyn RepositoryInterface>>,
+    pub(crate) repositories: Vec<RepositoryInterfaceHandle>,
 
     /// @var int[] array of stability => BasePackage::STABILITY_* value
     /// @phpstan-var array<key-of<BasePackage::STABILITIES>, BasePackage::STABILITY_*>
@@ -170,7 +170,7 @@ impl RepositorySet {
     /// repository the search for that package ends, and following repos will not be consulted.
     ///
     /// @param RepositoryInterface $repo A package repository
-    pub fn add_repository(&mut self, repo: Box<dyn RepositoryInterface>) -> Result<()> {
+    pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> Result<()> {
         if self.locked {
             return Err(RuntimeException {
                 message: "Pool has already been created from this repository set, it cannot be modified anymore.".to_string(),
@@ -179,17 +179,15 @@ impl RepositorySet {
             .into());
         }
 
-        let repos: Vec<Box<dyn RepositoryInterface>> =
-            if let Some(composite) = repo.as_any().downcast_ref::<CompositeRepository>() {
-                // TODO(phase-b): clone composite.get_repositories() — Box<dyn RepositoryInterface> cloning
-                composite
-                    .get_repositories()
-                    .iter()
-                    .map(|r| r.clone_box())
-                    .collect()
+        let repos: Vec<RepositoryInterfaceHandle> = {
+            let repo_ref = repo.borrow();
+            if let Some(composite) = repo_ref.as_any().downcast_ref::<CompositeRepository>() {
+                composite.get_repositories().clone()
             } else {
+                drop(repo_ref);
                 vec![repo]
-            };
+            }
+        };
 
         for repo in repos {
             self.repositories.push(repo);
@@ -379,7 +377,8 @@ impl RepositorySet {
         for repository in &self.repositories {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<()> = (|| -> Result<()> {
-                let Some(advisory_repo) = repository.as_advisory_provider() else {
+                let repo_ref = repository.borrow();
+                let Some(advisory_repo) = repo_ref.as_advisory_provider() else {
                     return Ok(());
                 };
                 if !advisory_repo.has_security_advisories() {
@@ -480,11 +479,11 @@ impl RepositorySet {
         pool_builder.set_allowed_types(allowed_types);
 
         for repo in &self.repositories {
-            let is_installed = repo.as_installed_repository_interface().is_some()
-                || repo
-                    .as_any()
-                    .downcast_ref::<InstalledRepository>()
-                    .is_some();
+            let is_installed = {
+                let repo_ref = repo.borrow();
+                repo_ref.as_installed_repository_interface().is_some()
+                    || repo_ref.as_any().is::<InstalledRepository>()
+            };
             if is_installed && !self.allow_installed_repositories {
                 return Err(LogicException {
                     message: "The pool can not accept packages from an installed repository"
@@ -507,11 +506,11 @@ impl RepositorySet {
     /// Create a pool for dependency resolution from the packages in this repository set.
     pub fn create_pool_with_all_packages(&mut self) -> Result<Pool> {
         for repo in &self.repositories {
-            let is_installed = repo.as_installed_repository_interface().is_some()
-                || repo
-                    .as_any()
-                    .downcast_ref::<InstalledRepository>()
-                    .is_some();
+            let is_installed = {
+                let repo_ref = repo.borrow();
+                repo_ref.as_installed_repository_interface().is_some()
+                    || repo_ref.as_any().is::<InstalledRepository>()
+            };
             if is_installed && !self.allow_installed_repositories {
                 return Err(LogicException {
                     message: "The pool can not accept packages from an installed repository"

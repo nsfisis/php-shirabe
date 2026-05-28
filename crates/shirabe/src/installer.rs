@@ -145,7 +145,7 @@ pub struct Installer {
     pub(crate) update_allow_transitive_dependencies: i64,
     pub(crate) suggested_packages_reporter: SuggestedPackagesReporter,
     pub(crate) platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
-    pub(crate) additional_fixed_repository: Option<Box<dyn RepositoryInterface>>,
+    pub(crate) additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
     pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
 }
 
@@ -293,17 +293,13 @@ impl Installer {
             .borrow_mut()
             .set_prefer_dist(self.prefer_dist);
 
-        let local_repo_box = self
-            .repository_manager
-            .borrow()
-            .get_local_repository()
-            .clone_installed_repository_box();
+        let local_repo = self.repository_manager.borrow().get_local_repository();
 
         let install = self.install;
         let res_result: anyhow::Result<i64> = if self.update {
-            self.do_update(local_repo_box, install)
+            self.do_update(local_repo, install)
         } else {
-            self.do_install(local_repo_box, false)
+            self.do_install(local_repo, false)
         };
 
         let res = match res_result {
@@ -347,15 +343,17 @@ impl Installer {
         }
 
         if self.update {
-            let locked_repository_box = self
-                .locker
-                .borrow_mut()
-                .get_locked_repository(self.dev_mode)?
-                .clone_box();
+            let locked_repository_handle = crate::repository::RepositoryInterfaceHandle::new(
+                self.locker
+                    .borrow_mut()
+                    .get_locked_repository(self.dev_mode)?,
+            );
             let installed_repo = InstalledRepository::new(vec![
-                locked_repository_box,
-                Box::new(self.create_platform_repo(false)),
-                Box::new(RootPackageRepository::new(self.package.clone())),
+                locked_repository_handle,
+                crate::repository::RepositoryInterfaceHandle::new(self.create_platform_repo(false)),
+                crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                    self.package.clone(),
+                )),
             ]);
             if is_fresh_install {
                 self.suggested_packages_reporter
@@ -407,9 +405,11 @@ impl Installer {
             self.autoload_generator
                 .borrow_mut()
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone_box());
+            let local_repo_handle = self.repository_manager.borrow().get_local_repository();
+            let local_repo_ref = local_repo_handle.borrow();
             self.autoload_generator.borrow_mut().dump(
                 &*self.config.borrow(),
-                self.repository_manager.borrow().get_local_repository(),
+                local_repo_ref.as_installed_repository_interface().unwrap(),
                 self.package.clone(),
                 &mut *self.installation_manager.borrow_mut(),
                 "composer",
@@ -512,7 +512,7 @@ impl Installer {
                 let repository_manager = self.repository_manager.clone();
                 let repository_manager = repository_manager.borrow();
                 for repo in repository_manager.get_repositories() {
-                    repo_set.add_repository(repo.clone_box())?;
+                    repo_set.add_repository(repo.clone())?;
                 }
 
                 // TODO(phase-b): Auditor::audit takes owned packages/ignore lists; need cloning
@@ -555,7 +555,7 @@ impl Installer {
 
     pub(crate) fn do_update(
         &mut self,
-        local_repo: Box<dyn InstalledRepositoryInterface>,
+        local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
     ) -> anyhow::Result<i64> {
         let platform_repo = self.create_platform_repo(true);
@@ -618,10 +618,16 @@ impl Installer {
         let repository_manager = repository_manager.borrow();
         let repositories = repository_manager.get_repositories();
         for repository in repositories {
-            repository_set.add_repository(repository.clone_box())?;
+            repository_set.add_repository(repository.clone())?;
         }
-        if let Some(ref lr) = locked_repository {
-            repository_set.add_repository(lr.clone_box())?;
+        if let Some(ref _lr) = locked_repository {
+            // TODO(phase-c): LockArrayRepository is held by value and is not Clone; share it as a
+            // RepositoryInterfaceHandle so it can be added here without copying.
+            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new::<
+                crate::repository::LockArrayRepository,
+            >(todo!(
+                "share locked LockArrayRepository as a handle"
+            )))?;
         }
 
         let fixed_root_package = self.fixed_root_package.clone();
@@ -839,9 +845,11 @@ impl Installer {
                 if self.io.is_very_verbose()
                     && strpos(&operation.get_operation_type(), "Alias").is_none()
                 {
-                    // TODO(phase-c): package->repository back-reference not yet on handles
-                    let repository: Option<&dyn RepositoryInterface> = None;
-                    if let Some(repo) = repository {
+                    let operation_pkg = match operation.as_update_operation() {
+                        Some(uo) => uo.get_target_package(),
+                        None => operation.get_package(),
+                    };
+                    if let Some(repo) = operation_pkg.get_repository() {
                         source_repo = format!(" from {}", repo.get_repo_name());
                     }
                 }
@@ -921,7 +929,9 @@ impl Installer {
         }
 
         let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
-        repository_set.add_repository(Box::new(result_repo))?;
+        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            result_repo,
+        ))?;
 
         let mut request = self.create_request(self.fixed_root_package.clone(), platform_repo, None);
         self.require_packages_for_update(&mut request, locked_repository, false)?;
@@ -959,7 +969,7 @@ impl Installer {
     /// Whether the function is called as part of an update command or independently
     pub(crate) fn do_install(
         &mut self,
-        mut local_repo: Box<dyn InstalledRepositoryInterface>,
+        local_repo: crate::repository::RepositoryInterfaceHandle,
         already_solved: bool,
     ) -> anyhow::Result<i64> {
         if self
@@ -1001,7 +1011,13 @@ impl Installer {
                 &vec![],
                 Some(&locked_repository),
             );
-            repository_set.add_repository(locked_repository.clone_box())?;
+            // TODO(phase-c): LockArrayRepository is held by value and is not Clone; share it as a
+            // RepositoryInterfaceHandle so it can be added here without copying.
+            repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new::<
+                crate::repository::LockArrayRepository,
+            >(todo!(
+                "share locked LockArrayRepository as a handle"
+            )))?;
 
             // creating requirements request
             let fixed_root_package = self.fixed_root_package.clone();
@@ -1103,7 +1119,13 @@ impl Installer {
         }
 
         // TODO in how far do we need to do anything here to ensure dev packages being updated to latest in lock without version change are treated correctly?
-        let local_repo_transaction = LocalRepoTransaction::new(&locked_repository, &*local_repo);
+        let local_repo_transaction = {
+            let local_repo_ref = local_repo.borrow();
+            LocalRepoTransaction::new(
+                &locked_repository,
+                local_repo_ref.as_installed_repository_interface().unwrap(),
+            )
+        };
         // TODO(phase-b): dispatch_installer_event takes owned Transaction, not &LocalRepoTransaction
         // self.event_dispatcher.borrow_mut().dispatch_installer_event(
         //     InstallerEvents::PRE_OPERATIONS_EXEC,
@@ -1172,13 +1194,17 @@ impl Installer {
 
         if self.execute_operations {
             local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
+            let mut local_repo_ref = local_repo.borrow_mut();
             self.installation_manager.borrow_mut().execute(
-                &mut *local_repo,
+                local_repo_ref
+                    .as_installed_repository_interface_mut()
+                    .unwrap(),
                 local_repo_transaction.get_operations(),
                 self.dev_mode,
                 self.run_scripts,
                 self.download_only,
             )?;
+            drop(local_repo_ref);
 
             // see https://github.com/composer/composer/issues/2764
             if local_repo_transaction.get_operations().len() > 0 {
@@ -1349,32 +1375,23 @@ impl Installer {
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             // allow using installed repos if needed to avoid warnings about installed repositories being used in the RepositorySet
             // see https://github.com/composer/composer/pull/9574
-            let additional_fixed_repositories: Vec<Box<dyn RepositoryInterface>> =
-                if let Some(composite) = additional_fixed_repository
-                    .as_any()
-                    .downcast_ref::<CompositeRepository>()
-                {
-                    composite
-                        .get_repositories()
-                        .iter()
-                        .map(|r| r.clone_box())
-                        .collect()
+            let additional_fixed_repositories: Vec<crate::repository::RepositoryInterfaceHandle> = {
+                let repo_ref = additional_fixed_repository.borrow();
+                if let Some(composite) = repo_ref.as_any().downcast_ref::<CompositeRepository>() {
+                    composite.get_repositories().clone()
                 } else {
-                    vec![additional_fixed_repository.clone_box()]
-                };
+                    drop(repo_ref);
+                    vec![additional_fixed_repository.clone()]
+                }
+            };
             for additional_fixed_repository in &additional_fixed_repositories {
-                // TODO(phase-b): as_installed_repository_interface not on RepositoryInterface trait
-                if additional_fixed_repository
-                    .as_any()
-                    .downcast_ref::<InstalledRepository>()
-                    .is_some()
-                {
+                if additional_fixed_repository.is::<InstalledRepository>() {
                     repository_set.allow_installed_repositories(true);
                     break;
                 }
             }
 
-            let _ = repository_set.add_repository(additional_fixed_repository.clone_box());
+            let _ = repository_set.add_repository(additional_fixed_repository.clone());
         }
 
         repository_set
@@ -1457,27 +1474,22 @@ impl Installer {
         let provided = root_package.get_provides();
         for package in fixed_packages {
             // skip platform packages that are provided by the root package
-            // TODO(phase-c): the handle does not expose get_repository (a `RefCell`-borrowed
-            // back-reference); detecting the platform repo needs repository back-refs on handles.
-            let pkg_repo_is_platform = false;
+            let pkg_repo_is_platform = package
+                .get_repository()
+                .map_or(false, |r| r.is::<PlatformRepository>());
+            let name = package.get_name();
             if !pkg_repo_is_platform
-                || !provided.contains_key(&package.get_name())
-                || !provided
-                    .get(&package.get_name())
-                    .unwrap()
-                    .get_constraint()
-                    .matches(
-                        &SimpleConstraint::new(
-                            "=".to_string(),
-                            package.get_version().to_string(),
-                            None,
-                        )
-                        .into(),
+                || !provided.contains_key(&name)
+                || !provided.get(&name).unwrap().get_constraint().matches(
+                    &SimpleConstraint::new(
+                        "=".to_string(),
+                        package.get_version().to_string(),
+                        None,
                     )
+                    .into(),
+                )
             {
-                // TODO(phase-c): wire up once the platform-repo detection above is implemented.
-                let _ = &package;
-                // request.fix_package(package.clone());
+                request.fix_package(package);
             }
         }
 
@@ -1590,7 +1602,7 @@ impl Installer {
                 packages.insert(key, new_alias_package);
             }
         }
-        rm.set_local_repository(Box::new(
+        rm.set_local_repository(crate::repository::RepositoryInterfaceHandle::new(
             InstalledArrayRepository::new_with_packages(packages.into_values().collect())
                 .expect("InstalledArrayRepository::new_with_packages should not fail"),
         ));
@@ -1678,7 +1690,7 @@ impl Installer {
 
     pub fn set_additional_fixed_repository(
         &mut self,
-        additional_fixed_repository: Box<dyn RepositoryInterface>,
+        additional_fixed_repository: crate::repository::RepositoryInterfaceHandle,
     ) -> &mut Self {
         self.additional_fixed_repository = Some(additional_fixed_repository);
 

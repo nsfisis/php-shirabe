@@ -56,9 +56,11 @@ pub trait PackageDiscoveryTrait {
     fn get_repos(&mut self) -> &CompositeRepository {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
-            let mut repos: Vec<Box<dyn crate::repository::RepositoryInterface>> = vec![
+            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![
                 // TODO(phase-b): PlatformRepository::new() signature
-                Box::new(todo!("PlatformRepository::new()") as PlatformRepository),
+                crate::repository::RepositoryInterfaceHandle::new::<PlatformRepository>(todo!(
+                    "PlatformRepository::new()"
+                )),
             ];
             let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
             for (_, repo) in RepositoryFactory::default_repos_with_default_manager(io_owned)

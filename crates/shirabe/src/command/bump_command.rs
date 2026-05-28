@@ -142,8 +142,8 @@ impl BumpCommand {
                 .get("lock")
                 .as_bool()
                 .unwrap_or(true);
-        let repo: Box<dyn crate::repository::RepositoryInterface> = if !has_lock_file_disabled {
-            Box::new(
+        let repo: crate::repository::RepositoryInterfaceHandle = if !has_lock_file_disabled {
+            crate::repository::RepositoryInterfaceHandle::new(
                 composer
                     .get_locker()
                     .borrow_mut()
@@ -158,20 +158,17 @@ impl BumpCommand {
                 );
                 return Ok(Self::ERROR_LOCK_OUTDATED);
             }
-            Box::new(
+            crate::repository::RepositoryInterfaceHandle::new(
                 composer
                     .get_locker()
                     .borrow_mut()
                     .get_locked_repository(true)?,
             )
         } else {
-            // TODO(phase-b): get_local_repository returns &dyn InstalledRepositoryInterface;
-            // cloning into an owned Box requires clone_box on that trait.
             composer
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository()
-                .clone_box()
         };
 
         if composer.get_package().get_type() != "project" && !dev_only {

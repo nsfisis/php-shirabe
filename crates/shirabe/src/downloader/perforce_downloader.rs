@@ -90,10 +90,10 @@ impl PerforceDownloader {
             return;
         }
 
-        let package_rc = package.as_rc().borrow();
-        let repository = package_rc.as_package_interface().get_repository();
+        let repository = package.get_repository();
         let repo_config: Option<IndexMap<String, PhpMixed>> = if let Some(repo) = repository {
-            if let Some(vcs_repo) = repo.as_any().downcast_ref::<VcsRepository>() {
+            let repo_ref = repo.borrow();
+            if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
                 Some(self.get_repo_config(vcs_repo))
             } else {
                 None
@@ -101,7 +101,6 @@ impl PerforceDownloader {
         } else {
             None
         };
-        drop(package_rc);
         self.perforce = Some(Perforce::create(
             repo_config.unwrap_or_default(),
             url,

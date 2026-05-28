@@ -34,8 +34,10 @@ use crate::package::version::StabilityFilter;
 use crate::plugin::PluginEvents;
 use crate::plugin::PrePoolCreateEvent;
 use crate::repository::CanonicalPackagesTrait;
+use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 
 #[derive(Debug)]
@@ -134,7 +136,7 @@ impl PoolBuilder {
 
     pub fn build_pool(
         &mut self,
-        repositories: Vec<Box<dyn RepositoryInterface>>,
+        repositories: Vec<RepositoryInterfaceHandle>,
         request: &mut Request,
     ) -> anyhow::Result<Pool> {
         self.restricted_packages_list = if request.get_restricted_packages().is_some() {
@@ -206,13 +208,9 @@ impl PoolBuilder {
             // TODO in how far can we do the above for conflicts? It's more tricky cause conflicts can be limited to
             // specific versions while replace is a conflict with all versions of the name
 
-            // TODO(phase-c): package->repository back-reference not yet on handles
-            let in_root_or_platform = None
-                .map(|r: &dyn RepositoryInterface| {
-                    r.as_any().is::<RootPackageRepository>()
-                        || r.as_any().is::<PlatformRepository>()
-                })
-                .unwrap_or(false);
+            let in_root_or_platform = package.get_repository().map_or(false, |r| {
+                r.is::<RootPackageRepository>() || r.is::<PlatformRepository>()
+            });
             if in_root_or_platform
                 || StabilityFilter::is_package_acceptable(
                     &self.acceptable_stabilities,
@@ -446,7 +444,7 @@ impl PoolBuilder {
     fn load_packages_marked_for_loading(
         &mut self,
         request: &mut Request,
-        repositories: &Vec<Box<dyn RepositoryInterface>>,
+        repositories: &Vec<RepositoryInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let to_remove: Vec<String> = self
             .packages_to_load
@@ -493,16 +491,14 @@ impl PoolBuilder {
         for (repo_index, repository) in repositories.iter().enumerate() {
             // these repos have their packages fixed or locked if they need to be loaded so we
             // never need to load anything else from them
-            let is_locked_repo = request
-                .get_locked_repository()
-                .map(|lr| {
-                    std::ptr::eq(
-                        lr as *const _ as *const u8,
-                        repository.as_ref() as *const _ as *const u8,
-                    )
-                })
-                .unwrap_or(false);
-            if repository.as_any().is::<PlatformRepository>() || is_locked_repo {
+            // TODO(phase-c): PHP compares `$request->getLockedRepository() === $repository` by
+            // strict identity, but `Request.locked_repository` is held by value, not as a handle.
+            // This approximates the check by matching any `LockArrayRepository` when the request
+            // has a locked repository set. Tighten to `ptr_eq` once `Request` stores the locked
+            // repository as `RepositoryInterfaceHandle`.
+            let is_locked_repo =
+                request.get_locked_repository().is_some() && repository.is::<LockArrayRepository>();
+            if repository.is::<PlatformRepository>() || is_locked_repo {
                 continue;
             }
 
@@ -611,7 +607,7 @@ impl PoolBuilder {
     fn load_package(
         &mut self,
         request: &mut Request,
-        repositories: &Vec<Box<dyn RepositoryInterface>>,
+        repositories: &Vec<RepositoryInterfaceHandle>,
         package: BasePackageHandle,
         propagate_update: bool,
     ) -> anyhow::Result<()> {
@@ -872,7 +868,7 @@ impl PoolBuilder {
     fn unlock_package(
         &mut self,
         request: &mut Request,
-        repositories: &Vec<Box<dyn RepositoryInterface>>,
+        repositories: &Vec<RepositoryInterfaceHandle>,
         name: &str,
     ) -> anyhow::Result<()> {
         let skipped: Vec<PackageInterfaceHandle> = self
@@ -1029,15 +1025,19 @@ impl PoolBuilder {
     fn remove_loaded_package(
         &mut self,
         _request: &Request,
-        repositories: &Vec<Box<dyn RepositoryInterface>>,
+        repositories: &Vec<RepositoryInterfaceHandle>,
         package: BasePackageHandle,
         index: i64,
     ) {
-        let repos_box: Vec<Box<dyn RepositoryInterface>> =
-            repositories.iter().map(|r| r.clone_box()).collect();
-        let _ = &repos_box;
-        // TODO(phase-c): package->repository back-reference not yet on handles
-        let repo_index: i64 = -1;
+        let repo_index: i64 = package
+            .get_repository()
+            .and_then(|pkg_repo| {
+                repositories
+                    .iter()
+                    .position(|r| r.ptr_eq(&pkg_repo))
+                    .map(|i| i as i64)
+            })
+            .unwrap_or(-1);
 
         if repo_index >= 0 {
             if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
@@ -1115,7 +1115,7 @@ impl PoolBuilder {
     fn run_security_advisory_filter(
         &mut self,
         pool: Pool,
-        repositories: &Vec<Box<dyn RepositoryInterface>>,
+        repositories: &Vec<RepositoryInterfaceHandle>,
         request: &Request,
     ) -> Pool {
         if self.security_advisory_pool_filter.is_none() {
@@ -1127,8 +1127,7 @@ impl PoolBuilder {
         let before = microtime(true);
         let total = pool.get_packages().len() as f64;
 
-        let repos_owned: Vec<Box<dyn RepositoryInterface>> =
-            repositories.iter().map(|r| r.clone_box()).collect();
+        let repos_owned: Vec<RepositoryInterfaceHandle> = repositories.iter().cloned().collect();
         let pool =
             self.security_advisory_pool_filter
                 .as_mut()

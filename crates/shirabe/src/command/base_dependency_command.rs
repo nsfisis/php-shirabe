@@ -53,10 +53,10 @@ pub trait BaseDependencyCommand: BaseCommand {
         let mut composer = crate::command::composer_full_mut(&composer);
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
-        let mut repos: Vec<Box<dyn RepositoryInterface>> = vec![];
-        repos.push(Box::new(RootPackageRepository::new(
-            composer.get_package().clone(),
-        )));
+        let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
+            vec![crate::repository::RepositoryInterfaceHandle::new(
+                RootPackageRepository::new(composer.get_package().clone()),
+            )];
 
         if input.get_option("locked").as_bool().unwrap_or(false) {
             let locker = composer.get_locker().clone();
@@ -71,16 +71,17 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }));
             }
 
-            repos.push(Box::new(locker.get_locked_repository(true)?));
+            repos.push(crate::repository::RepositoryInterfaceHandle::new(
+                locker.get_locked_repository(true)?,
+            ));
             let platform_overrides: IndexMap<String, PhpMixed> = locker
                 .get_platform_overrides()?
                 .into_iter()
                 .map(|(k, v)| (k, PhpMixed::String(v)))
                 .collect();
-            repos.push(Box::new(PlatformRepository::new(
-                vec![],
-                platform_overrides,
-            )?));
+            repos.push(crate::repository::RepositoryInterfaceHandle::new(
+                PlatformRepository::new(vec![], platform_overrides)?,
+            ));
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
@@ -98,10 +99,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 return Ok(1);
             }
 
-            // TODO(phase-b): InstalledRepositoryInterface is shared by reference (PHP class
-            // semantics); Box<dyn RepositoryInterface> requires owned upcast. Skipping local
-            // repo push until clone_box is exposed on InstalledRepositoryInterface.
-            let _ = local_repo;
+            repos.push(local_repo);
 
             let platform_overrides = composer
                 .get_config()
@@ -112,7 +110,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .unwrap_or_default();
             // TODO(phase-b): platform_overrides type adjustment; using empty for now
             let _ = platform_overrides;
-            repos.push(Box::new(PlatformRepository::new(vec![], IndexMap::new())?));
+            repos.push(crate::repository::RepositoryInterfaceHandle::new(
+                PlatformRepository::new(vec![], IndexMap::new())?,
+            ));
         }
 
         let mut installed_repo = InstalledRepository::new(repos);
@@ -159,9 +159,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                 &needle,
                 FindPackageConstraint::String(text_constraint.clone()),
             ) {
-                installed_repo.add_repository(Box::new(
-                    InstalledArrayRepository::new_with_packages(vec![r#match.into()])?,
-                ))?;
+                installed_repo.add_repository(
+                    crate::repository::RepositoryInterfaceHandle::new(
+                        InstalledArrayRepository::new_with_packages(vec![r#match.into()])?,
+                    ),
+                )?;
             } else if PlatformRepository::is_platform_package(&needle) {
                 let parser = VersionParser::new();
                 let platform_constraint = parser.parse_constraints(&text_constraint)?;
@@ -171,11 +173,14 @@ pub trait BaseDependencyCommand: BaseCommand {
                         .get_version()
                         .to_string();
                     let temp_platform_pkg = Package::new(needle.clone(), version.clone(), version);
-                    installed_repo.add_repository(Box::new(
-                        InstalledArrayRepository::new_with_packages(vec![
-                            crate::package::PackageHandle::from_package(temp_platform_pkg).into(),
-                        ])?,
-                    ))?;
+                    installed_repo.add_repository(
+                        crate::repository::RepositoryInterfaceHandle::new(
+                            InstalledArrayRepository::new_with_packages(vec![
+                                crate::package::PackageHandle::from_package(temp_platform_pkg)
+                                    .into(),
+                            ])?,
+                        ),
+                    )?;
                 }
             } else {
                 self.get_io().write_error(&format!(

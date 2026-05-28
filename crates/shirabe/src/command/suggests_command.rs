@@ -8,6 +8,7 @@ use crate::io::IOInterface;
 use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use anyhow::Result;
 use indexmap::IndexMap;
@@ -49,8 +50,10 @@ impl SuggestsCommand {
 
         let root_package_handle: crate::package::RootPackageInterfaceHandle =
             composer.get_package().clone();
-        let mut installed_repos: Vec<Box<dyn RepositoryInterface>> =
-            vec![Box::new(RootPackageRepository::new(root_package_handle))];
+        let mut installed_repos: Vec<RepositoryInterfaceHandle> =
+            vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                root_package_handle,
+            ))];
 
         if composer.get_locker().borrow_mut().is_locked() {
             // TODO(phase-b): get_platform_overrides returns IndexMap<String, String>; PlatformRepository::new expects IndexMap<String, PhpMixed>
@@ -60,7 +63,7 @@ impl SuggestsCommand {
                 .get_platform_overrides()?;
             let platform_overrides: IndexMap<String, PhpMixed> =
                 todo!("convert IndexMap<String, String> to IndexMap<String, PhpMixed>");
-            installed_repos.push(Box::new(PlatformRepository::new(
+            installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,
             )?));
@@ -68,13 +71,13 @@ impl SuggestsCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
-            installed_repos.push(Box::new(locked_repo));
+            installed_repos.push(RepositoryInterfaceHandle::new(locked_repo));
         } else {
             // TODO(phase-b): Config::get returns PhpMixed; need to coerce to IndexMap<String, PhpMixed>
             let _platform_cfg = composer.get_config().borrow().get("platform");
             let platform_overrides: IndexMap<String, PhpMixed> =
                 todo!("extract IndexMap<String, PhpMixed> from PhpMixed config value");
-            installed_repos.push(Box::new(PlatformRepository::new(
+            installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,
             )?));
@@ -82,8 +85,7 @@ impl SuggestsCommand {
                 composer
                     .get_repository_manager()
                     .borrow()
-                    .get_local_repository()
-                    .clone_box(),
+                    .get_local_repository(),
             );
         }
 

@@ -5,7 +5,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::ArrayRepository;
 use crate::repository::CanonicalPackagesTrait;
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
 use shirabe_php_shim::Countable;
@@ -88,5 +89,9 @@ impl RepositoryInterface for LockArrayRepository {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }

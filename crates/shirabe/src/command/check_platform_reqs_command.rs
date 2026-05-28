@@ -63,7 +63,7 @@ impl CheckPlatformReqsCommand {
         let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
         let mut remove_packages: Vec<String> = vec![];
 
-        let installed_repo_base: Box<dyn crate::repository::RepositoryInterface> = if input
+        let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
             .get_option("lock")
             .as_bool()
             .unwrap_or(false)
@@ -72,7 +72,7 @@ impl CheckPlatformReqsCommand {
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
-            Box::new(
+            crate::repository::RepositoryInterfaceHandle::new(
                 composer
                     .get_locker()
                     .borrow_mut()
@@ -87,21 +87,21 @@ impl CheckPlatformReqsCommand {
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                Box::new(
+                crate::repository::RepositoryInterfaceHandle::new(
                     composer
                         .get_locker()
                         .borrow_mut()
                         .get_locked_repository(!no_dev)?,
-                ) as Box<dyn crate::repository::RepositoryInterface>
+                )
             } else {
                 if no_dev {
-                    remove_packages = local_repo.get_dev_package_names().clone();
+                    remove_packages = local_repo.get_dev_package_names();
                 }
                 io.write_error(&format!(
                     "<info>Checking {}platform requirements for packages in the vendor dir</info>",
                     if no_dev { "non-dev " } else { "" }
                 ));
-                local_repo.clone_box()
+                local_repo.clone()
             }
         };
 
@@ -115,8 +115,10 @@ impl CheckPlatformReqsCommand {
         }
 
         let root_pkg_repo = RootPackageRepository::new(composer.get_package().clone());
-        let installed_repo =
-            InstalledRepository::new(vec![installed_repo_base, Box::new(root_pkg_repo)]);
+        let installed_repo = InstalledRepository::new(vec![
+            installed_repo_base,
+            crate::repository::RepositoryInterfaceHandle::new(root_pkg_repo),
+        ]);
 
         for package in installed_repo.get_packages() {
             if remove_packages.contains(&package.get_name().to_string()) {
@@ -134,8 +136,11 @@ impl CheckPlatformReqsCommand {
         requires_sorted.sort_by(|a, b| a.0.cmp(&b.0));
 
         let installed_repo_with_platform = InstalledRepository::new(vec![
-            Box::new(installed_repo),
-            Box::new(PlatformRepository::new(vec![], indexmap::IndexMap::new())?),
+            crate::repository::RepositoryInterfaceHandle::new(installed_repo),
+            crate::repository::RepositoryInterfaceHandle::new(PlatformRepository::new(
+                vec![],
+                indexmap::IndexMap::new(),
+            )?),
         ]);
 
         let mut results: Vec<CheckResult> = vec![];
