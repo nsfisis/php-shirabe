@@ -757,10 +757,13 @@ impl Problem {
                 }
             }
 
-            // TODO(phase-c): filtering out packages from a LockArrayRepository needs the handle's
-            // repository back-reference (phase-c handoff item #1), which is not yet available; keep
-            // all packages for now.
-            let non_locked_packages: Vec<&BasePackageHandle> = packages.iter().collect();
+            let non_locked_packages: Vec<&BasePackageHandle> = packages
+                .iter()
+                .filter(|p| {
+                    !p.get_repository()
+                        .map_or(false, |r| r.is::<LockArrayRepository>())
+                })
+                .collect();
 
             if non_locked_packages.len() == 0 {
                 return (

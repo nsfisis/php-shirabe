@@ -14,12 +14,11 @@ impl LocalRepoTransaction {
         locked_repository: &dyn RepositoryInterface,
         local_repository: &dyn InstalledRepositoryInterface,
     ) -> Self {
-        // TODO(phase-c): RepositoryInterface::get_packages yields BasePackageHandle; widen each to
-        // PackageInterfaceHandle (via .into()) and feed them to Transaction::new once the repository
-        // getters expose handles here.
-        let _ = (locked_repository, local_repository);
         Self {
-            inner: Transaction::new(Vec::new(), Vec::new()),
+            inner: Transaction::new(
+                local_repository.get_packages(),
+                locked_repository.get_packages(),
+            ),
         }
     }
 

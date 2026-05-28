@@ -614,10 +614,14 @@ pub trait PackageDiscoveryTrait {
                         message: format!(
                             "Package {} exists in {} and {} which has a higher repository priority. The packages from the higher priority repository do not match your minimum-stability and are therefore not installable. That repository is canonical so the lower priority repo's packages are not installable. See https://getcomposer.org/repoprio for details and assistance.",
                             name,
-                            // TODO(phase-c): the originating repository names need the handle's
-                            // repository back-reference (phase-c handoff item #1).
-                            "a higher priority repository",
-                            "a lower priority repository",
+                            all_repos_package
+                                .get_repository()
+                                .map(|r| r.get_repo_name())
+                                .unwrap_or_default(),
+                            package
+                                .get_repository()
+                                .map(|r| r.get_repo_name())
+                                .unwrap_or_default(),
                         ),
                         code: 0,
                     }

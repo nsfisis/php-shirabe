@@ -211,11 +211,9 @@ impl ShowCommand {
             && input.get_option("installed").as_bool() != Some(true)
             && input.get_option("locked").as_bool() != Some(true)
         {
-            let _rc = self.require_composer(None, None)?;
-            // TODO(phase-c): composer.get_package() returns &dyn RootPackageInterface, not a
-            // RootPackageInterfaceHandle, so it cannot be shared into RootPackageRepository::new yet.
+            let composer = self.require_composer(None, None)?;
             let package: crate::package::RootPackageInterfaceHandle =
-                todo!("share composer.get_package() as a RootPackageInterfaceHandle");
+                composer.borrow_partial().get_package().clone();
             if input.get_option("name-only").as_bool() == Some(true) {
                 self.get_io().write(&package.get_name());
 
@@ -234,8 +232,7 @@ impl ShowCommand {
             repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
             ]));
-            // TODO(phase-c): need to convert the root package handle to a CompletePackageInterfaceHandle
-            single_package = todo!("convert package to CompletePackageInterfaceHandle");
+            single_package = Some(package.clone().into());
         } else if input.get_option("platform").as_bool() == Some(true) {
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 RepositoryInterfaceHandle::new(make_platform_repo()?),
