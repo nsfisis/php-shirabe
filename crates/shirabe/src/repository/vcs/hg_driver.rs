@@ -62,7 +62,7 @@ impl HgDriver {
 
             self.inner.config.borrow_mut().prohibit_url_by_config(
                 &self.inner.url,
-                Some(&*self.inner.io.borrow()),
+                Some(self.inner.io.clone()),
                 &indexmap::IndexMap::new(),
             )?;
 

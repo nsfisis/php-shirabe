@@ -816,7 +816,7 @@ impl CreateProjectCommand {
             &stability,
             None,
             0,
-            Some(&*io.borrow()),
+            Some(io.clone()),
             PhpMixed::Bool(true),
         )?;
 
@@ -926,7 +926,7 @@ impl CreateProjectCommand {
             true,
             false,
         )?;
-        im.notify_installs(&*io.borrow());
+        im.notify_installs(io.clone());
 
         // collect suggestions
         // TODO(phase-b): self.suggested_packages_reporter is on the outer scope via &self

@@ -8,6 +8,7 @@ use shirabe_external_packages::symfony::component::console::output::OutputInterf
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
@@ -86,10 +87,7 @@ impl StatusCommand {
     fn do_execute(&mut self, input: &dyn InputInterface) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
-        // TODO(phase-b): release the &mut self borrow held by get_io via clone_box.
-        let io_box = self.get_io().clone();
-        let io_ref = io_box.borrow();
-        let io: &dyn IOInterface = &*io_ref;
+        let io = self.get_io().clone();
 
         let mut errors: IndexMap<String, String> = IndexMap::new();
         let mut unpushed_changes: IndexMap<String, String> = IndexMap::new();
@@ -104,14 +102,14 @@ impl StatusCommand {
             .map(std::rc::Rc::clone)
             .unwrap_or_else(|| {
                 std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
-                    io_box.clone(),
+                    io.clone(),
                 ))))
             });
         let mut guesser = VersionGuesser::new(
             composer.get_config(),
             process_executor.clone(),
             parser.clone(),
-            Some(io_box.clone()),
+            Some(io.clone()),
         );
         let dumper = ArrayDumper::new();
 

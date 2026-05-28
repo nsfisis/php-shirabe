@@ -16,6 +16,7 @@ use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFil
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::dumper::ArrayDumper;
@@ -66,7 +67,7 @@ impl VersionSelector {
         preferred_stability: &str,
         platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         show_warnings: shirabe_php_shim::PhpMixed,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         if !base_package::STABILITIES.contains_key(preferred_stability) {
@@ -178,7 +179,7 @@ impl VersionSelector {
 
                     let is_latest_version = !already_seen_names.contains_key(&pkg.get_name());
                     already_seen_names.insert(pkg.get_name().to_string(), true);
-                    if let Some(io) = io {
+                    if let Some(ref io) = io {
                         let should_warn = match &show_warnings {
                             shirabe_php_shim::PhpMixed::Bool(b) => *b,
                             _ => true,

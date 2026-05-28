@@ -341,7 +341,7 @@ impl CurlDownloader {
         {
             self.config.borrow_mut().prohibit_url_by_config(
                 url,
-                Some(&*self.io.borrow()),
+                Some(self.io.clone()),
                 &options,
             )?;
         }
@@ -1187,7 +1187,7 @@ impl CurlDownloader {
                         == Some("application/json")
                 {
                     HttpDownloader::output_warnings(
-                        &*self.io.borrow(),
+                        self.io.clone(),
                         job.get("origin").and_then(|v| v.as_string()).unwrap_or(""),
                         &match json_decode(response_ref.inner.get_body().unwrap_or(""), true)? {
                             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),

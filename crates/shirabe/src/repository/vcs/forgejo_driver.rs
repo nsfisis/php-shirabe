@@ -487,7 +487,12 @@ impl ForgejoDriver {
         }
     }
 
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, _deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+        url: &str,
+        _deep: bool,
+    ) -> bool {
         let forgejo_url = ForgejoUrl::try_from(Some(url));
         if forgejo_url.is_none() {
             return false;

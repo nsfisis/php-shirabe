@@ -39,9 +39,8 @@ impl ConfigValidator {
         let mut lax_valid = false;
         let mut manifest: Option<IndexMap<String, PhpMixed>> = None;
 
-        // TODO(phase-b): io type mismatch (&dyn IOInterface vs std::rc::Rc<std::cell::RefCell<dyn IOInterface>>)
-        let mut json =
-            JsonFile::new(file.to_string(), None, None).expect("config file path is always local");
+        let mut json = JsonFile::new(file.to_string(), None, Some(self.io.clone()))
+            .expect("config file path is always local");
         let schema_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             manifest = Some(match json.read()? {
                 PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),

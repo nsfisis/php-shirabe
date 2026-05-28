@@ -612,8 +612,6 @@ impl EventDispatcher {
                             // TODO(phase-b): IOInterface needs an `as_any` shim before
                             // `instanceof ConsoleIO` can be expressed; treat io as a
                             // generic IOInterface for now.
-                            let _io_ref_guard = self.io.borrow();
-                            let _io_ref: &dyn IOInterface = &*_io_ref_guard;
                             let downcast: Option<&ConsoleIO> = None;
                             let output: ConsoleOutput = if let Some(_console_io) = downcast {
                                 // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO

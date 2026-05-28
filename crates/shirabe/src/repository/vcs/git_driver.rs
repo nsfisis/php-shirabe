@@ -536,7 +536,12 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
         Ok(())
     }
 
-    fn supports(_io: &dyn IOInterface, _config: &Config, _url: &str, _deep: bool) -> bool {
+    fn supports(
+        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _config: &Config,
+        _url: &str,
+        _deep: bool,
+    ) -> bool {
         todo!()
     }
 }

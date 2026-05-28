@@ -292,7 +292,7 @@ impl RemoteFilesystem {
         {
             let _ = self.config.borrow_mut().prohibit_url_by_config(
                 &file_url,
-                Some(&*self.io.borrow()),
+                Some(self.io.clone()),
                 &indexmap::IndexMap::new(),
             );
         }
@@ -338,7 +338,7 @@ impl RemoteFilesystem {
                             _ => IndexMap::new(),
                         };
                         let _ = HttpDownloader::output_warnings(
-                            &*self.io.borrow(),
+                            self.io.clone(),
                             origin_url,
                             &parsed_map,
                         );

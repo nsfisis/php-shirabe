@@ -24,6 +24,7 @@ use crate::console::input::InputOption;
 use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
 use crate::installer::Installer;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
@@ -75,11 +76,7 @@ impl UpdateCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        // TODO(phase-b): clone_box avoids the &mut self conflict with require_composer
-        // below; revisit when get_io can return an Rc/Arc owned handle.
-        let io_box = self.get_io().clone();
-        let io_ref = io_box.borrow();
-        let io: &dyn IOInterface = &*io_ref;
+        let io = self.get_io().clone();
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
@@ -248,8 +245,13 @@ impl UpdateCommand {
         }
 
         if input.get_option("interactive").as_bool().unwrap_or(false) {
-            packages =
-                self.get_packages_interactively(io, input, output, &composer_handle, packages)?;
+            packages = self.get_packages_interactively(
+                io.clone(),
+                input,
+                output,
+                &composer_handle,
+                packages,
+            )?;
         }
 
         if input.get_option("root-reqs").as_bool().unwrap_or(false) {
@@ -312,7 +314,7 @@ impl UpdateCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        let mut install = Installer::create(io_box.clone(), &composer_handle);
+        let mut install = Installer::create(io.clone(), &composer_handle);
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
@@ -432,7 +434,7 @@ impl UpdateCommand {
                 // set_composer here requires a shared PartialComposer handle.
                 // bump_command.set_composer(composer);
                 result = bump_command.do_bump(
-                    io,
+                    io.clone(),
                     bump_after_update.as_string() == Some("dev"),
                     bump_after_update.as_string() == Some("no-dev"),
                     input.get_option("dry-run").as_bool().unwrap_or(false),
@@ -457,7 +459,7 @@ impl UpdateCommand {
     /// @return array<string>
     fn get_packages_interactively(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
         composer: &PartialComposerHandle,

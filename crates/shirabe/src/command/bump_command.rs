@@ -13,6 +13,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::json::JsonManipulator;
 use crate::package::AliasPackage;
@@ -72,10 +73,9 @@ impl BumpCommand {
         let dev_only = input.get_option("dev-only").as_bool().unwrap_or(false);
         let no_dev_only = input.get_option("no-dev-only").as_bool().unwrap_or(false);
         let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
-        // TODO(phase-b): do_bump expects &dyn IOInterface but get_io() requires &mut self; needs IO sharing refactor
-        let io_ref: &dyn IOInterface = todo!("share IOInterface across calls in do_bump");
+        let io = self.get_io().clone();
         self.do_bump(
-            io_ref,
+            io,
             dev_only,
             no_dev_only,
             dry_run,
@@ -86,7 +86,7 @@ impl BumpCommand {
 
     pub fn do_bump(
         &mut self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_only: bool,
         no_dev_only: bool,
         dry_run: bool,

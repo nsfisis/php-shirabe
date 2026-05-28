@@ -47,7 +47,7 @@ impl FossilDownloader {
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&*self.inner.io.borrow()),
+            Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 
@@ -108,7 +108,7 @@ impl FossilDownloader {
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&*self.inner.io.borrow()),
+            Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 

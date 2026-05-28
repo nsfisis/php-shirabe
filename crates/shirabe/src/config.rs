@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 
@@ -1144,7 +1145,7 @@ impl Config {
     pub fn prohibit_url_by_config(
         &mut self,
         url: &str,
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
@@ -1206,7 +1207,7 @@ impl Config {
                 )
                 .into());
             }
-            if let Some(io) = io {
+            if let Some(ref io) = io {
                 if let Some(ref hostname) = hostname {
                     if !self.warned_hosts.contains_key(hostname) {
                         io.write_error3(
@@ -1224,7 +1225,7 @@ impl Config {
             }
         }
 
-        if let Some(io) = io {
+        if let Some(ref io) = io {
             if let Some(ref hostname) = hostname {
                 if !self.ssl_verify_warned_hosts.contains_key(hostname) {
                     let mut warning: Option<String> = None;

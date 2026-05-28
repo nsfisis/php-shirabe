@@ -44,6 +44,7 @@ use crate::installer::MetapackageInstaller;
 use crate::installer::PluginInstaller;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceMutable;
 use crate::json::JsonFile;
 use crate::json::JsonValidationException;
 use crate::package::Locker;
@@ -592,8 +593,8 @@ impl Factory {
 
                     if full_load {
                         // load auth configs into the IO instance
-                        // TODO(phase-b): load_configuration requires &mut IOInterface; create_composer takes &dyn IOInterface
-                        // io.load_configuration(&mut *config.borrow_mut())?;
+                        io.borrow_mut()
+                            .load_configuration(&mut *config.borrow_mut())?;
 
                         // load existing Composer\InstalledVersions instance if available and scripts/plugins are allowed, as they might need it
                         // we only load if the InstalledVersions class wasn't defined yet so that this is only loaded once

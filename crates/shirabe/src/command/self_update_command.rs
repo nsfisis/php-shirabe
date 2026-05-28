@@ -143,7 +143,7 @@ impl SelfUpdateCommand {
         for channel in Versions::CHANNELS {
             if input.get_option(channel).as_bool().unwrap_or(false) {
                 requested_channel = Some(channel.to_string());
-                versions_util.set_channel(channel.to_string(), Some(&*io.borrow()))??;
+                versions_util.set_channel(channel.to_string(), Some(io.clone()))??;
                 break;
             }
         }
@@ -184,8 +184,7 @@ impl SelfUpdateCommand {
         }
 
         if input.get_option("update-keys").as_bool().unwrap_or(false) {
-            // TODO(phase-b): re-borrow `io` after fetch_keys conflicts with the earlier `let io = self.get_io()` borrow
-            let _ = io;
+            self.fetch_keys(io.clone(), &*config.borrow())?;
             return Ok(0);
         }
 
@@ -656,7 +655,11 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
     }
 
     /// @throws \Exception
-    pub(crate) fn fetch_keys(&self, io: &dyn IOInterface, config: &Config) -> Result<()> {
+    pub(crate) fn fetch_keys(
+        &self,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+    ) -> Result<()> {
         if !io.is_interactive() {
             return Err(RuntimeException {
                 message: "Public keys can not be fetched in non-interactive mode, please run Composer interactively".to_string(),

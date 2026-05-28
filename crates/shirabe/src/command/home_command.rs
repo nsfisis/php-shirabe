@@ -73,10 +73,7 @@ impl HomeCommand {
         _output: &dyn OutputInterface,
     ) -> Result<i64> {
         let repos = self.initialize_repos()?;
-        // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone();
-        let io_ref = io_box.borrow();
-        let io: &dyn IOInterface = &*io_ref;
+        let io = self.get_io().clone();
         let mut return_code: i64 = 0;
 
         let packages: Vec<String> = input

@@ -453,7 +453,7 @@ impl PluginManager {
                 String::new()
             }
         ));
-        plugin.activate(&self.composer_full(), &*self.io.borrow());
+        plugin.activate(&self.composer_full(), self.io.clone());
 
         // TODO(plugin): if plugin is EventSubscriberInterface, hook into the event dispatcher
         // The PHP code calls $this->composer->getEventDispatcher()->addSubscriber($plugin);
@@ -480,7 +480,7 @@ impl PluginManager {
         self.io
             .write_error(&format!("Unloading plugin {}", get_class_obj(plugin)));
         let mut removed = self.plugins.remove(index);
-        removed.deactivate(&self.composer_full(), &*self.io.borrow());
+        removed.deactivate(&self.composer_full(), self.io.clone());
 
         // TODO(plugin): remove_listener accepts any callable/object in PHP; here we have
         // a plugin instance and need to translate to a Callable, which is not portable
@@ -493,7 +493,7 @@ impl PluginManager {
         // TODO(plugin): plugin uninstall hook
         self.io
             .write_error(&format!("Uninstalling plugin {}", get_class_obj(plugin)));
-        plugin.uninstall(&self.composer_full(), &*self.io.borrow());
+        plugin.uninstall(&self.composer_full(), self.io.clone());
     }
 
     fn load_repository(

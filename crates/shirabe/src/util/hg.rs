@@ -36,7 +36,7 @@ impl Hg {
     ) -> Result<()> {
         self.config.borrow_mut().prohibit_url_by_config(
             &url,
-            Some(&*self.io.borrow()),
+            Some(self.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 

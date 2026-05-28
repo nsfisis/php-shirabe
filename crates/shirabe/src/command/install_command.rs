@@ -11,6 +11,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::installer::Installer;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::util::HttpDownloader;
@@ -66,10 +67,7 @@ impl InstallCommand {
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
     ) -> Result<i64> {
-        // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone();
-        let io_ref = io_box.borrow();
-        let io: &dyn IOInterface = &*io_ref;
+        let io = self.get_io().clone();
 
         if input.get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
@@ -115,7 +113,7 @@ impl InstallCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        let mut install = Installer::create(io_box.clone(), &composer_handle);
+        let mut install = Installer::create(io.clone(), &composer_handle);
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =

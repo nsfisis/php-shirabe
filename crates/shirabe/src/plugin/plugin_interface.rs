@@ -3,15 +3,17 @@
 use crate::composer::ComposerHandle;
 use crate::io::IOInterface;
 use crate::plugin::Capable;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub const PLUGIN_API_VERSION: &'static str = "2.9.0";
 
 pub trait PluginInterface: std::fmt::Debug {
-    fn activate(&mut self, composer: &ComposerHandle, io: &dyn IOInterface);
+    fn activate(&mut self, composer: &ComposerHandle, io: Rc<RefCell<dyn IOInterface>>);
 
-    fn deactivate(&mut self, composer: &ComposerHandle, io: &dyn IOInterface);
+    fn deactivate(&mut self, composer: &ComposerHandle, io: Rc<RefCell<dyn IOInterface>>);
 
-    fn uninstall(&mut self, composer: &ComposerHandle, io: &dyn IOInterface);
+    fn uninstall(&mut self, composer: &ComposerHandle, io: Rc<RefCell<dyn IOInterface>>);
 
     fn clone_box(&self) -> Box<dyn PluginInterface> {
         todo!()

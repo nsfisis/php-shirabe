@@ -979,7 +979,12 @@ impl GitLabDriver {
 
     /// Uses the config `gitlab-domains` to see if the driver supports the url for the
     /// repository given.
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, _deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+        url: &str,
+        _deep: bool,
+    ) -> bool {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match_strict_groups3(Self::URL_REGEX, url, Some(&mut match_)).unwrap_or(false)
         {

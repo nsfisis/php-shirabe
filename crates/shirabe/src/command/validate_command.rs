@@ -9,6 +9,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
@@ -118,10 +119,7 @@ impl ValidateCommand {
             .map(|s| s.to_string())
             .map(Ok)
             .unwrap_or_else(Factory::get_composer_file)?;
-        // TODO(phase-b): get_io() takes &mut self via BaseCommand; clone_box to release the borrow.
-        let io_box = self.get_io().clone();
-        let io_ref = io_box.borrow();
-        let io: &dyn IOInterface = &*io_ref;
+        let io = self.get_io().clone();
 
         if !std::path::Path::new(&file).exists() {
             io.write_error(&format!("<error>{} not found.</error>", file));
@@ -132,7 +130,7 @@ impl ValidateCommand {
             return Ok(3);
         }
 
-        let validator = ConfigValidator::new(io_box.clone());
+        let validator = ConfigValidator::new(io.clone());
         let check_all = if input.get_option("no-check-all").as_bool().unwrap_or(false) {
             0
         } else {
@@ -157,7 +155,7 @@ impl ValidateCommand {
             validator.validate(&file, check_all, check_version);
 
         let mut lock_errors: Vec<String> = vec![];
-        let composer = self.create_composer_instance(input, io_box.clone(), None, false, None)?;
+        let composer = self.create_composer_instance(input, io.clone(), None, false, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         let check_lock = (check_lock
             && composer
@@ -182,7 +180,7 @@ impl ValidateCommand {
         }
 
         self.output_result(
-            io,
+            io.clone(),
             &file,
             &mut errors,
             &mut warnings,
@@ -229,7 +227,7 @@ impl ValidateCommand {
                         validator.validate(&dep_file, check_all, check_version);
 
                     self.output_result(
-                        io,
+                        io.clone(),
                         &package.get_pretty_name(),
                         &mut dep_errors,
                         &mut dep_warnings,
@@ -264,7 +262,7 @@ impl ValidateCommand {
 
     fn output_result(
         &self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         name: &str,
         errors: &mut Vec<String>,
         warnings: &mut Vec<String>,

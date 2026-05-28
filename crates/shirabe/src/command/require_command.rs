@@ -553,17 +553,9 @@ impl RequireCommand {
             .borrow_mut()
             .deactivate_installed_plugins();
 
-        // try/catch/finally
-        // TODO(phase-b): do_update borrows io from self while also needing &mut self for state
-        // mutations; needs an Rc<dyn IOInterface> on self for clean sharing.
-        let do_update_result = self.do_update(
-            input,
-            output,
-            todo!("share io reference for do_update"),
-            &requirements,
-            require_key,
-            remove_key,
-        );
+        let io = self.get_io().clone();
+        let do_update_result =
+            self.do_update(input, output, io, &requirements, require_key, remove_key);
         let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
 
         let result = match do_update_result {
@@ -682,7 +674,7 @@ impl RequireCommand {
         &mut self,
         input: &dyn InputInterface,
         output: &dyn OutputInterface,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         requirements: &IndexMap<String, String>,
         require_key: &str,
         _remove_key: &str,
@@ -848,12 +840,7 @@ impl RequireCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        // TODO(phase-b): Installer::create takes std::rc::Rc<std::cell::RefCell<dyn IOInterface>> for ownership but io is a
-        // borrowed &dyn here; needs Rc<dyn IOInterface> for proper sharing.
-        let mut install = Installer::create(
-            todo!("share io as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>"),
-            &composer_handle,
-        );
+        let mut install = Installer::create(io.clone(), &composer_handle);
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&*composer.get_config().borrow(), input, false)?;

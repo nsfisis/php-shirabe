@@ -98,7 +98,7 @@ impl Svn {
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
             url,
-            Some(&*self.io.borrow()),
+            Some(self.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 

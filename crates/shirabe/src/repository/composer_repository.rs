@@ -264,11 +264,12 @@ impl ComposerRepository {
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
-        // TODO(phase-b): Cache::new expects std::rc::Rc<std::cell::RefCell<dyn IOInterface>> but io is also stored in self.io;
-        // need shared ownership (Rc) for IOInterface. Using todo!() placeholder.
-        let cache: Cache = todo!(
-            "Cache::new requires std::rc::Rc<std::cell::RefCell<dyn IOInterface>> but io is also moved into self.io"
+        let cache_dir = format!(
+            "{}/{}",
+            config.get("cache-repo-dir").as_string().unwrap_or(""),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone()))?,
         );
+        let cache = Cache::new(io.clone(), &cache_dir, Some("a-z0-9.$~"), None, false);
         let version_parser = VersionParser::new();
         let loader = ArrayLoader::new(Some(version_parser.clone()), true);
 
@@ -2963,7 +2964,7 @@ impl ComposerRepository {
                     .as_array()
                     .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
                     .unwrap_or_default();
-                HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data_local);
+                HttpDownloader::output_warnings(self.io.clone(), &self.url, &data_local);
 
                 if let Some(ck) = cache_key_owned.as_ref() {
                     if !ck.is_empty() && !self.cache.is_read_only() {
@@ -3160,7 +3161,7 @@ impl ComposerRepository {
                 .as_array()
                 .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
                 .unwrap_or_default();
-            HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data);
+            HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
             let last_modified_date = response.get_header("last-modified");
             response.collect();
@@ -3338,7 +3339,7 @@ impl ComposerRepository {
             .as_array()
             .map(|a| a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
             .unwrap_or_default();
-        HttpDownloader::output_warnings(&*self.io.borrow(), &self.url, &data);
+        HttpDownloader::output_warnings(self.io.clone(), &self.url, &data);
 
         let last_modified_date = response.get_header("last-modified");
         response.collect();

@@ -2,6 +2,7 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
@@ -71,7 +72,7 @@ impl Versions {
     pub fn set_channel(
         &mut self,
         channel: String,
-        io: Option<&dyn IOInterface>,
+        io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         if !Self::CHANNELS.contains(&channel.as_str()) {
             return Ok(Err(InvalidArgumentException {

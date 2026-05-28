@@ -90,10 +90,7 @@ impl SuggestsCommand {
         }
 
         let installed_repo = InstalledRepository::new(installed_repos);
-        // TODO(phase-b): SuggestedPackagesReporter::new expects std::rc::Rc<std::cell::RefCell<dyn IOInterface>>; self.get_io() returns &mut dyn IOInterface
-        let io_box: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            todo!("share IOInterface as Box<dyn IOInterface>");
-        let mut reporter = SuggestedPackagesReporter::new(io_box);
+        let mut reporter = SuggestedPackagesReporter::new(self.get_io().clone());
 
         let filter = input.get_argument("packages");
         let mut packages = RepositoryInterface::get_packages(&installed_repo);

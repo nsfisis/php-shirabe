@@ -2674,7 +2674,7 @@ impl ShowCommand {
             &best_stability,
             None,
             0,
-            Some(&*self.get_io().borrow()),
+            Some(self.get_io().clone()),
             PhpMixed::Bool(true),
         )?;
         while let Some(ref c) = candidate {

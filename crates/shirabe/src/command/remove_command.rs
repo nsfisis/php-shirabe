@@ -511,10 +511,7 @@ impl RemoveCommand {
             .borrow_mut()
             .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
 
-        // TODO(phase-b): Installer::create expects std::rc::Rc<std::cell::RefCell<dyn IOInterface>>; io here is &mut dyn IOInterface
-        let io_box: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
-            todo!("share IOInterface as Box<dyn IOInterface>");
-        let mut install = Installer::create(io_box, &composer_handle);
+        let mut install = Installer::create(self.get_io().clone(), &composer_handle);
 
         let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
         let optimize = input

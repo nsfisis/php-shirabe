@@ -934,7 +934,12 @@ impl GitHubDriver {
         Ok(self.branches.clone().unwrap_or_default())
     }
 
-    pub fn supports(io: &dyn IOInterface, config: &Config, url: &str, _deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: &Config,
+        url: &str,
+        _deep: bool,
+    ) -> bool {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match_strict_groups3(
             r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",

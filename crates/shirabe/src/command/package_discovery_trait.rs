@@ -178,10 +178,15 @@ pub trait PackageDiscoveryTrait {
 
                 if !requirement.contains_key("version") {
                     // determine the best version automatically
-                    // TODO(phase-b): self.get_io() borrow conflicts with self.find_best_version_and_name_for_package
-                    let (name, version): (String, String) = todo!(
-                        "borrow conflict between get_io and find_best_version_and_name_for_package"
-                    );
+                    let (name, version): (String, String) = self
+                        .find_best_version_and_name_for_package(
+                            io.clone(),
+                            input,
+                            requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                            platform_repo,
+                            preferred_stability,
+                            fixed,
+                        )?;
 
                     // replace package name from packagist.org
                     requirement.insert("name".to_string(), name);
@@ -431,10 +436,15 @@ pub trait PackageDiscoveryTrait {
 
                     let constraint: String = match &constraint_mixed {
                         PhpMixed::Bool(false) => {
-                            // TODO(phase-b): self.get_io() borrow conflicts with self.find_best_version_and_name_for_package
-                            let (_name, c): (String, String) = todo!(
-                                "borrow conflict between get_io and find_best_version_and_name_for_package"
-                            );
+                            let (_name, c): (String, String) = self
+                                .find_best_version_and_name_for_package(
+                                    io.clone(),
+                                    input,
+                                    &package,
+                                    platform_repo,
+                                    preferred_stability,
+                                    fixed,
+                                )?;
 
                             io.write_error3(
                                 &sprintf(
@@ -475,7 +485,7 @@ pub trait PackageDiscoveryTrait {
     /// @return array{string, string}     name version
     fn find_best_version_and_name_for_package(
         &mut self,
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         input: &dyn InputInterface,
         name: &str,
         platform_repo: Option<&PlatformRepository>,
@@ -734,7 +744,7 @@ pub trait PackageDiscoveryTrait {
                         if let Ok(idx) = idx_str.parse::<usize>() {
                             if let Some(selected) = similar.get(idx) {
                                 return self.find_best_version_and_name_for_package(
-                                    io,
+                                    io.clone(),
                                     input,
                                     selected,
                                     platform_repo,

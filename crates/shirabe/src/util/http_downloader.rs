@@ -18,6 +18,7 @@ use crate::composer::ComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use crate::package::version::VersionParser;
 use crate::util::GetResult;
 use crate::util::Platform;
@@ -689,7 +690,7 @@ impl HttpDownloader {
     ///
     /// @param  array{warning?: string, info?: string, warning-versions?: string, info-versions?: string, warnings?: array<array{versions: string, message: string}>, infos?: array<array{versions: string, message: string}>} $data
     pub fn output_warnings(
-        io: &dyn IOInterface,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         url: &str,
         data: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {

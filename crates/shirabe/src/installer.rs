@@ -321,7 +321,7 @@ impl Installer {
                 {
                     self.installation_manager
                         .borrow_mut()
-                        .notify_installs(&*self.io.borrow());
+                        .notify_installs(self.io.clone());
                 }
                 return Err(e);
             }
@@ -339,7 +339,7 @@ impl Installer {
         {
             self.installation_manager
                 .borrow_mut()
-                .notify_installs(&*self.io.borrow());
+                .notify_installs(self.io.clone());
         }
 
         if self.update {

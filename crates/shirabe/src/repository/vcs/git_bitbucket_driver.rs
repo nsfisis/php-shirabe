@@ -857,7 +857,12 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn supports(io: &dyn IOInterface, _config: &Config, url: &str, _deep: bool) -> bool {
+    pub fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        _config: &Config,
+        url: &str,
+        _deep: bool,
+    ) -> bool {
         if !Preg::is_match(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
             url,

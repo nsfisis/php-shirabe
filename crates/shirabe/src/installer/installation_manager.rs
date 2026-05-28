@@ -635,7 +635,7 @@ impl InstallationManager {
         self.output_progress = output_progress;
     }
 
-    pub fn notify_installs(&mut self, _io: &dyn IOInterface) {
+    pub fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
         // TODO(phase-c-promise): PHP collects every http_downloader.add() promise and runs them via
         // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
         let result: Result<()> = (|| -> Result<()> {

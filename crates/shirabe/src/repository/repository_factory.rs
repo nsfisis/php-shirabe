@@ -10,6 +10,7 @@ use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::factory::Factory;
 use crate::io::IOInterface;
+use crate::io::IOInterfaceMutable;
 use crate::json::JsonFile;
 use crate::repository::FilesystemRepository;
 use crate::repository::RepositoryInterfaceHandle;
@@ -150,9 +151,9 @@ impl RepositoryFactory {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
         };
-        if let Some(_io) = &io {
-            // TODO(phase-b): IOInterface::load_configuration requires &mut self, but this
-            // function takes &dyn IOInterface. Wider refactor needed; skip for now.
+        if let Some(io) = &io {
+            io.borrow_mut()
+                .load_configuration(&mut *config.borrow_mut())?;
         }
 
         let mut owned_rm;
