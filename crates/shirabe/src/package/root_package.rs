@@ -381,6 +381,9 @@ impl PackageInterface for RootPackage {
     fn set_source_reference(&mut self, _reference: Option<String>) {
         todo!()
     }
+    fn set_source_url(&mut self, _url: Option<String>) {
+        todo!()
+    }
     fn set_dist_url(&mut self, _url: Option<String>) {
         todo!()
     }

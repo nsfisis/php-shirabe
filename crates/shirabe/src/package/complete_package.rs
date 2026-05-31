@@ -352,6 +352,10 @@ impl PackageInterface for CompletePackage {
         todo!()
     }
 
+    fn set_source_url(&mut self, url: Option<String>) {
+        todo!()
+    }
+
     fn set_dist_url(&mut self, url: Option<String>) {
         todo!()
     }

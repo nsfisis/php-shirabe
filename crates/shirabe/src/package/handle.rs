@@ -309,6 +309,9 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_source_reference(&mut self, reference: Option<String>) {
                 self.$field.set_source_reference(reference);
             }
+            fn set_source_url(&mut self, url: Option<String>) {
+                self.$field.set_source_url(url);
+            }
             fn set_dist_url(&mut self, url: Option<String>) {
                 self.$field.set_dist_url(url);
             }
@@ -648,6 +651,13 @@ macro_rules! impl_package_interface_handle {
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_source_reference(reference);
+            }
+
+            pub fn set_source_url(&self, url: Option<String>) {
+                self.0
+                    .borrow_mut()
+                    .as_package_interface_mut()
+                    .set_source_url(url);
             }
 
             pub fn set_dist_url(&self, url: Option<String>) {

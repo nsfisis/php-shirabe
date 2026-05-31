@@ -145,12 +145,9 @@ impl LockTransaction {
                 continue;
             }
 
-            if let Some(concrete_pkg) = present_package.as_package() {
-                // TODO(phase-c): mirror the source url/mirrors of the present package onto it via
-                // its handle setters once the per-field copy semantics are reviewed.
-                let _ = concrete_pkg;
-                let _ = package.get_source_url();
-                let _ = package.get_source_mirrors();
+            if present_package.as_package().is_some() {
+                present_package.set_source_url(package.get_source_url());
+                present_package.set_source_mirrors(package.get_source_mirrors());
             }
 
             if present_package.get_dist_type() != package.get_dist_type() {
@@ -167,11 +164,9 @@ impl LockTransaction {
                     &package.get_dist_url().unwrap(),
                 )
                 .unwrap_or_else(|_| package.get_dist_url().unwrap());
-                // TODO(phase-c): apply new_dist_url onto present_package via its handle setter.
-                let _ = new_dist_url;
+                present_package.set_dist_url(Some(new_dist_url));
             }
-            // TODO(phase-c): apply dist mirrors onto present_package via its handle setter.
-            let _ = package.get_dist_mirrors();
+            present_package.set_dist_mirrors(package.get_dist_mirrors());
 
             return present_package.clone();
         }

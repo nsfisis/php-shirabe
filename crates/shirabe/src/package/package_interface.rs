@@ -279,6 +279,8 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
 
     fn set_source_reference(&mut self, reference: Option<String>);
 
+    fn set_source_url(&mut self, url: Option<String>);
+
     fn set_dist_url(&mut self, url: Option<String>);
 
     fn set_dist_type(&mut self, r#type: Option<String>);

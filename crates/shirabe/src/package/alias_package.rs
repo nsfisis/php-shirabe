@@ -425,6 +425,10 @@ impl PackageInterface for AliasPackage {
         self.alias_of.is_default_branch()
     }
 
+    fn set_source_url(&mut self, url: Option<String>) {
+        self.alias_of.set_source_url(url);
+    }
+
     fn set_dist_url(&mut self, url: Option<String>) {
         self.alias_of.set_dist_url(url);
     }
