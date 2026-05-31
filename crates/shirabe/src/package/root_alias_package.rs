@@ -11,9 +11,9 @@ use crate::package::RootPackageHandle;
 use crate::package::RootPackageInterface;
 use crate::package::handle::delegate_package_interface_to_inner;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootAliasPackage {
-    inner: CompleteAliasPackage,
+    pub(crate) inner: CompleteAliasPackage,
     // overrides CompleteAliasPackage::alias_of with the more specific RootPackage type
     pub(crate) alias_of: RootPackageHandle,
 }
@@ -83,8 +83,14 @@ impl RootPackageInterface for RootAliasPackage {
     }
 
     fn set_requires(&mut self, requires: Vec<Link>) {
-        // TODO(phase-c): PHP re-derives the local links via
-        // replaceSelfVersionDependencies before forwarding to aliasOf.
+        let replaced = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(requires.clone(), Link::TYPE_REQUIRE);
+        self.inner.inner.requires = replaced
+            .into_iter()
+            .map(|l| (l.get_target().to_string(), l))
+            .collect();
         self.alias_of.set_requires(requires);
     }
 

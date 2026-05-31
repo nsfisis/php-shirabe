@@ -322,7 +322,7 @@ impl InstallerInterface for LibraryInstaller {
         self.binary_installer
             .install_binaries(package.clone(), &install_path, true);
         if !repo.has_package(package.clone()) {
-            repo.add_package(package.clone());
+            repo.add_package(PackageInterfaceHandle::dup(&package));
         }
 
         Ok(None)
@@ -353,7 +353,7 @@ impl InstallerInterface for LibraryInstaller {
             .install_binaries(target.clone(), &install_path, true);
         repo.remove_package(initial.clone());
         if !repo.has_package(target.clone()) {
-            repo.add_package(target.clone());
+            repo.add_package(PackageInterfaceHandle::dup(&target));
         }
 
         Ok(None)

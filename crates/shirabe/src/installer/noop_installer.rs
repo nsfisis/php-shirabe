@@ -54,7 +54,7 @@ impl InstallerInterface for NoopInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if !repo.has_package(package.clone()) {
-            repo.add_package(package.clone());
+            repo.add_package(PackageInterfaceHandle::dup(&package));
         }
 
         Ok(None)
@@ -76,7 +76,7 @@ impl InstallerInterface for NoopInstaller {
 
         repo.remove_package(initial.clone());
         if !repo.has_package(target.clone()) {
-            repo.add_package(target.clone());
+            repo.add_package(PackageInterfaceHandle::dup(&target));
         }
 
         Ok(None)

@@ -212,8 +212,9 @@ impl ShowCommand {
             && input.get_option("locked").as_bool() != Some(true)
         {
             let composer = self.require_composer(None, None)?;
-            let package: crate::package::RootPackageInterfaceHandle =
-                composer.borrow_partial().get_package().clone();
+            let package = crate::package::RootPackageInterfaceHandle::dup(
+                composer.borrow_partial().get_package(),
+            );
             if input.get_option("name-only").as_bool() == Some(true) {
                 self.get_io().write(&package.get_name());
 
@@ -381,14 +382,15 @@ impl ShowCommand {
             };
             let root_pkg = composer_local.get_package();
 
-            let root_repo: RepositoryInterfaceHandle =
-                if input.get_option("self").as_bool() == Some(true) {
-                    RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                        composer_local.get_package().clone(),
-                    ))
-                } else {
-                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
-                };
+            let root_repo: RepositoryInterfaceHandle = if input.get_option("self").as_bool()
+                == Some(true)
+            {
+                RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                    crate::package::RootPackageInterfaceHandle::dup(composer_local.get_package()),
+                ))
+            } else {
+                RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
+            };
             if input.get_option("no-dev").as_bool() == Some(true) {
                 let local_packages = composer_local
                     .get_repository_manager()
@@ -401,8 +403,10 @@ impl ShowCommand {
                     false,
                     Vec::new(),
                 );
-                let cloned: Vec<crate::package::PackageInterfaceHandle> =
-                    packages.into_iter().map(|p| p.into()).collect();
+                let cloned: Vec<crate::package::PackageInterfaceHandle> = packages
+                    .iter()
+                    .map(crate::package::PackageInterfaceHandle::dup)
+                    .collect();
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     root_repo.clone(),
                     RepositoryInterfaceHandle::new(InstalledArrayRepository::new_with_packages(

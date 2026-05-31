@@ -13,7 +13,7 @@ use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
 use crate::repository::RepositoryInterfaceHandle;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct AliasPackage {
     id: i64,
     name: String,

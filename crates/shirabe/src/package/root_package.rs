@@ -11,7 +11,7 @@ use crate::package::PackageInterface;
 use crate::package::RootPackageInterface;
 use crate::repository::RepositoryInterfaceHandle;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RootPackage {
     inner: CompletePackage,
     pub(crate) minimum_stability: String,

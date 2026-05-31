@@ -12,7 +12,7 @@ use crate::package::{
 };
 
 /// Any package type.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AnyPackage {
     Package(Package),
     CompletePackage(CompletePackage),
@@ -136,6 +136,36 @@ impl AnyPackage {
     /// A `RootAliasPackage`.
     pub fn is_root_alias(&self) -> bool {
         matches!(self, Self::RootAliasPackage(_))
+    }
+
+    /// PHP `clone $package`: fresh object identity. Matches PHP's shallow
+    /// clone for most types (scalars/arrays are copied, nested object
+    /// references — including `aliasOf` on alias variants — are shared),
+    /// except for RootAliasPackage where PHP's `__clone` hook explicitly
+    /// reseats `aliasOf` to a fresh clone.
+    pub fn dup(&self) -> Self {
+        match self {
+            Self::Package(p) => Self::Package(p.clone()),
+            Self::CompletePackage(p) => Self::CompletePackage(p.clone()),
+            Self::RootPackage(p) => Self::RootPackage(p.clone()),
+            Self::AliasPackage(p) => Self::AliasPackage(p.clone()),
+            Self::CompleteAliasPackage(p) => Self::CompleteAliasPackage(p.clone()),
+            Self::RootAliasPackage(p) => {
+                // PHP's RootAliasPackage overrides `__clone()`:
+                //   $this->aliasOf = clone $this->aliasOf;
+                let new_alias_of_inner = p.alias_of.0.borrow().dup();
+                let new_alias_of_rc = Rc::new(RefCell::new(new_alias_of_inner));
+                let new_root = RootPackageHandle(new_alias_of_rc.clone());
+                let new_complete = CompletePackageHandle(new_alias_of_rc.clone());
+                let new_pkg = PackageHandle(new_alias_of_rc);
+
+                let mut cloned = p.clone();
+                cloned.alias_of = new_root;
+                cloned.inner.alias_of = new_complete;
+                cloned.inner.inner.alias_of = new_pkg;
+                Self::RootAliasPackage(cloned)
+            }
+        }
     }
 }
 
@@ -1118,6 +1148,15 @@ macro_rules! impl_handle_common {
             /// PHP `===` (reference identity).
             pub fn ptr_eq(&self, other: &Self) -> bool {
                 std::rc::Rc::ptr_eq(&self.0, &other.0)
+            }
+
+            /// PHP `clone $x`: fresh object identity. See [`AnyPackage::dup`]
+            /// for the per-variant semantics (including the RootAliasPackage
+            /// `__clone` hook).
+            pub fn dup(other: &Self) -> Self {
+                Self(std::rc::Rc::new(std::cell::RefCell::new(
+                    other.0.borrow().dup(),
+                )))
             }
         }
 

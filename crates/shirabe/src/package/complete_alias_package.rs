@@ -9,9 +9,9 @@ use crate::package::CompletePackageInterface;
 use crate::package::PackageHandle;
 use crate::package::handle::delegate_package_interface_to_inner;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompleteAliasPackage {
-    inner: AliasPackage,
+    pub(crate) inner: AliasPackage,
     // overrides AliasPackage::alias_of with the more specific CompletePackage type
     pub(crate) alias_of: CompletePackageHandle,
 }

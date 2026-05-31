@@ -207,7 +207,9 @@ impl HomeCommand {
             let composer = crate::command::composer_full(&composer);
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![];
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                RootPackageRepository::new(composer.get_package().clone()),
+                RootPackageRepository::new(crate::package::RootPackageInterfaceHandle::dup(
+                    composer.get_package(),
+                )),
             ));
             // TODO(phase-b): get_local_repository / get_repositories return shared refs; needs Rc<dyn ...> migration
             return Ok(repos);

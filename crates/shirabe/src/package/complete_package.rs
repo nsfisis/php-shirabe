@@ -6,7 +6,7 @@ use crate::package::PackageInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompletePackage {
     pub(crate) inner: Package,
     pub(crate) repositories: Vec<IndexMap<String, PhpMixed>>,

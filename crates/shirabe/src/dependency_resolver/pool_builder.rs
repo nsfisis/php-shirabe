@@ -625,10 +625,12 @@ impl PoolBuilder {
         // right version. It'd be more work to figure out which versions and which aliases of those versions this may
         // apply to
         if let Some(reference) = self.root_references.get(&name) {
-            // TODO(phase-c): apply root references to the package; PHP mutates the shared package in
-            // place and skips already locked/fixed packages, which needs &mut access through the
-            // handle plus a handle-based Request.
-            let _ = reference;
+            // do not modify the references on already locked or fixed packages
+            if !request.is_locked_package(package.clone())
+                && !request.is_fixed_package(package.clone())
+            {
+                package.set_source_dist_references(reference);
+            }
         }
 
         // if propagateUpdate is false we are loading a fixed or locked package, root aliases do not apply as they are
@@ -664,8 +666,7 @@ impl PoolBuilder {
 
             let new_index = self.index_counter;
             self.index_counter += 1;
-            self.packages
-                .insert(new_index, alias_handle.clone().into());
+            self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
                 .entry(alias_handle.get_alias_of().ptr_id().to_string())
                 .or_insert_with(IndexMap::new)

@@ -74,7 +74,7 @@ impl InstallerInterface for MetapackageInstaller {
             io_interface::NORMAL,
         );
 
-        repo.add_package(package);
+        repo.add_package(PackageInterfaceHandle::dup(&package));
 
         Ok(None)
     }
@@ -103,7 +103,7 @@ impl InstallerInterface for MetapackageInstaller {
         );
 
         repo.remove_package(initial.clone());
-        repo.add_package(target);
+        repo.add_package(PackageInterfaceHandle::dup(&target));
 
         Ok(None)
     }

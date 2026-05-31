@@ -11,8 +11,6 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterface;
 use crate::package::PackageInterface;
-use crate::package::RootAliasPackage;
-use crate::package::RootPackage;
 use crate::package::RootPackageInterface;
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
@@ -194,19 +192,16 @@ impl RootPackageLoader {
             Some("Composer\\Package\\RootPackage".to_string()),
         )?;
 
-        // TODO(phase-c): mutating the loaded RootPackage through a PackageInterfaceHandle
-        // requires going through as_root_package() + a RefCell borrow; the inherent
-        // RootPackage mutators used below are not yet reachable that way.
-        let real_package: &mut RootPackage = {
-            let _ = &mut package;
-            todo!(
-                "mutate RootPackage through PackageInterfaceHandle (as_root_package + borrow_mut)"
-            )
+        let real_package = if let Some(alias) = package.as_root_alias_package() {
+            alias.get_alias_of()
+        } else {
+            package
+                .as_root_package()
+                .expect("Expecting a Composer\\Package\\RootPackage at this point")
         };
 
         if auto_versioned {
             // TODO(phase-b): replace_version is an inherent method on Package, not exposed via trait.
-            let _ = real_package;
             todo!("replace_version is not accessible through RootPackage's embedded Package");
         }
 
@@ -230,7 +225,7 @@ impl RootPackageLoader {
                 aliases = self.extract_aliases(&links, aliases);
                 stability_flags = Self::extract_stability_flags(
                     &links,
-                    real_package.get_minimum_stability(),
+                    &real_package.get_minimum_stability(),
                     stability_flags,
                 );
                 references = Self::extract_references(&links, references);

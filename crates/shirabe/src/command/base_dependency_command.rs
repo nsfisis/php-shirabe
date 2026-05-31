@@ -55,7 +55,9 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
             vec![crate::repository::RepositoryInterfaceHandle::new(
-                RootPackageRepository::new(composer.get_package().clone()),
+                RootPackageRepository::new(crate::package::RootPackageInterfaceHandle::dup(
+                    composer.get_package(),
+                )),
             )];
 
         if input.get_option("locked").as_bool().unwrap_or(false) {
@@ -159,7 +161,9 @@ pub trait BaseDependencyCommand: BaseCommand {
             ) {
                 installed_repo.add_repository(
                     crate::repository::RepositoryInterfaceHandle::new(
-                        InstalledArrayRepository::new_with_packages(vec![r#match.into()])?,
+                        InstalledArrayRepository::new_with_packages(vec![
+                            crate::package::PackageInterfaceHandle::dup(&r#match),
+                        ])?,
                     ),
                 )?;
             } else if PlatformRepository::is_platform_package(&needle) {

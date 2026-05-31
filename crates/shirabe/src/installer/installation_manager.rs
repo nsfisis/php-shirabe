@@ -600,7 +600,7 @@ impl InstallationManager {
         let package = operation.get_package();
 
         if !repo.has_package(package.clone().into()) {
-            repo.add_package(package.into());
+            repo.add_package(crate::package::PackageInterfaceHandle::dup(&package.into()));
         }
     }
 

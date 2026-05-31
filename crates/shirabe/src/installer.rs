@@ -352,7 +352,7 @@ impl Installer {
                 locked_repository_handle,
                 crate::repository::RepositoryInterfaceHandle::new(self.create_platform_repo(false)),
                 crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    self.package.clone(),
+                    RootPackageInterfaceHandle::dup(&self.package),
                 )),
             ]);
             if is_fresh_install {
@@ -1335,10 +1335,7 @@ impl Installer {
             root_requires.insert(req, constraint);
         }
 
-        // TODO(phase-c): PHP does `$this->fixedRootPackage = clone($this->package)` (a deep,
-        // fresh-identity copy) and then strips its requires below. A handle clone only shares the
-        // same Rc, so a real deep clone of the package is needed to avoid mutating self.package.
-        // self.fixed_root_package = deep_clone(&self.package);
+        self.fixed_root_package = RootPackageInterfaceHandle::dup(&self.package);
         self.fixed_root_package.set_requires(vec![]);
         self.fixed_root_package.set_dev_requires(vec![]);
 
@@ -1578,7 +1575,7 @@ impl Installer {
     fn mock_local_repositories(&self, rm: &mut RepositoryManager) {
         let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages() {
-            packages.insert(package.to_string(), package.clone().into());
+            packages.insert(package.to_string(), PackageInterfaceHandle::dup(&package));
         }
         let keys: Vec<String> = packages.keys().cloned().collect();
         for key in keys {

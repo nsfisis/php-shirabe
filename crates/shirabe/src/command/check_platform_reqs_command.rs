@@ -112,7 +112,9 @@ impl CheckPlatformReqsCommand {
             }
         }
 
-        let root_pkg_repo = RootPackageRepository::new(composer.get_package().clone());
+        let root_pkg_repo = RootPackageRepository::new(
+            crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
+        );
         let installed_repo = InstalledRepository::new(vec![
             installed_repo_base,
             crate::repository::RepositoryInterfaceHandle::new(root_pkg_repo),

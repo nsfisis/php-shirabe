@@ -135,9 +135,9 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            // The root package borrow is also tied to `self.composer`; clone the package handle
-            // (shared Rc) for the same reason as above.
-            let root_package = self.composer_full().borrow().get_package().clone();
+            let root_package = crate::package::RootPackageInterfaceHandle::dup(
+                self.composer_full().borrow().get_package(),
+            );
             self.load_repository(&*repo.borrow(), false, Some(root_package))?;
         }
 

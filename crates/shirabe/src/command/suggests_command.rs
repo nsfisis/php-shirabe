@@ -48,11 +48,9 @@ impl SuggestsCommand {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
-        let root_package_handle: crate::package::RootPackageInterfaceHandle =
-            composer.get_package().clone();
         let mut installed_repos: Vec<RepositoryInterfaceHandle> =
             vec![RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                root_package_handle,
+                crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
             ))];
 
         if composer.get_locker().borrow_mut().is_locked() {

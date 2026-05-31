@@ -24,7 +24,7 @@ pub struct Mirror {
 }
 
 /// Core package definitions that are needed to resolve dependencies and install packages
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Package {
     id: i64,
     name: String,

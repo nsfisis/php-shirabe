@@ -951,8 +951,7 @@ impl Locker {
                 description: "Required (in require-dev)".to_string(),
             });
         }
-        // TODO(phase-b): clone $package to a RootPackageRepository
-        let root_repo = RootPackageRepository::new(todo!("phase-b: clone root package"));
+        let root_repo = RootPackageRepository::new(RootPackageInterfaceHandle::dup(&package));
 
         for set in &sets {
             let installed_repo = InstalledRepository::new(vec![/* set.repo, root_repo */]);
