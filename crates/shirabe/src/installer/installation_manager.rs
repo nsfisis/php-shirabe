@@ -308,17 +308,13 @@ impl InstallationManager {
 
             let package: PackageInterfaceHandle;
             let initial_package: Option<PackageInterfaceHandle>;
-            // TODO(phase-b): downcast for UpdateOperation / Install/Mark/Uninstall variants
-            let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
                 // @var UpdateOperation $operation
-                if let Some(_u) = update_op {
-                    // TODO(phase-c): bridge UpdateOperation handles (target/initial) into the
-                    // &dyn PackageInterface that the installer APIs still expect.
-                    continue;
-                } else {
-                    continue;
-                }
+                let update_op = operation
+                    .as_update_operation()
+                    .expect("op_type == \"update\" implies UpdateOperation");
+                package = update_op.get_target_package();
+                initial_package = Some(update_op.get_initial_package());
             } else {
                 // @var InstallOperation|MarkAliasInstalledOperation|MarkAliasUninstalledOperation|UninstallOperation $operation
                 package = operation.get_package();
@@ -451,15 +447,12 @@ impl InstallationManager {
 
             let package: PackageInterfaceHandle;
             let initial_package: Option<PackageInterfaceHandle>;
-            let update_op: Option<&UpdateOperation> = None;
             if op_type == "update" {
-                if let Some(_u) = update_op {
-                    // TODO(phase-c): bridge UpdateOperation handles (target/initial) into the
-                    // &dyn PackageInterface that the installer APIs still expect.
-                    continue;
-                } else {
-                    continue;
-                }
+                let update_op = operation
+                    .as_update_operation()
+                    .expect("op_type == \"update\" implies UpdateOperation");
+                package = update_op.get_target_package();
+                initial_package = Some(update_op.get_initial_package());
             } else {
                 package = operation.get_package();
                 initial_package = None;
