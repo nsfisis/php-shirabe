@@ -23,9 +23,9 @@ use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::AliasPackage;
+use crate::package::AliasPackageHandle;
 use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackage;
+use crate::package::CompleteAliasPackageHandle;
 use crate::package::CompletePackage;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
@@ -49,7 +49,7 @@ pub struct PoolBuilder {
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pool_optimizer: Option<PoolOptimizer>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    alias_map: IndexMap<String, IndexMap<i64, AliasPackage>>,
+    alias_map: IndexMap<String, IndexMap<i64, AliasPackageHandle>>,
     packages_to_load: IndexMap<String, AnyConstraint>,
     loaded_packages: IndexMap<String, AnyConstraint>,
     loaded_per_repo: IndexMap<i64, IndexMap<String, IndexMap<String, PackageInterfaceHandle>>>,
@@ -269,20 +269,21 @@ impl PoolBuilder {
                         None => continue,
                     };
 
-                    // TODO(phase-c): alias_map still stores AliasPackage by value, so we collect
-                    // (index, version) tuples instead of the alias handles.
-                    let mut package_and_aliases: Vec<(i64, String)> = Vec::new();
-                    package_and_aliases.push((i, package.get_version().to_string()));
+                    let mut package_and_aliases: Vec<(i64, BasePackageHandle)> = Vec::new();
+                    package_and_aliases.push((i, package.clone()));
                     if let Some(aliases) = self.alias_map.get(&package.ptr_id().to_string()) {
                         for (idx, alias) in aliases {
-                            package_and_aliases.push((*idx, alias.get_version().to_string()));
+                            package_and_aliases.push((*idx, alias.clone().into()));
                         }
                     }
 
                     let mut found = false;
-                    for (_idx, version) in &package_and_aliases {
-                        if CompilingMatcher::matches(&constraint, SimpleConstraint::OP_EQ, version)
-                        {
+                    for (_idx, package_or_alias) in &package_and_aliases {
+                        if CompilingMatcher::matches(
+                            &constraint,
+                            SimpleConstraint::OP_EQ,
+                            &package_or_alias.get_version(),
+                        ) {
                             found = true;
                         }
                     }
@@ -612,13 +613,10 @@ impl PoolBuilder {
         self.packages.insert(index, package.clone());
 
         if let Some(alias) = package.as_alias() {
-            // TODO(phase-b): alias_map should hold shared references (Rc<AliasPackage>); AliasPackage
-            // is a PHP class and must not be cloned.
-            let _ = &alias;
             self.alias_map
                 .entry(alias.get_alias_of().ptr_id().to_string())
                 .or_insert_with(IndexMap::new)
-                .insert(index, todo!("share AliasPackage via Rc"));
+                .insert(index, alias);
         }
 
         let name = package.get_name();
@@ -651,29 +649,27 @@ impl PoolBuilder {
             } else {
                 package.clone()
             };
-            let _ = (&base_package, &alias);
-            let alias_package: BasePackageHandle = if base_package.as_complete_package().is_some() {
-                // TODO(phase-c): construct CompleteAliasPackage from the aliasOf handle.
-                todo!("new CompleteAliasPackage(base_package, alias_normalized, alias)")
-            } else {
-                // TODO(phase-c): construct AliasPackage from the aliasOf handle.
-                todo!("new AliasPackage(base_package, alias_normalized, alias)")
-            };
-            // PHP: $aliasPackage->setRootPackageAlias(true);
-            // BasePackage doesn't expose this directly; the AliasPackage trait method handles it.
+            let alias_normalized = alias.get("alias_normalized").cloned().unwrap_or_default();
+            let alias_pretty = alias.get("alias").cloned().unwrap_or_default();
+            let alias_handle: AliasPackageHandle =
+                if let Some(complete) = base_package.as_complete_package() {
+                    CompleteAliasPackageHandle::new(complete, alias_normalized, alias_pretty).into()
+                } else {
+                    let real = base_package
+                        .as_package()
+                        .expect("non-alias base package must be a real Package");
+                    AliasPackageHandle::new(real, alias_normalized, alias_pretty)
+                };
+            alias_handle.set_root_package_alias(true);
 
             let new_index = self.index_counter;
             self.index_counter += 1;
-            self.packages.insert(new_index, alias_package.clone());
-            if let Some(ap) = alias_package.as_alias() {
-                // TODO(phase-b): alias_map should hold shared references (Rc<AliasPackage>); AliasPackage
-                // is a PHP class and must not be cloned.
-                let _ = &ap;
-                self.alias_map
-                    .entry(ap.get_alias_of().ptr_id().to_string())
-                    .or_insert_with(IndexMap::new)
-                    .insert(new_index, todo!("share AliasPackage via Rc"));
-            }
+            self.packages
+                .insert(new_index, alias_handle.clone().into());
+            self.alias_map
+                .entry(alias_handle.get_alias_of().ptr_id().to_string())
+                .or_insert_with(IndexMap::new)
+                .insert(new_index, alias_handle);
         }
 
         let requires = package.get_requires();
@@ -1048,8 +1044,8 @@ impl PoolBuilder {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0 {
                     if let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index) {
-                        if let Some(name_map) = repo_map.get_mut(alias_package.get_name()) {
-                            name_map.shift_remove(alias_package.get_version());
+                        if let Some(name_map) = repo_map.get_mut(&alias_package.get_name()) {
+                            name_map.shift_remove(&alias_package.get_version());
                         }
                     }
                 }

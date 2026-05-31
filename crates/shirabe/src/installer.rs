@@ -70,7 +70,8 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use crate::package::AliasPackage;
+use crate::package::AliasPackageHandle;
+use crate::package::CompleteAliasPackageHandle;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
@@ -1584,12 +1585,22 @@ impl Installer {
             let package_clone = packages.get(&key).unwrap().clone();
             if let Some(alias_pkg) = package_clone.as_alias() {
                 let alias_key = alias_pkg.get_alias_of().to_string();
-                // TODO(phase-b): get_class on dyn PackageInterface; skipped because PhpMixed shim only
-                let _class_name = "Composer\\Package\\AliasPackage".to_string();
+                let aliased = packages.get(&alias_key).unwrap().clone();
+                let version = alias_pkg.get_version();
+                let pretty_version = alias_pkg.get_pretty_version();
                 // PHP: $packages[$key] = new $className($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
-                // TODO(phase-c): re-create the alias package over the mocked aliased handle.
-                let _aliased = packages.get(&alias_key).unwrap().clone();
-                let new_alias_package: PackageInterfaceHandle = todo!();
+                let new_alias_package: PackageInterfaceHandle =
+                    if package_clone.as_complete_alias_package().is_some() {
+                        let complete = aliased.as_complete_package().expect(
+                            "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
+                        );
+                        CompleteAliasPackageHandle::new(complete, version, pretty_version).into()
+                    } else {
+                        let real = aliased
+                            .as_package()
+                            .expect("AliasPackage requires aliasOf to be a real Package");
+                        AliasPackageHandle::new(real, version, pretty_version).into()
+                    };
                 packages.insert(key, new_alias_package);
             }
         }
