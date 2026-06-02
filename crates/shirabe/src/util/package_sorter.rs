@@ -6,7 +6,6 @@ use shirabe_php_shim::{strnatcasecmp, version_compare};
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackage;
 
 pub struct PackageSorter;
 
@@ -47,9 +46,7 @@ impl PackageSorter {
 
         for package in &packages {
             let mut links: IndexMap<String, Link> = package.get_requires();
-            // TODO(phase-b): check for RootAliasPackage as well; PackageInterface lacks as_any
-            let root_package: Option<&RootPackage> = None;
-            if let Some(root_package) = root_package {
+            if let Some(root_package) = package.as_root() {
                 links.extend(root_package.get_dev_requires());
             }
             for link in links.values() {

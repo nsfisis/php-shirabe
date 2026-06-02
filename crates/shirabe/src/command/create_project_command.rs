@@ -830,9 +830,11 @@ impl CreateProjectCommand {
                     format!("stability {}", stability)
                 }
             );
-            // TODO(phase-b): `$platformRequirementFilter instanceof IgnoreAllPlatformRequirementFilter`
-            let is_ignore_all: Option<&IgnoreAllPlatformRequirementFilter> = None;
-            if is_ignore_all.is_none()
+            let is_ignore_all = platform_requirement_filter
+                .as_any()
+                .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
+                .is_some();
+            if !is_ignore_all
                 && version_selector
                     .find_best_candidate(
                         &name,

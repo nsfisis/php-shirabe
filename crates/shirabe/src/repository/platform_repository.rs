@@ -1903,9 +1903,8 @@ impl PlatformRepository {
 
     // ---- helpers ----
 
-    fn is_complete_package(_package: PackageInterfaceHandle) -> bool {
-        // TODO(phase-b): use Any-style downcasting once the trait carries it.
-        true
+    fn is_complete_package(package: PackageInterfaceHandle) -> bool {
+        package.as_complete().is_some()
     }
 
     fn resource_bundle_get(_value: &PhpMixed, _key: &str) -> PhpMixed {
