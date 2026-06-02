@@ -792,7 +792,6 @@ impl HttpDownloader {
     ///
     /// @return ?string[]
     pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
-        // TODO(phase-b): `$e instanceof TransportException`
         let e_as_transport: Option<&TransportException> = e.downcast_ref::<TransportException>();
         if e_as_transport.is_none() {
             return None;

@@ -138,10 +138,15 @@ impl JsonFile {
         })() {
             Ok(j) => j,
             Err(e) => {
-                // TODO(phase-b): downcast e to TransportException to match the specific catch
-                let _te: &TransportException = todo!("downcast e to TransportException");
-                // PHP: throw new \RuntimeException($e->getMessage(), 0, $e); (rethrow wrapped)
-                // PHP fallback: throw new \RuntimeException('Could not read '.$this->path."\n\n".$e->getMessage());
+                // TransportException keeps its message verbatim; any other exception is wrapped
+                // with the "Could not read" prefix.
+                if let Some(te) = e.downcast_ref::<TransportException>() {
+                    return Err(RuntimeException {
+                        message: te.message.clone(),
+                        code: 0,
+                    }
+                    .into());
+                }
                 return Err(RuntimeException {
                     message: format!("Could not read {}\n\n{}", self.path, e),
                     code: 0,

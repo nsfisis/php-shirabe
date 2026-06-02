@@ -149,8 +149,9 @@ pub trait VcsDownloader:
             match attempt {
                 Ok(promise) => return Ok(promise),
                 Err(e) => {
-                    // rethrow phpunit exceptions to avoid hard to debug bug failures
-                    // TODO(phase-b): downcast to PHPUnit\Framework\Exception
+                    // rethrow phpunit exceptions to avoid hard to debug bug failures.
+                    // PHPUnit\Framework\Exception is out of scope (the test framework is not
+                    // ported), so this instanceof check is always false.
                     let is_phpunit_exception = false;
                     if is_phpunit_exception {
                         return Err(e);
@@ -265,8 +266,9 @@ pub trait VcsDownloader:
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
-                    // rethrow phpunit exceptions to avoid hard to debug bug failures
-                    // TODO(phase-b): downcast to PHPUnit\Framework\Exception
+                    // rethrow phpunit exceptions to avoid hard to debug bug failures.
+                    // PHPUnit\Framework\Exception is out of scope (the test framework is not
+                    // ported), so this instanceof check is always false.
                     let is_phpunit_exception = false;
                     if is_phpunit_exception {
                         return Err(e);
@@ -344,8 +346,9 @@ pub trait VcsDownloader:
                     break;
                 }
                 Err(e) => {
-                    // rethrow phpunit exceptions to avoid hard to debug bug failures
-                    // TODO(phase-b): downcast to PHPUnit\Framework\Exception
+                    // rethrow phpunit exceptions to avoid hard to debug bug failures.
+                    // PHPUnit\Framework\Exception is out of scope (the test framework is not
+                    // ported), so this instanceof check is always false.
                     let is_phpunit_exception = false;
                     if is_phpunit_exception {
                         return Err(e);

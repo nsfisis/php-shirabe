@@ -395,12 +395,20 @@ impl RepositorySet {
             match attempt {
                 Ok(_) => {}
                 Err(e) => {
-                    // TODO(phase-b): downcast e to \Composer\Downloader\TransportException
-                    let _te: &TransportException = todo!("downcast e to TransportException");
+                    // PHP catches only \Composer\Downloader\TransportException; other
+                    // exceptions propagate uncaught.
+                    if e.downcast_ref::<TransportException>().is_none() {
+                        return Err(e);
+                    }
                     if !ignore_unreachable {
                         return Err(e);
                     }
-                    unreachable_repos.push(e.to_string());
+                    let message = e
+                        .downcast_ref::<TransportException>()
+                        .unwrap()
+                        .message
+                        .clone();
+                    unreachable_repos.push(message);
                 }
             }
         }

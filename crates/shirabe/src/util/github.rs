@@ -241,7 +241,6 @@ impl GitHub {
         {
             Ok(_) => {}
             Err(te) => {
-                // TODO(phase-b): downcast anyhow::Error to TransportException for status code
                 let code = te
                     .downcast_ref::<crate::downloader::TransportException>()
                     .and_then(|t| t.get_status_code())

@@ -184,9 +184,15 @@ impl SvnDriver {
             let composer: Option<IndexMap<String, PhpMixed>> = match base_result {
                 Ok(c) => c,
                 Err(e) => {
-                    // TODO(phase-b): downcast to TransportException
-                    let _te: &TransportException = todo!("downcast e to TransportException");
-                    let message = e.to_string();
+                    // PHP catches only TransportException; other exceptions propagate uncaught.
+                    if e.downcast_ref::<TransportException>().is_none() {
+                        return Err(e);
+                    }
+                    let message = e
+                        .downcast_ref::<TransportException>()
+                        .unwrap()
+                        .message
+                        .clone();
                     if stripos(&message, "path not found").is_none()
                         && stripos(&message, "svn: warning: W160013").is_none()
                     {

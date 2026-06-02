@@ -246,21 +246,25 @@ impl DownloadManager {
                 Ok(r) => r,
                 Err(e) => {
                     // PHP closure handleError: rethrow if not RuntimeException or if IrrecoverableDownloadException
-                    // TODO(phase-b): downcast for instanceof checks
-                    let is_runtime: bool = todo!("e instanceof RuntimeException");
-                    let is_irrecoverable: bool =
-                        todo!("e instanceof IrrecoverableDownloadException");
+                    let is_runtime = e.downcast_ref::<RuntimeException>().is_some();
+                    let is_irrecoverable =
+                        e.downcast_ref::<IrrecoverableDownloadException>().is_some();
                     if is_runtime && !is_irrecoverable {
                         if sources.is_empty() {
                             return Err(e);
                         }
 
+                        let message = e
+                            .downcast_ref::<RuntimeException>()
+                            .unwrap()
+                            .message
+                            .clone();
                         self.io.write_error3(
                             &format!(
                                 "    <warning>Failed to download {} from {}: {}</warning>",
                                 package.get_pretty_name(),
                                 source,
-                                e,
+                                message,
                             ),
                             true,
                             io_interface::NORMAL,
@@ -367,13 +371,20 @@ impl DownloadManager {
             {
                 Ok(p) => return Ok(p),
                 Err(e) => {
-                    // TODO(phase-b): downcast to RuntimeException
-                    let _re: &RuntimeException = todo!("downcast e to RuntimeException");
+                    // PHP catches only \RuntimeException; other exceptions propagate uncaught.
+                    if e.downcast_ref::<RuntimeException>().is_none() {
+                        return Err(e);
+                    }
                     if !self.io.is_interactive() {
                         return Err(e);
                     }
+                    let message = e
+                        .downcast_ref::<RuntimeException>()
+                        .unwrap()
+                        .message
+                        .clone();
                     self.io.write_error3(
-                        &format!("<error>    Update failed ({})</error>", e,),
+                        &format!("<error>    Update failed ({})</error>", message),
                         true,
                         io_interface::NORMAL,
                     );

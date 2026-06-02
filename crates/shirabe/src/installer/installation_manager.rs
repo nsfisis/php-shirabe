@@ -208,7 +208,6 @@ impl InstallationManager {
             let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
             for (index, operation) in operations.into_iter().enumerate() {
                 let index = index as i64;
-                // PHP: $operation instanceof UpdateOperation || $operation instanceof InstallOperation
                 let package: Option<PackageInterfaceHandle> =
                     if let Some(update) = operation.as_update_operation() {
                         Some(update.get_target_package())
@@ -367,7 +366,6 @@ impl InstallationManager {
         let mut batches: Vec<IndexMap<i64, Box<dyn OperationInterface>>> = vec![];
         let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
         for (index, operation) in operations {
-            // PHP: $operation instanceof InstallOperation || $operation instanceof UpdateOperation
             let package: Option<PackageInterfaceHandle> =
                 if let Some(update) = operation.as_update_operation() {
                     Some(update.get_target_package())
@@ -444,7 +442,6 @@ impl InstallationManager {
                         io_interface::NORMAL,
                     );
                 }
-                // PHP: $this->{$opType}($repo, $operation);
                 match op_type.as_str() {
                     "markAliasInstalled" => {
                         let op = operation
