@@ -309,9 +309,11 @@ impl RuleSetGenerator {
         for package in request.get_fixed_packages().values() {
             if package.get_id() == -1 {
                 // fixed package was not added to the pool as it did not pass the stability requirements, this is fine
-                // TODO(phase-c): wire Pool::is_unacceptable_fixed_or_locked_package(package) here;
-                // the package handle and the pool's identity check are now both handle-based.
-                if todo!("is_unacceptable_fixed_or_locked_package with a request package handle") {
+                if self
+                    .pool
+                    .borrow()
+                    .is_unacceptable_fixed_or_locked_package(package.clone())
+                {
                     continue;
                 }
 

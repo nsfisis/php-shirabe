@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
 
+use crate::advisory::PartialOrFullSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
-use crate::repository::PartialOrSecurityAdvisory;
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -18,7 +18,7 @@ fn serialize_constraint<S: serde::Serializer>(
     serializer.serialize_str(&c.get_pretty_string())
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PartialSecurityAdvisory {
     pub advisory_id: String,
@@ -32,7 +32,7 @@ impl PartialSecurityAdvisory {
         package_name: &str,
         data: &IndexMap<String, PhpMixed>,
         parser: &VersionParser,
-    ) -> Result<PartialOrSecurityAdvisory> {
+    ) -> Result<PartialOrFullSecurityAdvisory> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
         let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
@@ -81,10 +81,10 @@ impl PartialSecurityAdvisory {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
             );
-            return Ok(PartialOrSecurityAdvisory::Full(advisory));
+            return Ok(PartialOrFullSecurityAdvisory::Full(advisory));
         }
 
-        Ok(PartialOrSecurityAdvisory::Partial(Self {
+        Ok(PartialOrFullSecurityAdvisory::Partial(Self {
             advisory_id: data["advisoryId"].as_string().unwrap_or("").to_string(),
             package_name: package_name.to_string(),
             affected_versions: constraint,

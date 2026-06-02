@@ -11,6 +11,7 @@ use shirabe_php_shim::{
 };
 
 use crate::advisory::IgnoredSecurityAdvisory;
+use crate::advisory::PartialOrFullSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::io::ConsoleIO;
 use crate::io::IOInterface;
@@ -19,7 +20,6 @@ use crate::package::CompletePackageInterfaceHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::base_package::BasePackage;
-use crate::repository::PartialOrSecurityAdvisory;
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
 
@@ -182,7 +182,7 @@ impl Auditor {
         let error_or_warn = if warning_only { "warning" } else { "error" };
         if affected_packages_count > 0 || ignored_advisories.len() > 0 {
             let passes: Vec<(
-                &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+                &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
                 String,
             )> = vec![
                 (
@@ -243,12 +243,12 @@ impl Auditor {
         Ok(audit_bitmask)
     }
 
-    /// @param array<string, array<SecurityAdvisory|PartialOrSecurityAdvisory>> $advisories
+    /// @param array<string, array<SecurityAdvisory|PartialOrFullSecurityAdvisory>> $advisories
     /// @param array<string, string|null> $ignoreList
     /// @return bool
     pub fn needs_complete_advisory_load(
         &self,
-        advisories: &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
         ignore_list: &IndexMap<String, Option<String>>,
     ) -> bool {
         if advisories.len() == 0 {
@@ -256,16 +256,20 @@ impl Auditor {
         }
 
         // no partial advisories present
-        let advisories_values: Vec<&Vec<PartialOrSecurityAdvisory>> = advisories.values().collect();
+        let advisories_values: Vec<&Vec<PartialOrFullSecurityAdvisory>> =
+            advisories.values().collect();
         if array_all(
             &advisories_values,
-            |pkg_advisories: &&Vec<PartialOrSecurityAdvisory>| {
-                array_all(pkg_advisories, |_advisory: &PartialOrSecurityAdvisory| {
-                    // TODO(phase-b): `$advisory instanceof SecurityAdvisory` — needs an advisory
-                    // enum or trait downcast; SecurityAdvisoriesResult currently only holds
-                    // PartialOrSecurityAdvisory so this is hard-coded to false
-                    false
-                })
+            |pkg_advisories: &&Vec<PartialOrFullSecurityAdvisory>| {
+                array_all(
+                    pkg_advisories,
+                    |_advisory: &PartialOrFullSecurityAdvisory| {
+                        // TODO(phase-b): `$advisory instanceof SecurityAdvisory` — needs an advisory
+                        // enum or trait downcast; SecurityAdvisoriesResult currently only holds
+                        // PartialOrFullSecurityAdvisory so this is hard-coded to false
+                        false
+                    },
+                )
             },
         ) {
             return false;
@@ -307,13 +311,9 @@ impl Auditor {
         Ok(result)
     }
 
-    /// @phpstan-param array<string, array<PartialOrSecurityAdvisory|SecurityAdvisory>> $allAdvisories
-    /// @param array<string, string|null> $ignoreList List of advisory IDs, remote IDs, CVE IDs or package names that reported but not listed as vulnerabilities.
-    /// @param array<string, string|null> $ignoredSeverities List of ignored severity levels
-    /// @phpstan-return array{advisories: array<string, array<PartialOrSecurityAdvisory|SecurityAdvisory>>, ignoredAdvisories: array<string, array<PartialOrSecurityAdvisory|SecurityAdvisory>>}
     pub fn process_advisories(
         &self,
-        all_advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        all_advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
         ignore_list: &IndexMap<String, Option<String>>,
         ignored_severities: &IndexMap<String, Option<String>>,
     ) -> ProcessAdvisoriesResult {
@@ -324,8 +324,8 @@ impl Auditor {
             };
         }
 
-        let mut advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
-        let mut ignored: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
+        let mut ignored: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
         let mut ignore_reason: Option<String> = None;
 
         for (package, pkg_advisories) in all_advisories {
@@ -347,7 +347,7 @@ impl Auditor {
 
                 // TODO(phase-b): `$advisory instanceof SecurityAdvisory` — needs an advisory enum
                 // or trait downcast; the block below is skipped while SecurityAdvisoriesResult
-                // only holds PartialOrSecurityAdvisory
+                // only holds PartialOrFullSecurityAdvisory
                 let advisory_as_full: Option<&SecurityAdvisory> = None;
                 if let Some(full) = advisory_as_full {
                     if is_string(&PhpMixed::String(full.severity.clone().unwrap_or_default()))
@@ -411,11 +411,10 @@ impl Auditor {
         }
     }
 
-    /// @param array<string, array<PartialOrSecurityAdvisory>> $advisories
     /// @return array{int, int} Count of affected packages and total count of advisories
     fn count_advisories(
         &self,
-        advisories: &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
     ) -> (i64, i64) {
         let mut count: i64 = 0;
         for package_advisories in advisories.values() {
@@ -430,7 +429,7 @@ impl Auditor {
     fn output_advisories(
         &self,
         io: &mut dyn IOInterface,
-        advisories: &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
         format: &str,
     ) -> Result<()> {
         match format {
@@ -469,7 +468,7 @@ impl Auditor {
     fn output_advisories_table(
         &self,
         io: &ConsoleIO,
-        advisories: &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
     ) {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
@@ -483,7 +482,7 @@ impl Auditor {
                     "Affected versions".to_string(),
                     "Reported at".to_string(),
                 ];
-                // TODO(phase-b): advisory typed PartialOrSecurityAdvisory; PHP accesses
+                // TODO(phase-b): advisory typed PartialOrFullSecurityAdvisory; PHP accesses
                 // SecurityAdvisory fields (title, link, reportedAt, etc.)
                 let _ = advisory;
                 let row: Vec<String> = vec![
@@ -519,7 +518,7 @@ impl Auditor {
     fn output_advisories_plain(
         &self,
         io: &mut dyn IOInterface,
-        advisories: &IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+        advisories: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
     ) {
         let mut error: Vec<String> = vec![];
         let mut first_advisory = true;
@@ -528,7 +527,7 @@ impl Auditor {
                 if !first_advisory {
                     error.push("--------".to_string());
                 }
-                // TODO(phase-b): advisory typed PartialOrSecurityAdvisory; PHP accesses
+                // TODO(phase-b): advisory typed PartialOrFullSecurityAdvisory; PHP accesses
                 // SecurityAdvisory fields
                 let _ = advisory;
                 error.push(format!("Package: {}", /* advisory.packageName */ ""));
@@ -687,7 +686,7 @@ impl Auditor {
     }
 
     fn get_advisory_id(&self, advisory: &SecurityAdvisory) -> String {
-        // TODO(phase-b): advisory.advisory_id lives on inner PartialOrSecurityAdvisory
+        // TODO(phase-b): advisory.advisory_id lives on inner PartialOrFullSecurityAdvisory
         let advisory_id: &str = "";
         let _ = advisory;
         if str_starts_with(advisory_id, "PKSA-") {
@@ -747,6 +746,6 @@ impl Auditor {
 
 #[derive(Debug)]
 pub struct ProcessAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
-    pub ignored_advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
+    pub ignored_advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
 }

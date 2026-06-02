@@ -29,6 +29,7 @@ use crate::json::JsonValidationException;
 use crate::package::base_package::{self, BasePackage};
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryFactory;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
@@ -733,7 +734,7 @@ impl InitCommand {
                 "stable".to_string()
             };
         // TODO(phase-b): repos instanceof CompositeRepository downcast
-        let _platform_repo: Option<&PlatformRepository> = None;
+        let _platform_repo: Option<&PlatformRepositoryHandle> = None;
 
         // (omitted: iterate repos to find PlatformRepository instance)
 

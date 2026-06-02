@@ -7,7 +7,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use crate::advisory::IgnoredSecurityAdvisory;
 use crate::advisory::PartialSecurityAdvisory;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecurityAdvisory {
     #[serde(flatten)]

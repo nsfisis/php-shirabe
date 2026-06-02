@@ -1,29 +1,13 @@
 //! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
 
-use crate::advisory::PartialSecurityAdvisory;
-use crate::advisory::SecurityAdvisory;
+use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
-pub enum PartialOrSecurityAdvisory {
-    Partial(PartialSecurityAdvisory),
-    Full(SecurityAdvisory),
-}
-
-impl PartialOrSecurityAdvisory {
-    pub fn advisory_id(&self) -> &str {
-        match self {
-            PartialOrSecurityAdvisory::Partial(p) => &p.advisory_id,
-            PartialOrSecurityAdvisory::Full(s) => s.advisory_id(),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub struct SecurityAdvisoryResult {
     pub names_found: Vec<String>,
-    pub advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
 }
 
 pub trait AdvisoryProviderInterface {

@@ -209,8 +209,7 @@ impl PoolOptimizer {
             pool.get_unacceptable_fixed_or_locked_packages().clone(),
             removed_versions,
             self.removed_versions_by_package.clone(),
-            // TODO(phase-b): PartialSecurityAdvisory is a PHP class (no Clone). Need shared ownership rework.
-            todo!("pool.get_all_security_removed_package_versions().clone()"),
+            pool.get_all_security_removed_package_versions().clone(),
             pool.get_all_abandoned_removed_package_versions().clone(),
         )
     }

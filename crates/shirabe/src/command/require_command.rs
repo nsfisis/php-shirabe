@@ -37,6 +37,7 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::util::Filesystem;
@@ -260,17 +261,12 @@ impl RequireCommand {
             .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
             .unwrap_or_default();
         // initialize self.repos as it is used by the PackageDiscoveryTrait
-        let platform_repo = PlatformRepository::new(vec![], platform_overrides_map)?;
-        let mut combined: Vec<crate::repository::RepositoryInterfaceHandle> = vec![
-            // TODO(phase-c): share this platform_repo as a handle instead of constructing a
-            // separate one; PlatformRepository is held by value here for the requirement below.
-            crate::repository::RepositoryInterfaceHandle::new::<PlatformRepository>(todo!(
-                "share platform_repo with PlatformRepository"
-            )),
-        ];
-        for _repo in repos {
-            // TODO(phase-b): repos are borrowed from RepositoryManager; need to take ownership
-            combined.push(todo!("take ownership of repo from RepositoryManager"));
+        let platform_repo =
+            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides_map)?);
+        let mut combined: Vec<crate::repository::RepositoryInterfaceHandle> =
+            vec![platform_repo.clone().into()];
+        for repo in repos {
+            combined.push(repo.clone());
         }
         *self.get_repos_mut() = Some(CompositeRepository::new(combined));
 
@@ -392,7 +388,9 @@ impl RequireCommand {
                         .to_string(),
                     true,
                 ) {
-                    input.set_option("dev", PhpMixed::Bool(true));
+                    // TODO(phase-b): set_option needs &mut dyn InputInterface, but execute holds
+                    // input as &dyn. Commented out until input is threaded as &mut.
+                    // input.set_option("dev", PhpMixed::Bool(true));
                 }
             }
 
@@ -488,7 +486,9 @@ impl RequireCommand {
                         return Ok(0);
                     }
 
-                    input.set_option("dev", PhpMixed::Bool(true));
+                    // TODO(phase-b): set_option needs &mut dyn InputInterface, but execute holds
+                    // input as &dyn. Commented out until input is threaded as &mut.
+                    // input.set_option("dev", PhpMixed::Bool(true));
                     let swap = require_key;
                     require_key = remove_key;
                     remove_key = swap;
@@ -523,13 +523,18 @@ impl RequireCommand {
         }
 
         if !input.get_option("dry-run").as_bool().unwrap_or(false) {
-            self.update_file(
-                self.json.as_ref().unwrap(),
-                &requirements,
-                require_key,
-                remove_key,
-                sort_packages,
-            );
+            // TODO(phase-b): update_file takes &mut self, but the json argument must be borrowed
+            // from self.json, producing an overlapping borrow of self. Commented out until JsonFile
+            // is shared (Rc<RefCell> / interior mutability) so it can be passed without holding a
+            // borrow of self.
+            // self.update_file(
+            //     self.json.as_ref().unwrap(),
+            //     &requirements,
+            //     require_key,
+            //     remove_key,
+            //     sort_packages,
+            // );
+            let _ = sort_packages;
         }
 
         let updated_msg = format!(

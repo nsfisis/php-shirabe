@@ -496,8 +496,6 @@ impl UpdateCommand {
             io_interface::NORMAL,
         );
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
-        // TODO(phase-c): wire the non-locked branch through get_local_repository().get_packages()
-        // (returns Vec<BasePackageHandle>); only the locker branch is populated for now.
         let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
                 CanonicalPackagesTrait::get_packages(
@@ -508,12 +506,11 @@ impl UpdateCommand {
                         .borrow(),
                 )
             } else {
-                let _ = composer_ref
+                composer_ref
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .get_packages();
-                Vec::new()
+                    .get_packages()
             };
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {

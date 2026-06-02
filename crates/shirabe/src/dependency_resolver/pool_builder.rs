@@ -352,7 +352,7 @@ impl PoolBuilder {
 
         // filter vulnerable packages before optimizing the pool otherwise we may end up with inconsistent state where the optimizer took away versions
         // that were not vulnerable and now suddenly the vulnerable ones are removed and we are missing some versions to make it solvable
-        pool = self.run_security_advisory_filter(pool, &repositories, request);
+        pool = self.run_security_advisory_filter(pool, &repositories, request)?;
         pool = self.run_optimizer(request, pool);
 
         Intervals::clear();
@@ -1110,9 +1110,9 @@ impl PoolBuilder {
         pool: Pool,
         repositories: &Vec<RepositoryInterfaceHandle>,
         request: &Request,
-    ) -> Pool {
+    ) -> anyhow::Result<Pool> {
         if self.security_advisory_pool_filter.is_none() {
-            return pool;
+            return Ok(pool);
         }
 
         self.io.debug("Running security advisory pool filter.", &[]);
@@ -1121,16 +1121,16 @@ impl PoolBuilder {
         let total = pool.get_packages().len() as f64;
 
         let repos_owned: Vec<RepositoryInterfaceHandle> = repositories.iter().cloned().collect();
-        let pool =
-            self.security_advisory_pool_filter
-                .as_mut()
-                .unwrap()
-                .filter(pool, repos_owned, request);
+        let pool = self
+            .security_advisory_pool_filter
+            .as_mut()
+            .unwrap()
+            .filter(pool, repos_owned, request)?;
 
         let filtered = total - (pool.get_packages().len() as f64);
 
         if 0.0 == filtered {
-            return pool;
+            return Ok(pool);
         }
 
         self.io.write3(
@@ -1154,6 +1154,6 @@ impl PoolBuilder {
             io_interface::VERY_VERBOSE,
         );
 
-        pool
+        Ok(pool)
     }
 }

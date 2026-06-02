@@ -26,6 +26,7 @@ use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
@@ -147,7 +148,7 @@ pub trait PackageDiscoveryTrait {
         input: &dyn InputInterface,
         _output: &dyn OutputInterface,
         mut requires: Vec<String>,
-        platform_repo: Option<&PlatformRepository>,
+        platform_repo: Option<&PlatformRepositoryHandle>,
         preferred_stability: &str,
         use_best_version_constraint: bool,
         fixed: bool,
@@ -488,7 +489,7 @@ pub trait PackageDiscoveryTrait {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         input: &dyn InputInterface,
         name: &str,
-        platform_repo: Option<&PlatformRepository>,
+        platform_repo: Option<&PlatformRepositoryHandle>,
         preferred_stability: &str,
         fixed: bool,
     ) -> Result<(String, String)> {
@@ -859,13 +860,14 @@ pub trait PackageDiscoveryTrait {
     fn get_platform_exception_details(
         &self,
         candidate: PackageInterfaceHandle,
-        platform_repo: Option<&PlatformRepository>,
+        platform_repo: Option<&PlatformRepositoryHandle>,
     ) -> String {
         let mut details: Vec<String> = vec![];
         let platform_repo = match platform_repo {
             None => return String::new(),
             Some(p) => p,
         };
+        let platform_repo = platform_repo.borrow();
 
         for link in candidate.get_requires().values() {
             if !PlatformRepository::is_platform_package(link.get_target()) {

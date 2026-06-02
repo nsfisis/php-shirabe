@@ -15,7 +15,7 @@ use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::PartialSecurityAdvisory;
+use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory};
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
@@ -41,7 +41,7 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::repository::RepositorySecurityException;
-use crate::repository::{PartialOrSecurityAdvisory, SecurityAdvisoryResult};
+use crate::repository::SecurityAdvisoryResult;
 use crate::repository::{SEARCH_FULLTEXT, SEARCH_VENDOR};
 use crate::util::HttpDownloader;
 use crate::util::Url;
@@ -1038,7 +1038,7 @@ impl ComposerRepository {
             });
         }
 
-        let mut advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
 
         let api_url = self
@@ -1062,9 +1062,9 @@ impl ComposerRepository {
         let create = |data: &IndexMap<String, PhpMixed>,
                       name: &str,
                       package_constraint_map: &IndexMap<String, AnyConstraint>|
-         -> anyhow::Result<Option<PartialOrSecurityAdvisory>> {
+         -> anyhow::Result<Option<PartialOrFullSecurityAdvisory>> {
             let advisory = PartialSecurityAdvisory::create(name, data, &semver_parser)?;
-            let is_full = matches!(advisory, PartialOrSecurityAdvisory::Full(_));
+            let is_full = matches!(advisory, PartialOrFullSecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
                 let data_mixed = PhpMixed::Array(
                     data.iter()
@@ -1084,8 +1084,8 @@ impl ComposerRepository {
                 .into());
             }
             let affected_versions: &AnyConstraint = match &advisory {
-                PartialOrSecurityAdvisory::Partial(p) => &p.affected_versions,
-                PartialOrSecurityAdvisory::Full(p) => p.affected_versions(),
+                PartialOrFullSecurityAdvisory::Partial(p) => &p.affected_versions,
+                PartialOrFullSecurityAdvisory::Full(p) => p.affected_versions(),
             };
             let constraint = package_constraint_map.get(name);
             if let Some(c) = constraint {
@@ -1138,7 +1138,7 @@ impl ComposerRepository {
 
                 names_found.insert(name.clone(), true);
                 if !sec_advs_arr.is_empty() {
-                    let mut entries: Vec<PartialOrSecurityAdvisory> = Vec::new();
+                    let mut entries: Vec<PartialOrFullSecurityAdvisory> = Vec::new();
                     for (_k, data_mixed) in sec_advs_arr.iter() {
                         if let Some(data) = data_mixed.as_array() {
                             let data_map: IndexMap<String, PhpMixed> = data
@@ -1229,7 +1229,7 @@ impl ComposerRepository {
                         None => continue,
                     };
                     if !list.is_empty() {
-                        let mut entries: Vec<PartialOrSecurityAdvisory> = Vec::new();
+                        let mut entries: Vec<PartialOrFullSecurityAdvisory> = Vec::new();
                         for data_mixed in list.iter() {
                             if let Some(data) = data_mixed.as_array() {
                                 let data_map: IndexMap<String, PhpMixed> = data
@@ -1249,7 +1249,7 @@ impl ComposerRepository {
             }
         }
 
-        let advisories_filtered: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = advisories
+        let advisories_filtered: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = advisories
             .into_iter()
             .filter(|(_, adv)| !adv.is_empty())
             .collect();

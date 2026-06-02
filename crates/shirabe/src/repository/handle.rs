@@ -11,7 +11,8 @@ use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{
     FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
-    ProviderInfo, RepositoryInterface, SearchResult, WritableRepositoryInterface,
+    PlatformRepository, ProviderInfo, RepositoryInterface, SearchResult,
+    WritableRepositoryInterface,
 };
 
 /// Shared reference to a repository. Corresponds to PHP `RepositoryInterface`.
@@ -173,8 +174,7 @@ impl std::hash::Hash for RepositoryInterfaceHandle {
     }
 }
 
-/// Typed shared handle over `LockArrayRepository`. Preserves the PHP `?LockArrayRepository`
-/// typing where a `RepositoryInterfaceHandle` would be too wide.
+/// Typed shared handle over `LockArrayRepository`.
 #[derive(Debug, Clone)]
 pub struct LockArrayRepositoryHandle(Rc<RefCell<LockArrayRepository>>);
 
@@ -227,6 +227,64 @@ impl PartialEq for LockArrayRepositoryHandle {
 impl Eq for LockArrayRepositoryHandle {}
 
 impl std::hash::Hash for LockArrayRepositoryHandle {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.ptr_id().hash(state);
+    }
+}
+
+/// Typed shared handle over `PlatformRepository`.
+#[derive(Debug, Clone)]
+pub struct PlatformRepositoryHandle(Rc<RefCell<PlatformRepository>>);
+
+impl PlatformRepositoryHandle {
+    pub fn new(repository: PlatformRepository) -> Self {
+        let rc: Rc<RefCell<PlatformRepository>> = Rc::new(RefCell::new(repository));
+        let rc_dyn: Rc<RefCell<dyn RepositoryInterface>> = rc.clone();
+        rc.borrow().set_self_handle(Rc::downgrade(&rc_dyn));
+        Self(rc)
+    }
+
+    pub fn from_rc(rc: Rc<RefCell<PlatformRepository>>) -> Self {
+        Self(rc)
+    }
+
+    pub fn as_rc(&self) -> &Rc<RefCell<PlatformRepository>> {
+        &self.0
+    }
+
+    pub fn borrow(&self) -> Ref<'_, PlatformRepository> {
+        self.0.borrow()
+    }
+
+    pub fn borrow_mut(&self) -> RefMut<'_, PlatformRepository> {
+        self.0.borrow_mut()
+    }
+
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    pub fn ptr_id(&self) -> usize {
+        Rc::as_ptr(&self.0) as *const () as usize
+    }
+}
+
+impl From<PlatformRepositoryHandle> for RepositoryInterfaceHandle {
+    fn from(h: PlatformRepositoryHandle) -> Self {
+        let rc: Rc<RefCell<dyn RepositoryInterface>> = h.0;
+        RepositoryInterfaceHandle::from_rc(rc)
+    }
+}
+
+impl PartialEq for PlatformRepositoryHandle {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for PlatformRepositoryHandle {}
+
+impl std::hash::Hash for PlatformRepositoryHandle {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ptr_id().hash(state);
     }

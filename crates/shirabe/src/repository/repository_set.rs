@@ -13,8 +13,7 @@ use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::PartialSecurityAdvisory;
-use crate::advisory::SecurityAdvisory;
+use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolBuilder;
 use crate::dependency_resolver::PoolOptimizer;
@@ -29,12 +28,12 @@ use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
+use crate::repository::AdvisoryProviderInterface;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledRepository;
 use crate::repository::InstalledRepositoryInterface;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
-use crate::repository::{AdvisoryProviderInterface, PartialOrSecurityAdvisory};
 use crate::repository::{FindPackageConstraint, RepositoryInterface, RepositoryInterfaceHandle};
 
 #[derive(Debug, Clone)]
@@ -372,8 +371,8 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,
-    ) -> Result<IndexMap<String, Vec<PartialOrSecurityAdvisory>>> {
-        let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrSecurityAdvisory>>> = vec![];
+    ) -> Result<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> {
+        let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
             // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<()> = (|| -> Result<()> {
@@ -646,6 +645,6 @@ impl RepositorySet {
 
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
     pub unreachable_repos: Vec<String>,
 }

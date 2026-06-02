@@ -1,15 +1,13 @@
 //! ref: composer/src/Composer/Repository/PackageRepository.php
 
-use crate::advisory::PartialSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
+use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory};
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionParser;
 use crate::repository::ArrayRepository;
 use crate::repository::InvalidRepositoryException;
-use crate::repository::{
-    AdvisoryProviderInterface, PartialOrSecurityAdvisory, SecurityAdvisoryResult,
-};
+use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{Exception, PhpMixed, RuntimeException, var_export};
@@ -97,7 +95,7 @@ impl AdvisoryProviderInterface for PackageRepository {
         let semver_parser = shirabe_semver::version_parser::VersionParser;
         let _ = parser;
 
-        let mut advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
             if !package_constraint_map.contains_key(package_name.as_str()) {
                 continue;
@@ -106,7 +104,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                 PhpMixed::List(list) => list,
                 _ => continue,
             };
-            let mut items: Vec<PartialOrSecurityAdvisory> = Vec::new();
+            let mut items: Vec<PartialOrFullSecurityAdvisory> = Vec::new();
             for data in list {
                 let data_map: IndexMap<String, PhpMixed> = match data.as_ref() {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect(),
@@ -121,7 +119,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                     Err(_) => continue,
                 };
                 if !allow_partial_advisories
-                    && matches!(advisory, PartialOrSecurityAdvisory::Partial(_))
+                    && matches!(advisory, PartialOrFullSecurityAdvisory::Partial(_))
                 {
                     return Err(anyhow::anyhow!(RuntimeException {
                         message: format!(
@@ -141,7 +139,7 @@ impl AdvisoryProviderInterface for PackageRepository {
         }
 
         let names_found: Vec<String> = advisories.keys().cloned().collect();
-        let advisories: IndexMap<String, Vec<PartialOrSecurityAdvisory>> = advisories
+        let advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = advisories
             .into_iter()
             .filter(|(_, adv)| !adv.is_empty())
             .collect();
