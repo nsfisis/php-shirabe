@@ -208,25 +208,32 @@ impl InstallationManager {
             let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
             for (index, operation) in operations.into_iter().enumerate() {
                 let index = index as i64;
-                // TODO(phase-b): instanceof downcasts for UpdateOperation/InstallOperation
-                let is_update_or_install = false;
-                if is_update_or_install {
-                    let package: Option<PackageInterfaceHandle> = None;
-                    let _ = package;
-                    let extra: IndexMap<String, PhpMixed> = IndexMap::new();
-                    if extra
-                        .get("plugin-modifies-downloads")
-                        .and_then(|v| v.as_bool())
-                        == Some(true)
-                    {
-                        if (batch.len() as i64) > 0 {
-                            batches.push(std::mem::take(&mut batch));
-                        }
-                        let mut single = IndexMap::new();
-                        single.insert(index, operation);
-                        batches.push(single);
+                // PHP: $operation instanceof UpdateOperation || $operation instanceof InstallOperation
+                let package: Option<PackageInterfaceHandle> =
+                    if let Some(update) = operation.as_update_operation() {
+                        Some(update.get_target_package())
+                    } else {
+                        operation
+                            .as_install_operation()
+                            .map(|install| install.get_package())
+                    };
+                if let Some(package) = package {
+                    if package.get_type() == "composer-plugin" {
+                        let extra = package.get_extra();
+                        if extra
+                            .get("plugin-modifies-downloads")
+                            .and_then(|v| v.as_bool())
+                            == Some(true)
+                        {
+                            if (batch.len() as i64) > 0 {
+                                batches.push(std::mem::take(&mut batch));
+                            }
+                            let mut single = IndexMap::new();
+                            single.insert(index, operation);
+                            batches.push(single);
 
-                        continue;
+                            continue;
+                        }
                     }
                 }
                 batch.insert(index, operation);
@@ -360,11 +367,17 @@ impl InstallationManager {
         let mut batches: Vec<IndexMap<i64, Box<dyn OperationInterface>>> = vec![];
         let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
         for (index, operation) in operations {
-            // TODO(phase-b): instanceof InstallOperation/UpdateOperation downcasts
-            let is_install_or_update = false;
-            if is_install_or_update {
-                // TODO(phase-b): package type check (composer-plugin / composer-installer)
-                let pkg_type = "";
+            // PHP: $operation instanceof InstallOperation || $operation instanceof UpdateOperation
+            let package: Option<PackageInterfaceHandle> =
+                if let Some(update) = operation.as_update_operation() {
+                    Some(update.get_target_package())
+                } else {
+                    operation
+                        .as_install_operation()
+                        .map(|install| install.get_package())
+                };
+            if let Some(package) = package {
+                let pkg_type = package.get_type();
                 if pkg_type == "composer-plugin" || pkg_type == "composer-installer" {
                     if (batch.len() as i64) > 0 {
                         batches.push(std::mem::take(&mut batch));
@@ -434,10 +447,22 @@ impl InstallationManager {
                 // PHP: $this->{$opType}($repo, $operation);
                 match op_type.as_str() {
                     "markAliasInstalled" => {
-                        // TODO(phase-b): downcast operation to MarkAliasInstalledOperation
+                        let op = operation
+                            .as_any()
+                            .downcast_ref::<MarkAliasInstalledOperation>()
+                            .expect(
+                                "op_type == \"markAliasInstalled\" implies MarkAliasInstalledOperation",
+                            );
+                        self.mark_alias_installed(repo, op);
                     }
                     "markAliasUninstalled" => {
-                        // TODO(phase-b): downcast operation to MarkAliasUninstalledOperation
+                        let op = operation
+                            .as_any()
+                            .downcast_ref::<MarkAliasUninstalledOperation>()
+                            .expect(
+                                "op_type == \"markAliasUninstalled\" implies MarkAliasUninstalledOperation",
+                            );
+                        self.mark_alias_uninstalled(repo, op);
                     }
                     _ => {}
                 }
