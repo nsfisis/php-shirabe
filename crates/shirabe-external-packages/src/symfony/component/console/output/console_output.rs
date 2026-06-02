@@ -1,4 +1,5 @@
 use crate::symfony::component::console::formatter::OutputFormatter;
+use crate::symfony::component::console::output::ConsoleOutputInterface;
 use crate::symfony::component::console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -12,13 +13,27 @@ impl ConsoleOutput {
     ) -> Self {
         todo!()
     }
+}
 
-    pub fn get_error_output(&self) -> &dyn OutputInterface {
+impl ConsoleOutputInterface for ConsoleOutput {
+    fn get_error_output(&self) -> &dyn OutputInterface {
+        todo!()
+    }
+
+    fn set_error_output(&mut self, _error: Box<dyn OutputInterface>) {
         todo!()
     }
 }
 
 impl OutputInterface for ConsoleOutput {
+    fn is_console_output_interface(&self) -> bool {
+        true
+    }
+
+    fn as_console_output_interface(&self) -> Option<&dyn ConsoleOutputInterface> {
+        Some(self)
+    }
+
     fn write(&self, _messages: &str, _newline: bool, _type: i64) {
         todo!()
     }

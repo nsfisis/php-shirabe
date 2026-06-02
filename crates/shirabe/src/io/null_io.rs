@@ -138,7 +138,11 @@ impl IOInterfaceMutable for NullIO {
     }
 }
 
-impl IOInterface for NullIO {}
+impl IOInterface for NullIO {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 impl BaseIO for NullIO {
     fn authentications(

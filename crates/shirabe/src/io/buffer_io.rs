@@ -245,7 +245,11 @@ impl crate::io::IOInterfaceMutable for BufferIO {
     }
 }
 
-impl crate::io::IOInterface for BufferIO {}
+impl crate::io::IOInterface for BufferIO {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 impl crate::io::BaseIO for BufferIO {
     fn authentications(

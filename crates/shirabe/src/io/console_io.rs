@@ -142,10 +142,7 @@ impl ConsoleIO {
             messages
         };
 
-        if true == stderr && self.output.is_console_output_interface() {
-            // TODO(phase-b): downcast Box<dyn OutputInterface> to ConsoleOutputInterface
-            let console_output: &dyn ConsoleOutputInterface =
-                todo!("downcast self.output to ConsoleOutputInterface");
+        if stderr && let Some(console_output) = self.output.as_console_output_interface() {
             console_output.get_error_output().write(
                 &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
                 newline,
@@ -263,11 +260,8 @@ impl ConsoleIO {
     }
 
     fn get_error_output(&self) -> &dyn OutputInterface {
-        if self.output.is_console_output_interface() {
-            // TODO(phase-b): downcast Box<dyn OutputInterface> to ConsoleOutputInterface
-            return todo!(
-                "downcast self.output to ConsoleOutputInterface and call get_error_output()"
-            );
+        if let Some(console_output) = self.output.as_console_output_interface() {
+            return console_output.get_error_output();
         }
 
         &*self.output
@@ -677,7 +671,11 @@ impl IOInterfaceMutable for ConsoleIO {
     }
 }
 
-impl IOInterface for ConsoleIO {}
+impl IOInterface for ConsoleIO {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
 
 impl BaseIO for ConsoleIO {
     fn authentications(

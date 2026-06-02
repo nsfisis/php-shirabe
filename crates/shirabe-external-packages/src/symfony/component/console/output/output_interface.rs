@@ -1,4 +1,5 @@
 use crate::symfony::component::console::formatter::OutputFormatter;
+use crate::symfony::component::console::output::ConsoleOutputInterface;
 
 pub trait OutputInterface {
     // PHP class semantics: OutputInterface methods take &self with interior mutability,
@@ -19,6 +20,12 @@ pub trait OutputInterface {
     /// PHP: `$output instanceof ConsoleOutputInterface`. Default false; ConsoleOutput overrides.
     fn is_console_output_interface(&self) -> bool {
         false
+    }
+
+    /// PHP: `$output instanceof ConsoleOutputInterface`. Returns the output as a
+    /// ConsoleOutputInterface trait object when it is one. Default None; ConsoleOutput overrides.
+    fn as_console_output_interface(&self) -> Option<&dyn ConsoleOutputInterface> {
+        None
     }
 
     /// PHP: only StreamOutput exposes `getStream()`. Default panics for outputs without one.

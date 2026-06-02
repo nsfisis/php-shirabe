@@ -434,8 +434,7 @@ impl Auditor {
     ) -> Result<()> {
         match format {
             Self::FORMAT_TABLE => {
-                // TODO(phase-b): `$io instanceof ConsoleIO` downcast from &dyn IOInterface
-                let io_as_console: Option<&ConsoleIO> = None;
+                let io_as_console = io.as_any().downcast_ref::<ConsoleIO>();
                 if io_as_console.is_none() {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -610,8 +609,7 @@ impl Auditor {
             return Ok(());
         }
 
-        // TODO(phase-b): `$io instanceof ConsoleIO` downcast from &dyn IOInterface
-        let io_as_console: Option<&ConsoleIO> = None;
+        let io_as_console = io.as_any().downcast_ref::<ConsoleIO>();
         if io_as_console.is_none() {
             return Err(InvalidArgumentException {
                 message: format!(

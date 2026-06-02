@@ -609,11 +609,8 @@ impl EventDispatcher {
                                 .join(" ");
                             // reusing the output from $this->io is mostly needed for tests, but generally speaking
                             // it does not hurt to keep the same stream as the current Application
-                            // TODO(phase-b): IOInterface needs an `as_any` shim before
-                            // `instanceof ConsoleIO` can be expressed; treat io as a
-                            // generic IOInterface for now.
-                            let downcast: Option<&ConsoleIO> = None;
-                            let output: ConsoleOutput = if let Some(_console_io) = downcast {
+                            let is_console_io = self.io.borrow().as_any().is::<ConsoleIO>();
+                            let output: ConsoleOutput = if is_console_io {
                                 // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
                                 // is required by the original PHP — needs user-decided porting strategy.
                                 let _refl_php_version_gate = PHP_VERSION_ID < 80100;

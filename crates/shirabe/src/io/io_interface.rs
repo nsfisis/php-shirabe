@@ -149,7 +149,9 @@ pub trait IOInterfaceMutable {
 
 // PHP `IOInterface`. This is the type used for the shared trait object
 // `dyn IOInterface`; its vtable carries both the immutable and mutable methods.
-pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {}
+pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
+    fn as_any(&self) -> &dyn std::any::Any;
+}
 
 // Shared-ownership handle for a PHP IO instance (reference semantics). It
 // exposes only the immutable surface; mutating methods (`set_authentication`,
