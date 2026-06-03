@@ -171,7 +171,6 @@ impl SvnDriver {
                 }
             }
 
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let base_result =
                 self.get_file_content("composer.json", identifier)
                     .and_then(|file_content| {
@@ -259,14 +258,16 @@ impl SvnDriver {
             (identifier.clone(), String::new())
         };
 
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         let output: String = match self.execute(
             vec!["svn".to_string(), "cat".to_string()],
             &format!("{}{}{}", self.base_url, path, rev),
         ) {
             Ok(o) => o,
             Err(e) => {
-                return Err(TransportException::new(e.to_string(), 0).into());
+                if let Some(e) = e.downcast_ref::<RuntimeException>() {
+                    return Err(TransportException::new(e.message.clone(), 0).into());
+                }
+                return Err(e);
             }
         };
         if trim(&output, None) == "" {
@@ -557,7 +558,6 @@ impl SvnDriver {
                 .set_cache_credentials(self.cache_credentials);
         }
 
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         match self
             .util
             .as_mut()

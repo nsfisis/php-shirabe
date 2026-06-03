@@ -374,7 +374,6 @@ impl RepositorySet {
     ) -> Result<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> {
         let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<()> = (|| -> Result<()> {
                 let repo_ref = repository.borrow();
                 let Some(advisory_repo) = repo_ref.as_advisory_provider() else {

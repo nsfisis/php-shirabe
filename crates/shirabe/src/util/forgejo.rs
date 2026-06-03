@@ -122,8 +122,6 @@ impl Forgejo {
         ) {
             Ok(_) => {}
             Err(e) => {
-                // TODO(phase-b): anyhow::Error has no get_code(); HTTP status codes come from
-                // TransportException::get_status_code().
                 let code = e
                     .downcast_ref::<crate::downloader::TransportException>()
                     .and_then(|te| te.get_status_code())
@@ -140,7 +138,6 @@ impl Forgejo {
                     return Ok(Ok(false));
                 }
 
-                // TODO(phase-b): downcast anyhow::Error to TransportException for the inner Err
                 return Err(e);
             }
         }

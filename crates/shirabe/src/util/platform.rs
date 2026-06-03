@@ -399,7 +399,6 @@ impl Platform {
 
             if php_os_family() == "Linux" {
                 let mut process = ProcessExecutor::new(None);
-                // TODO(phase-b): inner Result for catch(\Exception); use anyhow::Result<Result<_, _>>
                 let mut output = String::new();
                 let result: Result<()> = (|| {
                     if process.execute_args(&["lsmod".to_string()], &mut output, ()) == 0

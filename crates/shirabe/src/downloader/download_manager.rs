@@ -238,7 +238,6 @@ impl DownloadManager {
                 }
             };
 
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let result = match downloader
                 .download3(package.clone(), &target_dir, prev_package.clone())
                 .await
@@ -363,7 +362,6 @@ impl DownloadManager {
         let initial_type = self.get_downloader_type(initial_downloader.unwrap());
         let target_type = self.get_downloader_type(downloader.unwrap());
         if initial_type == target_type {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             match downloader
                 .unwrap()
                 .update(initial.clone(), target.clone(), &target_dir)

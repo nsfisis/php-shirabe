@@ -803,7 +803,6 @@ pub trait PackageDiscoveryTrait {
 
     /// @return array<string>
     fn find_similar(&mut self, package: &str) -> Result<Vec<String>> {
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         let results: Vec<SearchResult> = match (|| -> Result<Vec<SearchResult>> {
             if self.get_repos_mut().is_none() {
                 return Err(LogicException {

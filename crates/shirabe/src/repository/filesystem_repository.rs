@@ -94,7 +94,6 @@ impl FilesystemRepository {
             return Ok(());
         }
 
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         let packages: PhpMixed = match (|| -> Result<PhpMixed> {
             let data = self.file.read()?;
             let packages_value = if let PhpMixed::Array(ref m) = data {

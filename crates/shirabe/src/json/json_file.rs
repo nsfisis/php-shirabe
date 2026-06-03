@@ -102,7 +102,6 @@ impl JsonFile {
     /// @throws \RuntimeException
     /// @return mixed
     pub fn read(&mut self) -> Result<PhpMixed> {
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         let json: Option<String> = match (|| -> Result<Option<String>> {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
@@ -216,7 +215,6 @@ impl JsonFile {
         let mut retries = 3;
         while retries > 0 {
             retries -= 1;
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<()> = (|| -> Result<()> {
                 self.file_put_contents_if_modified(
                     &self.path,

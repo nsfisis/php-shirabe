@@ -362,7 +362,6 @@ impl VersionGuesser {
             &mut output,
             Some(path.to_string()),
         ) {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(version) => return Ok(Some((version, trim(&output, None)))),
                 Err(_e) => {}
@@ -639,7 +638,6 @@ impl VersionGuesser {
             &mut output,
             Some(path.to_string()),
         ) {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(v) => {
                     version = Some(v);

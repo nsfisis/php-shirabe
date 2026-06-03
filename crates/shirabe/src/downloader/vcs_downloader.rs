@@ -142,7 +142,6 @@ pub trait VcsDownloader:
         let mut urls = self.prepare_urls(package.get_source_urls());
 
         while let Some(url) = array_shift(&mut urls) {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<Option<PhpMixed>> = self
                 .do_download(package.clone(), path, &url, prev_package.clone())
                 .await;
@@ -260,7 +259,6 @@ pub trait VcsDownloader:
 
         let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<Option<PhpMixed>> =
                 self.do_install(package.clone(), path, &url).await;
             match attempt {
@@ -336,7 +334,6 @@ pub trait VcsDownloader:
 
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
             let attempt: Result<Option<PhpMixed>> = self
                 .do_update(initial.clone(), target.clone(), path, &url)
                 .await;
