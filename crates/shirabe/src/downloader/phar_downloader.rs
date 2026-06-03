@@ -3,6 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::ArchiveDownloader;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
@@ -63,10 +64,24 @@ impl PharDownloader {
     }
 }
 
+impl ChangeReportInterface for PharDownloader {
+    fn get_local_changes(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<Option<String>> {
+        self.inner.get_local_changes(package, path)
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PharDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()
+    }
+
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
     }
 
     async fn download(

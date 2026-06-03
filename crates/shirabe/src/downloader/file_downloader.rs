@@ -153,6 +153,10 @@ impl DownloaderInterface for FileDownloader {
         "dist".to_owned()
     }
 
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
     /// @inheritDoc
     async fn download(
         &self,

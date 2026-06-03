@@ -14,6 +14,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::downloader::VcsCapableDownloaderInterface;
@@ -534,6 +535,16 @@ impl VcsCapableDownloaderInterface for PathDownloader {
     }
 }
 
+impl crate::downloader::ChangeReportInterface for PathDownloader {
+    fn get_local_changes(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<String>> {
+        self.inner.get_local_changes(package, path)
+    }
+}
+
 // TODO(phase-b): wire up PathDownloader trait properly. PathDownloader extends FileDownloader and
 // overrides download/install/remove with &mut self signatures that diverge from the trait. The
 // trait methods here delegate to the inner FileDownloader; the bespoke overrides on the struct
@@ -542,6 +553,16 @@ impl VcsCapableDownloaderInterface for PathDownloader {
 impl DownloaderInterface for PathDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()
+    }
+
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+        Some(self)
     }
 
     async fn download(

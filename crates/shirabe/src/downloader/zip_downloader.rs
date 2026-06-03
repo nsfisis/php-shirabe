@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
 use crate::downloader::ArchiveDownloader;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::FileDownloader;
 use crate::io::IOInterface;
@@ -553,6 +554,16 @@ impl ZipDownloader {
     }
 }
 
+impl ChangeReportInterface for ZipDownloader {
+    fn get_local_changes(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<Option<String>> {
+        self.inner.get_local_changes(package, path)
+    }
+}
+
 // TODO(phase-b): ZipDownloader::download is overridden with extra setup (UNZIP_COMMANDS init,
 // etc.). The trait method here delegates straight to the inner FileDownloader; the bespoke
 // override on the struct itself takes &mut self and is not yet routed through the trait.
@@ -560,6 +571,10 @@ impl ZipDownloader {
 impl crate::downloader::DownloaderInterface for ZipDownloader {
     fn get_installation_source(&self) -> String {
         self.inner.get_installation_source()
+    }
+
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
     }
 
     async fn download(

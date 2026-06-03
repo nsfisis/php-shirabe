@@ -1380,6 +1380,12 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         todo!()
     }
 
+    fn as_dvcs_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
+        Some(self)
+    }
+
     async fn download(
         &self,
         _package: PackageInterfaceHandle,

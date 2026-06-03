@@ -80,19 +80,16 @@ pub trait DownloaderInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
     fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
         None
     }
 
-    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
     fn as_vcs_capable_downloader_interface(
         &self,
     ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
         None
     }
 
-    /// TODO(phase-b): runtime downcast helpers for PHP `instanceof` checks.
     fn as_dvcs_downloader_interface(
         &self,
     ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
