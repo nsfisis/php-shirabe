@@ -461,11 +461,11 @@ impl GitDownloader {
         &self,
         _package: PackageInterfaceHandle,
         path: &str,
-    ) -> Option<String> {
+    ) -> Result<Option<String>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
-            return None;
+            return Ok(None);
         }
 
         let command = vec![
@@ -482,15 +482,15 @@ impl GitDownloader {
             .execute_args(&command, &mut output, Some(path.clone()))
             != 0
         {
-            // TODO(phase-b): bubble error via Result later
-            panic!(
-                "{}",
-                format!(
+            return Err(RuntimeException {
+                message: format!(
                     "Failed to execute {}\n\n{}",
                     implode(" ", &command),
                     self.inner.process.borrow().get_error_output(),
-                )
-            );
+                ),
+                code: 0,
+            }
+            .into());
         }
 
         let mut refs = trim(&output, None);
@@ -499,7 +499,7 @@ impl GitDownloader {
             .unwrap_or(false)
         {
             // could not match the HEAD for some reason
-            return None;
+            return Ok(None);
         }
         let head_ref = head_match
             .get(&CaptureKey::ByIndex(1))
@@ -515,7 +515,7 @@ impl GitDownloader {
         .unwrap_or(false)
         {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
-            return None;
+            return Ok(None);
         }
         let candidate_branches: Vec<String> = branches_match
             .get(&CaptureKey::ByIndex(1))
@@ -584,15 +584,15 @@ impl GitDownloader {
                         Some(path.clone()),
                     ) != 0
                     {
-                        // TODO(phase-b): bubble error via Result later
-                        panic!(
-                            "{}",
-                            format!(
+                        return Err(RuntimeException {
+                            message: format!(
                                 "Failed to execute {}\n\n{}",
                                 implode(" ", &command),
                                 self.inner.process.borrow().get_error_output(),
-                            )
-                        );
+                            ),
+                            code: 0,
+                        }
+                        .into());
                     }
 
                     let output = trim(&output, None);
@@ -629,15 +629,15 @@ impl GitDownloader {
                     Some(path.clone()),
                 ) != 0
                 {
-                    // TODO(phase-b): bubble error via Result later
-                    panic!(
-                        "{}",
-                        format!(
+                    return Err(RuntimeException {
+                        message: format!(
                             "Failed to execute {}\n\n{}",
                             implode(" ", &command),
                             self.inner.process.borrow().get_error_output(),
-                        )
-                    );
+                        ),
+                        code: 0,
+                    }
+                    .into());
                 }
                 refs = trim(&output, None);
             }
@@ -648,7 +648,7 @@ impl GitDownloader {
             }
         }
 
-        unpushed_changes
+        Ok(unpushed_changes)
     }
 
     pub(crate) async fn clean_changes(
@@ -660,7 +660,7 @@ impl GitDownloader {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
 
-        let unpushed = self.get_unpushed_changes(package.clone(), &path);
+        let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
         if let Some(unpushed) = unpushed.as_deref() {
             if self.inner.io.is_interactive()
                 || self
@@ -1325,7 +1325,7 @@ impl DvcsDownloaderInterface for GitDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: String,
-    ) -> Option<String> {
+    ) -> Result<Option<String>> {
         GitDownloader::get_unpushed_changes(self, package, &path)
     }
 }

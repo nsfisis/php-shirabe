@@ -199,7 +199,7 @@ impl StatusCommand {
 
             if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface() {
                 if let Some(unpushed) =
-                    dvcs_downloader.get_unpushed_changes(package.clone(), target_dir.clone())
+                    dvcs_downloader.get_unpushed_changes(package.clone(), target_dir.clone())?
                 {
                     unpushed_changes.insert(target_dir, unpushed);
                 }
