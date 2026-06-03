@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Downloader/PerforceDownloader.php
 
 use crate::config::Config;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsCapableDownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -124,18 +126,6 @@ impl PerforceDownloader {
         self.do_install(target, path, url).await
     }
 
-    pub fn get_local_changes(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: String,
-    ) -> Option<String> {
-        self.inner
-            .io
-            .write_error("Perforce driver does not check for local changes before overriding");
-
-        None
-    }
-
     pub(crate) fn get_commit_logs(
         &mut self,
         from_reference: String,
@@ -159,11 +149,41 @@ impl PerforceDownloader {
     }
 }
 
+impl ChangeReportInterface for PerforceDownloader {
+    fn get_local_changes(
+        &self,
+        _package: PackageInterfaceHandle,
+        _path: &str,
+    ) -> Result<Option<String>> {
+        self.inner
+            .io
+            .write_error("Perforce driver does not check for local changes before overriding");
+
+        Ok(None)
+    }
+}
+
+impl VcsCapableDownloaderInterface for PerforceDownloader {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
+        self.inner.get_vcs_reference(package, &path)
+    }
+}
+
 // TODO(phase-b): wire up VcsDownloader trait properly. PerforceDownloader extends VcsDownloader
 // which implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the
 // inner VcsDownloaderBase exposes the matching impl surface.
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for PerforceDownloader {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+        Some(self)
+    }
+
     fn get_installation_source(&self) -> String {
         todo!()
     }

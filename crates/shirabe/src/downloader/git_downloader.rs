@@ -11,7 +11,9 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DvcsDownloaderInterface;
+use crate::downloader::VcsCapableDownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -455,49 +457,6 @@ impl GitDownloader {
         Ok(None)
     }
 
-    pub fn get_local_changes(
-        &self,
-        _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> Option<String> {
-        GitUtil::clean_env(&self.inner.process);
-        if !self.has_metadata_repository(path) {
-            return None;
-        }
-
-        let command = vec![
-            "git".to_string(),
-            "status".to_string(),
-            "--porcelain".to_string(),
-            "--untracked-files=no".to_string(),
-        ];
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
-            &command,
-            &mut output,
-            Some(path.to_string()),
-        ) != 0
-        {
-            // TODO(phase-b): cannot throw from &self / non-Result fn; bubble error via Result later
-            panic!(
-                "{}",
-                format!(
-                    "Failed to execute {}\n\n{}",
-                    implode(" ", &command),
-                    self.inner.process.borrow().get_error_output(),
-                )
-            );
-        }
-
-        let output = trim(&output, None);
-
-        if strlen(&output) > 0 {
-            Some(output)
-        } else {
-            None
-        }
-    }
-
     pub fn get_unpushed_changes(
         &self,
         _package: PackageInterfaceHandle,
@@ -723,7 +682,7 @@ impl GitDownloader {
             }
         }
 
-        let changes = match self.get_local_changes(package.clone(), &path) {
+        let changes = match self.get_local_changes(package.clone(), &path)? {
             Some(c) => c,
             None => return Ok(None),
         };
@@ -1371,6 +1330,57 @@ impl DvcsDownloaderInterface for GitDownloader {
     }
 }
 
+impl ChangeReportInterface for GitDownloader {
+    fn get_local_changes(
+        &self,
+        _package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<Option<String>> {
+        GitUtil::clean_env(&self.inner.process);
+        if !self.has_metadata_repository(path) {
+            return Ok(None);
+        }
+
+        let command = vec![
+            "git".to_string(),
+            "status".to_string(),
+            "--porcelain".to_string(),
+            "--untracked-files=no".to_string(),
+        ];
+        let mut output = String::new();
+        if self.inner.process.borrow_mut().execute_args(
+            &command,
+            &mut output,
+            Some(path.to_string()),
+        ) != 0
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Failed to execute {}\n\n{}",
+                    implode(" ", &command),
+                    self.inner.process.borrow().get_error_output(),
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        let output = trim(&output, None);
+
+        Ok(if strlen(&output) > 0 {
+            Some(output)
+        } else {
+            None
+        })
+    }
+}
+
+impl VcsCapableDownloaderInterface for GitDownloader {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
+        self.inner.get_vcs_reference(package, &path)
+    }
+}
+
 // TODO(phase-b): GitDownloader extends VcsDownloader which implements DownloaderInterface.
 // Delegating each trait method to todo!() until the inner VcsDownloaderBase exposes the
 // matching impl surface.
@@ -1383,6 +1393,16 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     fn as_dvcs_downloader_interface(
         &self,
     ) -> Option<&dyn crate::downloader::DvcsDownloaderInterface> {
+        Some(self)
+    }
+
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
         Some(self)
     }
 

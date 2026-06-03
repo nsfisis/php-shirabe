@@ -69,6 +69,24 @@ impl VcsDownloaderBase {
         // Callers in subclasses must do that check themselves (they already have).
         Ok(None)
     }
+
+    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+        let parser = VersionParser::new();
+        let mut guesser = VersionGuesser::new(
+            self.config.clone(),
+            self.process.clone(),
+            parser.clone(),
+            Some(self.io.clone()),
+        );
+        let dumper = ArrayDumper::new();
+
+        let package_config = dumper.dump(package.clone());
+        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
+            return package_version.commit.clone();
+        }
+
+        None
+    }
 }
 
 pub trait VcsDownloader:

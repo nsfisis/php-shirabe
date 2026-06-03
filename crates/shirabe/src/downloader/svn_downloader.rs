@@ -6,7 +6,9 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, RuntimeException, is_dir, version_compare};
 
 use crate::config::Config;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsCapableDownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -158,27 +160,6 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub fn get_local_changes(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
-        if !self.has_metadata_repository(path) {
-            return None;
-        }
-
-        let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
-            &["svn", "status", "--ignore-externals"]
-                .map(|s| s.to_string())
-                .to_vec(),
-            &mut output,
-            Some(path.to_string()),
-        );
-
-        if Preg::is_match("{^ *[^X ] +}m", &output).unwrap_or(false) {
-            Some(output)
-        } else {
-            None
-        }
-    }
-
     pub(crate) fn execute(
         &self,
         package: PackageInterfaceHandle,
@@ -211,7 +192,7 @@ impl SvnDownloader {
         path: &str,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let changes = self.get_local_changes(package.clone(), path);
+        let changes = self.get_local_changes(package.clone(), path)?;
         if changes.is_none() {
             return Ok(None);
         }
@@ -432,6 +413,41 @@ impl SvnDownloader {
     }
 }
 
+impl ChangeReportInterface for SvnDownloader {
+    fn get_local_changes(
+        &self,
+        _package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<Option<String>> {
+        if !self.has_metadata_repository(path) {
+            return Ok(None);
+        }
+
+        let mut output = String::new();
+        self.inner.process.borrow_mut().execute_args(
+            &["svn", "status", "--ignore-externals"]
+                .map(|s| s.to_string())
+                .to_vec(),
+            &mut output,
+            Some(path.to_string()),
+        );
+
+        Ok(
+            if Preg::is_match("{^ *[^X ] +}m", &output).unwrap_or(false) {
+                Some(output)
+            } else {
+                None
+            },
+        )
+    }
+}
+
+impl VcsCapableDownloaderInterface for SvnDownloader {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
+        self.inner.get_vcs_reference(package, &path)
+    }
+}
+
 // TODO(phase-b): wire up VcsDownloader trait properly. SvnDownloader extends VcsDownloader which
 // implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
 // VcsDownloaderBase exposes the matching impl surface.
@@ -439,6 +455,16 @@ impl SvnDownloader {
 impl DownloaderInterface for SvnDownloader {
     fn get_installation_source(&self) -> String {
         todo!()
+    }
+
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+        Some(self)
     }
 
     async fn download(

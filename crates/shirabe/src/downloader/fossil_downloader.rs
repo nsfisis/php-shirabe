@@ -1,7 +1,9 @@
 //! ref: composer/src/Composer/Downloader/FossilDownloader.php
 
 use crate::config::Config;
+use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
+use crate::downloader::VcsCapableDownloaderInterface;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -151,27 +153,6 @@ impl FossilDownloader {
         Ok(None)
     }
 
-    pub fn get_local_changes(
-        &self,
-        _package: PackageInterfaceHandle,
-        path: String,
-    ) -> Option<String> {
-        if !self.has_metadata_repository(&path) {
-            return None;
-        }
-
-        let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
-            &["fossil".to_string(), "changes".to_string()],
-            &mut output,
-            shirabe_php_shim::realpath(&path),
-        );
-
-        let output = output.trim().to_string();
-
-        if output.len() > 0 { Some(output) } else { None }
-    }
-
     pub(crate) fn get_commit_logs(
         &self,
         _from_reference: String,
@@ -248,11 +229,50 @@ impl FossilDownloader {
     }
 }
 
+impl ChangeReportInterface for FossilDownloader {
+    fn get_local_changes(
+        &self,
+        _package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<Option<String>> {
+        if !self.has_metadata_repository(path) {
+            return Ok(None);
+        }
+
+        let mut output = String::new();
+        self.inner.process.borrow_mut().execute_args(
+            &["fossil".to_string(), "changes".to_string()],
+            &mut output,
+            shirabe_php_shim::realpath(path),
+        );
+
+        let output = output.trim().to_string();
+
+        Ok(if output.len() > 0 { Some(output) } else { None })
+    }
+}
+
+impl VcsCapableDownloaderInterface for FossilDownloader {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
+        self.inner.get_vcs_reference(package, &path)
+    }
+}
+
 // TODO(phase-b): wire up VcsDownloader trait properly. FossilDownloader extends VcsDownloader
 // which implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the
 // inner VcsDownloaderBase exposes the matching impl surface.
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FossilDownloader {
+    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+        Some(self)
+    }
+
     fn get_installation_source(&self) -> String {
         todo!()
     }
