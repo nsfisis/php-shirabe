@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_VERSION_ID, PhpMixed,
+    FILTER_VALIDATE_BOOLEAN, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PHP_VERSION_ID, PhpMixed,
     RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
     array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
     filter_var, gethostbyname, http_clear_last_response_headers, http_get_last_response_headers,
@@ -177,8 +177,7 @@ impl RemoteFilesystem {
         file_name: Option<String>,
         progress: bool,
     ) -> anyhow::Result<GetResult> {
-        // TODO(phase-b): PHP_URL_SCHEME constant isn't yet in the shim; PHP_URL_HOST stands in.
-        self.scheme = parse_url(&strtr(file_url, "\\", "/"), PHP_URL_HOST)
+        self.scheme = parse_url(&strtr(file_url, "\\", "/"), PHP_URL_SCHEME)
             .as_string()
             .unwrap_or("")
             .to_string();
@@ -928,12 +927,10 @@ impl RemoteFilesystem {
     ) -> anyhow::Result<Option<String>> {
         let mut target_url: Option<String> = None;
         if let Some(location_header) = Response::find_header_value(response_headers, "location") {
-            // TODO(phase-b): use PHP_URL_SCHEME once available to detect absolute URLs.
-            if !parse_url(&location_header, PHP_URL_HOST)
+            if !parse_url(&location_header, PHP_URL_SCHEME)
                 .as_string()
                 .unwrap_or("")
                 .is_empty()
-                && location_header.contains("://")
             {
                 target_url = Some(location_header);
             } else if parse_url(&location_header, PHP_URL_HOST)

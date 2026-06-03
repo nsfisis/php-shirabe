@@ -8,7 +8,7 @@ use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, call_user_func, file_get_contents, filemtime, function_exists, hash,
-    in_array, is_array, is_int, ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch,
+    in_array, is_array, is_int, ksort, realpath, reset_first, sprintf, strcmp, strtolower, touch2,
     trim, usort,
 };
 
@@ -709,9 +709,7 @@ impl Locker {
         self.virtual_file_written = false;
         if let Some(mtime) = lock_mtime {
             if is_int(&PhpMixed::Int(mtime)) {
-                // TODO(phase-b): touch() in php-shim doesn't accept mtime; need touch2
-                let _ = mtime;
-                let _ = touch(&self.lock_file.get_path());
+                let _ = touch2(&self.lock_file.get_path(), mtime);
             }
         }
         Ok(())

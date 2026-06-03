@@ -7,9 +7,9 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, defined, env_contains_key, env_get, env_set, env_unset,
     file_exists, file_get_contents, fopen, fstat, function_exists, getcwd, getenv, in_array,
-    ini_get, is_array, is_readable, mb_strlen, posix_geteuid, posix_getpwuid, posix_getuid,
-    posix_isatty, putenv, realpath, server_argv, server_contains_key, server_get, server_set,
-    server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    ini_get, is_array, is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid,
+    posix_getuid, posix_isatty, putenv, realpath, server_argv, server_contains_key, server_get,
+    server_set, server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 
 use crate::util::ProcessExecutor;
@@ -397,10 +397,7 @@ impl Platform {
                 return true;
             }
 
-            if defined("PHP_OS_FAMILY")
-                // TODO(phase-b): PHP_OS_FAMILY constant comparison
-                && true
-            {
+            if php_os_family() == "Linux" {
                 let mut process = ProcessExecutor::new(None);
                 // TODO(phase-b): inner Result for catch(\Exception); use anyhow::Result<Result<_, _>>
                 let mut output = String::new();

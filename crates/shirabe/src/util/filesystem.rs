@@ -405,9 +405,9 @@ impl Filesystem {
                         while !feof(source_handle.clone()) {
                             let chunk =
                                 fread(source_handle.clone(), 1024 * 1024).unwrap_or_default();
-                            // TODO(phase-b): PHP fwrite returns int|false; shim currently returns ();
-                            // assume success here.
-                            fwrite(target_handle.clone(), &chunk, chunk.len() as i64);
+                            if fwrite(target_handle.clone(), &chunk, chunk.len() as i64).is_none() {
+                                return Err(e.into());
+                            }
                         }
                         fclose(source_handle);
                         fclose(target_handle);

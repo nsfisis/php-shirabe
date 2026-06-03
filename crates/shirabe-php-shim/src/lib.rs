@@ -536,7 +536,7 @@ pub fn fopen(_file: &str, _mode: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn fwrite(_file: PhpMixed, _data: &str, _length: i64) {
+pub fn fwrite(_file: PhpMixed, _data: &str, _length: i64) -> Option<i64> {
     todo!()
 }
 
@@ -861,6 +861,23 @@ pub fn mb_convert_encoding(_string: Vec<u8>, _to_encoding: &str, _from_encoding:
 
 pub fn touch(_path: &str) -> bool {
     todo!()
+}
+
+pub fn touch2(_path: &str, _mtime: i64) -> bool {
+    todo!()
+}
+
+/// PHP `PHP_OS_FAMILY` constant: the family of the host OS.
+/// One of "Windows", "BSD", "Darwin", "Solaris", "Linux", "Unknown".
+pub fn php_os_family() -> &'static str {
+    match std::env::consts::OS {
+        "linux" | "android" => "Linux",
+        "macos" | "ios" => "Darwin",
+        "windows" => "Windows",
+        "freebsd" | "dragonfly" | "netbsd" | "openbsd" => "BSD",
+        "solaris" | "illumos" => "Solaris",
+        _ => "Unknown",
+    }
 }
 
 pub fn chmod(_path: &str, _mode: u32) -> bool {
