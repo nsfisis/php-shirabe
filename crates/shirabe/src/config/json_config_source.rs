@@ -207,19 +207,19 @@ impl JsonConfigSource {
             )?;
         }
 
-        // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
         match self.file.validate_schema(JsonFile::LAX_SCHEMA, None) {
             Ok(_) => {}
             Err(e) => {
-                // TODO(phase-b): downcast e to JsonValidationException to match the specific catch
-                let _jve: &JsonValidationException = todo!("downcast e to JsonValidationException");
+                let Some(jve) = e.downcast_ref::<JsonValidationException>() else {
+                    return Err(e);
+                };
                 // restore contents to the original state
                 file_put_contents(self.file.get_path(), contents.as_bytes());
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
                         PHP_EOL,
-                        implode(PHP_EOL, todo!("e.get_errors()")),
+                        implode(PHP_EOL, jve.get_errors()),
                     ),
                     code: 0,
                 }

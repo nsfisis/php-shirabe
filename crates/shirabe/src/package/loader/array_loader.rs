@@ -195,7 +195,6 @@ impl ArrayLoader {
             {
                 Ok(v) => version = v,
                 Err(e) => {
-                    // TODO(phase-b): preserve original exception chain via anyhow::Error::context
                     return Err(UnexpectedValueException {
                         message: format!(
                             "Failed to normalize version for package \"{}\": {}",
@@ -761,9 +760,7 @@ impl ArrayLoader {
 
         let parsed_constraint = match self.version_parser.parse_constraints(&constraint) {
             Ok(c) => c,
-            Err(e) => {
-                // TODO(phase-b): preserve original exception chain
-                let _ = &e;
+            Err(_e) => {
                 return Err(UnexpectedValueException {
                     message: format!(
                         "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
