@@ -426,11 +426,14 @@ impl JsonFile {
         Ok(true)
     }
 
-    pub fn encode(data: &PhpMixed) -> String {
+    pub fn encode<T: serde::Serialize + ?Sized>(data: &T) -> String {
         Self::encode_with_options(data, JsonEncodeOptions::default())
     }
 
-    pub fn encode_with_options(data: &PhpMixed, options: JsonEncodeOptions) -> String {
+    pub fn encode_with_options<T: serde::Serialize + ?Sized>(
+        data: &T,
+        options: JsonEncodeOptions,
+    ) -> String {
         let json = json_encode_ex(data, options.to_flags());
 
         let json = match json {

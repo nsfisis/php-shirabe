@@ -13,6 +13,51 @@ pub enum PhpMixed {
     Object(ArrayObject),
 }
 
+impl serde::Serialize for PhpMixed {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::{SerializeMap, SerializeSeq};
+        match self {
+            PhpMixed::Null => serializer.serialize_none(),
+            PhpMixed::Bool(b) => serializer.serialize_bool(*b),
+            PhpMixed::Int(i) => serializer.serialize_i64(*i),
+            PhpMixed::Float(f) => serializer.serialize_f64(*f),
+            PhpMixed::String(s) => serializer.serialize_str(s),
+            PhpMixed::List(items) => {
+                let mut seq = serializer.serialize_seq(Some(items.len()))?;
+                for item in items {
+                    seq.serialize_element(item)?;
+                }
+                seq.end()
+            }
+            PhpMixed::Array(entries) => {
+                let mut map = serializer.serialize_map(Some(entries.len()))?;
+                for (k, v) in entries {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            }
+            PhpMixed::Object(object) => object.serialize(serializer),
+        }
+    }
+}
+
+impl serde::Serialize for ArrayObject {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+        let mut map = serializer.serialize_map(Some(self.data.len()))?;
+        for (k, v) in &self.data {
+            map.serialize_entry(k, v)?;
+        }
+        map.end()
+    }
+}
+
 impl PhpMixed {
     pub fn as_bool(&self) -> Option<bool> {
         match self {
@@ -815,7 +860,7 @@ pub const JSON_UNESCAPED_SLASHES: i64 = 64;
 pub const JSON_PRETTY_PRINT: i64 = 128;
 pub const JSON_THROW_ON_ERROR: i64 = 4194304;
 
-pub fn json_encode(_value: &PhpMixed) -> Option<String> {
+pub fn json_encode<T: serde::Serialize + ?Sized>(_value: &T) -> Option<String> {
     todo!()
 }
 
@@ -1078,7 +1123,7 @@ pub fn random_int(_min: i64, _max: i64) -> i64 {
     todo!()
 }
 
-pub fn json_encode_ex(_value: &PhpMixed, _flags: i64) -> Option<String> {
+pub fn json_encode_ex<T: serde::Serialize + ?Sized>(_value: &T, _flags: i64) -> Option<String> {
     todo!()
 }
 

@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 anyhow.workspace = true
 indexmap.workspace = true
+serde.workspace = true
 zip.workspace = true
 
 [lints]
