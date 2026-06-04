@@ -174,7 +174,6 @@ impl DownloadManager {
 
     pub fn get_downloader_type(&self, downloader: &dyn DownloaderInterface) -> String {
         // PHP: array_search($downloader, $this->downloaders)
-        // TODO(phase-b): reference equality on Box<dyn DownloaderInterface>
         for (r#type, candidate) in &self.downloaders {
             if std::ptr::eq(
                 candidate.as_ref() as *const dyn DownloaderInterface as *const (),

@@ -430,7 +430,6 @@ impl RemoteFilesystem {
                 if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                     self.degraded_mode = true;
                     self.io.write_error3("", true, crate::io::NORMAL);
-                    // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
                     self.io.write_error3(
                         &format!(
                             "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
@@ -579,7 +578,6 @@ impl RemoteFilesystem {
                     }
 
                     self.degraded_mode = true;
-                    // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
                     self.io.write_error3(
                         &format!(
                             "\n<error>Failed to decode response: {}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
@@ -670,7 +668,6 @@ impl RemoteFilesystem {
             if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
                 self.degraded_mode = true;
                 self.io.write_error3("", true, crate::io::NORMAL);
-                // TODO(phase-b): PHP writeError accepts an array of lines; joined here with newline.
                 self.io.write_error3(
                     &format!(
                         "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",

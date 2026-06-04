@@ -114,7 +114,6 @@ impl GitHub {
         }
         note += &format!(" {}", date("Y-m-d Hi", None));
 
-        // PHP: writeError(array) joins with newline. TODO(phase-b): writeError accepts array natively in Symfony.
         let (local_name, auth_name): (Option<String>, String) = {
             let cfg = self.config.borrow();
             (

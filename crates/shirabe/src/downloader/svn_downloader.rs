@@ -229,7 +229,6 @@ impl SvnDownloader {
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line for now.
         for line in &changes[..slice_end] {
             self.inner.io.write_error3(line, true, io_interface::NORMAL);
         }
@@ -268,13 +267,11 @@ impl SvnDownloader {
                     .into());
                 }
                 Some("v") => {
-                    // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line.
                     for line in &changes {
                         self.inner.io.write_error3(line, true, io_interface::NORMAL);
                     }
                 }
                 _ => {
-                    // TODO(phase-b): PHP writeError accepts array<string>; iterate per-line.
                     let help_lines = vec![
                         format!(
                             "    y - discard changes and apply the {}",
