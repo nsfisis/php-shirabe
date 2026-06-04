@@ -1,5 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolOptimizer.php
 
+use std::rc::Rc;
+
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort};
@@ -20,7 +22,7 @@ use crate::package::version::VersionParser;
 #[derive(Debug)]
 pub struct PoolOptimizer {
     /// @var PolicyInterface
-    policy: Box<dyn PolicyInterface>,
+    policy: Rc<dyn PolicyInterface>,
 
     /// @var array<int, true>
     irremovable_packages: IndexMap<i64, bool>,
@@ -48,7 +50,7 @@ struct IdenticalDefinitionPointers {
 }
 
 impl PoolOptimizer {
-    pub fn new(policy: Box<dyn PolicyInterface>) -> Self {
+    pub fn new(policy: Rc<dyn PolicyInterface>) -> Self {
         Self {
             policy,
             irremovable_packages: IndexMap::new(),

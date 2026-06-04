@@ -710,7 +710,7 @@ impl Installer {
             &mut lock_transaction,
             &platform_repo,
             &aliases,
-            &policy,
+            &*policy,
             locked_repository.as_ref(),
         )?;
         if exit_code != 0 {
@@ -1401,7 +1401,7 @@ impl Installer {
         &mut self,
         for_update: bool,
         locked_repo: Option<&crate::repository::LockArrayRepositoryHandle>,
-    ) -> DefaultPolicy {
+    ) -> std::rc::Rc<dyn PolicyInterface> {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
         if !for_update {
@@ -1437,11 +1437,11 @@ impl Installer {
             preferred_versions = Some(versions);
         }
 
-        DefaultPolicy::new(
+        std::rc::Rc::new(DefaultPolicy::new(
             prefer_stable.unwrap(),
             prefer_lowest.unwrap(),
             preferred_versions,
-        )
+        ))
     }
 
     fn create_request(
@@ -1615,7 +1615,10 @@ impl Installer {
         ));
     }
 
-    fn create_pool_optimizer(&self, policy: &dyn PolicyInterface) -> Option<PoolOptimizer> {
+    fn create_pool_optimizer(
+        &self,
+        policy: std::rc::Rc<dyn PolicyInterface>,
+    ) -> Option<PoolOptimizer> {
         // Not the best architectural decision here, would need to be able
         // to configure from the outside of Installer but this is only
         // a debugging tool and should never be required in any other use case
@@ -1629,9 +1632,7 @@ impl Installer {
             return None;
         }
 
-        // TODO(phase-b): PoolOptimizer::new takes owned Box<dyn PolicyInterface>; have &dyn
-        let _ = policy;
-        todo!()
+        Some(PoolOptimizer::new(policy))
     }
 
     fn get_audit_config(&mut self) -> anyhow::Result<&AuditConfig> {

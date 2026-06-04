@@ -34,7 +34,7 @@ use crate::package::BasePackageHandle;
 
 #[derive(Debug)]
 pub struct Solver {
-    pub(crate) policy: Box<dyn PolicyInterface>,
+    pub(crate) policy: Rc<dyn PolicyInterface>,
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
 
     pub(crate) rules: RuleSet,
@@ -60,7 +60,7 @@ impl Solver {
     const BRANCH_LEVEL: usize = 1;
 
     pub fn new(
-        policy: Box<dyn PolicyInterface>,
+        policy: Rc<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
@@ -249,8 +249,7 @@ impl Solver {
 
         self.io
             .write_error3("Generating rules", true, crate::io::DEBUG);
-        let mut rule_set_generator =
-            RuleSetGenerator::new(self.policy.clone_box(), self.pool.clone());
+        let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone(), self.pool.clone());
         // TODO(phase-b): get_rules_for takes Option<Box<dyn PlatformRequirementFilterInterface>>;
         // PHP passes the filter directly. Forwarding `None` here keeps the call typecheckable.
         let _ = platform_requirement_filter.as_ref();

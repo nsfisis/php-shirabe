@@ -23,7 +23,7 @@ use crate::package::PackageInterfaceHandle;
 
 #[derive(Debug)]
 pub struct RuleSetGenerator {
-    pub(crate) policy: Box<dyn PolicyInterface>,
+    pub(crate) policy: Rc<dyn PolicyInterface>,
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) rules: RuleSet,
     pub(crate) added_map: IndexMap<i64, PackageInterfaceHandle>,
@@ -32,7 +32,7 @@ pub struct RuleSetGenerator {
 
 impl RuleSetGenerator {
     pub fn new(
-        policy: Box<dyn PolicyInterface>,
+        policy: Rc<dyn PolicyInterface>,
         pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     ) -> Self {
         Self {
