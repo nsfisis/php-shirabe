@@ -766,15 +766,12 @@ impl Factory {
                             composer_full
                                 .set_locker(std::rc::Rc::new(std::cell::RefCell::new(locker)));
                         } else {
-                            let lock_contents = JsonFile::encode(
-                                &PhpMixed::Array(
-                                    local_config_data
-                                        .iter()
-                                        .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                                        .collect(),
-                                ),
-                                448,
-                            );
+                            let lock_contents = JsonFile::encode(&PhpMixed::Array(
+                                local_config_data
+                                    .iter()
+                                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
+                                    .collect(),
+                            ));
                             let locker = Locker::new(
                                 io.clone(),
                                 JsonFile::new(Platform::get_dev_null(), None, Some(io.clone()))?,

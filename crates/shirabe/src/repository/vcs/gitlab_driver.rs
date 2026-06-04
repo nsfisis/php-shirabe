@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -276,7 +277,7 @@ impl GitLabDriver {
                         self.inner.cache.as_mut().map(|c| {
                             c.write(
                                 identifier,
-                                &JsonFile::encode(
+                                &JsonFile::encode_with_options(
                                     &PhpMixed::Array(
                                         composer_map
                                             .clone()
@@ -284,8 +285,10 @@ impl GitLabDriver {
                                             .map(|(k, v)| (k, Box::new(v)))
                                             .collect(),
                                     ),
-                                    shirabe_php_shim::JSON_UNESCAPED_UNICODE
-                                        | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
+                                    JsonEncodeOptions {
+                                        pretty_print: false,
+                                        ..Default::default()
+                                    },
                                 ),
                             )
                         });

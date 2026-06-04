@@ -24,6 +24,50 @@ use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 
+#[derive(Debug, Clone)]
+pub struct JsonEncodeOptions {
+    pub unescaped_slashes: bool,
+    pub pretty_print: bool,
+    pub unescaped_unicode: bool,
+    pub indent: String,
+}
+
+impl Default for JsonEncodeOptions {
+    fn default() -> Self {
+        Self {
+            unescaped_slashes: true,
+            pretty_print: true,
+            unescaped_unicode: true,
+            indent: JsonFile::INDENT_DEFAULT.to_string(),
+        }
+    }
+}
+
+impl JsonEncodeOptions {
+    pub fn none() -> Self {
+        Self {
+            unescaped_slashes: false,
+            pretty_print: false,
+            unescaped_unicode: false,
+            indent: JsonFile::INDENT_DEFAULT.to_string(),
+        }
+    }
+
+    fn to_flags(&self) -> i64 {
+        let mut flags = 0;
+        if self.unescaped_slashes {
+            flags |= JSON_UNESCAPED_SLASHES;
+        }
+        if self.pretty_print {
+            flags |= JSON_PRETTY_PRINT;
+        }
+        if self.unescaped_unicode {
+            flags |= JSON_UNESCAPED_UNICODE;
+        }
+        flags
+    }
+}
+
 /// Reads/writes json files.
 #[derive(Debug)]
 pub struct JsonFile {
@@ -171,21 +215,15 @@ impl JsonFile {
     }
 
     pub fn write(&self, hash: PhpMixed) -> Result<()> {
-        self.write2(
-            hash,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-        )
+        self.write_with_options(hash, JsonEncodeOptions::default())
     }
 
-    /// Writes json file.
-    ///
-    /// @param  mixed[]                              $hash    writes hash into json file
-    /// @param  int                                  $options json_encode options
-    /// @throws \UnexpectedValueException|\Exception
-    /// @return void
-    pub fn write2(&self, hash: PhpMixed, options: i64) -> Result<()> {
+    pub fn write_with_options(&self, hash: PhpMixed, options: JsonEncodeOptions) -> Result<()> {
         if self.path == "php://memory" {
-            file_put_contents(&self.path, Self::encode(&hash, options).as_bytes());
+            file_put_contents(
+                &self.path,
+                Self::encode_with_options(&hash, options.clone()).as_bytes(),
+            );
 
             return Ok(());
         }
@@ -220,12 +258,8 @@ impl JsonFile {
                     &self.path,
                     &format!(
                         "{}{}",
-                        Self::encode(&hash, options),
-                        if options & JSON_PRETTY_PRINT != 0 {
-                            "\n"
-                        } else {
-                            ""
-                        },
+                        Self::encode_with_options(&hash, options.clone()),
+                        if options.pretty_print { "\n" } else { "" },
                     ),
                 )?;
                 Ok(())
@@ -392,18 +426,12 @@ impl JsonFile {
         Ok(true)
     }
 
-    /// Encodes an array into (optionally pretty-printed) JSON
-    ///
-    /// @param  mixed  $data    Data to encode into a formatted JSON string
-    /// @param  int    $options json_encode options (defaults to JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-    /// @param  string $indent  Indentation string
-    /// @return string Encoded json
-    pub fn encode(data: &PhpMixed, options: i64) -> String {
-        Self::encode_with_indent(data, options, Self::INDENT_DEFAULT)
+    pub fn encode(data: &PhpMixed) -> String {
+        Self::encode_with_options(data, JsonEncodeOptions::default())
     }
 
-    pub fn encode_with_indent(data: &PhpMixed, options: i64, indent: &str) -> String {
-        let json = json_encode_ex(data, options);
+    pub fn encode_with_options(data: &PhpMixed, options: JsonEncodeOptions) -> String {
+        let json = json_encode_ex(data, options.to_flags());
 
         let json = match json {
             Some(j) => j,
@@ -415,9 +443,9 @@ impl JsonFile {
             }
         };
 
-        if (options & JSON_PRETTY_PRINT) > 0 && indent != Self::INDENT_DEFAULT {
+        if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
-            let indent_owned = indent.to_string();
+            let indent_owned = options.indent.clone();
             return Preg::replace_callback(
                 r"#^ {4,}#m",
                 move |m: &indexmap::IndexMap<

@@ -5,14 +5,15 @@ use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, RuntimeException, array_key_exists,
-    is_array, max, sprintf, stripos, strrpos, strtr, substr, trim,
+    PhpMixed, RuntimeException, array_key_exists, is_array, max, sprintf, stripos, strrpos, strtr,
+    substr, trim,
 };
 
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
@@ -203,12 +204,15 @@ impl SvnDriver {
             };
 
             if self.should_cache(identifier) {
-                let encoded = JsonFile::encode(
+                let encoded = JsonFile::encode_with_options(
                     &composer
                         .clone()
                         .map(PhpMixed::from)
                         .unwrap_or(PhpMixed::Null),
-                    JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                    JsonEncodeOptions {
+                        pretty_print: false,
+                        ..Default::default()
+                    },
                 );
                 self.inner
                     .cache

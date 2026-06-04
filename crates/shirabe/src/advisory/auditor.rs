@@ -168,13 +168,9 @@ impl Auditor {
                 ),
             );
 
-            io.write(&JsonFile::encode_with_indent(
-                &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                shirabe_php_shim::JSON_UNESCAPED_SLASHES
-                    | shirabe_php_shim::JSON_PRETTY_PRINT
-                    | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
-                JsonFile::INDENT_DEFAULT,
-            ));
+            io.write(&JsonFile::encode(&PhpMixed::Array(
+                json.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+            )));
 
             return Ok(audit_bitmask);
         }

@@ -182,7 +182,7 @@ impl SearchCommand {
         } else if format == "json" {
             // TODO(phase-b): JsonFile::encode takes &PhpMixed; convert Vec<SearchResult> into PhpMixed
             let _ = &results;
-            io.write(&JsonFile::encode(&PhpMixed::Null, 448));
+            io.write(&JsonFile::encode(&PhpMixed::Null));
         }
 
         Ok(0)

@@ -575,12 +575,9 @@ impl ShowCommand {
                                 .collect(),
                         ))]),
                     );
-                    self.get_io().write(&JsonFile::encode(
-                        &PhpMixed::Array(
-                            wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                        ),
-                        0,
-                    ));
+                    self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
+                        wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                    )));
                 } else {
                     self.display_package_tree(vec![array_tree]);
                 }
@@ -700,10 +697,9 @@ impl ShowCommand {
                             .collect(),
                     ),
                 );
-                self.get_io().write(&JsonFile::encode(
-                    &PhpMixed::Array(wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                    0,
-                ));
+                self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
+                    wrapper.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                )));
             } else {
                 self.display_package_tree(array_tree);
             }
@@ -1152,15 +1148,12 @@ impl ShowCommand {
                 );
             }
             let io = self.get_io();
-            io.write(&JsonFile::encode(
-                &PhpMixed::Array(
-                    json_map
-                        .into_iter()
-                        .map(|(k, v)| (k, Box::new(v)))
-                        .collect(),
-                ),
-                0,
-            ));
+            io.write(&JsonFile::encode(&PhpMixed::Array(
+                json_map
+                    .into_iter()
+                    .map(|(k, v)| (k, Box::new(v)))
+                    .collect(),
+            )));
         } else {
             if input.get_option("latest").as_bool() == Some(true)
                 && view_data.values().any(|v| !v.is_empty())
@@ -2025,10 +2018,9 @@ impl ShowCommand {
 
         json = Self::append_links(json, package);
 
-        self.get_io().write(&JsonFile::encode(
-            &PhpMixed::Array(json.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-            0,
-        ));
+        self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
+            json.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+        )));
         Ok(())
     }
 

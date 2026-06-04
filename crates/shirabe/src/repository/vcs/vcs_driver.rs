@@ -3,14 +3,13 @@
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, extension_loaded,
-};
+use shirabe_php_shim::{PhpMixed, extension_loaded};
 
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::VcsDriverInterface;
 use crate::util::Filesystem;
@@ -188,9 +187,12 @@ pub trait VcsDriver: VcsDriverInterface {
                             .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                             .collect(),
                     );
-                    let encoded = JsonFile::encode(
+                    let encoded = JsonFile::encode_with_options(
                         &composer_mixed,
-                        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+                        JsonEncodeOptions {
+                            pretty_print: false,
+                            ..Default::default()
+                        },
                     );
                     self.cache_mut().map(|c| c.write(identifier, &encoded));
                 }

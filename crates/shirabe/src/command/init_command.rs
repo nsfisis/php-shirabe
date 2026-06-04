@@ -301,7 +301,7 @@ impl InitCommand {
             .into_iter()
             .map(|(k, v)| (k, Box::new(v)))
             .collect();
-        let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()), 448);
+        let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()));
 
         if input.is_interactive() {
             io.write_error3(&format!("\n{}\n", json), true, io_interface::NORMAL);

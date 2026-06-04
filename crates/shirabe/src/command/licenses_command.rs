@@ -247,15 +247,12 @@ impl LicensesCommand {
                             .collect(),
                     ),
                 );
-                io.write(&JsonFile::encode(
-                    &PhpMixed::Array(
-                        output_map
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
-                    448,
-                ));
+                io.write(&JsonFile::encode(&PhpMixed::Array(
+                    output_map
+                        .into_iter()
+                        .map(|(k, v)| (k, Box::new(v)))
+                        .collect(),
+                )));
             }
             "summary" => {
                 let mut used_licenses: IndexMap<String, i64> = IndexMap::new();

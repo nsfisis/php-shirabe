@@ -312,10 +312,9 @@ impl CheckPlatformReqsCommand {
                 })
                 .collect();
 
-            io.write(&JsonFile::encode(
-                &PhpMixed::List(rows.into_iter().map(Box::new).collect()),
-                448,
-            ));
+            io.write(&JsonFile::encode(&PhpMixed::List(
+                rows.into_iter().map(Box::new).collect(),
+            )));
         } else {
             let rows: Vec<PhpMixed> = results
                 .iter()

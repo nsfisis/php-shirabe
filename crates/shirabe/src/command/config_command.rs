@@ -8,12 +8,11 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
-    ArrayObject, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
-    JsonObject, PhpMixed, RuntimeException, array_filter, array_filter_use_key, array_is_list,
-    array_map, array_merge, array_unique, call_user_func, count, escapeshellcmd, exec, explode,
-    file_exists, file_get_contents, implode, in_array, is_array, is_bool, is_dir, is_numeric,
-    is_object, is_string, json_encode, key, sort, sprintf, str_replace, str_starts_with, strpos,
-    strtolower, system, touch, var_export,
+    ArrayObject, InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
+    array_filter_use_key, array_is_list, array_map, array_merge, array_unique, call_user_func,
+    count, escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array,
+    is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
+    str_replace, str_starts_with, strpos, strtolower, system, touch, var_export,
 };
 
 use crate::advisory::Auditor;
@@ -26,6 +25,7 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::package::base_package::{self, BasePackage};
 use crate::util::Filesystem;
@@ -476,7 +476,13 @@ impl ConfigCommand {
             }
 
             let value_str = if is_array(&value) || is_object(&value) || is_bool(&value) {
-                JsonFile::encode(&value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                JsonFile::encode_with_options(
+                    &value,
+                    JsonEncodeOptions {
+                        pretty_print: false,
+                        ..Default::default()
+                    },
+                )
             } else {
                 value.as_string().unwrap_or("").to_string()
             };

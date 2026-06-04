@@ -16,6 +16,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -264,7 +265,7 @@ impl GitBitbucketDriver {
                 if self.inner.should_cache(identifier) {
                     self.inner.cache.as_mut().unwrap().write(
                         identifier,
-                        &JsonFile::encode_with_indent(
+                        &JsonFile::encode_with_options(
                             &PhpMixed::Array(
                                 composer
                                     .clone()
@@ -273,9 +274,10 @@ impl GitBitbucketDriver {
                                     .map(|(k, v)| (k, Box::new(v)))
                                     .collect(),
                             ),
-                            shirabe_php_shim::JSON_UNESCAPED_UNICODE
-                                | shirabe_php_shim::JSON_UNESCAPED_SLASHES,
-                            JsonFile::INDENT_DEFAULT,
+                            JsonEncodeOptions {
+                                pretty_print: false,
+                                ..Default::default()
+                            },
                         ),
                     )?;
                 }

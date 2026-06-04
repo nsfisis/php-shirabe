@@ -14,6 +14,7 @@ use shirabe_php_shim::{
 
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::CompleteAliasPackageHandle;
@@ -133,14 +134,14 @@ impl Locker {
 
         Ok(hash(
             "md5",
-            &JsonFile::encode(
+            &JsonFile::encode_with_options(
                 &PhpMixed::Array(
                     relevant_content
                         .into_iter()
                         .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
                 ),
-                0,
+                JsonEncodeOptions::none(),
             ),
         ))
     }
@@ -634,13 +635,9 @@ impl Locker {
             } else {
                 self.virtual_file_written = true;
                 let parsed = JsonFile::parse_json(
-                    Some(&JsonFile::encode_with_indent(
-                        &PhpMixed::Array(lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect()),
-                        shirabe_php_shim::JSON_UNESCAPED_SLASHES
-                            | shirabe_php_shim::JSON_PRETTY_PRINT
-                            | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
-                        JsonFile::INDENT_DEFAULT,
-                    )),
+                    Some(&JsonFile::encode(&PhpMixed::Array(
+                        lock.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
+                    ))),
                     None,
                 )?;
                 let parsed_map: IndexMap<String, PhpMixed> = match parsed {

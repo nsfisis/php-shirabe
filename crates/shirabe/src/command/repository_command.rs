@@ -380,7 +380,7 @@ impl RepositoryCommand {
                     .get("url")
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| JsonFile::encode(repo, 448));
+                    .unwrap_or_else(|| JsonFile::encode(repo));
                 io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
             }
         }

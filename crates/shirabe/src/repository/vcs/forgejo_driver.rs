@@ -13,6 +13,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::repository::vcs::GitDriver;
 use crate::repository::vcs::VcsDriverBase;
@@ -341,17 +342,17 @@ impl ForgejoDriver {
                     )?;
                     if self.inner.should_cache(identifier) {
                         if let Some(ref composer_map) = c {
-                            // TODO(phase-b): JsonFile::encode_with_options does not exist; use encode
-                            let encoded = JsonFile::encode(
+                            let encoded = JsonFile::encode_with_options(
                                 &PhpMixed::Array(
                                     composer_map
                                         .iter()
                                         .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                                         .collect(),
                                 ),
-                                (shirabe_php_shim::JSON_UNESCAPED_UNICODE
-                                    | shirabe_php_shim::JSON_UNESCAPED_SLASHES)
-                                    as i64,
+                                JsonEncodeOptions {
+                                    pretty_print: false,
+                                    ..Default::default()
+                                },
                             );
                             self.inner
                                 .cache

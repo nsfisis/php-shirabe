@@ -4,10 +4,9 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::metadata_minifier::MetadataMinifier;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    Countable, InvalidArgumentException, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
-    LogicException, PHP_EOL, PhpMixed, RuntimeException, UnexpectedValueException,
-    extension_loaded, hash, http_build_query, in_array, json_decode, parse_url_all, realpath,
-    strtolower, strtr, urlencode, var_export,
+    Countable, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
+    UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,
+    parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
 };
 
 use shirabe_semver::compiling_matcher::CompilingMatcher;
@@ -22,6 +21,7 @@ use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::json::JsonEncodeOptions;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
 use crate::package::PackageInterface;
@@ -2976,7 +2976,10 @@ impl ComposerRepository {
                                         .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                                         .collect(),
                                 );
-                                json = JsonFile::encode(&as_mixed, 0);
+                                json = JsonFile::encode_with_options(
+                                    &as_mixed,
+                                    JsonEncodeOptions::none(),
+                                );
                             }
                         }
                         self.cache.write(ck, &json);
@@ -3168,7 +3171,7 @@ impl ComposerRepository {
                         .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                         .collect(),
                 );
-                json = JsonFile::encode(&as_mixed, 0);
+                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none());
             }
             if !self.cache.is_read_only() {
                 self.cache.write(cache_key, &json);
@@ -3346,7 +3349,13 @@ impl ComposerRepository {
                     .map(|(k, v)| (k.clone(), Box::new(v.clone())))
                     .collect(),
             );
-            json = JsonFile::encode(&as_mixed, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            json = JsonFile::encode_with_options(
+                &as_mixed,
+                JsonEncodeOptions {
+                    pretty_print: false,
+                    ..Default::default()
+                },
+            );
         }
         if !self.cache.is_read_only() {
             self.cache.write(cache_key, &json);
