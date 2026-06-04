@@ -96,10 +96,9 @@ impl InstallationManager {
     /// code is ever executed.
     pub fn disable_plugins(&mut self) {
         for installer in self.installers.iter_mut() {
-            // TODO(phase-b): $installer instanceof PluginInstaller downcast
-            let plugin_installer: Option<&mut PluginInstaller> = None;
-            let _ = plugin_installer;
-            // if let Some(pi) = plugin_installer { pi.disable_plugins(); }
+            if let Some(plugin_installer) = installer.as_plugin_installer_mut() {
+                plugin_installer.disable_plugins();
+            }
         }
     }
 
@@ -161,12 +160,9 @@ impl InstallationManager {
         };
 
         // if the given installer support installing binaries
-        // TODO(phase-b): $installer instanceof BinaryPresenceInterface downcast
-        let bp: Option<&dyn BinaryPresenceInterface> = None;
-        if let Some(bp) = bp {
+        if let Some(bp) = installer.as_binary_presence_interface() {
             bp.ensure_binaries_presence(package);
         }
-        let _ = installer;
     }
 
     /// Executes solver operation.

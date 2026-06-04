@@ -3,5 +3,5 @@
 use crate::package::PackageInterfaceHandle;
 
 pub trait BinaryPresenceInterface {
-    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle);
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
 }

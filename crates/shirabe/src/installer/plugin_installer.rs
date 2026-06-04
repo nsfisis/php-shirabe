@@ -2,6 +2,7 @@
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::installer::BinaryInstaller;
+use crate::installer::BinaryPresenceInterface;
 use crate::installer::InstallerInterface;
 use crate::installer::LibraryInstaller;
 use crate::io::IOInterface;
@@ -175,5 +176,13 @@ impl InstallerInterface for PluginInstaller {
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         self.inner.get_install_path(package)
+    }
+
+    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+        Some(&mut self.inner)
+    }
+
+    fn as_plugin_installer_mut(&mut self) -> Option<&mut PluginInstaller> {
+        Some(self)
     }
 }

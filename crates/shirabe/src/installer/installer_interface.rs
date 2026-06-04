@@ -1,5 +1,7 @@
 //! ref: composer/src/Composer/Installer/InstallerInterface.php
 
+use crate::installer::BinaryPresenceInterface;
+use crate::installer::PluginInstaller;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterface;
 use shirabe_php_shim::PhpMixed;
@@ -54,6 +56,14 @@ pub trait InstallerInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+
+    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+        None
+    }
+
+    fn as_plugin_installer_mut(&mut self) -> Option<&mut PluginInstaller> {
+        None
+    }
 
     fn clone_box(&self) -> Box<dyn InstallerInterface> {
         todo!()

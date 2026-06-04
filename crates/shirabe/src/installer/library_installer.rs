@@ -418,13 +418,14 @@ impl InstallerInterface for LibraryInstaller {
             base_path
         })
     }
+
+    fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
+        Some(self)
+    }
 }
 
 impl BinaryPresenceInterface for LibraryInstaller {
-    fn ensure_binaries_presence(&self, _package: PackageInterfaceHandle) {
-        // TODO(phase-b): trait takes &self but LibraryInstaller::ensure_binaries_presence
-        // requires &mut self due to BinaryInstaller::install_binaries(&mut self, ...).
-        // Revisit the trait or use interior mutability.
-        todo!()
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
+        LibraryInstaller::ensure_binaries_presence(self, package);
     }
 }
