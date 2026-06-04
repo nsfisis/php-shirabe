@@ -14,6 +14,7 @@ use crate::config::Config;
 use crate::downloader::ChangeReportInterface;
 use crate::downloader::DvcsDownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
+use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -58,401 +59,6 @@ impl GitDownloader {
             git_util,
             cached_packages: IndexMap::new(),
         }
-    }
-
-    pub(crate) async fn do_download(
-        &mut self,
-        package: PackageInterfaceHandle,
-        _path: &str,
-        url: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
-        // Do not create an extra local cache when repository is already local
-        if Filesystem::is_local_path(url) {
-            return Ok(None);
-        }
-
-        GitUtil::clean_env(&self.inner.process);
-
-        let cache_path = format!(
-            "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
-        );
-        let git_version = GitUtil::get_version(&self.inner.process);
-
-        // --dissociate option is only available since git 2.3.0-rc0
-        if git_version.is_some()
-            && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", ">=")
-            && Cache::is_usable(&cache_path)
-        {
-            self.inner.io.write_error3(
-                &format!(
-                    "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
-                    package.get_name(),
-                    package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
-                ),
-                true,
-                io_interface::NORMAL,
-            );
-            self.inner.io.write_error3(
-                &sprintf(
-                    "    Cloning to cache at %s",
-                    &[PhpMixed::String(cache_path.clone())],
-                ),
-                true,
-                io_interface::DEBUG,
-            );
-            let r#ref = package.get_source_reference();
-            let pretty_version = package.get_pretty_version();
-            if self.git_util.fetch_ref_or_sync_mirror(
-                url,
-                &cache_path,
-                r#ref.as_deref().unwrap_or(""),
-                Some(&pretty_version),
-            )? && is_dir(&cache_path)
-            {
-                self.cached_packages
-                    .entry(package.get_id())
-                    .or_insert_with(IndexMap::new)
-                    .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
-            }
-        } else if git_version.is_none() {
-            return Err(RuntimeException {
-                message: "git was not found in your PATH, skipping source download".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(None)
-    }
-
-    pub(crate) async fn do_install(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
-    ) -> Result<Option<PhpMixed>> {
-        GitUtil::clean_env(&self.inner.process);
-        let path = self.normalize_path(path);
-        let cache_path = format!(
-            "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
-        );
-        let r#ref = package.get_source_reference().unwrap_or_default();
-
-        let msg;
-        let commands: Vec<Vec<String>>;
-        let has_cached = self
-            .cached_packages
-            .get(&package.get_id())
-            .and_then(|m| m.get(&r#ref))
-            .copied()
-            .unwrap_or(false);
-        if has_cached {
-            msg = format!("Cloning {} from cache", self.get_short_hash(&r#ref));
-
-            let mut clone_flags: Vec<String> = vec![
-                "--dissociate".to_string(),
-                "--reference".to_string(),
-                cache_path.clone(),
-            ];
-            let transport_options = package.get_transport_options();
-            if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array()) {
-                if let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool()) {
-                    if single {
-                        clone_flags = vec![];
-                    }
-                }
-            }
-
-            commands = vec![
-                {
-                    let mut base = vec![
-                        "git".to_string(),
-                        "clone".to_string(),
-                        "--no-checkout".to_string(),
-                        cache_path.clone(),
-                        path.clone(),
-                    ];
-                    base.extend(clone_flags);
-                    base
-                },
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "origin".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "add".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
-                ],
-            ];
-        } else {
-            msg = format!("Cloning {}", self.get_short_hash(&r#ref));
-            commands = vec![
-                vec![
-                    "git".to_string(),
-                    "clone".to_string(),
-                    "--no-checkout".to_string(),
-                    "--".to_string(),
-                    "%url%".to_string(),
-                    path.clone(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "add".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%url%".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "composer".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "origin".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
-                ],
-            ];
-            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The required git reference for {} is not in cache and network is disabled, aborting",
-                        package.get_name(),
-                    ),
-                    code: 0,
-                }
-                .into());
-            }
-        }
-
-        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
-
-        self.git_util
-            .run_commands(commands, url, Some(&path), true, None)?;
-
-        let source_url = package.get_source_url();
-        if Some(url) != source_url.as_deref() && source_url.is_some() {
-            self.update_origin_url(&path, source_url.as_deref().unwrap());
-        } else {
-            self.set_push_url(&path, url);
-        }
-
-        let pretty_version = package.get_pretty_version();
-        if let Some(new_ref) =
-            self.update_to_commit(package.clone(), &path, &r#ref, &pretty_version)?
-        {
-            if package.get_dist_reference() == package.get_source_reference() {
-                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
-                // package.set_dist_reference(Some(new_ref.clone()));
-            }
-            // package.set_source_reference(Some(new_ref));
-            let _ = new_ref;
-        }
-
-        Ok(None)
-    }
-
-    pub(crate) async fn do_update(
-        &mut self,
-        _initial: PackageInterfaceHandle,
-        target: PackageInterfaceHandle,
-        path: &str,
-        url: &str,
-    ) -> Result<Option<PhpMixed>> {
-        GitUtil::clean_env(&self.inner.process);
-        let path = self.normalize_path(path);
-        if !self.has_metadata_repository(&path) {
-            return Err(RuntimeException {
-                message: format!(
-                    "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                    path
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        let cache_path = format!(
-            "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
-        );
-        let r#ref = target.get_source_reference().unwrap_or_default();
-
-        let msg;
-        let remote_url;
-        let has_cached = self
-            .cached_packages
-            .get(&target.get_id())
-            .and_then(|m| m.get(&r#ref))
-            .copied()
-            .unwrap_or(false);
-        if has_cached {
-            msg = format!("Checking out {} from cache", self.get_short_hash(&r#ref));
-            remote_url = cache_path.clone();
-        } else {
-            msg = format!("Checking out {}", self.get_short_hash(&r#ref));
-            remote_url = "%url%".to_string();
-            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
-                return Err(RuntimeException {
-                    message: format!(
-                        "The required git reference for {} is not in cache and network is disabled, aborting",
-                        target.get_name(),
-                    ),
-                    code: 0,
-                }
-                .into());
-            }
-        }
-
-        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
-
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
-            &vec![
-                "git".to_string(),
-                "rev-parse".to_string(),
-                "--quiet".to_string(),
-                "--verify".to_string(),
-                format!("{}^{{commit}}", r#ref),
-            ],
-            &mut output,
-            Some(path.clone()),
-        ) != 0
-        {
-            let commands = vec![
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    remote_url.clone(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "composer".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "--tags".to_string(),
-                    "composer".to_string(),
-                ],
-            ];
-
-            self.git_util
-                .run_commands(commands, url, Some(&path), false, None)?;
-        }
-
-        let command = vec![
-            "git".to_string(),
-            "remote".to_string(),
-            "set-url".to_string(),
-            "composer".to_string(),
-            "--".to_string(),
-            "%sanitizedUrl%".to_string(),
-        ];
-        self.git_util
-            .run_commands(vec![command], url, Some(&path), false, None)?;
-
-        let pretty_version = target.get_pretty_version();
-        if let Some(new_ref) =
-            self.update_to_commit(target.clone(), &path, &r#ref, &pretty_version)?
-        {
-            if target.get_dist_reference() == target.get_source_reference() {
-                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
-                // target.set_dist_reference(Some(new_ref.clone()));
-            }
-            // target.set_source_reference(Some(new_ref));
-            let _ = new_ref;
-        }
-
-        let mut update_origin_url = false;
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
-            &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
-            &mut output,
-            Some(path.clone()),
-        ) == 0
-        {
-            let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
-            let mut composer_match: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(
-                r"{^origin\s+(?P<url>\S+)}m",
-                &output,
-                Some(&mut origin_match),
-            )
-            .unwrap_or(false)
-                && Preg::is_match3(
-                    r"{^composer\s+(?P<url>\S+)}m",
-                    &output,
-                    Some(&mut composer_match),
-                )
-                .unwrap_or(false)
-            {
-                let origin_url = origin_match
-                    .get(&CaptureKey::ByName("url".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
-                let composer_url = composer_match
-                    .get(&CaptureKey::ByName("url".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
-                if origin_url == composer_url
-                    && Some(composer_url.as_str()) != target.get_source_url().as_deref()
-                {
-                    update_origin_url = true;
-                }
-            }
-        }
-        if update_origin_url && target.get_source_url().is_some() {
-            self.update_origin_url(&path, &target.get_source_url().unwrap());
-        }
-
-        Ok(None)
     }
 
     pub fn get_unpushed_changes(
@@ -647,211 +253,6 @@ impl GitDownloader {
         }
 
         Ok(unpushed_changes)
-    }
-
-    pub(crate) async fn clean_changes(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        update: bool,
-    ) -> Result<Option<PhpMixed>> {
-        GitUtil::clean_env(&self.inner.process);
-        let path = self.normalize_path(path);
-
-        let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
-        if let Some(unpushed) = unpushed.as_deref() {
-            if self.inner.io.is_interactive()
-                || self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get("discard-changes")
-                    .as_bool()
-                    != Some(true)
-            {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Source directory {} has unpushed changes on the current branch: \n{}",
-                        path, unpushed
-                    ),
-                    code: 0,
-                }
-                .into());
-            }
-        }
-
-        let changes = match self.get_local_changes(package.clone(), &path)? {
-            Some(c) => c,
-            None => return Ok(None),
-        };
-
-        if !self.inner.io.is_interactive() {
-            let discard_changes = self.inner.config.borrow_mut().get("discard-changes");
-            if discard_changes.as_bool() == Some(true) {
-                return self.discard_changes(&path).await;
-            }
-            if discard_changes.as_string() == Some("stash") {
-                if !update {
-                    return self
-                        .inner
-                        .clean_changes(package.clone(), &path, update)
-                        .await;
-                }
-
-                return self.stash_changes(&path).await;
-            }
-
-            return self.inner.clean_changes(package, &path, update).await;
-        }
-
-        let changes: Vec<String> = array_map(
-            |elem: &String| format!("    {}", elem),
-            &Preg::split(r"{\s*\r?\n\s*}", &changes)?,
-        );
-        self.inner.io.write_error3(
-            &format!(
-                "    <error>{} has modified files:</error>",
-                package.get_pretty_name()
-            ),
-            true,
-            io_interface::NORMAL,
-        );
-        let slice_end = 10_usize.min(changes.len());
-        // TODO(phase-b): PHP passes the list directly to writeError; joined here so write_error3 takes &str
-        self.inner
-            .io
-            .write_error3(&changes[..slice_end].join("\n"), true, io_interface::NORMAL);
-        if (changes.len() as i64) > 10 {
-            self.inner.io.write_error3(
-                &format!(
-                    "    <info>{} more files modified, choose \"v\" to view the full list</info>",
-                    changes.len() as i64 - 10
-                ),
-                true,
-                io_interface::NORMAL,
-            );
-        }
-
-        'outer: loop {
-            let answer = self
-                .inner
-                .io
-                .ask(
-                    format!(
-                        "    <info>Discard changes [y,n,v,{}?]?</info> ",
-                        if update { "s," } else { "" }
-                    ),
-                    PhpMixed::String("?".to_string()),
-                )
-                .as_string()
-                .map(|s| s.to_string());
-            let mut do_help = false;
-            match answer.as_deref() {
-                Some("y") => {
-                    self.discard_changes(&path).await?;
-                    break 'outer;
-                }
-                Some("s") => {
-                    if !update {
-                        // goto help;
-                        do_help = true;
-                    } else {
-                        self.stash_changes(&path).await?;
-                        break 'outer;
-                    }
-                }
-                Some("n") => {
-                    return Err(RuntimeException {
-                        message: "Update aborted".to_string(),
-                        code: 0,
-                    }
-                    .into());
-                }
-                Some("v") => {
-                    // TODO(phase-b): PHP passes list directly; joined here for &str arg
-                    self.inner
-                        .io
-                        .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
-                }
-                Some("d") => {
-                    self.view_diff(&path);
-                }
-                _ => {
-                    // case '?': default:
-                    do_help = true;
-                }
-            }
-
-            if do_help {
-                // help:
-                // TODO(phase-b): PHP passes list directly; joined here for &str arg
-                self.inner.io.write_error3(
-                    &[
-                        format!(
-                            "    y - discard changes and apply the {}",
-                            if update { "update" } else { "uninstall" }
-                        ),
-                        format!(
-                            "    n - abort the {} and let you manually clean things up",
-                            if update { "update" } else { "uninstall" }
-                        ),
-                        "    v - view modified files".to_string(),
-                        "    d - view local modifications (diff)".to_string(),
-                    ]
-                    .join("\n"),
-                    true,
-                    io_interface::NORMAL,
-                );
-                if update {
-                    self.inner.io.write_error3(
-                        "    s - stash changes and try to reapply them after the update",
-                        true,
-                        io_interface::NORMAL,
-                    );
-                }
-                self.inner
-                    .io
-                    .write_error3("    ? - print help", true, io_interface::NORMAL);
-            }
-        }
-
-        Ok(None)
-    }
-
-    pub(crate) fn reapply_changes(&mut self, path: &str) -> Result<()> {
-        let path = self.normalize_path(path);
-        if self
-            .has_stashed_changes
-            .get(&path)
-            .copied()
-            .unwrap_or(false)
-        {
-            self.has_stashed_changes.shift_remove(&path);
-            self.inner.io.write_error3(
-                "    <info>Re-applying stashed changes</info>",
-                true,
-                io_interface::NORMAL,
-            );
-            let mut output = String::new();
-            if self.inner.process.borrow_mut().execute_args(
-                &vec!["git".to_string(), "stash".to_string(), "pop".to_string()],
-                &mut output,
-                Some(path.clone()),
-            ) != 0
-            {
-                return Err(RuntimeException {
-                    message: format!(
-                        "Failed to apply stashed changes:\n\n{}",
-                        self.inner.process.borrow().get_error_output()
-                    ),
-                    code: 0,
-                }
-                .into());
-            }
-        }
-
-        self.has_discarded_changes.shift_remove(&path);
-        Ok(())
     }
 
     /// Updates the given path to the given commit ref
@@ -1153,42 +554,6 @@ impl GitDownloader {
         }
     }
 
-    pub(crate) fn get_commit_logs(
-        &mut self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> Result<String> {
-        let path = self.normalize_path(path);
-        let mut args = vec![
-            "--format=%h - %an: %s".to_string(),
-            format!("{}..{}", from_reference, to_reference),
-        ];
-        args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process));
-        let command = GitUtil::build_rev_list_command(&self.inner.process, args);
-
-        let mut output = String::new();
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute_args(&command, &mut output, Some(path.clone()))
-            != 0
-        {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    implode(" ", &command),
-                    self.inner.process.borrow().get_error_output(),
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(GitUtil::parse_rev_list_output(&output, &self.inner.process))
-    }
-
     /// @phpstan-return PromiseInterface<void|null>
     /// @throws \RuntimeException
     pub(crate) async fn discard_changes(&mut self, path: &str) -> Result<Option<PhpMixed>> {
@@ -1301,12 +666,6 @@ impl GitDownloader {
         path
     }
 
-    pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {
-        let path = self.normalize_path(path);
-
-        is_dir(&format!("{}/.git", path))
-    }
-
     pub(crate) fn get_short_hash(&self, reference: &str) -> String {
         if !self.inner.io.is_verbose()
             && Preg::is_match(r"{^[0-9a-f]{40}$}", reference).unwrap_or(false)
@@ -1330,7 +689,7 @@ impl DvcsDownloaderInterface for GitDownloader {
 
 impl ChangeReportInterface for GitDownloader {
     fn get_local_changes(
-        &self,
+        &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {
@@ -1379,13 +738,678 @@ impl VcsCapableDownloaderInterface for GitDownloader {
     }
 }
 
-// TODO(phase-b): GitDownloader extends VcsDownloader which implements DownloaderInterface.
-// Delegating each trait method to todo!() until the inner VcsDownloaderBase exposes the
-// matching impl surface.
+impl VcsDownloader for GitDownloader {
+    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.inner.io.clone()
+    }
+
+    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+        &self.inner.config
+    }
+
+    fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
+        &self.inner.process
+    }
+
+    fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>> {
+        &self.inner.filesystem
+    }
+
+    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+        &self.inner.has_cleaned_changes
+    }
+
+    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.inner.has_cleaned_changes
+    }
+
+    async fn do_download(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        url: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>> {
+        // Do not create an extra local cache when repository is already local
+        if Filesystem::is_local_path(url) {
+            return Ok(None);
+        }
+
+        GitUtil::clean_env(&self.inner.process);
+
+        let cache_path = format!(
+            "{}/{}/",
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+        );
+        let git_version = GitUtil::get_version(&self.inner.process);
+
+        // --dissociate option is only available since git 2.3.0-rc0
+        if git_version.is_some()
+            && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", ">=")
+            && Cache::is_usable(&cache_path)
+        {
+            self.inner.io.write_error3(
+                &format!(
+                    "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
+                    package.get_name(),
+                    package
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                ),
+                true,
+                io_interface::NORMAL,
+            );
+            self.inner.io.write_error3(
+                &sprintf(
+                    "    Cloning to cache at %s",
+                    &[PhpMixed::String(cache_path.clone())],
+                ),
+                true,
+                io_interface::DEBUG,
+            );
+            let r#ref = package.get_source_reference();
+            let pretty_version = package.get_pretty_version();
+            if self.git_util.fetch_ref_or_sync_mirror(
+                url,
+                &cache_path,
+                r#ref.as_deref().unwrap_or(""),
+                Some(&pretty_version),
+            )? && is_dir(&cache_path)
+            {
+                self.cached_packages
+                    .entry(package.get_id())
+                    .or_insert_with(IndexMap::new)
+                    .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
+            }
+        } else if git_version.is_none() {
+            return Err(RuntimeException {
+                message: "git was not found in your PATH, skipping source download".to_string(),
+                code: 0,
+            }
+            .into());
+        }
+
+        Ok(None)
+    }
+
+    async fn do_install(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        url: &str,
+    ) -> Result<Option<PhpMixed>> {
+        GitUtil::clean_env(&self.inner.process);
+        let path = self.normalize_path(path);
+        let cache_path = format!(
+            "{}/{}/",
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+        );
+        let r#ref = package.get_source_reference().unwrap_or_default();
+
+        let msg;
+        let commands: Vec<Vec<String>>;
+        let has_cached = self
+            .cached_packages
+            .get(&package.get_id())
+            .and_then(|m| m.get(&r#ref))
+            .copied()
+            .unwrap_or(false);
+        if has_cached {
+            msg = format!("Cloning {} from cache", self.get_short_hash(&r#ref));
+
+            let mut clone_flags: Vec<String> = vec![
+                "--dissociate".to_string(),
+                "--reference".to_string(),
+                cache_path.clone(),
+            ];
+            let transport_options = package.get_transport_options();
+            if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array()) {
+                if let Some(single) = git_opts.get("single_use_clone").and_then(|v| v.as_bool()) {
+                    if single {
+                        clone_flags = vec![];
+                    }
+                }
+            }
+
+            commands = vec![
+                {
+                    let mut base = vec![
+                        "git".to_string(),
+                        "clone".to_string(),
+                        "--no-checkout".to_string(),
+                        cache_path.clone(),
+                        path.clone(),
+                    ];
+                    base.extend(clone_flags);
+                    base
+                },
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "origin".to_string(),
+                    "--".to_string(),
+                    "%sanitizedUrl%".to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "add".to_string(),
+                    "composer".to_string(),
+                    "--".to_string(),
+                    "%sanitizedUrl%".to_string(),
+                ],
+            ];
+        } else {
+            msg = format!("Cloning {}", self.get_short_hash(&r#ref));
+            commands = vec![
+                vec![
+                    "git".to_string(),
+                    "clone".to_string(),
+                    "--no-checkout".to_string(),
+                    "--".to_string(),
+                    "%url%".to_string(),
+                    path.clone(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "add".to_string(),
+                    "composer".to_string(),
+                    "--".to_string(),
+                    "%url%".to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "fetch".to_string(),
+                    "composer".to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "origin".to_string(),
+                    "--".to_string(),
+                    "%sanitizedUrl%".to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "composer".to_string(),
+                    "--".to_string(),
+                    "%sanitizedUrl%".to_string(),
+                ],
+            ];
+            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
+                return Err(RuntimeException {
+                    message: format!(
+                        "The required git reference for {} is not in cache and network is disabled, aborting",
+                        package.get_name(),
+                    ),
+                    code: 0,
+                }
+                .into());
+            }
+        }
+
+        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
+
+        self.git_util
+            .run_commands(commands, url, Some(&path), true, None)?;
+
+        let source_url = package.get_source_url();
+        if Some(url) != source_url.as_deref() && source_url.is_some() {
+            self.update_origin_url(&path, source_url.as_deref().unwrap());
+        } else {
+            self.set_push_url(&path, url);
+        }
+
+        let pretty_version = package.get_pretty_version();
+        if let Some(new_ref) =
+            self.update_to_commit(package.clone(), &path, &r#ref, &pretty_version)?
+        {
+            if package.get_dist_reference() == package.get_source_reference() {
+                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
+                // package.set_dist_reference(Some(new_ref.clone()));
+            }
+            // package.set_source_reference(Some(new_ref));
+            let _ = new_ref;
+        }
+
+        Ok(None)
+    }
+
+    async fn do_update(
+        &mut self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
+        url: &str,
+    ) -> Result<Option<PhpMixed>> {
+        GitUtil::clean_env(&self.inner.process);
+        let path = self.normalize_path(path);
+        if !self.has_metadata_repository(&path) {
+            return Err(RuntimeException {
+                message: format!(
+                    "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
+                    path
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        let cache_path = format!(
+            "{}/{}/",
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or(""),
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+        );
+        let r#ref = target.get_source_reference().unwrap_or_default();
+
+        let msg;
+        let remote_url;
+        let has_cached = self
+            .cached_packages
+            .get(&target.get_id())
+            .and_then(|m| m.get(&r#ref))
+            .copied()
+            .unwrap_or(false);
+        if has_cached {
+            msg = format!("Checking out {} from cache", self.get_short_hash(&r#ref));
+            remote_url = cache_path.clone();
+        } else {
+            msg = format!("Checking out {}", self.get_short_hash(&r#ref));
+            remote_url = "%url%".to_string();
+            if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
+                return Err(RuntimeException {
+                    message: format!(
+                        "The required git reference for {} is not in cache and network is disabled, aborting",
+                        target.get_name(),
+                    ),
+                    code: 0,
+                }
+                .into());
+            }
+        }
+
+        self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
+
+        let mut output = String::new();
+        if self.inner.process.borrow_mut().execute_args(
+            &vec![
+                "git".to_string(),
+                "rev-parse".to_string(),
+                "--quiet".to_string(),
+                "--verify".to_string(),
+                format!("{}^{{commit}}", r#ref),
+            ],
+            &mut output,
+            Some(path.clone()),
+        ) != 0
+        {
+            let commands = vec![
+                vec![
+                    "git".to_string(),
+                    "remote".to_string(),
+                    "set-url".to_string(),
+                    "composer".to_string(),
+                    "--".to_string(),
+                    remote_url.clone(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "fetch".to_string(),
+                    "composer".to_string(),
+                ],
+                vec![
+                    "git".to_string(),
+                    "fetch".to_string(),
+                    "--tags".to_string(),
+                    "composer".to_string(),
+                ],
+            ];
+
+            self.git_util
+                .run_commands(commands, url, Some(&path), false, None)?;
+        }
+
+        let command = vec![
+            "git".to_string(),
+            "remote".to_string(),
+            "set-url".to_string(),
+            "composer".to_string(),
+            "--".to_string(),
+            "%sanitizedUrl%".to_string(),
+        ];
+        self.git_util
+            .run_commands(vec![command], url, Some(&path), false, None)?;
+
+        let pretty_version = target.get_pretty_version();
+        if let Some(new_ref) =
+            self.update_to_commit(target.clone(), &path, &r#ref, &pretty_version)?
+        {
+            if target.get_dist_reference() == target.get_source_reference() {
+                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
+                // target.set_dist_reference(Some(new_ref.clone()));
+            }
+            // target.set_source_reference(Some(new_ref));
+            let _ = new_ref;
+        }
+
+        let mut update_origin_url = false;
+        let mut output = String::new();
+        if self.inner.process.borrow_mut().execute_args(
+            &vec!["git".to_string(), "remote".to_string(), "-v".to_string()],
+            &mut output,
+            Some(path.clone()),
+        ) == 0
+        {
+            let mut origin_match: IndexMap<CaptureKey, String> = IndexMap::new();
+            let mut composer_match: IndexMap<CaptureKey, String> = IndexMap::new();
+            if Preg::is_match3(
+                r"{^origin\s+(?P<url>\S+)}m",
+                &output,
+                Some(&mut origin_match),
+            )
+            .unwrap_or(false)
+                && Preg::is_match3(
+                    r"{^composer\s+(?P<url>\S+)}m",
+                    &output,
+                    Some(&mut composer_match),
+                )
+                .unwrap_or(false)
+            {
+                let origin_url = origin_match
+                    .get(&CaptureKey::ByName("url".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
+                let composer_url = composer_match
+                    .get(&CaptureKey::ByName("url".to_string()))
+                    .cloned()
+                    .unwrap_or_default();
+                if origin_url == composer_url
+                    && Some(composer_url.as_str()) != target.get_source_url().as_deref()
+                {
+                    update_origin_url = true;
+                }
+            }
+        }
+        if update_origin_url && target.get_source_url().is_some() {
+            self.update_origin_url(&path, &target.get_source_url().unwrap());
+        }
+
+        Ok(None)
+    }
+
+    async fn clean_changes(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        update: bool,
+    ) -> Result<Option<PhpMixed>> {
+        GitUtil::clean_env(&self.inner.process);
+        let path = self.normalize_path(path);
+
+        let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
+        if let Some(unpushed) = unpushed.as_deref() {
+            if self.inner.io.is_interactive()
+                || self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("discard-changes")
+                    .as_bool()
+                    != Some(true)
+            {
+                return Err(RuntimeException {
+                    message: format!(
+                        "Source directory {} has unpushed changes on the current branch: \n{}",
+                        path, unpushed
+                    ),
+                    code: 0,
+                }
+                .into());
+            }
+        }
+
+        let changes = match self.get_local_changes(package.clone(), &path)? {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+
+        if !self.inner.io.is_interactive() {
+            let discard_changes = self.inner.config.borrow_mut().get("discard-changes");
+            if discard_changes.as_bool() == Some(true) {
+                return self.discard_changes(&path).await;
+            }
+            if discard_changes.as_string() == Some("stash") {
+                if !update {
+                    return self
+                        .inner
+                        .clean_changes(package.clone(), &path, update)
+                        .await;
+                }
+
+                return self.stash_changes(&path).await;
+            }
+
+            return self.inner.clean_changes(package, &path, update).await;
+        }
+
+        let changes: Vec<String> = array_map(
+            |elem: &String| format!("    {}", elem),
+            &Preg::split(r"{\s*\r?\n\s*}", &changes)?,
+        );
+        self.inner.io.write_error3(
+            &format!(
+                "    <error>{} has modified files:</error>",
+                package.get_pretty_name()
+            ),
+            true,
+            io_interface::NORMAL,
+        );
+        let slice_end = 10_usize.min(changes.len());
+        // TODO(phase-b): PHP passes the list directly to writeError; joined here so write_error3 takes &str
+        self.inner
+            .io
+            .write_error3(&changes[..slice_end].join("\n"), true, io_interface::NORMAL);
+        if (changes.len() as i64) > 10 {
+            self.inner.io.write_error3(
+                &format!(
+                    "    <info>{} more files modified, choose \"v\" to view the full list</info>",
+                    changes.len() as i64 - 10
+                ),
+                true,
+                io_interface::NORMAL,
+            );
+        }
+
+        'outer: loop {
+            let answer = self
+                .inner
+                .io
+                .ask(
+                    format!(
+                        "    <info>Discard changes [y,n,v,{}?]?</info> ",
+                        if update { "s," } else { "" }
+                    ),
+                    PhpMixed::String("?".to_string()),
+                )
+                .as_string()
+                .map(|s| s.to_string());
+            let mut do_help = false;
+            match answer.as_deref() {
+                Some("y") => {
+                    self.discard_changes(&path).await?;
+                    break 'outer;
+                }
+                Some("s") => {
+                    if !update {
+                        // goto help;
+                        do_help = true;
+                    } else {
+                        self.stash_changes(&path).await?;
+                        break 'outer;
+                    }
+                }
+                Some("n") => {
+                    return Err(RuntimeException {
+                        message: "Update aborted".to_string(),
+                        code: 0,
+                    }
+                    .into());
+                }
+                Some("v") => {
+                    // TODO(phase-b): PHP passes list directly; joined here for &str arg
+                    self.inner
+                        .io
+                        .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
+                }
+                Some("d") => {
+                    self.view_diff(&path);
+                }
+                _ => {
+                    // case '?': default:
+                    do_help = true;
+                }
+            }
+
+            if do_help {
+                // help:
+                // TODO(phase-b): PHP passes list directly; joined here for &str arg
+                self.inner.io.write_error3(
+                    &[
+                        format!(
+                            "    y - discard changes and apply the {}",
+                            if update { "update" } else { "uninstall" }
+                        ),
+                        format!(
+                            "    n - abort the {} and let you manually clean things up",
+                            if update { "update" } else { "uninstall" }
+                        ),
+                        "    v - view modified files".to_string(),
+                        "    d - view local modifications (diff)".to_string(),
+                    ]
+                    .join("\n"),
+                    true,
+                    io_interface::NORMAL,
+                );
+                if update {
+                    self.inner.io.write_error3(
+                        "    s - stash changes and try to reapply them after the update",
+                        true,
+                        io_interface::NORMAL,
+                    );
+                }
+                self.inner
+                    .io
+                    .write_error3("    ? - print help", true, io_interface::NORMAL);
+            }
+        }
+
+        Ok(None)
+    }
+
+    fn reapply_changes(&mut self, path: &str) -> Result<()> {
+        let path = self.normalize_path(path);
+        if self
+            .has_stashed_changes
+            .get(&path)
+            .copied()
+            .unwrap_or(false)
+        {
+            self.has_stashed_changes.shift_remove(&path);
+            self.inner.io.write_error3(
+                "    <info>Re-applying stashed changes</info>",
+                true,
+                io_interface::NORMAL,
+            );
+            let mut output = String::new();
+            if self.inner.process.borrow_mut().execute_args(
+                &vec!["git".to_string(), "stash".to_string(), "pop".to_string()],
+                &mut output,
+                Some(path.clone()),
+            ) != 0
+            {
+                return Err(RuntimeException {
+                    message: format!(
+                        "Failed to apply stashed changes:\n\n{}",
+                        self.inner.process.borrow().get_error_output()
+                    ),
+                    code: 0,
+                }
+                .into());
+            }
+        }
+
+        self.has_discarded_changes.shift_remove(&path);
+        Ok(())
+    }
+
+    fn get_commit_logs(
+        &mut self,
+        from_reference: &str,
+        to_reference: &str,
+        path: &str,
+    ) -> Result<String> {
+        let path = self.normalize_path(path);
+        let mut args = vec![
+            "--format=%h - %an: %s".to_string(),
+            format!("{}..{}", from_reference, to_reference),
+        ];
+        args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process));
+        let command = GitUtil::build_rev_list_command(&self.inner.process, args);
+
+        let mut output = String::new();
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute_args(&command, &mut output, Some(path.clone()))
+            != 0
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Failed to execute {}\n\n{}",
+                    implode(" ", &command),
+                    self.inner.process.borrow().get_error_output(),
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        Ok(GitUtil::parse_rev_list_output(&output, &self.inner.process))
+    }
+
+    fn has_metadata_repository(&self, path: &str) -> bool {
+        let path = self.normalize_path(path);
+
+        is_dir(&format!("{}/.git", path))
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for GitDownloader {
     fn get_installation_source(&self) -> String {
-        todo!()
+        <Self as VcsDownloader>::get_installation_source(self)
     }
 
     fn as_dvcs_downloader_interface(
@@ -1394,7 +1418,9 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         Some(self)
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -1405,59 +1431,59 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     }
 
     async fn download(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
     async fn prepare(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::install(self, package, path).await
     }
 
     async fn update(
-        &self,
-        _initial: PackageInterfaceHandle,
-        _target: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
     async fn remove(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::remove(self, package, path).await
     }
 
     async fn cleanup(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

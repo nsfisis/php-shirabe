@@ -93,13 +93,9 @@ pub trait VcsDownloader:
     DownloaderInterface + ChangeReportInterface + VcsCapableDownloaderInterface
 {
     fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
-    fn io_mut(&mut self) -> &mut dyn IOInterface;
     fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
-    fn config_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Config>>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
-    fn process_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
-    fn filesystem_mut(&mut self) -> &mut std::rc::Rc<std::cell::RefCell<Filesystem>>;
     fn has_cleaned_changes(&self) -> &IndexMap<String, bool>;
     fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool>;
 
@@ -130,7 +126,12 @@ pub trait VcsDownloader:
     ) -> Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
-    fn get_commit_logs(&self, from_reference: &str, to_reference: &str, path: &str) -> String;
+    fn get_commit_logs(
+        &mut self,
+        from_reference: &str,
+        to_reference: &str,
+        path: &str,
+    ) -> Result<String>;
 
     /// Checks if VCS metadata repository has been initialized
     /// repository example: .git|.svn|.hg
@@ -174,7 +175,7 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
@@ -185,7 +186,7 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
@@ -219,9 +220,7 @@ pub trait VcsDownloader:
             self.has_cleaned_changes_mut()
                 .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
-            self.filesystem_mut()
-                .borrow_mut()
-                .empty_directory(path, true)?;
+            self.filesystem().borrow_mut().empty_directory(path, true)?;
         } else if r#type == "uninstall" {
             self.clean_changes(package, path, false).await?;
         }
@@ -245,7 +244,7 @@ pub trait VcsDownloader:
                 })
                 .unwrap_or(false)
         {
-            self.reapply_changes(path);
+            self.reapply_changes(path)?;
             self.has_cleaned_changes_mut()
                 .shift_remove(&prev_package.unwrap().get_unique_name());
         }
@@ -269,7 +268,7 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io_mut().write_error3(
+        self.io().write_error3(
             &format!("  - {}: ", InstallOperation::format(package.clone(), false)),
             false,
             io_interface::NORMAL,
@@ -290,7 +289,7 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
@@ -301,7 +300,7 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
@@ -339,7 +338,7 @@ pub trait VcsDownloader:
             .into());
         }
 
-        self.io_mut().write_error3(
+        self.io().write_error3(
             &format!(
                 "  - {}: ",
                 UpdateOperation::format(initial.clone(), target.clone(), false),
@@ -369,7 +368,7 @@ pub trait VcsDownloader:
                         return Err(e);
                     }
                     if self.io().is_debug() {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             &format!("Failed: [{}] {}", get_class_err(&e), e,),
                             true,
                             io_interface::NORMAL,
@@ -380,7 +379,7 @@ pub trait VcsDownloader:
                             .collect(),
                     )) > 0
                     {
-                        self.io_mut().write_error3(
+                        self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
@@ -397,11 +396,11 @@ pub trait VcsDownloader:
             let initial_ref = initial.get_source_reference().unwrap_or_default();
             let target_ref = target.get_source_reference().unwrap_or_default();
             let mut message = "Pulling in changes:";
-            let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path);
+            let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
 
             if trim(&logs, None) == "" {
                 message = "Rolling back changes:";
-                logs = self.get_commit_logs(&target_ref, &initial_ref, path);
+                logs = self.get_commit_logs(&target_ref, &initial_ref, path)?;
             }
 
             if trim(&logs, None) != "" {
@@ -414,10 +413,9 @@ pub trait VcsDownloader:
                 // escape angle brackets for proper output in the console
                 logs = str_replace("<", "\\<", &logs);
 
-                self.io_mut()
+                self.io()
                     .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
-                self.io_mut()
-                    .write_error3(&logs, true, io_interface::NORMAL);
+                self.io().write_error3(&logs, true, io_interface::NORMAL);
             }
         }
 
@@ -435,14 +433,14 @@ pub trait VcsDownloader:
         package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<PhpMixed>> {
-        self.io_mut().write_error3(
+        self.io().write_error3(
             &format!("  - {}", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );
 
         let result = self
-            .filesystem_mut()
+            .filesystem()
             .borrow_mut()
             .remove_directory_async(path)
             .await?;
@@ -481,7 +479,7 @@ pub trait VcsDownloader:
     /// @param  bool $update  if true (update) the changes can be stashed and reapplied after an update,
     ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
     async fn clean_changes(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         _update: bool,
@@ -499,7 +497,9 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&self, _path: &str) {}
+    fn reapply_changes(&mut self, _path: &str) -> Result<()> {
+        Ok(())
+    }
 
     fn prepare_urls(&self, mut urls: Vec<String>) -> Vec<String> {
         for index in 0..urls.len() {

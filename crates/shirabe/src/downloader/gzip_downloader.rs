@@ -132,7 +132,7 @@ impl GzipDownloader {
 
 impl ChangeReportInterface for GzipDownloader {
     fn get_local_changes(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {
@@ -146,12 +146,14 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -163,7 +165,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -175,7 +177,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     }
 
     async fn install(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -184,7 +186,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     }
 
     async fn update(
-        &self,
+        &mut self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -193,7 +195,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     }
 
     async fn remove(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -202,7 +204,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

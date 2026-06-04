@@ -153,13 +153,15 @@ impl DownloaderInterface for FileDownloader {
         "dist".to_owned()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
     /// @inheritDoc
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -437,7 +439,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn prepare(
-        &self,
+        &mut self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _path: &str,
@@ -448,7 +450,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn cleanup(
-        &self,
+        &mut self,
         _type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -503,7 +505,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn install(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -565,7 +567,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn update(
-        &self,
+        &mut self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -583,7 +585,7 @@ impl DownloaderInterface for FileDownloader {
 
     /// @inheritDoc
     async fn remove(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -615,7 +617,7 @@ impl ChangeReportInterface for FileDownloader {
     /// @inheritDoc
     /// @throws \RuntimeException
     fn get_local_changes(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {

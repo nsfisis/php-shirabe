@@ -6,7 +6,7 @@ use crate::package::PackageInterfaceHandle;
 
 pub trait ChangeReportInterface {
     fn get_local_changes(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>>;

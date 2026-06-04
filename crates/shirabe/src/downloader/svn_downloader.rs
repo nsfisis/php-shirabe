@@ -9,6 +9,7 @@ use crate::config::Config;
 use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
+use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -37,12 +38,85 @@ impl SvnDownloader {
         }
     }
 
-    pub(crate) async fn do_download(
-        &mut self,
+    pub(crate) fn execute(
+        &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        base_url: &str,
+        command: Vec<String>,
         url: &str,
-        prev_package: Option<PackageInterfaceHandle>,
+        cwd: Option<&str>,
+        path: Option<&str>,
+    ) -> anyhow::Result<String> {
+        let mut util = SvnUtil::new(
+            base_url.to_string(),
+            self.inner.io.clone(),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
+        );
+        util.set_cache_credentials(self.cache_credentials);
+        util.execute(command, url, cwd, path, self.inner.io.is_verbose())
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "{} could not be downloaded, {}",
+                    package.get_pretty_name(),
+                    e
+                )
+            })
+    }
+
+    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+        let mut output = String::new();
+        if self.inner.process.borrow_mut().execute_args(
+            &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
+            &mut output,
+            Some(path.to_string()),
+        ) != 0
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Could not reset changes\n\n:{}",
+                    self.inner.process.borrow().get_error_output()
+                ),
+                code: 0,
+            }
+            .into());
+        }
+
+        Ok(None)
+    }
+}
+
+impl VcsDownloader for SvnDownloader {
+    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.inner.io.clone()
+    }
+
+    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+        &self.inner.config
+    }
+
+    fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
+        &self.inner.process
+    }
+
+    fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>> {
+        &self.inner.filesystem
+    }
+
+    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+        &self.inner.has_cleaned_changes
+    }
+
+    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.inner.has_cleaned_changes
+    }
+
+    async fn do_download(
+        &mut self,
+        _package: PackageInterfaceHandle,
+        _path: &str,
+        url: &str,
+        _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
@@ -62,7 +136,7 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub(crate) async fn do_install(
+    async fn do_install(
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
@@ -109,9 +183,9 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub(crate) async fn do_update(
+    async fn do_update(
         &mut self,
-        initial: PackageInterfaceHandle,
+        _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
         url: &str,
@@ -160,33 +234,7 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub(crate) fn execute(
-        &self,
-        package: PackageInterfaceHandle,
-        base_url: &str,
-        command: Vec<String>,
-        url: &str,
-        cwd: Option<&str>,
-        path: Option<&str>,
-    ) -> anyhow::Result<String> {
-        let mut util = SvnUtil::new(
-            base_url.to_string(),
-            self.inner.io.clone(),
-            self.inner.config.clone(),
-            Some(self.inner.process.clone()),
-        );
-        util.set_cache_credentials(self.cache_credentials);
-        util.execute(command, url, cwd, path, self.inner.io.is_verbose())
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "{} could not be downloaded, {}",
-                    package.get_pretty_name(),
-                    e
-                )
-            })
-    }
-
-    pub(crate) async fn clean_changes(
+    async fn clean_changes(
         &mut self,
         package: PackageInterfaceHandle,
         path: &str,
@@ -294,8 +342,8 @@ impl SvnDownloader {
         Ok(None)
     }
 
-    pub(crate) fn get_commit_logs(
-        &self,
+    fn get_commit_logs(
+        &mut self,
         from_reference: &str,
         to_reference: &str,
         path: &str,
@@ -384,35 +432,14 @@ impl SvnDownloader {
         }
     }
 
-    pub(crate) async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
-            &["svn", "revert", "-R", "."].map(|s| s.to_string()).to_vec(),
-            &mut output,
-            Some(path.to_string()),
-        ) != 0
-        {
-            return Err(RuntimeException {
-                message: format!(
-                    "Could not reset changes\n\n:{}",
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
-            .into());
-        }
-
-        Ok(None)
-    }
-
-    pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {
+    fn has_metadata_repository(&self, path: &str) -> bool {
         is_dir(&format!("{}/.svn", path))
     }
 }
 
 impl ChangeReportInterface for SvnDownloader {
     fn get_local_changes(
-        &self,
+        &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -445,16 +472,15 @@ impl VcsCapableDownloaderInterface for SvnDownloader {
     }
 }
 
-// TODO(phase-b): wire up VcsDownloader trait properly. SvnDownloader extends VcsDownloader which
-// implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the inner
-// VcsDownloaderBase exposes the matching impl surface.
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for SvnDownloader {
     fn get_installation_source(&self) -> String {
-        todo!()
+        <Self as VcsDownloader>::get_installation_source(self)
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -465,59 +491,59 @@ impl DownloaderInterface for SvnDownloader {
     }
 
     async fn download(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
     async fn prepare(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::install(self, package, path).await
     }
 
     async fn update(
-        &self,
-        _initial: PackageInterfaceHandle,
-        _target: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
     async fn remove(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::remove(self, package, path).await
     }
 
     async fn cleanup(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

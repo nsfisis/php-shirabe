@@ -1011,52 +1011,52 @@ impl Factory {
 
         dm.set_downloader(
             "git",
-            Box::new(GitDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(GitDownloader::new(
                 io.clone(),
                 config.clone(),
                 Some(process.clone()),
                 Some(fs.clone()),
-            )),
+            ))),
         );
         dm.set_downloader(
             "svn",
-            Box::new(SvnDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(SvnDownloader::new(
                 io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "fossil",
-            Box::new(FossilDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(FossilDownloader::new(
                 io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "hg",
-            Box::new(HgDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(HgDownloader::new(
                 io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "perforce",
-            Box::new(PerforceDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(PerforceDownloader::new(
                 io.clone(),
                 config.clone(),
                 process.clone(),
                 fs.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "zip",
-            Box::new(ZipDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(ZipDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1064,11 +1064,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "rar",
-            Box::new(RarDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(RarDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1076,11 +1076,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "tar",
-            Box::new(TarDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(TarDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1088,11 +1088,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "gzip",
-            Box::new(GzipDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(GzipDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1100,11 +1100,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "xz",
-            Box::new(XzDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(XzDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1112,11 +1112,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "phar",
-            Box::new(PharDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(PharDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1124,11 +1124,11 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
         dm.set_downloader(
             "file",
-            Box::new(FileDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(FileDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1136,11 +1136,11 @@ impl Factory {
                 cache.clone(),
                 Some(fs.clone()),
                 Some(process.clone()),
-            )),
+            ))),
         );
         dm.set_downloader(
             "path",
-            Box::new(PathDownloader::new(
+            std::rc::Rc::new(std::cell::RefCell::new(PathDownloader::new(
                 io.clone(),
                 config.clone(),
                 http_downloader.clone(),
@@ -1148,7 +1148,7 @@ impl Factory {
                 cache.clone(),
                 fs.clone(),
                 process.clone(),
-            )),
+            ))),
         );
 
         Ok(std::rc::Rc::new(std::cell::RefCell::new(dm)))

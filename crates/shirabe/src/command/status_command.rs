@@ -128,13 +128,11 @@ impl StatusCommand {
                 Some(d) => d,
                 None => continue,
             };
-            // TODO(phase-b): downloader borrow lifetime tied to dm.borrow() temporary; restructure later.
-            let dm_borrow = dm.borrow();
-            let downloader: &dyn crate::downloader::DownloaderInterface =
-                match dm_borrow.get_downloader_for_package(package.clone())? {
-                    Some(d) => d,
-                    None => continue,
-                };
+            let downloader_handle = match dm.borrow().get_downloader_for_package(package.clone())? {
+                Some(d) => d,
+                None => continue,
+            };
+            let mut downloader = downloader_handle.borrow_mut();
 
             // TODO(phase-b): isinstance checks using ChangeReportInterface/VcsCapableDownloaderInterface/DvcsDownloaderInterface
             if let Some(change_reporter) = downloader.as_change_report_interface() {

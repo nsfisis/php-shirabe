@@ -537,7 +537,7 @@ impl VcsCapableDownloaderInterface for PathDownloader {
 
 impl crate::downloader::ChangeReportInterface for PathDownloader {
     fn get_local_changes(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
@@ -555,7 +555,9 @@ impl DownloaderInterface for PathDownloader {
         self.inner.get_installation_source()
     }
 
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -566,7 +568,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
@@ -578,7 +580,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,
@@ -590,7 +592,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn install(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -599,7 +601,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn update(
-        &self,
+        &mut self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &str,
@@ -608,7 +610,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn remove(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         path: &str,
         output: bool,
@@ -617,7 +619,7 @@ impl DownloaderInterface for PathDownloader {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         path: &str,

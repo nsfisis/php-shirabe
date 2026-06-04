@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::downloader::ChangeReportInterface;
 use crate::downloader::DownloaderInterface;
 use crate::downloader::VcsCapableDownloaderInterface;
+use crate::downloader::VcsDownloader;
 use crate::downloader::VcsDownloaderBase;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -11,6 +12,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
@@ -31,30 +33,82 @@ impl FossilDownloader {
         }
     }
 
-    pub(crate) async fn do_download(
+    fn execute(
         &self,
+        command: Vec<String>,
+        cwd: Option<String>,
+        output: &mut String,
+    ) -> Result<()> {
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, output, cwd)?
+            != 0
+        {
+            return Err(RuntimeException {
+                message: format!(
+                    "Failed to execute {}\n\n{}",
+                    command.join(" "),
+                    self.inner.process.borrow().get_error_output()
+                ),
+                code: 0,
+            }
+            .into());
+        }
+        Ok(())
+    }
+}
+
+impl VcsDownloader for FossilDownloader {
+    fn io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+        self.inner.io.clone()
+    }
+
+    fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>> {
+        &self.inner.config
+    }
+
+    fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {
+        &self.inner.process
+    }
+
+    fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>> {
+        &self.inner.filesystem
+    }
+
+    fn has_cleaned_changes(&self) -> &IndexMap<String, bool> {
+        &self.inner.has_cleaned_changes
+    }
+
+    fn has_cleaned_changes_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.inner.has_cleaned_changes
+    }
+
+    async fn do_download(
+        &mut self,
         _package: PackageInterfaceHandle,
-        _path: String,
-        _url: String,
+        _path: &str,
+        _url: &str,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         Ok(None)
     }
 
-    pub(crate) async fn do_install(
-        &self,
+    async fn do_install(
+        &mut self,
         package: PackageInterfaceHandle,
-        path: String,
-        url: String,
+        path: &str,
+        url: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
-            &url,
+            url,
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 
         let repo_file = format!("{}.fossil", path);
-        let real_path = shirabe_php_shim::realpath(&path);
+        let real_path = shirabe_php_shim::realpath(path);
 
         self.inner.io.write_error(&format!(
             "Cloning {}",
@@ -67,7 +121,7 @@ impl FossilDownloader {
                 "fossil".to_string(),
                 "clone".to_string(),
                 "--".to_string(),
-                url,
+                url.to_string(),
                 repo_file.clone(),
             ],
             None,
@@ -101,15 +155,15 @@ impl FossilDownloader {
         Ok(None)
     }
 
-    pub(crate) async fn do_update(
-        &self,
+    async fn do_update(
+        &mut self,
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: String,
-        url: String,
+        path: &str,
+        url: &str,
     ) -> Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
-            &url,
+            url,
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
@@ -119,7 +173,7 @@ impl FossilDownloader {
             target.get_source_reference().unwrap_or_default()
         ));
 
-        if !self.has_metadata_repository(&path) {
+        if !self.has_metadata_repository(path) {
             return Err(RuntimeException {
                 message: format!(
                     "The .fslckout file is missing from {}, see https://getcomposer.org/commit-deps for more information",
@@ -129,7 +183,7 @@ impl FossilDownloader {
             }.into());
         }
 
-        let real_path = shirabe_php_shim::realpath(&path);
+        let real_path = shirabe_php_shim::realpath(path);
         let mut output = String::new();
         self.execute(
             vec!["fossil".to_string(), "pull".to_string()],
@@ -153,11 +207,11 @@ impl FossilDownloader {
         Ok(None)
     }
 
-    pub(crate) fn get_commit_logs(
-        &self,
-        _from_reference: String,
-        to_reference: String,
-        path: String,
+    fn get_commit_logs(
+        &mut self,
+        _from_reference: &str,
+        to_reference: &str,
+        path: &str,
     ) -> Result<String> {
         let mut output = String::new();
         self.execute(
@@ -171,9 +225,9 @@ impl FossilDownloader {
                 "-n".to_string(),
                 "0".to_string(),
                 "before".to_string(),
-                to_reference.clone(),
+                to_reference.to_string(),
             ],
-            shirabe_php_shim::realpath(&path),
+            shirabe_php_shim::realpath(path),
             &mut output,
         )?;
 
@@ -197,33 +251,7 @@ impl FossilDownloader {
         Ok(log)
     }
 
-    fn execute(
-        &self,
-        command: Vec<String>,
-        cwd: Option<String>,
-        output: &mut String,
-    ) -> Result<()> {
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute(&command, output, cwd)?
-            != 0
-        {
-            return Err(RuntimeException {
-                message: format!(
-                    "Failed to execute {}\n\n{}",
-                    command.join(" "),
-                    self.inner.process.borrow().get_error_output()
-                ),
-                code: 0,
-            }
-            .into());
-        }
-        Ok(())
-    }
-
-    pub(crate) fn has_metadata_repository(&self, path: &str) -> bool {
+    fn has_metadata_repository(&self, path: &str) -> bool {
         std::path::Path::new(&format!("{}/.fslckout", path)).is_file()
             || std::path::Path::new(&format!("{}/_FOSSIL_", path)).is_file()
     }
@@ -231,7 +259,7 @@ impl FossilDownloader {
 
 impl ChangeReportInterface for FossilDownloader {
     fn get_local_changes(
-        &self,
+        &mut self,
         _package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {
@@ -258,12 +286,11 @@ impl VcsCapableDownloaderInterface for FossilDownloader {
     }
 }
 
-// TODO(phase-b): wire up VcsDownloader trait properly. FossilDownloader extends VcsDownloader
-// which implements DownloaderInterface in PHP. Delegating each trait method to todo!() until the
-// inner VcsDownloaderBase exposes the matching impl surface.
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FossilDownloader {
-    fn as_change_report_interface(&self) -> Option<&dyn crate::downloader::ChangeReportInterface> {
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
         Some(self)
     }
 
@@ -274,63 +301,63 @@ impl DownloaderInterface for FossilDownloader {
     }
 
     fn get_installation_source(&self) -> String {
-        todo!()
+        <Self as VcsDownloader>::get_installation_source(self)
     }
 
     async fn download(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::download(self, package, path, prev_package).await
     }
 
     async fn prepare(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::install(self, package, path).await
     }
 
     async fn update(
-        &self,
-        _initial: PackageInterfaceHandle,
-        _target: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::update(self, initial, target, path).await
     }
 
     async fn remove(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
         _output: bool,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::remove(self, package, path).await
     }
 
     async fn cleanup(
-        &self,
-        _type: &str,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _prev_package: Option<PackageInterfaceHandle>,
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        todo!()
+        <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

@@ -8,7 +8,7 @@ use anyhow::Result;
 use shirabe_php_shim::PhpMixed;
 
 pub enum DownloaderOrManager<'a> {
-    Interface(&'a dyn DownloaderInterface),
+    Interface(&'a std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>),
     Manager(&'a std::rc::Rc<std::cell::RefCell<DownloadManager>>),
 }
 
@@ -20,7 +20,7 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.download3(package, path, prev_package).await,
+            Self::Interface(d) => d.borrow_mut().download3(package, path, prev_package).await,
             Self::Manager(d) => d.borrow().download(package, path, prev_package).await,
         }
     }
@@ -33,7 +33,11 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.prepare(r#type, package, path, prev_package).await,
+            Self::Interface(d) => {
+                d.borrow_mut()
+                    .prepare(r#type, package, path, prev_package)
+                    .await
+            }
             Self::Manager(d) => {
                 d.borrow()
                     .prepare(r#type, package, path, prev_package)
@@ -48,7 +52,7 @@ impl<'a> DownloaderOrManager<'a> {
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.install2(package, path).await,
+            Self::Interface(d) => d.borrow_mut().install2(package, path).await,
             Self::Manager(d) => d.borrow().install(package, path).await,
         }
     }
@@ -60,7 +64,7 @@ impl<'a> DownloaderOrManager<'a> {
         path: &str,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.update(package, prev_package, path).await,
+            Self::Interface(d) => d.borrow_mut().update(package, prev_package, path).await,
             Self::Manager(d) => d.borrow().update(package, prev_package, path).await,
         }
     }
@@ -73,7 +77,11 @@ impl<'a> DownloaderOrManager<'a> {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
         match self {
-            Self::Interface(d) => d.cleanup(r#type, package, path, prev_package).await,
+            Self::Interface(d) => {
+                d.borrow_mut()
+                    .cleanup(r#type, package, path, prev_package)
+                    .await
+            }
             Self::Manager(d) => {
                 d.borrow()
                     .cleanup(r#type, package, path, prev_package)

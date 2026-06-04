@@ -31,7 +31,7 @@ pub struct DownloadManager {
     /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var array<string, DownloaderInterface>
-    downloaders: IndexMap<String, Box<dyn DownloaderInterface>>,
+    downloaders: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>,
 }
 
 impl DownloadManager {
@@ -91,7 +91,7 @@ impl DownloadManager {
     pub fn set_downloader(
         &mut self,
         r#type: &str,
-        downloader: Box<dyn DownloaderInterface>,
+        downloader: std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
     ) -> &mut Self {
         let r#type = strtolower(r#type);
         self.downloaders.insert(r#type, downloader);
@@ -103,7 +103,10 @@ impl DownloadManager {
     ///
     /// @param  string                    $type installation type
     /// @throws \InvalidArgumentException if downloader for provided type is not registered
-    pub fn get_downloader(&self, r#type: &str) -> Result<&dyn DownloaderInterface> {
+    pub fn get_downloader(
+        &self,
+        r#type: &str,
+    ) -> Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(&r#type) {
             return Err(InvalidArgumentException {
@@ -119,7 +122,7 @@ impl DownloadManager {
             .into());
         }
 
-        Ok(self.downloaders.get(&r#type).unwrap().as_ref())
+        Ok(self.downloaders.get(&r#type).unwrap().clone())
     }
 
     /// Returns downloader for already installed package.
@@ -131,7 +134,7 @@ impl DownloadManager {
     pub fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
-    ) -> Result<Option<&dyn DownloaderInterface>> {
+    ) -> Result<Option<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>> {
         let installation_source = package.get_installation_source();
 
         if "metapackage" == package.get_type() {
@@ -153,13 +156,14 @@ impl DownloadManager {
             .into());
         };
 
-        if installation_source.as_deref() != Some(&downloader.get_installation_source()) {
+        let downloader_installation_source = downloader.borrow().get_installation_source();
+        if installation_source.as_deref() != Some(&downloader_installation_source) {
             return Err(LogicException {
                 message: sprintf(
                     "Downloader \"%s\" is a %s type downloader and can not be used to download %s for package %s",
                     &[
-                        PhpMixed::String(shirabe_php_shim::get_class_obj(downloader)),
-                        PhpMixed::String(downloader.get_installation_source()),
+                        PhpMixed::String(shirabe_php_shim::get_class_obj(&*downloader.borrow())),
+                        PhpMixed::String(downloader_installation_source),
                         PhpMixed::String(installation_source.clone().unwrap_or_default()),
                         PhpMixed::String(package.to_string()),
                     ],
@@ -172,13 +176,13 @@ impl DownloadManager {
         Ok(Some(downloader))
     }
 
-    pub fn get_downloader_type(&self, downloader: &dyn DownloaderInterface) -> String {
+    pub fn get_downloader_type(
+        &self,
+        downloader: &std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
+    ) -> String {
         // PHP: array_search($downloader, $this->downloaders)
         for (r#type, candidate) in &self.downloaders {
-            if std::ptr::eq(
-                candidate.as_ref() as *const dyn DownloaderInterface as *const (),
-                downloader as *const dyn DownloaderInterface as *const (),
-            ) {
+            if std::rc::Rc::ptr_eq(candidate, downloader) {
                 return r#type.clone();
             }
         }
@@ -238,6 +242,7 @@ impl DownloadManager {
             };
 
             let result = match downloader
+                .borrow_mut()
                 .download3(package.clone(), &target_dir, prev_package.clone())
                 .await
             {
@@ -299,6 +304,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
+                .borrow_mut()
                 .prepare(r#type, package, &target_dir, prev_package)
                 .await;
         }
@@ -321,7 +327,7 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.install2(package, &target_dir).await;
+            return downloader.borrow_mut().install2(package, &target_dir).await;
         }
 
         Ok(None)
@@ -353,16 +359,20 @@ impl DownloadManager {
         // if we have a downloader present before, but not after, the package became a metapackage and its files should be removed
         if downloader.is_none() {
             return initial_downloader
+                .as_ref()
                 .unwrap()
+                .borrow_mut()
                 .remove2(initial, &target_dir)
                 .await;
         }
 
-        let initial_type = self.get_downloader_type(initial_downloader.unwrap());
-        let target_type = self.get_downloader_type(downloader.unwrap());
+        let initial_type = self.get_downloader_type(initial_downloader.as_ref().unwrap());
+        let target_type = self.get_downloader_type(downloader.as_ref().unwrap());
         if initial_type == target_type {
             match downloader
+                .as_ref()
                 .unwrap()
+                .borrow_mut()
                 .update(initial.clone(), target.clone(), &target_dir)
                 .await
             {
@@ -399,7 +409,9 @@ impl DownloadManager {
         // we wipe the dir and do a new install instead of updating it
         // PHP: return $promise->then(fn () => $this->install($target, $targetDir));
         let _ = initial_downloader
+            .as_ref()
             .unwrap()
+            .borrow_mut()
             .remove2(initial, &target_dir)
             .await?;
         self.install(target, &target_dir).await
@@ -417,7 +429,7 @@ impl DownloadManager {
     ) -> Result<Option<PhpMixed>> {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
-            return downloader.remove2(package, &target_dir).await;
+            return downloader.borrow_mut().remove2(package, &target_dir).await;
         }
 
         Ok(None)
@@ -440,6 +452,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         if let Some(downloader) = self.get_downloader_for_package(package.clone())? {
             return downloader
+                .borrow_mut()
                 .cleanup(r#type, package, &target_dir, prev_package)
                 .await;
         }
