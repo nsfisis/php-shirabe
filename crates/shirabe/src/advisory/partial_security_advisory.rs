@@ -63,13 +63,27 @@ impl PartialSecurityAdvisory {
                     "%Y-%m-%dT%H:%M:%S+00:00",
                 )
                 .unwrap_or_default();
+            let sources: Vec<IndexMap<String, String>> = data["sources"]
+                .as_list()
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|item| item.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|(k, v)| {
+                                    v.as_string().map(|s| (k.clone(), s.to_string()))
+                                })
+                                .collect()
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
             let advisory = SecurityAdvisory::new(
                 package_name.to_string(),
                 data["advisoryId"].as_string().unwrap_or("").to_string(),
                 constraint,
                 data["title"].as_string().unwrap_or("").to_string(),
-                // TODO(phase-b): parse PhpMixed sources array into Vec<IndexMap<String, String>>
-                todo!(),
+                sources,
                 reported_at,
                 data.get("cve")
                     .and_then(|v| v.as_string())
