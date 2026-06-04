@@ -36,10 +36,7 @@ impl ArrayLoader {
     pub fn new(parser: Option<VersionParser>, load_options: bool) -> Self {
         let parser = match parser {
             Some(p) => p,
-            None => {
-                // TODO(phase-b): VersionParser has no public `new` yet
-                todo!("VersionParser::new()")
-            }
+            None => VersionParser::new(),
         };
         Self {
             version_parser: parser,

@@ -296,8 +296,7 @@ impl VcsRepository {
             }
             .into());
         }
-        // TODO(phase-b): VersionParser has no public `new`
-        self.version_parser = Some(todo!("VersionParser::new()"));
+        self.version_parser = Some(VersionParser::new());
         if self.loader.is_none() {
             self.loader = Some(Box::new(ArrayLoader::new(
                 Some(todo!("phase-b: clone VersionParser")),

@@ -712,8 +712,7 @@ impl HttpDownloader {
             let versions_key = format!("{}-versions", r#type);
             if let Some(versions_value) = data.get(&versions_key) {
                 if !shirabe_php_shim::empty(versions_value) {
-                    // TODO(phase-b): VersionParser::new
-                    let version_parser: VersionParser = todo!("VersionParser::new()");
+                    let version_parser: VersionParser = VersionParser::new();
                     let constraint = version_parser
                         .parse_constraints(versions_value.as_string().unwrap_or(""))?;
                     let composer_constraint = SimpleConstraint::new(
@@ -745,8 +744,7 @@ impl HttpDownloader {
                 continue;
             }
 
-            // TODO(phase-b): VersionParser::new
-            let version_parser: VersionParser = todo!("VersionParser::new()");
+            let version_parser: VersionParser = VersionParser::new();
             if let Some(PhpMixed::List(list)) = entry {
                 for spec in list {
                     let r#type = substr(key, 0, Some(-1));

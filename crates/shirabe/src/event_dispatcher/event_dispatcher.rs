@@ -1307,8 +1307,7 @@ impl EventDispatcher {
     // ---- helpers ----
 
     fn io_clone(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
-        // TODO(phase-b): IOInterface is not Clone — placeholder until io ownership is resolved.
-        todo!("clone std::rc::Rc<std::cell::RefCell<dyn IOInterface>>")
+        self.io.clone()
     }
 
     fn composer(&self) -> PartialComposerHandle {

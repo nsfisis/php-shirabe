@@ -567,8 +567,7 @@ impl CreateProjectCommand {
         no_progress: bool,
         secure_http: bool,
     ) -> Result<bool> {
-        // TODO(phase-b): VersionParser has no public `new` yet
-        let parser: VersionParser = todo!("VersionParser::new()");
+        let parser: VersionParser = VersionParser::new();
         let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
         let name = strtolower(
             requirements[0]

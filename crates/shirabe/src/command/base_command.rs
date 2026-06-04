@@ -643,8 +643,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         &self,
         requirements: Vec<String>,
     ) -> Result<Vec<IndexMap<String, String>>> {
-        // TODO(phase-b): VersionParser has no public `new` yet
-        let parser: VersionParser = todo!("VersionParser::new()");
+        let parser: VersionParser = VersionParser::new();
 
         parser.parse_name_version_pairs(requirements)
     }
