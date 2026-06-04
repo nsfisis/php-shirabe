@@ -448,17 +448,11 @@ impl Application {
                     if e.downcast_ref::<NoSslException>().is_some() {
                         // suppress these as they are not relevant at this point
                     } else if let Some(pe) = e.downcast_ref::<ParsingException>() {
-                        // TODO(phase-b): ParsingException::get_details is not yet ported.
-                        let details: IndexMap<String, PhpMixed> = IndexMap::new();
+                        let details = pe.get_details();
 
                         let file = realpath(&Factory::get_composer_file().unwrap_or_default());
 
-                        let mut line: Option<i64> = None;
-                        if !details.is_empty() {
-                            if let Some(l) = details.get("line").and_then(|v| v.as_int()) {
-                                line = Some(l);
-                            }
-                        }
+                        let line = details.line;
 
                         let mut ghe = GithubActionError::new(self.io.clone());
                         ghe.emit(&pe.message, file.as_deref(), line);

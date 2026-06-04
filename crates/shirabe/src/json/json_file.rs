@@ -535,7 +535,7 @@ impl JsonFile {
                     "The input does not contain valid JSON\n{}",
                     result.get_message()
                 ),
-                None,
+                result.get_details().clone(),
             ),
             Some(f) => ParsingException::new(
                 format!(
@@ -543,7 +543,7 @@ impl JsonFile {
                     f,
                     result.get_message()
                 ),
-                None,
+                result.get_details().clone(),
             ),
         }
         .into())

@@ -1,21 +1,48 @@
+#[derive(Debug, Clone, Default)]
+pub struct ParsingExceptionLoc {
+    pub first_line: i64,
+    pub first_column: i64,
+    pub last_line: i64,
+    pub last_column: i64,
+}
+
+#[derive(Debug, Clone)]
+pub enum ParsingExceptionToken {
+    Name(String),
+    Symbol(i64),
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ParsingExceptionDetails {
+    pub text: Option<String>,
+    pub token: Option<ParsingExceptionToken>,
+    pub line: Option<i64>,
+    pub loc: Option<ParsingExceptionLoc>,
+    pub expected: Option<Vec<String>>,
+}
+
 #[derive(Debug)]
 pub struct ParsingException {
     pub message: String,
     pub code: i64,
+    pub(crate) details: ParsingExceptionDetails,
 }
 
 impl ParsingException {
-    pub fn new(message: String, _details: Option<shirabe_php_shim::PhpMixed>) -> Self {
-        Self { message, code: 0 }
+    pub fn new(message: String, details: ParsingExceptionDetails) -> Self {
+        Self {
+            message,
+            code: 0,
+            details,
+        }
     }
 
     pub fn get_message(&self) -> &str {
         &self.message
     }
 
-    pub fn get_details(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
-        // TODO(phase-b): PHP ParsingException exposes ['text', 'line', 'token'] details
-        indexmap::IndexMap::new()
+    pub fn get_details(&self) -> &ParsingExceptionDetails {
+        &self.details
     }
 }
 
