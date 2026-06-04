@@ -101,10 +101,10 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn ask_and_validate(
         &self,
         question: String,
-        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
-    ) -> PhpMixed;
+    ) -> anyhow::Result<PhpMixed>;
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String>;
 
@@ -279,10 +279,10 @@ impl IOInterfaceImmutable for Rc<RefCell<dyn IOInterface>> {
     fn ask_and_validate(
         &self,
         question: String,
-        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         self.borrow()
             .ask_and_validate(question, validator, attempts, default)
     }

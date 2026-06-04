@@ -9,10 +9,10 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys, array_slice,
-    array_unshift, array_values, asort, count, explode, file_get_contents, implode, in_array,
-    is_array, is_file, is_numeric, is_string, json_decode, levenshtein, sprintf, strlen, strpos,
-    trim,
+    Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
+    array_slice, array_unshift, array_values, asort, count, explode, file_get_contents, implode,
+    in_array, is_array, is_file, is_numeric, is_string, json_decode, levenshtein, sprintf, strlen,
+    strpos, trim,
 };
 
 use crate::composer::PartialComposerHandle;
@@ -353,17 +353,17 @@ pub trait PackageDiscoveryTrait {
 
                     let matches_clone = matches.clone();
                     let version_parser_clone = version_parser.clone();
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
-                        Box::new(move |selection_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
+                        move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let selection = selection_mixed.as_string().unwrap_or("").to_string();
                             if "" == selection {
-                                return PhpMixed::Bool(false);
+                                return Ok(PhpMixed::Bool(false));
                             }
 
                             if is_numeric(&PhpMixed::String(selection.clone())) {
                                 let idx: usize = selection.parse().unwrap_or(0);
                                 if let Some(p) = matches_clone.get(idx) {
-                                    return PhpMixed::String(p.name.clone());
+                                    return Ok(PhpMixed::String(p.name.clone()));
                                 }
                             }
 
@@ -380,29 +380,32 @@ pub trait PackageDiscoveryTrait {
                                 {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
-                                    // TODO(phase-b): parse_constraints returns Result
-                                    let _ = version_parser_clone.parse_constraints(&v);
+                                    version_parser_clone.parse_constraints(&v)?;
 
-                                    return PhpMixed::String(format!(
+                                    return Ok(PhpMixed::String(format!(
                                         "{} {}",
                                         m.get(&CaptureKey::ByName("name".to_string()))
                                             .cloned()
                                             .unwrap_or_default(),
                                         v,
-                                    ));
+                                    )));
                                 }
 
                                 // parsing `acme/example`
-                                return PhpMixed::String(
+                                return Ok(PhpMixed::String(
                                     m.get(&CaptureKey::ByName("name".to_string()))
                                         .cloned()
                                         .unwrap_or_default(),
-                                );
+                                ));
                             }
 
-                            // TODO(phase-b): throw new \Exception('Not a valid selection');
-                            panic!("Not a valid selection");
-                        });
+                            Err(Exception {
+                                message: "Not a valid selection".to_string(),
+                                code: 0,
+                            }
+                            .into())
+                        },
+                    );
 
                     package = io
                         .ask_and_validate(
@@ -410,7 +413,7 @@ pub trait PackageDiscoveryTrait {
                             validator,
                             Some(3),
                             PhpMixed::String(String::new()),
-                        )
+                        )?
                         .as_string()
                         .map(|s| s.to_string())
                         .unwrap_or_default();
@@ -418,13 +421,13 @@ pub trait PackageDiscoveryTrait {
 
                 // no constraint yet, determine the best version automatically
                 if !package.is_empty() && strpos(&package, " ").is_none() {
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
-                        Box::new(|input_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
+                        Box::new(|input_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let input = trim(input_mixed.as_string().unwrap_or(""), None);
                             if strlen(&input) > 0 {
-                                PhpMixed::String(input)
+                                Ok(PhpMixed::String(input))
                             } else {
-                                PhpMixed::Bool(false)
+                                Ok(PhpMixed::Bool(false))
                             }
                         });
 
@@ -433,7 +436,7 @@ pub trait PackageDiscoveryTrait {
                         validator,
                         Some(3),
                         PhpMixed::String(String::new()),
-                    );
+                    )?;
 
                     let constraint: String = match &constraint_mixed {
                         PhpMixed::Bool(false) => {
@@ -537,14 +540,13 @@ pub trait PackageDiscoveryTrait {
                 if input.is_interactive() {
                     let providers_count = providers.len();
                     let name_owned = name.to_string();
-                    let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
-                        Box::new(move |value_mixed: PhpMixed| -> PhpMixed {
+                    let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
+                        Box::new(move |value_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let value = value_mixed.as_string().unwrap_or("").to_string();
                             let parser = VersionParser::new();
-                            // TODO(phase-b): parse_constraints returns Result
-                            let _ = parser.parse_constraints(&value);
+                            parser.parse_constraints(&value)?;
 
-                            PhpMixed::String(value)
+                            Ok(PhpMixed::String(value))
                         });
                     constraint = self
                         .get_io()
@@ -556,7 +558,7 @@ pub trait PackageDiscoveryTrait {
                             validator,
                             Some(3),
                             PhpMixed::String("*".to_string()),
-                        )
+                        )?
                         .as_string()
                         .map(|s| s.to_string())
                         .unwrap_or_default();

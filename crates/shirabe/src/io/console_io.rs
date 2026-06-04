@@ -487,10 +487,10 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn ask_and_validate(
         &self,
         question: String,
-        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         let _helper = self.helper_set.get("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
@@ -502,13 +502,10 @@ impl IOInterfaceImmutable for ConsoleIO {
             Some(default)
         };
         let mut question = Question::new(&sanitized_question, sanitized_default);
-        // TODO(phase-b): IOInterface validator type is Box<dyn Fn(PhpMixed) -> PhpMixed>
-        // but Question::set_validator expects Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed>>>.
-        // Bridge the signatures by adapting the input/output types.
+        // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed>; adapt the
+        // None answer to PHP's null and forward the validator's Result unchanged.
         let adapted: Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>> =
-            Box::new(move |answer: Option<PhpMixed>| {
-                Ok(validator(answer.unwrap_or(PhpMixed::Null)))
-            });
+            Box::new(move |answer: Option<PhpMixed>| validator(answer.unwrap_or(PhpMixed::Null)));
         question.set_validator(Some(adapted));
         question.set_max_attempts(attempts);
 

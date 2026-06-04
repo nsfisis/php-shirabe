@@ -175,10 +175,10 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     fn ask_and_validate(
         &self,
         question: String,
-        validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         attempts: Option<i64>,
         default: PhpMixed,
-    ) -> PhpMixed {
+    ) -> anyhow::Result<PhpMixed> {
         self.inner
             .ask_and_validate(question, validator, attempts, default)
     }

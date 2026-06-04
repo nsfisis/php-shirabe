@@ -5,9 +5,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, base64_encode,
-    explode, in_array, is_array, is_string, json_decode, parse_url, sprintf, str_replace, strpos,
-    strtolower, substr, trigger_error, trim,
+    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException,
+    base64_encode, explode, in_array, is_array, is_string, json_decode, parse_url, sprintf,
+    str_replace, strpos, strtolower, substr, trigger_error, trim,
 };
 
 use crate::config::Config;
@@ -69,7 +69,7 @@ impl AuthHelper {
                     origin,
                     config_source.get_name(),
                 ),
-                Box::new(|value: PhpMixed| -> PhpMixed {
+                Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     let input = strtolower(&substr(
                         &trim(value.as_string().unwrap_or(""), None),
                         0,
@@ -83,15 +83,17 @@ impl AuthHelper {
                         ]),
                         false,
                     ) {
-                        return PhpMixed::String(input);
+                        return Ok(PhpMixed::String(input));
                     }
-                    // PHP: throw new \RuntimeException('Please answer (y)es or (n)o');
-                    // TODO(phase-b): validator should return a recoverable error rather than panic
-                    panic!("Please answer (y)es or (n)o");
+                    Err(RuntimeException {
+                        message: "Please answer (y)es or (n)o".to_string(),
+                        code: 0,
+                    }
+                    .into())
                 }),
                 None,
                 PhpMixed::String("y".to_string()),
-            );
+            )?;
 
             if answer.as_string() == Some("y") {
                 store = Some(());

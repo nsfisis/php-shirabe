@@ -672,9 +672,8 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             "Open <info>https://composer.github.io/pubkeys.html</info> to find the latest keys",
         );
 
-        // TODO(phase-b): closure captures none; PHP throws inside the closure on bad input
-        let validator: Box<dyn Fn(PhpMixed) -> PhpMixed> =
-            Box::new(|value: PhpMixed| -> PhpMixed {
+        let validator: std::rc::Rc<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
+            std::rc::Rc::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 let value_str = value.as_string().unwrap_or("").to_string();
                 if !Preg::is_match(
                     r"{^-----BEGIN PUBLIC KEY-----$}",
@@ -682,11 +681,17 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 )
                 .unwrap_or(false)
                 {
-                    // TODO(phase-b): closure cannot throw
-                    panic!("{}", "Invalid input");
+                    return Err(UnexpectedValueException {
+                        message: "Invalid input".to_string(),
+                        code: 0,
+                    }
+                    .into());
                 }
 
-                PhpMixed::String(format!("{}\n", shirabe_php_shim::trim(&value_str, None)))
+                Ok(PhpMixed::String(format!(
+                    "{}\n",
+                    shirabe_php_shim::trim(&value_str, None)
+                )))
             });
 
         let mut dev_key = String::new();
@@ -708,10 +713,13 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             dev_key = io
                 .ask_and_validate(
                     "Enter Dev / Snapshot Public Key (including lines with -----): ".to_string(),
-                    Box::new(|v: PhpMixed| v),
+                    {
+                        let validator = validator.clone();
+                        Box::new(move |v: PhpMixed| validator(v))
+                    },
                     None,
                     PhpMixed::Null,
-                )
+                )?
                 .as_string()
                 .unwrap_or("")
                 .to_string();
@@ -727,7 +735,6 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
                 }
             }
         }
-        let _ = &validator;
         let key_path = format!(
             "{}/keys.dev.pub",
             config.get("home").as_string().unwrap_or("")
@@ -757,10 +764,13 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             tags_key = io
                 .ask_and_validate(
                     "Enter Tags Public Key (including lines with -----): ".to_string(),
-                    Box::new(|v: PhpMixed| v),
+                    {
+                        let validator = validator.clone();
+                        Box::new(move |v: PhpMixed| validator(v))
+                    },
                     None,
                     PhpMixed::Null,
-                )
+                )?
                 .as_string()
                 .unwrap_or("")
                 .to_string();

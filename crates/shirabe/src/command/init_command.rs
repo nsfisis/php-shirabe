@@ -539,9 +539,9 @@ impl InitCommand {
                     "Package name (<vendor>/<name>) [<comment>{}</comment>]: ",
                     name_default
                 ),
-                Box::new(move |value: PhpMixed| -> PhpMixed {
+                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
-                        return PhpMixed::String(name_for_validate.clone());
+                        return Ok(PhpMixed::String(name_for_validate.clone()));
                     }
 
                     if !Preg::is_match(
@@ -550,21 +550,21 @@ impl InitCommand {
                     )
                     .unwrap_or(false)
                     {
-                        // TODO(phase-b): closure returning PhpMixed cannot throw — needs Result type
-                        panic!(
-                            "{}",
-                            format!(
+                        return Err(InvalidArgumentException {
+                            message: format!(
                                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
                                 value.as_string().unwrap_or("")
-                            )
-                        );
+                            ),
+                            code: 0,
+                        }
+                        .into());
                     }
 
-                    value
+                    Ok(value)
                 }),
                 None,
                 PhpMixed::String(name.clone()),
-            )
+            )?
             .as_string()
             .unwrap_or("")
             .to_string();
@@ -605,10 +605,10 @@ impl InitCommand {
                 }
             ),
             // TODO(phase-b): closure cannot call &self.parse_author_string; needs &self capture
-            Box::new(move |value: PhpMixed| -> PhpMixed {
+            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 let value_str = value.as_string().unwrap_or("").to_string();
                 if value_str == "n" || value_str == "no" {
-                    return PhpMixed::Null;
+                    return Ok(PhpMixed::Null);
                 }
                 let value_or_default = if value_str.is_empty() {
                     author_for_validate.clone()
@@ -617,11 +617,11 @@ impl InitCommand {
                 };
                 // TODO(phase-b): would call self.parse_author_string(value_or_default)
                 let _ = value_or_default;
-                PhpMixed::Null
+                Ok(PhpMixed::Null)
             }),
             None,
             PhpMixed::String(author_default),
-        );
+        )?;
         input.set_option("author", author_value);
 
         let minimum_stability = input
@@ -635,19 +635,17 @@ impl InitCommand {
                 "Minimum Stability [<comment>{}</comment>]: ",
                 minimum_stability.clone().unwrap_or_default()
             ),
-            Box::new(move |value: PhpMixed| -> PhpMixed {
+            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 if value.is_null() {
-                    return minimum_stability_for_validate
+                    return Ok(minimum_stability_for_validate
                         .clone()
                         .map(PhpMixed::String)
-                        .unwrap_or(PhpMixed::Null);
+                        .unwrap_or(PhpMixed::Null));
                 }
 
                 if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
-                    // TODO(phase-b): closure cannot throw
-                    panic!(
-                        "{}",
-                        format!(
+                    return Err(InvalidArgumentException {
+                        message: format!(
                             "Invalid minimum stability \"{}\". Must be empty or one of: {}",
                             value.as_string().unwrap_or(""),
                             implode(
@@ -657,17 +655,19 @@ impl InitCommand {
                                     .map(|k| k.to_string())
                                     .collect::<Vec<_>>()
                             )
-                        )
-                    );
+                        ),
+                        code: 0,
+                    }
+                    .into());
                 }
 
-                value
+                Ok(value)
             }),
             None,
             minimum_stability_default
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
-        );
+        )?;
         input.set_option("stability", minimum_stability_value);
 
         let type_val = input.get_option("type");
@@ -827,14 +827,14 @@ impl InitCommand {
                 "Add PSR-4 autoload mapping? Maps namespace \"{}\" to the entered relative path. [<comment>{}</comment>, n to skip]: ",
                 namespace, autoload
             ),
-            Box::new(move |value: PhpMixed| -> PhpMixed {
+            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 if value.is_null() {
-                    return PhpMixed::String(autoload_for_validate.clone());
+                    return Ok(PhpMixed::String(autoload_for_validate.clone()));
                 }
 
                 let value_str = value.as_string().unwrap_or("").to_string();
                 if value_str == "n" || value_str == "no" {
-                    return PhpMixed::Null;
+                    return Ok(PhpMixed::Null);
                 }
 
                 let value_or_default = if value_str.is_empty() {
@@ -845,21 +845,21 @@ impl InitCommand {
 
                 if !Preg::is_match(r"{^[^/][A-Za-z0-9\-_/]+/$}", &value_or_default).unwrap_or(false)
                 {
-                    // TODO(phase-b): closure cannot throw
-                    panic!(
-                        "{}",
-                        sprintf(
+                    return Err(InvalidArgumentException {
+                        message: sprintf(
                             "The src folder name \"%s\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
                             &[PhpMixed::String(value_or_default.clone())],
-                        )
-                    );
+                        ),
+                        code: 0,
+                    }
+                    .into());
                 }
 
-                PhpMixed::String(value_or_default)
+                Ok(PhpMixed::String(value_or_default))
             }),
             None,
             PhpMixed::String(autoload_default),
-        );
+        )?;
         input.set_option("autoload", autoload_value);
 
         Ok(())

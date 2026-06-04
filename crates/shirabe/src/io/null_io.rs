@@ -70,11 +70,11 @@ impl IOInterfaceImmutable for NullIO {
     fn ask_and_validate(
         &self,
         _question: String,
-        _validator: Box<dyn Fn(PhpMixed) -> PhpMixed>,
+        _validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>>,
         _attempts: Option<i64>,
         default: PhpMixed,
-    ) -> PhpMixed {
-        default
+    ) -> anyhow::Result<PhpMixed> {
+        Ok(default)
     }
 
     fn ask_and_hide_answer(&self, _question: String) -> Option<String> {
