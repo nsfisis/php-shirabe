@@ -3,13 +3,14 @@
 use std::rc::Rc;
 
 use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::composer::util::ComposerMirror;
 use shirabe_php_shim::{E_USER_DEPRECATED, LogicException, PhpMixed, strpos, trigger_error};
 
 use crate::package::BasePackage;
+use crate::package::DisplayMode;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
@@ -583,128 +584,144 @@ impl BasePackage for Package {
 }
 
 impl std::fmt::Display for Package {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_unique_name())
     }
 }
 
 impl PackageInterface for Package {
     fn get_name(&self) -> &str {
-        todo!()
+        &self.name
     }
     fn get_pretty_name(&self) -> &str {
-        todo!()
+        &self.pretty_name
     }
-    fn get_names(&self, _provides: bool) -> Vec<String> {
-        todo!()
+    fn get_names(&self, provides: bool) -> Vec<String> {
+        let mut names: IndexSet<String> = IndexSet::new();
+        names.insert(self.get_name().to_string());
+
+        if provides {
+            for (_, link) in self.get_provides() {
+                names.insert(link.get_target().to_string());
+            }
+        }
+
+        for (_, link) in self.get_replaces() {
+            names.insert(link.get_target().to_string());
+        }
+
+        names.into_iter().collect()
     }
-    fn set_id(&mut self, _id: i64) {
-        todo!()
+    fn set_id(&mut self, id: i64) {
+        self.id = id;
     }
     fn get_id(&self) -> i64 {
-        todo!()
+        self.id
     }
     fn is_dev(&self) -> bool {
-        todo!()
+        self.dev
     }
     fn get_type(&self) -> &str {
-        todo!()
+        self.r#type
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .unwrap_or("library")
     }
-    fn get_target_dir(&self) -> Option<&str> {
-        todo!()
+    fn get_target_dir(&self) -> Option<String> {
+        Package::get_target_dir(self)
     }
     fn get_extra(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.extra.clone()
     }
-    fn set_installation_source(&mut self, _type: Option<String>) {
-        todo!()
+    fn set_installation_source(&mut self, r#type: Option<String>) {
+        self.installation_source = r#type;
     }
     fn get_installation_source(&self) -> Option<&str> {
-        todo!()
+        self.installation_source.as_deref()
     }
     fn get_source_type(&self) -> Option<&str> {
-        todo!()
+        self.source_type.as_deref()
     }
     fn get_source_url(&self) -> Option<&str> {
-        todo!()
+        self.source_url.as_deref()
     }
     fn get_source_urls(&self) -> Vec<String> {
-        todo!()
+        Package::get_source_urls(self)
     }
     fn get_source_reference(&self) -> Option<&str> {
-        todo!()
+        self.source_reference.as_deref()
     }
-    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
-        todo!()
+    fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
+        self.source_mirrors.clone()
     }
-    fn set_source_mirrors(&mut self, _mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
-        todo!()
+    fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
+        self.source_mirrors = mirrors;
     }
     fn get_dist_type(&self) -> Option<&str> {
-        todo!()
+        self.dist_type.as_deref()
     }
     fn get_dist_url(&self) -> Option<&str> {
-        todo!()
+        self.dist_url.as_deref()
     }
     fn get_dist_urls(&self) -> Vec<String> {
-        todo!()
+        Package::get_dist_urls(self)
     }
     fn get_dist_reference(&self) -> Option<&str> {
-        todo!()
+        self.dist_reference.as_deref()
     }
     fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        todo!()
+        self.dist_sha1_checksum.as_deref()
     }
-    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
-        todo!()
+    fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
+        self.dist_mirrors.clone()
     }
-    fn set_dist_mirrors(&mut self, _mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
-        todo!()
+    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
+        self.dist_mirrors = mirrors;
     }
     fn get_version(&self) -> &str {
-        todo!()
+        &self.version
     }
     fn get_pretty_version(&self) -> &str {
-        todo!()
+        &self.pretty_version
     }
-    fn get_full_pretty_version(&self, _truncate: bool, _display_mode: i64) -> String {
-        todo!()
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
+        BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
     fn get_release_date(&self) -> Option<DateTime<Utc>> {
-        todo!()
+        self.release_date
     }
     fn get_stability(&self) -> &str {
-        todo!()
+        &self.stability
     }
     fn get_requires(&self) -> IndexMap<String, Link> {
-        todo!()
+        self.requires.clone()
     }
     fn get_conflicts(&self) -> IndexMap<String, Link> {
-        todo!()
+        self.conflicts.clone()
     }
     fn get_provides(&self) -> IndexMap<String, Link> {
-        todo!()
+        self.provides.clone()
     }
     fn get_replaces(&self) -> IndexMap<String, Link> {
-        todo!()
+        self.replaces.clone()
     }
     fn get_dev_requires(&self) -> IndexMap<String, Link> {
-        todo!()
+        self.dev_requires.clone()
     }
     fn get_suggests(&self) -> IndexMap<String, String> {
-        todo!()
+        self.suggests.clone()
     }
     fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.autoload.clone()
     }
     fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.dev_autoload.clone()
     }
     fn get_include_paths(&self) -> Vec<String> {
-        todo!()
+        self.include_paths.clone()
     }
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
-        todo!()
+        self.php_ext.clone()
     }
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if let Some(existing) = self.repository.as_ref().and_then(|w| w.upgrade()) {
@@ -726,42 +743,48 @@ impl PackageInterface for Package {
             .map(RepositoryInterfaceHandle::from_rc)
     }
     fn get_binaries(&self) -> Vec<String> {
-        todo!()
+        self.binaries.clone()
     }
     fn get_unique_name(&self) -> String {
-        todo!()
+        format!("{}-{}", self.get_name(), self.get_version())
     }
     fn get_notification_url(&self) -> Option<&str> {
-        todo!()
+        self.notification_url.as_deref()
     }
     fn get_pretty_string(&self) -> String {
-        todo!()
+        format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
     }
     fn is_default_branch(&self) -> bool {
-        todo!()
+        self.is_default_branch
     }
     fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.transport_options.clone()
     }
-    fn set_transport_options(&mut self, _options: IndexMap<String, PhpMixed>) {
-        todo!()
+    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+        self.transport_options = options;
     }
-    fn set_source_reference(&mut self, _reference: Option<String>) {
-        todo!()
+    fn set_source_reference(&mut self, reference: Option<String>) {
+        self.source_reference = reference;
     }
-    fn set_source_url(&mut self, _url: Option<String>) {
-        todo!()
+    fn set_source_url(&mut self, url: Option<String>) {
+        self.source_url = url;
     }
-    fn set_dist_url(&mut self, _url: Option<String>) {
-        todo!()
+    fn set_dist_url(&mut self, url: Option<String>) {
+        self.dist_url = match url.as_deref() {
+            Some("") => None,
+            _ => url,
+        };
     }
-    fn set_dist_type(&mut self, _type: Option<String>) {
-        todo!()
+    fn set_dist_type(&mut self, r#type: Option<String>) {
+        self.dist_type = match r#type.as_deref() {
+            Some("") => None,
+            _ => r#type,
+        };
     }
-    fn set_dist_reference(&mut self, _reference: Option<String>) {
-        todo!()
+    fn set_dist_reference(&mut self, reference: Option<String>) {
+        self.dist_reference = reference;
     }
-    fn set_source_dist_references(&mut self, _reference: &str) {
-        todo!()
+    fn set_source_dist_references(&mut self, reference: &str) {
+        Package::set_source_dist_references(self, reference.to_string());
     }
 }

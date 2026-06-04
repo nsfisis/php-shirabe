@@ -19,7 +19,6 @@ use crate::json::JsonFile;
 use crate::package::BasePackage;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageInterface;
-use crate::package::PackageInterface;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::repository::CanonicalPackagesTrait;
@@ -178,14 +177,10 @@ impl LicensesCommand {
                     };
                     table.add_row(PhpMixed::List(vec![
                         Box::new(PhpMixed::String(name)),
-                        Box::new(PhpMixed::String(
-                            package
-                                .get_full_pretty_version(
-                                    false,
-                                    <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
-                                )
-                                .to_string(),
-                        )),
+                        Box::new(PhpMixed::String(package.get_full_pretty_version(
+                            false,
+                            crate::package::DisplayMode::SourceRefIfDev,
+                        ))),
                         Box::new(PhpMixed::String(licenses_str)),
                     ]));
                 }
@@ -203,7 +198,10 @@ impl LicensesCommand {
                     let mut dep_info: IndexMap<String, PhpMixed> = IndexMap::new();
                     dep_info.insert(
                         "version".to_string(),
-                        PhpMixed::String(package.get_full_pretty_version(true, 0).to_string()),
+                        PhpMixed::String(package.get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev,
+                        )),
                     );
                     dep_info.insert(
                         "license".to_string(),

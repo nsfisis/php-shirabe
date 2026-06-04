@@ -3,8 +3,20 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
+use crate::package::Mirror;
 use crate::package::PackageInterfaceHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
+
+/// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
+fn mirror_to_php(mirror: Mirror) -> PhpMixed {
+    let mut entry: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
+    entry.insert("url".to_string(), Box::new(PhpMixed::String(mirror.url)));
+    entry.insert(
+        "preferred".to_string(),
+        Box::new(PhpMixed::Bool(mirror.preferred)),
+    );
+    PhpMixed::Array(entry)
+}
 
 #[derive(Debug)]
 pub struct ArrayDumper;
@@ -62,14 +74,7 @@ impl ArrayDumper {
                             mirrors
                                 .into_iter()
                                 .enumerate()
-                                .map(|(i, m)| {
-                                    (
-                                        i.to_string(),
-                                        Box::new(PhpMixed::Array(
-                                            m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                        )),
-                                    )
-                                })
+                                .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
                                 .collect(),
                         )),
                     );
@@ -108,14 +113,7 @@ impl ArrayDumper {
                             mirrors
                                 .into_iter()
                                 .enumerate()
-                                .map(|(i, m)| {
-                                    (
-                                        i.to_string(),
-                                        Box::new(PhpMixed::Array(
-                                            m.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                        )),
-                                    )
-                                })
+                                .map(|(i, m)| (i.to_string(), Box::new(mirror_to_php(m))))
                                 .collect(),
                         )),
                     );

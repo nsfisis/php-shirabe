@@ -5,7 +5,20 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::package::Link;
+use crate::package::Mirror;
 use crate::repository::RepositoryInterfaceHandle;
+
+/// Selects how `get_full_pretty_version` renders the reference.
+///
+/// ref: PackageInterface::DISPLAY_SOURCE_REF_IF_DEV
+/// ref: PackageInterface::DISPLAY_SOURCE_REF
+/// ref: PackageInterface::DISPLAY_DIST_REF
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DisplayMode {
+    SourceRefIfDev,
+    SourceRef,
+    DistRef,
+}
 
 /// Defines the essential information a package has that is used during solving/installation
 ///
@@ -54,7 +67,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the package targetDir property
     ///
     /// @return ?string The package targetDir
-    fn get_target_dir(&self) -> Option<&str>;
+    fn get_target_dir(&self) -> Option<String>;
 
     /// Returns the package extra data
     ///
@@ -96,10 +109,10 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the source mirrors of this package
     ///
     /// @return ?list<array{url: non-empty-string, preferred: bool}>
-    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>>;
+    fn get_source_mirrors(&self) -> Option<Vec<Mirror>>;
 
     /// @param  null|list<array{url: non-empty-string, preferred: bool}> $mirrors
-    fn set_source_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>);
+    fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the type of the distribution archive of this version, e.g. zip, tarball
     ///
@@ -127,10 +140,10 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the dist mirrors of this package
     ///
     /// @return ?list<array{url: non-empty-string, preferred: bool}>
-    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>>;
+    fn get_dist_mirrors(&self) -> Option<Vec<Mirror>>;
 
     /// @param  null|list<array{url: non-empty-string, preferred: bool}> $mirrors
-    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>);
+    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the version of this package
     ///
@@ -149,9 +162,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// @param  bool   $truncate    If the source reference is a sha1 hash, truncate it
     /// @param  int    $displayMode One of the DISPLAY_ constants on this interface determining display of references
     /// @return string version
-    ///
-    /// @phpstan-param self::DISPLAY_SOURCE_REF_IF_DEV|self::DISPLAY_SOURCE_REF|self::DISPLAY_DIST_REF $displayMode
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String;
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String;
 
     /// Returns the release date of the package
     fn get_release_date(&self) -> Option<DateTime<Utc>>;
@@ -307,10 +318,4 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn as_root_package_interface(&self) -> Option<&dyn crate::package::RootPackageInterface> {
         None
     }
-}
-
-impl dyn PackageInterface {
-    pub const DISPLAY_SOURCE_REF_IF_DEV: i64 = 0;
-    pub const DISPLAY_SOURCE_REF: i64 = 1;
-    pub const DISPLAY_DIST_REF: i64 = 2;
 }

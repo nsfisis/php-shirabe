@@ -193,7 +193,7 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_type(&self) -> &str {
                 self.$field.get_type()
             }
-            fn get_target_dir(&self) -> Option<&str> {
+            fn get_target_dir(&self) -> Option<String> {
                 self.$field.get_target_dir()
             }
             fn get_extra(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
@@ -217,15 +217,10 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_source_reference(&self) -> Option<&str> {
                 self.$field.get_source_reference()
             }
-            fn get_source_mirrors(
-                &self,
-            ) -> Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>> {
+            fn get_source_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
                 self.$field.get_source_mirrors()
             }
-            fn set_source_mirrors(
-                &mut self,
-                mirrors: Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>>,
-            ) {
+            fn set_source_mirrors(&mut self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.$field.set_source_mirrors(mirrors);
             }
             fn get_dist_type(&self) -> Option<&str> {
@@ -243,15 +238,10 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_dist_sha1_checksum(&self) -> Option<&str> {
                 self.$field.get_dist_sha1_checksum()
             }
-            fn get_dist_mirrors(
-                &self,
-            ) -> Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>> {
+            fn get_dist_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
                 self.$field.get_dist_mirrors()
             }
-            fn set_dist_mirrors(
-                &mut self,
-                mirrors: Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>>,
-            ) {
+            fn set_dist_mirrors(&mut self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.$field.set_dist_mirrors(mirrors);
             }
             fn get_version(&self) -> &str {
@@ -260,7 +250,11 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_pretty_version(&self) -> &str {
                 self.$field.get_pretty_version()
             }
-            fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
+            fn get_full_pretty_version(
+                &self,
+                truncate: bool,
+                display_mode: crate::package::DisplayMode,
+            ) -> String {
                 self.$field.get_full_pretty_version(truncate, display_mode)
             }
             fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
@@ -408,11 +402,7 @@ macro_rules! impl_package_interface_handle {
             }
 
             pub fn get_target_dir(&self) -> Option<String> {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_target_dir()
-                    .map(str::to_string)
+                self.0.borrow().as_package_interface().get_target_dir()
             }
 
             pub fn get_extra(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
@@ -462,16 +452,11 @@ macro_rules! impl_package_interface_handle {
                     .map(str::to_string)
             }
 
-            pub fn get_source_mirrors(
-                &self,
-            ) -> Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>> {
+            pub fn get_source_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
                 self.0.borrow().as_package_interface().get_source_mirrors()
             }
 
-            pub fn set_source_mirrors(
-                &self,
-                mirrors: Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>>,
-            ) {
+            pub fn set_source_mirrors(&self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
@@ -514,16 +499,11 @@ macro_rules! impl_package_interface_handle {
                     .map(str::to_string)
             }
 
-            pub fn get_dist_mirrors(
-                &self,
-            ) -> Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>> {
+            pub fn get_dist_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
                 self.0.borrow().as_package_interface().get_dist_mirrors()
             }
 
-            pub fn set_dist_mirrors(
-                &self,
-                mirrors: Option<Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>>,
-            ) {
+            pub fn set_dist_mirrors(&self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
@@ -546,7 +526,11 @@ macro_rules! impl_package_interface_handle {
                     .to_string()
             }
 
-            pub fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
+            pub fn get_full_pretty_version(
+                &self,
+                truncate: bool,
+                display_mode: crate::package::DisplayMode,
+            ) -> String {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -997,7 +981,7 @@ macro_rules! impl_root_package_interface_handle {
                     .clone()
             }
 
-            pub fn set_requires(&self, requires: Vec<crate::package::Link>) {
+            pub fn set_requires(&self, requires: indexmap::IndexMap<String, crate::package::Link>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1005,7 +989,10 @@ macro_rules! impl_root_package_interface_handle {
                     .set_requires(requires);
             }
 
-            pub fn set_dev_requires(&self, dev_requires: Vec<crate::package::Link>) {
+            pub fn set_dev_requires(
+                &self,
+                dev_requires: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1013,7 +1000,10 @@ macro_rules! impl_root_package_interface_handle {
                     .set_dev_requires(dev_requires);
             }
 
-            pub fn set_conflicts(&self, conflicts: Vec<crate::package::Link>) {
+            pub fn set_conflicts(
+                &self,
+                conflicts: indexmap::IndexMap<String, crate::package::Link>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1021,7 +1011,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_conflicts(conflicts);
             }
 
-            pub fn set_provides(&self, provides: Vec<crate::package::Link>) {
+            pub fn set_provides(&self, provides: indexmap::IndexMap<String, crate::package::Link>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1029,7 +1019,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_provides(provides);
             }
 
-            pub fn set_replaces(&self, replaces: Vec<crate::package::Link>) {
+            pub fn set_replaces(&self, replaces: indexmap::IndexMap<String, crate::package::Link>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()

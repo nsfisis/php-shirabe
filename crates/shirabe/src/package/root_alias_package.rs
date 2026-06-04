@@ -82,11 +82,11 @@ impl RootPackageInterface for RootAliasPackage {
         todo!("RootAliasPackage::get_config cannot return a borrow across the aliasOf handle")
     }
 
-    fn set_requires(&mut self, requires: Vec<Link>) {
-        let replaced = self
-            .inner
-            .inner
-            .replace_self_version_dependencies(requires.clone(), Link::TYPE_REQUIRE);
+    fn set_requires(&mut self, requires: IndexMap<String, Link>) {
+        let replaced = self.inner.inner.replace_self_version_dependencies(
+            requires.values().cloned().collect(),
+            Link::TYPE_REQUIRE,
+        );
         self.inner.inner.requires = replaced
             .into_iter()
             .map(|l| (l.get_target().to_string(), l))
@@ -94,19 +94,19 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_requires(requires);
     }
 
-    fn set_dev_requires(&mut self, dev_requires: Vec<Link>) {
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<String, Link>) {
         self.alias_of.set_dev_requires(dev_requires);
     }
 
-    fn set_conflicts(&mut self, conflicts: Vec<Link>) {
+    fn set_conflicts(&mut self, conflicts: IndexMap<String, Link>) {
         self.alias_of.set_conflicts(conflicts);
     }
 
-    fn set_provides(&mut self, provides: Vec<Link>) {
+    fn set_provides(&mut self, provides: IndexMap<String, Link>) {
         self.alias_of.set_provides(provides);
     }
 
-    fn set_replaces(&mut self, replaces: Vec<Link>) {
+    fn set_replaces(&mut self, replaces: IndexMap<String, Link>) {
         self.alias_of.set_replaces(replaces);
     }
 

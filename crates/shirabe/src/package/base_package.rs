@@ -3,8 +3,9 @@
 use std::sync::LazyLock;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, UnexpectedValueException, preg_quote};
+use shirabe_php_shim::preg_quote;
 
+use crate::package::DisplayMode;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::repository::PlatformRepository;
@@ -109,48 +110,38 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
 
     // get_pretty_string is inherited from PackageInterface.
 
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> anyhow::Result<String> {
-        const DISPLAY_SOURCE_REF_IF_DEV: i64 = <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV;
-        const DISPLAY_SOURCE_REF: i64 = <dyn PackageInterface>::DISPLAY_SOURCE_REF;
-        const DISPLAY_DIST_REF: i64 = <dyn PackageInterface>::DISPLAY_DIST_REF;
-
-        if display_mode == DISPLAY_SOURCE_REF_IF_DEV
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
+        if display_mode == DisplayMode::SourceRefIfDev
             && (!self.is_dev()
                 || (!["hg", "git"].contains(&self.get_source_type().unwrap_or_default())
                     && (self.get_source_type().unwrap_or_default() != ""
                         || self.get_dist_reference().unwrap_or_default() == "")))
         {
-            return Ok(self.get_pretty_version().to_string());
+            return self.get_pretty_version().to_string();
         }
 
         let reference: Option<&str> = match display_mode {
-            DISPLAY_SOURCE_REF_IF_DEV => {
+            DisplayMode::SourceRefIfDev => {
                 if self.get_source_reference().unwrap_or_default() != "" {
                     self.get_source_reference()
                 } else {
                     self.get_dist_reference()
                 }
             }
-            DISPLAY_SOURCE_REF => self.get_source_reference(),
-            DISPLAY_DIST_REF => self.get_dist_reference(),
-            _ => {
-                return Err(anyhow::anyhow!(UnexpectedValueException {
-                    message: format!("Display mode {} is not supported", display_mode),
-                    code: 0,
-                }));
-            }
+            DisplayMode::SourceRef => self.get_source_reference(),
+            DisplayMode::DistRef => self.get_dist_reference(),
         };
 
         let reference = match reference {
-            None => return Ok(self.get_pretty_version().to_string()),
+            None => return self.get_pretty_version().to_string(),
             Some(r) => r,
         };
 
         if truncate && reference.len() == 40 && self.get_source_type() != Some("svn") {
-            return Ok(format!("{} {}", self.get_pretty_version(), &reference[..7]));
+            return format!("{} {}", self.get_pretty_version(), &reference[..7]);
         }
 
-        Ok(format!("{} {}", self.get_pretty_version(), reference))
+        format!("{} {}", self.get_pretty_version(), reference)
     }
 
     fn get_stability_priority(&self) -> i64 {

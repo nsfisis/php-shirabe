@@ -8,6 +8,7 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 use crate::package::BasePackage;
 use crate::package::Link;
+use crate::package::Mirror;
 use crate::package::PackageHandle;
 use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
@@ -305,8 +306,8 @@ impl PackageInterface for AliasPackage {
         todo!("AliasPackage::get_type cannot return &str across the aliasOf handle")
     }
 
-    fn get_target_dir(&self) -> Option<&str> {
-        todo!("AliasPackage::get_target_dir cannot return &str across the aliasOf handle")
+    fn get_target_dir(&self) -> Option<String> {
+        self.alias_of.get_target_dir()
     }
 
     fn get_extra(&self) -> IndexMap<String, PhpMixed> {
@@ -341,11 +342,11 @@ impl PackageInterface for AliasPackage {
         self.alias_of.set_source_reference(reference);
     }
 
-    fn set_source_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+    fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.alias_of.set_source_mirrors(mirrors);
     }
 
-    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+    fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
         self.alias_of.get_source_mirrors()
     }
 
@@ -381,11 +382,11 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_transport_options()
     }
 
-    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
+    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.alias_of.set_dist_mirrors(mirrors);
     }
 
-    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
+    fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
         self.alias_of.get_dist_mirrors()
     }
 
@@ -441,7 +442,11 @@ impl PackageInterface for AliasPackage {
         self.alias_of.set_source_dist_references(reference);
     }
 
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
+    fn get_full_pretty_version(
+        &self,
+        truncate: bool,
+        display_mode: crate::package::DisplayMode,
+    ) -> String {
         self.alias_of
             .get_full_pretty_version(truncate, display_mode)
     }

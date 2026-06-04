@@ -21,15 +21,15 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn get_config(&self) -> &IndexMap<String, PhpMixed>;
 
-    fn set_requires(&mut self, requires: Vec<Link>);
+    fn set_requires(&mut self, requires: IndexMap<String, Link>);
 
-    fn set_dev_requires(&mut self, dev_requires: Vec<Link>);
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<String, Link>);
 
-    fn set_conflicts(&mut self, conflicts: Vec<Link>);
+    fn set_conflicts(&mut self, conflicts: IndexMap<String, Link>);
 
-    fn set_provides(&mut self, provides: Vec<Link>);
+    fn set_provides(&mut self, provides: IndexMap<String, Link>);
 
-    fn set_replaces(&mut self, replaces: Vec<Link>);
+    fn set_replaces(&mut self, replaces: IndexMap<String, Link>);
 
     fn set_autoload(&mut self, autoload: IndexMap<String, PhpMixed>);
 

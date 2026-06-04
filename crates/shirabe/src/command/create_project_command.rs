@@ -895,10 +895,7 @@ impl CreateProjectCommand {
         io.write_error(&format!(
             "<info>Installing {} ({})</info>",
             package.get_name(),
-            package.get_full_pretty_version(
-                false,
-                <dyn crate::package::PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV
-            )
+            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev)
         ));
 
         if disable_plugins {

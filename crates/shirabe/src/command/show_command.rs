@@ -606,8 +606,9 @@ impl ShowCommand {
                 && latest_package
                     .as_ref()
                     .unwrap()
-                    .get_full_pretty_version(true, 0)
-                    != package.get_full_pretty_version(true, 0)
+                    .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    != package
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 && (latest_package
                     .as_ref()
                     .unwrap()
@@ -905,9 +906,13 @@ impl ShowCommand {
 
                         // Determine if Composer is checking outdated dependencies and if current package should trigger non-default exit code
                         let mut package_is_up_to_date = if let Some(latest) = latest_package {
-                            latest.get_full_pretty_version(true, 0)
-                                == package.get_full_pretty_version(true, 0)
-                                && latest.as_complete().map_or(true, |c| !c.is_abandoned())
+                            latest.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            ) == package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            ) && latest.as_complete().map_or(true, |c| !c.is_abandoned())
                         } else {
                             false
                         };
@@ -967,7 +972,10 @@ impl ShowCommand {
                         }
                         name_length = name_length.max(package.get_pretty_name().len());
                         if write_version {
-                            let mut version_str = package.get_full_pretty_version(true, 0);
+                            let mut version_str = package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            );
                             if format == "text" {
                                 version_str = version_str.trim_start_matches('v').to_string();
                             }
@@ -1003,7 +1011,10 @@ impl ShowCommand {
                         }
                         if write_latest && latest_package.is_some() {
                             let latest = latest_package.unwrap();
-                            let mut latest_version_str = latest.get_full_pretty_version(true, 0);
+                            let mut latest_version_str = latest.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev,
+                            );
                             if format == "text" {
                                 latest_version_str =
                                     latest_version_str.trim_start_matches('v').to_string();
@@ -2518,8 +2529,8 @@ impl ShowCommand {
         latest_package: PackageInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> String {
-        if latest_package.get_full_pretty_version(true, 0)
-            == package.get_full_pretty_version(true, 0)
+        if latest_package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+            == package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
         {
             return "up-to-date".to_string();
         }

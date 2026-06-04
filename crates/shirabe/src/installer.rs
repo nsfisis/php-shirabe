@@ -736,7 +736,10 @@ impl Installer {
                     install_names.push(format!(
                         "{}:{}",
                         io.get_package().get_pretty_name(),
-                        io.get_package().get_full_pretty_version(true, 0)
+                        io.get_package().get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev
+                        )
                     ));
                 } else if let Some(uo) = operation.as_update_operation() {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
@@ -753,7 +756,10 @@ impl Installer {
                     update_names.push(format!(
                         "{}:{}",
                         uo.get_target_package().get_pretty_name(),
-                        uo.get_target_package().get_full_pretty_version(true, 0)
+                        uo.get_target_package().get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev
+                        )
                     ));
                 } else if let Some(uo) = operation.as_uninstall_operation() {
                     uninstalls.push(operation.clone_box());
@@ -1137,13 +1143,15 @@ impl Installer {
                 installs.push(format!(
                     "{}:{}",
                     io.get_package().get_pretty_name(),
-                    io.get_package().get_full_pretty_version(true, 0)
+                    io.get_package()
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let Some(uo) = operation.as_update_operation() {
                 updates.push(format!(
                     "{}:{}",
                     uo.get_target_package().get_pretty_name(),
-                    uo.get_target_package().get_full_pretty_version(true, 0)
+                    uo.get_target_package()
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
             } else if let Some(uo) = operation.as_uninstall_operation() {
                 uninstalls.push(uo.get_package().get_pretty_name().to_string());
@@ -1336,8 +1344,8 @@ impl Installer {
         }
 
         self.fixed_root_package = RootPackageInterfaceHandle::dup(&self.package);
-        self.fixed_root_package.set_requires(vec![]);
-        self.fixed_root_package.set_dev_requires(vec![]);
+        self.fixed_root_package.set_requires(IndexMap::new());
+        self.fixed_root_package.set_dev_requires(IndexMap::new());
 
         stability_flags.insert(
             self.package.get_name(),

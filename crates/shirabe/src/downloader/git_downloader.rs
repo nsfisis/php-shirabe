@@ -95,10 +95,8 @@ impl GitDownloader {
                 &format!(
                     "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
                     package.get_name(),
-                    package.get_full_pretty_version(
-                        true,
-                        <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,
-                    ),
+                    package
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
                 ),
                 true,
                 io_interface::NORMAL,

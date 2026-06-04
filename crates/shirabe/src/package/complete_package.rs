@@ -1,6 +1,8 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
 use crate::package::CompletePackageInterface;
+use crate::package::DisplayMode;
+use crate::package::Mirror;
 use crate::package::Package;
 use crate::package::PackageInterface;
 use indexmap::IndexMap;
@@ -154,159 +156,159 @@ impl CompletePackageInterface for CompletePackage {
 
 impl PackageInterface for CompletePackage {
     fn get_name(&self) -> &str {
-        todo!()
+        self.inner.get_name()
     }
 
     fn get_pretty_name(&self) -> &str {
-        todo!()
+        self.inner.get_pretty_name()
     }
 
     fn get_names(&self, provides: bool) -> Vec<String> {
-        todo!()
+        self.inner.get_names(provides)
     }
 
     fn set_id(&mut self, id: i64) {
-        todo!()
+        self.inner.set_id(id);
     }
 
     fn get_id(&self) -> i64 {
-        todo!()
+        self.inner.get_id()
     }
 
     fn is_dev(&self) -> bool {
-        todo!()
+        self.inner.is_dev()
     }
 
     fn get_type(&self) -> &str {
-        todo!()
+        PackageInterface::get_type(&self.inner)
     }
 
-    fn get_target_dir(&self) -> Option<&str> {
-        todo!()
+    fn get_target_dir(&self) -> Option<String> {
+        self.inner.get_target_dir()
     }
 
     fn get_extra(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.inner.get_extra().clone()
     }
 
     fn set_installation_source(&mut self, r#type: Option<String>) {
-        todo!()
+        self.inner.set_installation_source(r#type);
     }
 
     fn get_installation_source(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_installation_source()
     }
 
     fn get_source_type(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_source_type()
     }
 
     fn get_source_url(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_source_url()
     }
 
     fn get_source_urls(&self) -> Vec<String> {
-        todo!()
+        self.inner.get_source_urls()
     }
 
     fn get_source_reference(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_source_reference()
     }
 
-    fn get_source_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
-        todo!()
+    fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
+        self.inner.get_source_mirrors().cloned()
     }
 
-    fn set_source_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
-        todo!()
+    fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
+        self.inner.set_source_mirrors(mirrors);
     }
 
     fn get_dist_type(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_dist_type()
     }
 
     fn get_dist_url(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_dist_url()
     }
 
     fn get_dist_urls(&self) -> Vec<String> {
-        todo!()
+        self.inner.get_dist_urls()
     }
 
     fn get_dist_reference(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_dist_reference()
     }
 
     fn get_dist_sha1_checksum(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_dist_sha1_checksum()
     }
 
-    fn get_dist_mirrors(&self) -> Option<Vec<IndexMap<String, PhpMixed>>> {
-        todo!()
+    fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
+        self.inner.get_dist_mirrors().cloned()
     }
 
-    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<IndexMap<String, PhpMixed>>>) {
-        todo!()
+    fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
+        self.inner.set_dist_mirrors(mirrors);
     }
 
     fn get_version(&self) -> &str {
-        todo!()
+        self.inner.get_version()
     }
 
     fn get_pretty_version(&self) -> &str {
-        todo!()
+        self.inner.get_pretty_version()
     }
 
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: i64) -> String {
-        todo!()
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
+        PackageInterface::get_full_pretty_version(&self.inner, truncate, display_mode)
     }
 
     fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
-        todo!()
+        self.inner.get_release_date().copied()
     }
 
     fn get_stability(&self) -> &str {
-        todo!()
+        self.inner.get_stability()
     }
 
     fn get_requires(&self) -> IndexMap<String, super::Link> {
-        todo!()
+        self.inner.get_requires().clone()
     }
 
     fn get_conflicts(&self) -> IndexMap<String, super::Link> {
-        todo!()
+        self.inner.get_conflicts().clone()
     }
 
     fn get_provides(&self) -> IndexMap<String, super::Link> {
-        todo!()
+        self.inner.get_provides().clone()
     }
 
     fn get_replaces(&self) -> IndexMap<String, super::Link> {
-        todo!()
+        self.inner.get_replaces().clone()
     }
 
     fn get_dev_requires(&self) -> IndexMap<String, super::Link> {
-        todo!()
+        self.inner.get_dev_requires().clone()
     }
 
     fn get_suggests(&self) -> IndexMap<String, String> {
-        todo!()
+        self.inner.get_suggests().clone()
     }
 
     fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.inner.get_autoload().clone()
     }
 
     fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.inner.get_dev_autoload().clone()
     }
 
     fn get_include_paths(&self) -> Vec<String> {
-        todo!()
+        self.inner.get_include_paths().clone()
     }
 
     fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
-        todo!()
+        self.inner.get_php_ext().cloned()
     }
 
     fn set_repository(
@@ -321,55 +323,55 @@ impl PackageInterface for CompletePackage {
     }
 
     fn get_binaries(&self) -> Vec<String> {
-        todo!()
+        self.inner.get_binaries().clone()
     }
 
     fn get_unique_name(&self) -> String {
-        todo!()
+        self.inner.get_unique_name()
     }
 
     fn get_notification_url(&self) -> Option<&str> {
-        todo!()
+        self.inner.get_notification_url()
     }
 
     fn get_pretty_string(&self) -> String {
-        todo!()
+        self.inner.get_pretty_string()
     }
 
     fn is_default_branch(&self) -> bool {
-        todo!()
+        self.inner.is_default_branch()
     }
 
     fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
-        todo!()
+        self.inner.get_transport_options().clone()
     }
 
     fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
-        todo!()
+        self.inner.set_transport_options(options);
     }
 
     fn set_source_reference(&mut self, reference: Option<String>) {
-        todo!()
+        self.inner.set_source_reference(reference);
     }
 
     fn set_source_url(&mut self, url: Option<String>) {
-        todo!()
+        self.inner.set_source_url(url);
     }
 
     fn set_dist_url(&mut self, url: Option<String>) {
-        todo!()
+        self.inner.set_dist_url(url);
     }
 
     fn set_dist_type(&mut self, r#type: Option<String>) {
-        todo!()
+        self.inner.set_dist_type(r#type);
     }
 
     fn set_dist_reference(&mut self, reference: Option<String>) {
-        todo!()
+        self.inner.set_dist_reference(reference);
     }
 
     fn set_source_dist_references(&mut self, reference: &str) {
-        todo!()
+        PackageInterface::set_source_dist_references(&mut self.inner, reference);
     }
 }
 

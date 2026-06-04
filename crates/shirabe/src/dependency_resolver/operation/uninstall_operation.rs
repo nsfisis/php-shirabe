@@ -2,7 +2,6 @@
 
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 
 #[derive(Debug)]
@@ -23,8 +22,7 @@ impl UninstallOperation {
         format!(
             "Removing <info>{}</info> (<comment>{}</comment>)",
             package.get_pretty_name(),
-            package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV),
+            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
         )
     }
 }

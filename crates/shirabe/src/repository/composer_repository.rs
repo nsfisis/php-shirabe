@@ -2772,26 +2772,22 @@ impl ComposerRepository {
                     if let Some(mirrors) =
                         self.source_mirrors.as_ref().and_then(|m| m.get(&src_type))
                     {
-                        let converted: Vec<IndexMap<String, PhpMixed>> = mirrors
+                        let converted: Vec<crate::package::Mirror> = mirrors
                             .iter()
-                            .map(|m| {
-                                let mut im: IndexMap<String, PhpMixed> = IndexMap::new();
-                                im.insert("url".to_string(), PhpMixed::String(m.url.clone()));
-                                im.insert("preferred".to_string(), PhpMixed::Bool(m.preferred));
-                                im
+                            .map(|m| crate::package::Mirror {
+                                url: m.url.clone(),
+                                preferred: m.preferred,
                             })
                             .collect();
                         package.set_source_mirrors(Some(converted));
                     }
                 }
                 if let Some(dist_mirrors) = self.dist_mirrors.as_ref() {
-                    let converted: Vec<IndexMap<String, PhpMixed>> = dist_mirrors
+                    let converted: Vec<crate::package::Mirror> = dist_mirrors
                         .iter()
-                        .map(|m| {
-                            let mut im: IndexMap<String, PhpMixed> = IndexMap::new();
-                            im.insert("url".to_string(), PhpMixed::String(m.url.clone()));
-                            im.insert("preferred".to_string(), PhpMixed::Bool(m.preferred));
-                            im
+                        .map(|m| crate::package::Mirror {
+                            url: m.url.clone(),
+                            preferred: m.preferred,
                         })
                         .collect();
                     package.set_dist_mirrors(Some(converted));

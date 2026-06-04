@@ -241,7 +241,10 @@ impl DownloaderInterface for FileDownloader {
                         &format!(
                             "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
                             package.get_name(),
-                            package.get_full_pretty_version(true, 0)
+                            package.get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev
+                            )
                         ),
                         true,
                         io_interface::VERY_VERBOSE,
@@ -263,7 +266,10 @@ impl DownloaderInterface for FileDownloader {
                     self.io.write_error(&format!(
                         "  - Downloading <info>{}</info> (<comment>{}</comment>)",
                         package.get_name(),
-                        package.get_full_pretty_version(true, 0)
+                        package.get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev
+                        )
                     ));
                 }
 

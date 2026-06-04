@@ -3,7 +3,6 @@
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::AliasPackageHandle;
-use crate::package::PackageInterface;
 
 #[derive(Debug)]
 pub struct MarkAliasInstalledOperation {
@@ -38,11 +37,11 @@ impl OperationInterface for MarkAliasInstalledOperation {
             "Marking <info>{}</info> (<comment>{}</comment>) as installed, alias of <info>{}</info> (<comment>{}</comment>)",
             self.package.get_pretty_name(),
             self.package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV),
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
             self.package.get_alias_of().get_pretty_name(),
             self.package
                 .get_alias_of()
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF_IF_DEV,),
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev,),
         )
     }
 

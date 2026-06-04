@@ -2,7 +2,6 @@
 
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::SolverOperation;
-use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
 
@@ -33,25 +32,25 @@ impl UpdateOperation {
         target_package: PackageInterfaceHandle,
         lock: bool,
     ) -> String {
-        let mut from_version = initial_package
-            .get_full_pretty_version(false, <dyn PackageInterface>::DISPLAY_SOURCE_REF);
-        let mut to_version = target_package
-            .get_full_pretty_version(false, <dyn PackageInterface>::DISPLAY_SOURCE_REF);
+        let mut from_version =
+            initial_package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRef);
+        let mut to_version =
+            target_package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRef);
 
         if from_version == to_version
             && initial_package.get_source_reference() != target_package.get_source_reference()
         {
             from_version = initial_package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF);
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRef);
             to_version = target_package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_SOURCE_REF);
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRef);
         } else if from_version == to_version
             && initial_package.get_dist_reference() != target_package.get_dist_reference()
         {
-            from_version = initial_package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_DIST_REF);
-            to_version = target_package
-                .get_full_pretty_version(true, <dyn PackageInterface>::DISPLAY_DIST_REF);
+            from_version =
+                initial_package.get_full_pretty_version(true, crate::package::DisplayMode::DistRef);
+            to_version =
+                target_package.get_full_pretty_version(true, crate::package::DisplayMode::DistRef);
         }
 
         let action_name = if VersionParser::is_upgrade(
