@@ -5,19 +5,20 @@ use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, Exception, LogicException, PhpMixed, UnexpectedValueException, is_scalar,
-    is_string, json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr,
-    trigger_error, trim, ucfirst,
+    E_USER_DEPRECATED, Exception, PhpMixed, UnexpectedValueException, is_scalar, is_string,
+    json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
-use crate::package::CompleteAliasPackage;
+use crate::package::CompleteAliasPackageHandle;
 use crate::package::CompletePackage;
 use crate::package::CompletePackageHandle;
 use crate::package::CompletePackageInterface;
 use crate::package::Link;
+use crate::package::Mirror;
+use crate::package::Package;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::package::RootAliasPackage;
+use crate::package::RootAliasPackageHandle;
 use crate::package::RootPackage;
 use crate::package::RootPackageHandle;
 use crate::package::loader::LoaderInterface;
@@ -45,8 +46,108 @@ impl ArrayLoader {
     }
 }
 
+enum CompleteOrRootPackage {
+    Complete(CompletePackage),
+    Root(RootPackage),
+}
+
+impl CompleteOrRootPackage {
+    fn package(&self) -> &Package {
+        match self {
+            Self::Complete(p) => &p.inner,
+            Self::Root(p) => &p.inner.inner,
+        }
+    }
+
+    fn package_mut(&mut self) -> &mut Package {
+        match self {
+            Self::Complete(p) => &mut p.inner,
+            Self::Root(p) => &mut p.inner.inner,
+        }
+    }
+
+    fn complete_mut(&mut self) -> &mut dyn CompletePackageInterface {
+        match self {
+            Self::Complete(p) => p,
+            Self::Root(p) => p,
+        }
+    }
+
+    fn is_root(&self) -> bool {
+        matches!(self, Self::Root(_))
+    }
+
+    fn get_name(&self) -> &str {
+        self.package().get_name()
+    }
+
+    fn get_pretty_version(&self) -> &str {
+        self.package().get_pretty_version()
+    }
+
+    fn into_handle(self) -> PackageInterfaceHandle {
+        match self {
+            Self::Complete(p) => CompletePackageHandle::from_complete_package(p).into(),
+            Self::Root(p) => RootPackageHandle::from_root_package(p).into(),
+        }
+    }
+}
+
+fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
+    match value {
+        PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
+        _ => IndexMap::new(),
+    }
+}
+
+fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
+    match value {
+        PhpMixed::List(l) => l.iter().map(|v| strval(v)).collect(),
+        PhpMixed::Array(m) => m.values().map(|v| strval(v)).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<String, Link>) {
+    if method == Link::TYPE_REQUIRE {
+        package.set_requires(links);
+    } else if method == Link::TYPE_DEV_REQUIRE {
+        package.set_dev_requires(links);
+    } else if method == Link::TYPE_CONFLICT {
+        package.set_conflicts(links);
+    } else if method == Link::TYPE_PROVIDE {
+        package.set_provides(links);
+    } else if method == Link::TYPE_REPLACE {
+        package.set_replaces(links);
+    }
+}
+
+fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
+    let entries: Vec<&PhpMixed> = match value {
+        PhpMixed::List(l) => l.iter().map(|v| v.as_ref()).collect(),
+        PhpMixed::Array(m) => m.values().map(|v| v.as_ref()).collect(),
+        _ => Vec::new(),
+    };
+    entries
+        .into_iter()
+        .filter_map(|entry| match entry {
+            PhpMixed::Array(m) => Some(Mirror {
+                url: m
+                    .get("url")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+                preferred: m
+                    .get("preferred")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false),
+            }),
+            _ => None,
+        })
+        .collect()
+}
+
 impl LoaderInterface for ArrayLoader {
-    /// @inheritDoc
     fn load(
         &self,
         mut config: IndexMap<String, PhpMixed>,
@@ -73,7 +174,6 @@ impl LoaderInterface for ArrayLoader {
             if entry.is_none() || !entry_is_array {
                 continue;
             }
-            let _method = format!("set{}", ucfirst(opts.method));
             let links = self.parse_links(
                 package.get_name(),
                 package.get_pretty_version(),
@@ -86,9 +186,7 @@ impl LoaderInterface for ArrayLoader {
                     _ => IndexMap::new(),
                 },
             )?;
-            // TODO(phase-b): PHP `$package->{$method}($links)` — dynamic setter dispatch by name
-            let _ = &mut package;
-            let _ = links;
+            apply_link_setter(package.package_mut(), opts.method, links);
         }
 
         let package = self.configure_object(package, &mut config)?;
@@ -112,9 +210,9 @@ impl ArrayLoader {
         > = IndexMap::new();
 
         for mut version in versions {
-            let package = self.create_object(&version, "Composer\\Package\\CompletePackage")?;
+            let mut package = self.create_object(&version, "Composer\\Package\\CompletePackage")?;
 
-            self.configure_cached_links(&mut link_cache, &package, &version)?;
+            self.configure_cached_links(&mut link_cache, &mut package, &version)?;
             let package = self.configure_object(package, &mut version)?;
 
             packages.push(package);
@@ -123,19 +221,11 @@ impl ArrayLoader {
         Ok(packages)
     }
 
-    /// @template PackageClass of CompletePackage
-    ///
-    /// @param mixed[] $config package data
-    /// @param string  $class  FQCN to be instantiated
-    ///
-    /// @return CompletePackage|RootPackage
-    ///
-    /// @phpstan-param class-string<PackageClass> $class
     fn create_object(
         &self,
         config: &IndexMap<String, PhpMixed>,
         class: &str,
-    ) -> Result<Box<CompletePackage>> {
+    ) -> Result<CompleteOrRootPackage> {
         if !config.contains_key("name") {
             return Err(UnexpectedValueException {
                 message: format!(
@@ -205,51 +295,51 @@ impl ArrayLoader {
             }
         }
 
-        // PHP: return new $class($config['name'], $version, $config['version']);
-        // TODO(phase-b): dispatch class-string $class to CompletePackage / RootPackage
-        // constructor; for now we only support CompletePackage
-        let _ = class;
-        let _name = config.get("name").and_then(|v| v.as_string()).unwrap_or("");
-        let _pretty_version = config_version.as_string().unwrap_or("").to_string();
-        let _ = version;
-        todo!(
-            "phase-b: dynamic class-string instantiation new $class($name, $version, $prettyVersion)"
-        )
+        let name = config
+            .get("name")
+            .and_then(|v| v.as_string())
+            .unwrap_or("")
+            .to_string();
+        let pretty_version = config_version.as_string().unwrap_or("").to_string();
+
+        if class == "Composer\\Package\\RootPackage" {
+            Ok(CompleteOrRootPackage::Root(RootPackage::new(
+                name,
+                version,
+                pretty_version,
+            )))
+        } else {
+            Ok(CompleteOrRootPackage::Complete(CompletePackage::new(
+                name,
+                version,
+                pretty_version,
+            )))
+        }
     }
 
-    /// @param CompletePackage $package
-    /// @param mixed[]         $config package data
-    ///
-    /// @return RootPackage|RootAliasPackage|CompletePackage|CompleteAliasPackage
     fn configure_object(
         &self,
-        mut package: Box<CompletePackage>,
+        mut package: CompleteOrRootPackage,
         config: &mut IndexMap<String, PhpMixed>,
     ) -> Result<PackageInterfaceHandle> {
-        // PHP: if (!$package instanceof CompletePackage) — true by construction in Rust
-        // (create_object always returns Box<CompletePackage>); kept as a no-op for parity.
-        let _ = LogicException {
-            message: "ArrayLoader expects instances of the Composer\\Package\\CompletePackage class to function correctly".to_string(),
-            code: 0,
-        };
-
-        // PHP: $package->setType(isset($config['type']) ? strtolower($config['type']) : 'library');
-        // TODO(phase-b): set_type on CompletePackage/Package
-        let _type_value = if let Some(t) = config.get("type") {
-            strtolower(t.as_string().unwrap_or(""))
-        } else {
-            "library".to_string()
-        };
+        package
+            .package_mut()
+            .set_type(if let Some(t) = config.get("type") {
+                strtolower(t.as_string().unwrap_or(""))
+            } else {
+                "library".to_string()
+            });
 
         if let Some(target_dir) = config.get("target-dir") {
-            // TODO(phase-b): package.set_target_dir
-            let _ = target_dir;
+            package
+                .package_mut()
+                .set_target_dir(target_dir.as_string().map(|s| s.to_string()));
         }
 
         if let Some(extra) = config.get("extra") {
             if matches!(extra, PhpMixed::Array(_)) {
-                // TODO(phase-b): package.set_extra
-                let _ = extra;
+                let extra_map = php_to_map(extra);
+                package.package_mut().set_extra(extra_map);
             }
         }
 
@@ -258,7 +348,6 @@ impl ArrayLoader {
                 PhpMixed::Array(_) | PhpMixed::List(_) => bin,
                 other => PhpMixed::List(vec![Box::new(other)]),
             };
-            // foreach ($config['bin'] as $key => $bin) { $config['bin'][$key] = ltrim($bin, '/'); }
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
@@ -272,18 +361,20 @@ impl ArrayLoader {
                     }
                 }
             }
+            let binaries = php_to_string_vec(&bin_list);
             config.insert("bin".to_string(), bin_list);
-            // TODO(phase-b): package.set_binaries
+            package.package_mut().set_binaries(binaries);
         }
 
         if let Some(installation_source) = config.get("installation-source") {
-            // TODO(phase-b): package.set_installation_source
-            let _ = installation_source;
+            package
+                .package_mut()
+                .set_installation_source(installation_source.as_string().map(|s| s.to_string()));
         }
 
         if let Some(default_branch) = config.get("default-branch") {
             if default_branch.as_bool() == Some(true) {
-                // TODO(phase-b): package.set_is_default_branch(true)
+                package.package_mut().set_is_default_branch(true);
             }
         }
 
@@ -318,13 +409,19 @@ impl ArrayLoader {
                 .into());
             }
             let source_map = source_map.unwrap();
-            // TODO(phase-b): package.set_source_type/_url/_reference/_mirrors
-            let _ = source_map.get("type");
-            let _ = source_map.get("url");
-            let _reference = source_map.get("reference").map(|v| strval(v));
-            let _ = _reference;
+            package
+                .package_mut()
+                .set_source_type(source_map.get("type").map(|v| strval(v)));
+            package
+                .package_mut()
+                .set_source_url(source_map.get("url").map(|v| strval(v)));
+            package
+                .package_mut()
+                .set_source_reference(source_map.get("reference").map(|v| strval(v)));
             if let Some(mirrors) = source_map.get("mirrors") {
-                let _ = mirrors;
+                package
+                    .package_mut()
+                    .set_source_mirrors(Some(php_to_mirrors(mirrors)));
             }
         }
 
@@ -357,15 +454,22 @@ impl ArrayLoader {
                 .into());
             }
             let dist_map = dist_map.unwrap();
-            // TODO(phase-b): package.set_dist_type/_url/_reference/_sha1_checksum/_mirrors
-            let _ = dist_map.get("type");
-            let _ = dist_map.get("url");
-            let _reference = dist_map.get("reference").map(|v| strval(v));
-            let _ = _reference;
-            let _shasum = dist_map.get("shasum");
-            let _ = _shasum;
+            package
+                .package_mut()
+                .set_dist_type(dist_map.get("type").map(|v| strval(v)));
+            package
+                .package_mut()
+                .set_dist_url(dist_map.get("url").map(|v| strval(v)));
+            package
+                .package_mut()
+                .set_dist_reference(dist_map.get("reference").map(|v| strval(v)));
+            package
+                .package_mut()
+                .set_dist_sha1_checksum(dist_map.get("shasum").map(|v| strval(v)));
             if let Some(mirrors) = dist_map.get("mirrors") {
-                let _ = mirrors;
+                package
+                    .package_mut()
+                    .set_dist_mirrors(Some(php_to_mirrors(mirrors)));
             }
         }
 
@@ -381,29 +485,33 @@ impl ArrayLoader {
                         }
                     }
                 }
+                let suggests: IndexMap<String, String> = suggest_map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), strval(v)))
+                    .collect();
                 config.insert("suggest".to_string(), PhpMixed::Array(suggest_map));
-                // TODO(phase-b): package.set_suggests
+                package.package_mut().set_suggests(suggests);
             }
         }
 
         if let Some(autoload) = config.get("autoload") {
-            // TODO(phase-b): package.set_autoload
-            let _ = autoload;
+            let autoload_map = php_to_map(autoload);
+            package.package_mut().set_autoload(autoload_map);
         }
 
         if let Some(autoload_dev) = config.get("autoload-dev") {
-            // TODO(phase-b): package.set_dev_autoload
-            let _ = autoload_dev;
+            let dev_autoload_map = php_to_map(autoload_dev);
+            package.package_mut().set_dev_autoload(dev_autoload_map);
         }
 
         if let Some(include_path) = config.get("include-path") {
-            // TODO(phase-b): package.set_include_paths
-            let _ = include_path;
+            let include_paths = php_to_string_vec(include_path);
+            package.package_mut().set_include_paths(include_paths);
         }
 
         if let Some(php_ext) = config.get("php-ext") {
-            // TODO(phase-b): package.set_php_ext
-            let _ = php_ext;
+            let php_ext_map = php_to_map(php_ext);
+            package.package_mut().set_php_ext(Some(php_ext_map));
         }
 
         if let Some(time_value) = config.get("time") {
@@ -423,164 +531,168 @@ impl ArrayLoader {
                             code: 0,
                         });
                 if let Ok(date) = result {
-                    // TODO(phase-b): package.set_release_date(date)
-                    let _ = date;
+                    package.package_mut().set_release_date(Some(date));
                 }
             }
         }
 
         if let Some(notification_url) = config.get("notification-url") {
             if !shirabe_php_shim::empty(notification_url) {
-                // TODO(phase-b): package.set_notification_url
-                let _ = notification_url;
+                package
+                    .package_mut()
+                    .set_notification_url(strval(notification_url));
             }
         }
 
-        // PHP: $package instanceof CompletePackageInterface — true since $package is CompletePackage
-        {
-            if let Some(archive) = config.get("archive").cloned() {
-                if let PhpMixed::Array(archive_map) = archive {
-                    if let Some(name) = archive_map.get("name") {
-                        if !shirabe_php_shim::empty(name) {
-                            // TODO(phase-b): package.set_archive_name
-                            let _ = name;
-                        }
+        if let Some(archive) = config.get("archive").cloned() {
+            if let PhpMixed::Array(archive_map) = archive {
+                if let Some(name) = archive_map.get("name") {
+                    if !shirabe_php_shim::empty(name) {
+                        package.complete_mut().set_archive_name(strval(name));
                     }
-                    if let Some(exclude) = archive_map.get("exclude") {
-                        if !shirabe_php_shim::empty(exclude) {
-                            // TODO(phase-b): package.set_archive_excludes
-                            let _ = exclude;
-                        }
+                }
+                if let Some(exclude) = archive_map.get("exclude") {
+                    if !shirabe_php_shim::empty(exclude) {
+                        package
+                            .complete_mut()
+                            .set_archive_excludes(php_to_string_vec(exclude));
                     }
                 }
             }
+        }
 
-            if let Some(scripts) = config.get("scripts").cloned() {
-                if let PhpMixed::Array(mut scripts_map) = scripts {
-                    for (event, listeners) in scripts_map.iter_mut() {
-                        let listeners_array = match listeners.as_ref() {
-                            PhpMixed::Array(_) | PhpMixed::List(_) => listeners.clone(),
-                            other => Box::new(PhpMixed::List(vec![Box::new(other.clone())])),
-                        };
-                        *listeners = listeners_array;
-                        let _ = event;
-                    }
-                    for reserved in ["composer", "php", "putenv"].iter() {
-                        if scripts_map.contains_key(*reserved) {
-                            trigger_error(
-                                &format!(
-                                    "The `{}` script name is reserved for internal use, please avoid defining it",
-                                    reserved
-                                ),
-                                E_USER_DEPRECATED,
-                            );
-                        }
-                    }
-                    config.insert("scripts".to_string(), PhpMixed::Array(scripts_map));
-                    // TODO(phase-b): package.set_scripts
-                }
-            }
-
-            if let Some(description) = config.get("description") {
-                if !shirabe_php_shim::empty(description) && is_string(description) {
-                    package.set_description(description.as_string().unwrap_or("").to_string());
-                }
-            }
-
-            if let Some(homepage) = config.get("homepage") {
-                if !shirabe_php_shim::empty(homepage) && is_string(homepage) {
-                    package.set_homepage(homepage.as_string().unwrap_or("").to_string());
-                }
-            }
-
-            if let Some(keywords) = config.get("keywords") {
-                if !shirabe_php_shim::empty(keywords) {
-                    if matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_)) {
-                        // PHP: array_map('strval', $config['keywords'])
-                        let keywords_vec: Vec<String> = match keywords {
-                            PhpMixed::List(list) => list.iter().map(|v| strval(v)).collect(),
-                            PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
-                            _ => vec![],
-                        };
-                        package.set_keywords(keywords_vec);
-                    }
-                }
-            }
-
-            if let Some(license) = config.get("license") {
-                if !shirabe_php_shim::empty(license) {
-                    let license_vec: Vec<String> = match license {
-                        PhpMixed::Array(map) => map
-                            .values()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
-                            .collect(),
-                        PhpMixed::List(list) => list
-                            .iter()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
-                            .collect(),
-                        other => vec![other.as_string().unwrap_or("").to_string()],
+        if let Some(scripts) = config.get("scripts").cloned() {
+            if let PhpMixed::Array(mut scripts_map) = scripts {
+                for (event, listeners) in scripts_map.iter_mut() {
+                    let listeners_array = match listeners.as_ref() {
+                        PhpMixed::Array(_) | PhpMixed::List(_) => listeners.clone(),
+                        other => Box::new(PhpMixed::List(vec![Box::new(other.clone())])),
                     };
-                    package.set_license(license_vec);
+                    *listeners = listeners_array;
+                    let _ = event;
                 }
-            }
-
-            if let Some(authors) = config.get("authors") {
-                if !shirabe_php_shim::empty(authors) {
-                    if let PhpMixed::List(list) = authors {
-                        let authors_vec: Vec<IndexMap<String, String>> = list
-                            .iter()
-                            .filter_map(|v| match v.as_ref() {
-                                PhpMixed::Array(m) => Some(
-                                    m.iter()
-                                        .map(|(k, v)| {
-                                            (k.clone(), v.as_string().unwrap_or("").to_string())
-                                        })
-                                        .collect(),
-                                ),
-                                _ => None,
-                            })
-                            .collect();
-                        package.set_authors(authors_vec);
+                for reserved in ["composer", "php", "putenv"].iter() {
+                    if scripts_map.contains_key(*reserved) {
+                        trigger_error(
+                            &format!(
+                                "The `{}` script name is reserved for internal use, please avoid defining it",
+                                reserved
+                            ),
+                            E_USER_DEPRECATED,
+                        );
                     }
                 }
+                let scripts: IndexMap<String, Vec<String>> = scripts_map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
+                    .collect();
+                config.insert("scripts".to_string(), PhpMixed::Array(scripts_map));
+                package.complete_mut().set_scripts(scripts);
             }
+        }
 
-            if let Some(support) = config.get("support") {
-                if let PhpMixed::Array(map) = support {
-                    let support_map: IndexMap<String, String> = map
+        if let Some(description) = config.get("description") {
+            if !shirabe_php_shim::empty(description) && is_string(description) {
+                package
+                    .complete_mut()
+                    .set_description(description.as_string().unwrap_or("").to_string());
+            }
+        }
+
+        if let Some(homepage) = config.get("homepage") {
+            if !shirabe_php_shim::empty(homepage) && is_string(homepage) {
+                package
+                    .complete_mut()
+                    .set_homepage(homepage.as_string().unwrap_or("").to_string());
+            }
+        }
+
+        if let Some(keywords) = config.get("keywords") {
+            if !shirabe_php_shim::empty(keywords) {
+                if matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_)) {
+                    let keywords_vec: Vec<String> = match keywords {
+                        PhpMixed::List(list) => list.iter().map(|v| strval(v)).collect(),
+                        PhpMixed::Array(map) => map.values().map(|v| strval(v)).collect(),
+                        _ => vec![],
+                    };
+                    package.complete_mut().set_keywords(keywords_vec);
+                }
+            }
+        }
+
+        if let Some(license) = config.get("license") {
+            if !shirabe_php_shim::empty(license) {
+                let license_vec: Vec<String> = match license {
+                    PhpMixed::Array(map) => map
+                        .values()
+                        .map(|v| v.as_string().unwrap_or("").to_string())
+                        .collect(),
+                    PhpMixed::List(list) => list
                         .iter()
-                        .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                        .map(|v| v.as_string().unwrap_or("").to_string())
+                        .collect(),
+                    other => vec![other.as_string().unwrap_or("").to_string()],
+                };
+                package.complete_mut().set_license(license_vec);
+            }
+        }
+
+        if let Some(authors) = config.get("authors") {
+            if !shirabe_php_shim::empty(authors) {
+                if let PhpMixed::List(list) = authors {
+                    let authors_vec: Vec<IndexMap<String, String>> = list
+                        .iter()
+                        .filter_map(|v| match v.as_ref() {
+                            PhpMixed::Array(m) => Some(
+                                m.iter()
+                                    .map(|(k, v)| {
+                                        (k.clone(), v.as_string().unwrap_or("").to_string())
+                                    })
+                                    .collect(),
+                            ),
+                            _ => None,
+                        })
                         .collect();
-                    package.set_support(support_map);
+                    package.complete_mut().set_authors(authors_vec);
                 }
             }
+        }
 
-            if let Some(funding) = config.get("funding") {
-                if !shirabe_php_shim::empty(funding) {
-                    if let PhpMixed::List(list) = funding {
-                        let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
-                            .iter()
-                            .filter_map(|v| match v.as_ref() {
-                                PhpMixed::Array(m) => Some(
-                                    m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
-                                ),
-                                _ => None,
-                            })
-                            .collect();
-                        package.set_funding(funding_vec);
-                    }
+        if let Some(support) = config.get("support") {
+            if let PhpMixed::Array(map) = support {
+                let support_map: IndexMap<String, String> = map
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                    .collect();
+                package.complete_mut().set_support(support_map);
+            }
+        }
+
+        if let Some(funding) = config.get("funding") {
+            if !shirabe_php_shim::empty(funding) {
+                if let PhpMixed::List(list) = funding {
+                    let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
+                        .iter()
+                        .filter_map(|v| match v.as_ref() {
+                            PhpMixed::Array(m) => {
+                                Some(m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    package.complete_mut().set_funding(funding_vec);
                 }
             }
+        }
 
-            if let Some(abandoned) = config.get("abandoned") {
-                package.set_abandoned(abandoned.clone());
-            }
+        if let Some(abandoned) = config.get("abandoned") {
+            package.complete_mut().set_abandoned(abandoned.clone());
         }
 
         if self.load_options {
             if let Some(transport_options) = config.get("transport-options") {
-                // TODO(phase-b): package.set_transport_options
-                let _ = transport_options;
+                let options = php_to_map(transport_options);
+                package.package_mut().set_transport_options(options);
             }
         }
 
@@ -589,42 +701,33 @@ impl ArrayLoader {
             if !alias_normalized.is_empty() {
                 let pretty_alias = Preg::replace(r"{(\.9{7})+}", ".x", &alias_normalized)?;
 
-                // TODO(phase-b): `$package instanceof RootPackage` downcast from CompletePackage
-                let package_as_root: Option<RootPackage> = None;
-                if let Some(root) = package_as_root {
-                    let _ = RootAliasPackage::new(
+                return Ok(match package {
+                    CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
                         RootPackageHandle::from_root_package(root),
                         alias_normalized,
                         pretty_alias,
-                    );
-                    // TODO(phase-b): return Box<RootAliasPackage> wrapped as Box<BasePackage>
-                    todo!("phase-b: return RootAliasPackage as Box<BasePackage>")
-                }
-
-                let _ = CompleteAliasPackage::new(
-                    CompletePackageHandle::from_complete_package(*package),
-                    alias_normalized,
-                    pretty_alias,
-                );
-                // TODO(phase-b): return Box<CompleteAliasPackage> wrapped as Box<BasePackage>
-                todo!("phase-b: return CompleteAliasPackage as Box<BasePackage>")
+                    )
+                    .into(),
+                    CompleteOrRootPackage::Complete(complete) => CompleteAliasPackageHandle::new(
+                        CompletePackageHandle::from_complete_package(complete),
+                        alias_normalized,
+                        pretty_alias,
+                    )
+                    .into(),
+                });
             }
         }
 
-        // TODO(phase-b): coerce Box<CompletePackage> -> Box<BasePackage>
-        let _ = package;
-        todo!("phase-b: return Box<CompletePackage> as Box<BasePackage>")
+        Ok(package.into_handle())
     }
 
-    /// @param array<string, array<string, array<int|string, array<int|string, array{string, Link}>>>> $linkCache
-    /// @param mixed[]                                                                             $config
     fn configure_cached_links(
         &self,
         link_cache: &mut IndexMap<
             String,
             IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
         >,
-        package: &Box<CompletePackage>,
+        package: &mut CompleteOrRootPackage,
         config: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {
         let name = package.get_name().to_string();
@@ -632,8 +735,6 @@ impl ArrayLoader {
 
         for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
             if let Some(entry) = config.get(*r#type) {
-                let _method = format!("set{}", ucfirst(opts.method));
-
                 let mut links: IndexMap<String, Link> = IndexMap::new();
                 let entries: IndexMap<String, PhpMixed> = match entry {
                     PhpMixed::Array(m) => {
@@ -691,8 +792,7 @@ impl ArrayLoader {
                     }
                 }
 
-                // TODO(phase-b): PHP `$package->{$method}($links)` — dynamic setter dispatch by name
-                let _ = links;
+                apply_link_setter(package.package_mut(), opts.method, links);
             }
         }
 

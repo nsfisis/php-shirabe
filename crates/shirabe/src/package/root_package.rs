@@ -15,7 +15,7 @@ use crate::repository::RepositoryInterfaceHandle;
 
 #[derive(Debug, Clone)]
 pub struct RootPackage {
-    inner: CompletePackage,
+    pub(crate) inner: CompletePackage,
     pub(crate) minimum_stability: String,
     pub(crate) prefer_stable: bool,
     pub(crate) stability_flags: IndexMap<String, i64>,
