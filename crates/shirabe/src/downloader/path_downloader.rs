@@ -62,14 +62,191 @@ impl PathDownloader {
         }
     }
 
-    pub async fn download(
+    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+        let path = Filesystem::trim_trailing_slash(path);
+        let parser = VersionParser::new();
+        let mut guesser = VersionGuesser::new(
+            self.inner.config.clone(),
+            self.inner.process.clone(),
+            parser.clone(),
+            Some(self.inner.io.clone()),
+        );
+        let dumper = ArrayDumper::new();
+
+        let package_config = dumper.dump(package.clone());
+        let package_version = guesser.guess_version(&package_config, &path);
+        if let Ok(Some(version)) = package_version {
+            return version.commit;
+        }
+
+        None
+    }
+
+    pub(crate) fn get_install_operation_appendix(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<String> {
+        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
+            message: format!(
+                "The package {} has no dist url configured, cannot install.",
+                package.get_pretty_name()
+            ),
+            code: 0,
+        })?;
+        let real_url = realpath(&url).ok_or_else(|| RuntimeException {
+            message: format!("Failed to realpath {}", url),
+            code: 0,
+        })?;
+
+        if realpath(path).as_deref() == Some(&real_url) {
+            return Ok(": Source already present".to_string());
+        }
+
+        let (current_strategy, _) =
+            self.compute_allowed_strategies(&package.get_transport_options())?;
+
+        if current_strategy == Self::STRATEGY_SYMLINK {
+            if Platform::is_windows() {
+                return Ok(format!(
+                    ": Junctioning from {}",
+                    package.get_dist_url().unwrap_or_default()
+                ));
+            }
+
+            return Ok(format!(
+                ": Symlinking from {}",
+                package.get_dist_url().unwrap_or_default()
+            ));
+        }
+
+        Ok(format!(
+            ": Mirroring from {}",
+            package.get_dist_url().unwrap_or_default()
+        ))
+    }
+
+    fn compute_allowed_strategies(
+        &self,
+        transport_options: &IndexMap<String, PhpMixed>,
+    ) -> Result<(i64, Vec<i64>)> {
+        // When symlink transport option is null, both symlink and mirror are allowed
+        let mut current_strategy = Self::STRATEGY_SYMLINK;
+        let mut allowed_strategies = vec![Self::STRATEGY_SYMLINK, Self::STRATEGY_MIRROR];
+
+        let mirror_path_repos = Platform::get_env("COMPOSER_MIRROR_PATH_REPOS");
+        if mirror_path_repos.map_or(false, |v| !v.is_empty()) {
+            current_strategy = Self::STRATEGY_MIRROR;
+        }
+
+        let symlink_option = transport_options.get("symlink");
+
+        match symlink_option {
+            Some(PhpMixed::Bool(true)) => {
+                current_strategy = Self::STRATEGY_SYMLINK;
+                allowed_strategies = vec![Self::STRATEGY_SYMLINK];
+            }
+            Some(PhpMixed::Bool(false)) => {
+                current_strategy = Self::STRATEGY_MIRROR;
+                allowed_strategies = vec![Self::STRATEGY_MIRROR];
+            }
+            _ => {}
+        }
+
+        // Check we can use junctions safely if we are on Windows
+        if Platform::is_windows()
+            && Self::STRATEGY_SYMLINK == current_strategy
+            && !self.safe_junctions()
+        {
+            if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
+                return Err(RuntimeException {
+                    message: "You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+            current_strategy = Self::STRATEGY_MIRROR;
+            allowed_strategies = vec![Self::STRATEGY_MIRROR];
+        }
+
+        // Check we can use symlink() otherwise
+        if !Platform::is_windows()
+            && Self::STRATEGY_SYMLINK == current_strategy
+            && !function_exists("symlink")
+        {
+            if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
+                return Err(RuntimeException {
+                    message: "Your PHP has the symlink() function disabled which does not allow Composer to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+            current_strategy = Self::STRATEGY_MIRROR;
+            allowed_strategies = vec![Self::STRATEGY_MIRROR];
+        }
+
+        Ok((current_strategy, allowed_strategies))
+    }
+
+    // Returns true if junctions can be created and safely used on Windows.
+    //
+    // A PHP bug makes junction detection fragile, leading to possible data loss when removing a
+    // package. See https://bugs.php.net/bug.php?id=77552
+    //
+    // For safety we require a minimum version of Windows 7, so we can call the system rmdir which
+    // will preserve target content if given a junction.
+    //
+    // The PHP bug was fixed in 7.2.16 and 7.3.3 (requires at least Windows 7).
+    fn safe_junctions(&self) -> bool {
+        // We need to call mklink, and rmdir on Windows 7 (version 6.1)
+        function_exists("proc_open")
+            && (PHP_WINDOWS_VERSION_MAJOR > 6
+                || (PHP_WINDOWS_VERSION_MAJOR == 6 && PHP_WINDOWS_VERSION_MINOR >= 1))
+    }
+}
+
+impl VcsCapableDownloaderInterface for PathDownloader {
+    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
+        PathDownloader::get_vcs_reference(self, package, &path)
+    }
+}
+
+impl crate::downloader::ChangeReportInterface for PathDownloader {
+    fn get_local_changes(
         &mut self,
         package: PackageInterfaceHandle,
-        path: String,
-        _prev_package: Option<PackageInterfaceHandle>,
-        _output: bool,
+        path: &str,
+    ) -> anyhow::Result<Option<String>> {
+        self.inner.get_local_changes(package, path)
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl DownloaderInterface for PathDownloader {
+    fn get_installation_source(&self) -> String {
+        self.inner.get_installation_source()
+    }
+
+    fn as_change_report_interface(
+        &mut self,
+    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
+        Some(self)
+    }
+
+    fn as_vcs_capable_downloader_interface(
+        &self,
+    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
+        Some(self)
+    }
+
+    async fn download(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+        output: bool,
     ) -> Result<Option<PhpMixed>> {
-        let path = Filesystem::trim_trailing_slash(&path);
+        let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
                 "The package {} has no dist url configured, cannot download.",
@@ -124,13 +301,25 @@ impl PathDownloader {
         Ok(None)
     }
 
-    pub async fn install(
+    async fn prepare(
+        &mut self,
+        r#type: &str,
+        package: PackageInterfaceHandle,
+        path: &str,
+        prev_package: Option<PackageInterfaceHandle>,
+    ) -> Result<Option<PhpMixed>> {
+        self.inner
+            .prepare(r#type, package, path, prev_package)
+            .await
+    }
+
+    async fn install(
         &mut self,
         package: PackageInterfaceHandle,
-        path: String,
+        path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        let path = Filesystem::trim_trailing_slash(&path);
+        let path = Filesystem::trim_trailing_slash(path);
         let url = package.get_dist_url().ok_or_else(|| RuntimeException {
             message: format!(
                 "The package {} has no dist url configured, cannot install.",
@@ -295,13 +484,22 @@ impl PathDownloader {
         Ok(None)
     }
 
-    pub async fn remove(
+    async fn update(
+        &mut self,
+        initial: PackageInterfaceHandle,
+        target: PackageInterfaceHandle,
+        path: &str,
+    ) -> Result<Option<PhpMixed>> {
+        self.inner.update(initial, target, path).await
+    }
+
+    async fn remove(
         &mut self,
         package: PackageInterfaceHandle,
-        path: String,
+        path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        let path = Filesystem::trim_trailing_slash(&path);
+        let path = Filesystem::trim_trailing_slash(path);
         // realpath() may resolve Windows junctions to the source path, so we'll check for a junction
         // first to prevent a false positive when checking if the dist and install paths are the same.
         // See https://bugs.php.net/bug.php?id=77639
@@ -384,238 +582,6 @@ impl PathDownloader {
         }
 
         self.inner.remove(package, &path, output).await
-    }
-
-    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
-        let path = Filesystem::trim_trailing_slash(path);
-        let parser = VersionParser::new();
-        let mut guesser = VersionGuesser::new(
-            self.inner.config.clone(),
-            self.inner.process.clone(),
-            parser.clone(),
-            Some(self.inner.io.clone()),
-        );
-        let dumper = ArrayDumper::new();
-
-        let package_config = dumper.dump(package.clone());
-        let package_version = guesser.guess_version(&package_config, &path);
-        if let Ok(Some(version)) = package_version {
-            return version.commit;
-        }
-
-        None
-    }
-
-    pub(crate) fn get_install_operation_appendix(
-        &self,
-        package: PackageInterfaceHandle,
-        path: &str,
-    ) -> Result<String> {
-        let url = package.get_dist_url().ok_or_else(|| RuntimeException {
-            message: format!(
-                "The package {} has no dist url configured, cannot install.",
-                package.get_pretty_name()
-            ),
-            code: 0,
-        })?;
-        let real_url = realpath(&url).ok_or_else(|| RuntimeException {
-            message: format!("Failed to realpath {}", url),
-            code: 0,
-        })?;
-
-        if realpath(path).as_deref() == Some(&real_url) {
-            return Ok(": Source already present".to_string());
-        }
-
-        let (current_strategy, _) =
-            self.compute_allowed_strategies(&package.get_transport_options())?;
-
-        if current_strategy == Self::STRATEGY_SYMLINK {
-            if Platform::is_windows() {
-                return Ok(format!(
-                    ": Junctioning from {}",
-                    package.get_dist_url().unwrap_or_default()
-                ));
-            }
-
-            return Ok(format!(
-                ": Symlinking from {}",
-                package.get_dist_url().unwrap_or_default()
-            ));
-        }
-
-        Ok(format!(
-            ": Mirroring from {}",
-            package.get_dist_url().unwrap_or_default()
-        ))
-    }
-
-    fn compute_allowed_strategies(
-        &self,
-        transport_options: &IndexMap<String, PhpMixed>,
-    ) -> Result<(i64, Vec<i64>)> {
-        // When symlink transport option is null, both symlink and mirror are allowed
-        let mut current_strategy = Self::STRATEGY_SYMLINK;
-        let mut allowed_strategies = vec![Self::STRATEGY_SYMLINK, Self::STRATEGY_MIRROR];
-
-        let mirror_path_repos = Platform::get_env("COMPOSER_MIRROR_PATH_REPOS");
-        if mirror_path_repos.map_or(false, |v| !v.is_empty()) {
-            current_strategy = Self::STRATEGY_MIRROR;
-        }
-
-        let symlink_option = transport_options.get("symlink");
-
-        match symlink_option {
-            Some(PhpMixed::Bool(true)) => {
-                current_strategy = Self::STRATEGY_SYMLINK;
-                allowed_strategies = vec![Self::STRATEGY_SYMLINK];
-            }
-            Some(PhpMixed::Bool(false)) => {
-                current_strategy = Self::STRATEGY_MIRROR;
-                allowed_strategies = vec![Self::STRATEGY_MIRROR];
-            }
-            _ => {}
-        }
-
-        // Check we can use junctions safely if we are on Windows
-        if Platform::is_windows()
-            && Self::STRATEGY_SYMLINK == current_strategy
-            && !self.safe_junctions()
-        {
-            if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException {
-                    message: "You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-            current_strategy = Self::STRATEGY_MIRROR;
-            allowed_strategies = vec![Self::STRATEGY_MIRROR];
-        }
-
-        // Check we can use symlink() otherwise
-        if !Platform::is_windows()
-            && Self::STRATEGY_SYMLINK == current_strategy
-            && !function_exists("symlink")
-        {
-            if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException {
-                    message: "Your PHP has the symlink() function disabled which does not allow Composer to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string(),
-                    code: 0,
-                }
-                .into());
-            }
-            current_strategy = Self::STRATEGY_MIRROR;
-            allowed_strategies = vec![Self::STRATEGY_MIRROR];
-        }
-
-        Ok((current_strategy, allowed_strategies))
-    }
-
-    // Returns true if junctions can be created and safely used on Windows.
-    //
-    // A PHP bug makes junction detection fragile, leading to possible data loss when removing a
-    // package. See https://bugs.php.net/bug.php?id=77552
-    //
-    // For safety we require a minimum version of Windows 7, so we can call the system rmdir which
-    // will preserve target content if given a junction.
-    //
-    // The PHP bug was fixed in 7.2.16 and 7.3.3 (requires at least Windows 7).
-    fn safe_junctions(&self) -> bool {
-        // We need to call mklink, and rmdir on Windows 7 (version 6.1)
-        function_exists("proc_open")
-            && (PHP_WINDOWS_VERSION_MAJOR > 6
-                || (PHP_WINDOWS_VERSION_MAJOR == 6 && PHP_WINDOWS_VERSION_MINOR >= 1))
-    }
-}
-
-impl VcsCapableDownloaderInterface for PathDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        PathDownloader::get_vcs_reference(self, package, &path)
-    }
-}
-
-impl crate::downloader::ChangeReportInterface for PathDownloader {
-    fn get_local_changes(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
-        self.inner.get_local_changes(package, path)
-    }
-}
-
-// TODO(phase-b): wire up PathDownloader trait properly. PathDownloader extends FileDownloader and
-// overrides download/install/remove with &mut self signatures that diverge from the trait. The
-// trait methods here delegate to the inner FileDownloader; the bespoke overrides on the struct
-// itself are not yet routed through the trait.
-#[async_trait::async_trait(?Send)]
-impl DownloaderInterface for PathDownloader {
-    fn get_installation_source(&self) -> String {
-        self.inner.get_installation_source()
-    }
-
-    fn as_change_report_interface(
-        &mut self,
-    ) -> Option<&mut dyn crate::downloader::ChangeReportInterface> {
-        Some(self)
-    }
-
-    fn as_vcs_capable_downloader_interface(
-        &self,
-    ) -> Option<&dyn crate::downloader::VcsCapableDownloaderInterface> {
-        Some(self)
-    }
-
-    async fn download(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        prev_package: Option<PackageInterfaceHandle>,
-        output: bool,
-    ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .download(package, path, prev_package, output)
-            .await
-    }
-
-    async fn prepare(
-        &mut self,
-        r#type: &str,
-        package: PackageInterfaceHandle,
-        path: &str,
-        prev_package: Option<PackageInterfaceHandle>,
-    ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .prepare(r#type, package, path, prev_package)
-            .await
-    }
-
-    async fn install(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        output: bool,
-    ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output).await
-    }
-
-    async fn update(
-        &mut self,
-        initial: PackageInterfaceHandle,
-        target: PackageInterfaceHandle,
-        path: &str,
-    ) -> Result<Option<PhpMixed>> {
-        self.inner.update(initial, target, path).await
-    }
-
-    async fn remove(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        output: bool,
-    ) -> Result<Option<PhpMixed>> {
-        self.inner.remove(package, path, output).await
     }
 
     async fn cleanup(

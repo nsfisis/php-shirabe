@@ -24,7 +24,7 @@ pub trait ArchiveDownloader {
     fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool>;
 
     async fn extract(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         file: &str,
         path: &str,

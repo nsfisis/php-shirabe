@@ -48,8 +48,26 @@ impl RarDownloader {
             cleanup_executed: IndexMap::new(),
         }
     }
+}
 
-    pub(crate) async fn extract(
+impl ArchiveDownloader for RarDownloader {
+    fn inner(&self) -> &FileDownloader {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut FileDownloader {
+        &mut self.inner
+    }
+
+    fn cleanup_executed(&self) -> &IndexMap<String, bool> {
+        &self.cleanup_executed
+    }
+
+    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.cleanup_executed
+    }
+
+    async fn extract(
         &mut self,
         _package: PackageInterfaceHandle,
         file: &str,
@@ -185,9 +203,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .prepare(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
@@ -196,7 +212,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output).await
+        <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
     async fn update(
@@ -224,8 +240,6 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .cleanup(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

@@ -50,7 +50,39 @@ impl GzipDownloader {
         }
     }
 
-    pub(crate) async fn extract(
+    fn extract_using_ext(&self, file: &str, target_filepath: &str) {
+        let archive_file = gzopen(file, "rb");
+        let target_file = fopen(target_filepath, "wb");
+        loop {
+            let string = gzread(archive_file.clone(), 4096);
+            if string.is_empty() {
+                break;
+            }
+            fwrite(target_file.clone(), &string, Platform::strlen(&string));
+        }
+        gzclose(archive_file);
+        fclose(target_file);
+    }
+}
+
+impl ArchiveDownloader for GzipDownloader {
+    fn inner(&self) -> &FileDownloader {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut FileDownloader {
+        &mut self.inner
+    }
+
+    fn cleanup_executed(&self) -> &IndexMap<String, bool> {
+        &self.cleanup_executed
+    }
+
+    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.cleanup_executed
+    }
+
+    async fn extract(
         &mut self,
         package: PackageInterfaceHandle,
         file: &str,
@@ -114,20 +146,6 @@ impl GzipDownloader {
 
         Ok(None)
     }
-
-    fn extract_using_ext(&self, file: &str, target_filepath: &str) {
-        let archive_file = gzopen(file, "rb");
-        let target_file = fopen(target_filepath, "wb");
-        loop {
-            let string = gzread(archive_file.clone(), 4096);
-            if string.is_empty() {
-                break;
-            }
-            fwrite(target_file.clone(), &string, Platform::strlen(&string));
-        }
-        gzclose(archive_file);
-        fclose(target_file);
-    }
 }
 
 impl ChangeReportInterface for GzipDownloader {
@@ -171,9 +189,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .prepare(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
@@ -182,7 +198,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output).await
+        <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
     async fn update(
@@ -210,8 +226,6 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .cleanup(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }

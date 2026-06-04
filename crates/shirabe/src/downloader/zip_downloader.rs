@@ -61,146 +61,6 @@ impl ZipDownloader {
         }
     }
 
-    pub async fn download(
-        &mut self,
-        package: PackageInterfaceHandle,
-        path: &str,
-        prev_package: Option<PackageInterfaceHandle>,
-        output: bool,
-    ) -> Result<Option<PhpMixed>> {
-        {
-            let mut unzip_commands = UNZIP_COMMANDS.lock().unwrap();
-            if unzip_commands.is_none() {
-                *unzip_commands = Some(vec![]);
-                let finder = ExecutableFinder::new();
-                let commands = unzip_commands.as_mut().unwrap();
-                if Platform::is_windows() {
-                    if let Some(cmd) =
-                        finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
-                    {
-                        commands.push(vec![
-                            "7z".to_string(),
-                            cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
-                        ]);
-                    }
-                }
-                if let Some(cmd) = finder.find("unzip", None, &[]) {
-                    commands.push(vec![
-                        "unzip".to_string(),
-                        cmd,
-                        "-qq".to_string(),
-                        "%file%".to_string(),
-                        "-d".to_string(),
-                        "%path%".to_string(),
-                    ]);
-                }
-                if !Platform::is_windows() {
-                    if let Some(cmd) = finder.find("7z", None, &[]) {
-                        // 7z linux/macOS support is only used if unzip is not present
-                        commands.push(vec![
-                            "7z".to_string(),
-                            cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
-                        ]);
-                    } else if let Some(cmd) = finder.find("7zz", None, &[]) {
-                        // 7zz linux/macOS support is only used if unzip is not present
-                        commands.push(vec![
-                            "7zz".to_string(),
-                            cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
-                        ]);
-                    } else if let Some(cmd) = finder.find("7za", None, &[]) {
-                        // 7za linux/macOS support is only used if unzip is not present
-                        commands.push(vec![
-                            "7za".to_string(),
-                            cmd,
-                            "x".to_string(),
-                            "-bb0".to_string(),
-                            "-y".to_string(),
-                            "%file%".to_string(),
-                            "-o%path%".to_string(),
-                        ]);
-                    }
-                }
-            }
-        }
-
-        let proc_open_missing = !function_exists("proc_open");
-        if proc_open_missing {
-            *UNZIP_COMMANDS.lock().unwrap() = Some(vec![]);
-        }
-
-        {
-            let mut has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap();
-            if has_zip_archive.is_none() {
-                *has_zip_archive = Some(class_exists("ZipArchive"));
-            }
-        }
-
-        let has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
-        let unzip_commands_empty = UNZIP_COMMANDS
-            .lock()
-            .unwrap()
-            .as_ref()
-            .map_or(true, |v| v.is_empty());
-
-        if !has_zip_archive && unzip_commands_empty {
-            let ini_message = IniHelper::get_message();
-            let error = if proc_open_missing {
-                format!(
-                    "The zip extension is missing and unzip/7z commands cannot be called as proc_open is disabled, skipping.\n{}",
-                    ini_message
-                )
-            } else {
-                format!(
-                    "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
-                    ini_message
-                )
-            };
-            return Err(RuntimeException {
-                message: error,
-                code: 0,
-            }
-            .into());
-        }
-
-        {
-            let mut is_windows_guard = IS_WINDOWS.lock().unwrap();
-            if is_windows_guard.is_none() {
-                *is_windows_guard = Some(Platform::is_windows());
-
-                if !is_windows_guard.unwrap() && unzip_commands_empty {
-                    if proc_open_missing {
-                        self.inner.io.write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
-                    } else {
-                        self.inner.io.write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
-                    }
-                }
-            }
-        }
-
-        self.inner
-            .download(package, path, prev_package, output)
-            .await
-    }
-
     async fn extract_with_system_unzip(
         &mut self,
         package: PackageInterfaceHandle,
@@ -522,15 +382,6 @@ impl ZipDownloader {
         })
     }
 
-    pub(crate) async fn extract(
-        &mut self,
-        package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
-    ) -> Result<Option<PhpMixed>> {
-        self.extract_with_system_unzip(package, file, path).await
-    }
-
     pub fn get_error_message(&self, retval: i64, file: &str) -> String {
         match retval {
             ZipArchive::ER_EXISTS => format!("File '{}' already exists.", file),
@@ -554,6 +405,33 @@ impl ZipDownloader {
     }
 }
 
+impl ArchiveDownloader for ZipDownloader {
+    fn inner(&self) -> &FileDownloader {
+        &self.inner
+    }
+
+    fn inner_mut(&mut self) -> &mut FileDownloader {
+        &mut self.inner
+    }
+
+    fn cleanup_executed(&self) -> &IndexMap<String, bool> {
+        &self.cleanup_executed
+    }
+
+    fn cleanup_executed_mut(&mut self) -> &mut IndexMap<String, bool> {
+        &mut self.cleanup_executed
+    }
+
+    async fn extract(
+        &mut self,
+        package: PackageInterfaceHandle,
+        file: &str,
+        path: &str,
+    ) -> Result<Option<PhpMixed>> {
+        self.extract_with_system_unzip(package, file, path).await
+    }
+}
+
 impl ChangeReportInterface for ZipDownloader {
     fn get_local_changes(
         &mut self,
@@ -564,9 +442,6 @@ impl ChangeReportInterface for ZipDownloader {
     }
 }
 
-// TODO(phase-b): ZipDownloader::download is overridden with extra setup (UNZIP_COMMANDS init,
-// etc.). The trait method here delegates straight to the inner FileDownloader; the bespoke
-// override on the struct itself takes &mut self and is not yet routed through the trait.
 #[async_trait::async_trait(?Send)]
 impl crate::downloader::DownloaderInterface for ZipDownloader {
     fn get_installation_source(&self) -> String {
@@ -586,6 +461,134 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
+        {
+            let mut unzip_commands = UNZIP_COMMANDS.lock().unwrap();
+            if unzip_commands.is_none() {
+                *unzip_commands = Some(vec![]);
+                let finder = ExecutableFinder::new();
+                let commands = unzip_commands.as_mut().unwrap();
+                if Platform::is_windows() {
+                    if let Some(cmd) =
+                        finder.find("7z", None, &[r"C:\Program Files\7-Zip".to_string()])
+                    {
+                        commands.push(vec![
+                            "7z".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
+                    }
+                }
+                if let Some(cmd) = finder.find("unzip", None, &[]) {
+                    commands.push(vec![
+                        "unzip".to_string(),
+                        cmd,
+                        "-qq".to_string(),
+                        "%file%".to_string(),
+                        "-d".to_string(),
+                        "%path%".to_string(),
+                    ]);
+                }
+                if !Platform::is_windows() {
+                    if let Some(cmd) = finder.find("7z", None, &[]) {
+                        // 7z linux/macOS support is only used if unzip is not present
+                        commands.push(vec![
+                            "7z".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
+                    } else if let Some(cmd) = finder.find("7zz", None, &[]) {
+                        // 7zz linux/macOS support is only used if unzip is not present
+                        commands.push(vec![
+                            "7zz".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
+                    } else if let Some(cmd) = finder.find("7za", None, &[]) {
+                        // 7za linux/macOS support is only used if unzip is not present
+                        commands.push(vec![
+                            "7za".to_string(),
+                            cmd,
+                            "x".to_string(),
+                            "-bb0".to_string(),
+                            "-y".to_string(),
+                            "%file%".to_string(),
+                            "-o%path%".to_string(),
+                        ]);
+                    }
+                }
+            }
+        }
+
+        let proc_open_missing = !function_exists("proc_open");
+        if proc_open_missing {
+            *UNZIP_COMMANDS.lock().unwrap() = Some(vec![]);
+        }
+
+        {
+            let mut has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap();
+            if has_zip_archive.is_none() {
+                *has_zip_archive = Some(class_exists("ZipArchive"));
+            }
+        }
+
+        let has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap().unwrap_or(false);
+        let unzip_commands_empty = UNZIP_COMMANDS
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map_or(true, |v| v.is_empty());
+
+        if !has_zip_archive && unzip_commands_empty {
+            let ini_message = IniHelper::get_message();
+            let error = if proc_open_missing {
+                format!(
+                    "The zip extension is missing and unzip/7z commands cannot be called as proc_open is disabled, skipping.\n{}",
+                    ini_message
+                )
+            } else {
+                format!(
+                    "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
+                    ini_message
+                )
+            };
+            return Err(RuntimeException {
+                message: error,
+                code: 0,
+            }
+            .into());
+        }
+
+        {
+            let mut is_windows_guard = IS_WINDOWS.lock().unwrap();
+            if is_windows_guard.is_none() {
+                *is_windows_guard = Some(Platform::is_windows());
+
+                if !is_windows_guard.unwrap() && unzip_commands_empty {
+                    if proc_open_missing {
+                        self.inner.io.write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                    } else {
+                        self.inner.io.write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
+                        self.inner.io.write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                        self.inner.io.write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
+                    }
+                }
+            }
+        }
+
         self.inner
             .download(package, path, prev_package, output)
             .await
@@ -598,9 +601,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .prepare(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
     }
 
     async fn install(
@@ -609,7 +610,7 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         output: bool,
     ) -> Result<Option<PhpMixed>> {
-        self.inner.install(package, path, output).await
+        <Self as ArchiveDownloader>::install(self, package, path, output).await
     }
 
     async fn update(
@@ -637,8 +638,6 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.inner
-            .cleanup(r#type, package, path, prev_package)
-            .await
+        <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await
     }
 }
