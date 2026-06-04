@@ -169,8 +169,8 @@ impl EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<Box<dyn OperationInterface>>,
-        operation: Box<dyn OperationInterface>,
+        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        operation: std::rc::Rc<dyn OperationInterface>,
     ) -> anyhow::Result<i64> {
         let composer = self.composer();
         assert!(

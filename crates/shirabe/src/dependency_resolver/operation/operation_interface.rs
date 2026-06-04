@@ -13,10 +13,6 @@ pub trait OperationInterface: std::fmt::Debug {
 
     fn to_string(&self) -> String;
 
-    fn clone_box(&self) -> Box<dyn OperationInterface> {
-        todo!()
-    }
-
     fn as_install_operation(&self) -> Option<&InstallOperation> {
         None
     }

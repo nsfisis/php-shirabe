@@ -14,8 +14,8 @@ pub struct PackageEvent {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
     local_repo: Box<dyn RepositoryInterface>,
-    operations: Vec<Box<dyn OperationInterface>>,
-    operation: Box<dyn OperationInterface>,
+    operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+    operation: std::rc::Rc<dyn OperationInterface>,
 }
 
 impl PackageEvent {
@@ -25,8 +25,8 @@ impl PackageEvent {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         local_repo: Box<dyn RepositoryInterface>,
-        operations: Vec<Box<dyn OperationInterface>>,
-        operation: Box<dyn OperationInterface>,
+        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+        operation: std::rc::Rc<dyn OperationInterface>,
     ) -> Self {
         Self {
             inner: Event::new(event_name, vec![], IndexMap::new()),
@@ -59,7 +59,7 @@ impl PackageEvent {
         self.local_repo.as_ref()
     }
 
-    pub fn get_operations(&self) -> &Vec<Box<dyn OperationInterface>> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
         &self.operations
     }
 

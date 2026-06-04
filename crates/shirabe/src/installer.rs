@@ -724,15 +724,15 @@ impl Installer {
         let platform_dev_reqs =
             self.extract_platform_requirements(&self.package.get_dev_requires());
 
-        let mut installs_updates: Vec<Box<dyn OperationInterface>> = vec![];
-        let mut uninstalls: Vec<Box<dyn OperationInterface>> = vec![];
+        let mut installs_updates: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut uninstalls: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         if !lock_transaction.get_operations().is_empty() {
             let mut install_names: Vec<String> = vec![];
             let mut update_names: Vec<String> = vec![];
             let mut uninstall_names: Vec<String> = vec![];
             for operation in lock_transaction.get_operations() {
                 if let Some(io) = operation.as_install_operation() {
-                    installs_updates.push(operation.clone_box());
+                    installs_updates.push(operation.clone());
                     install_names.push(format!(
                         "{}:{}",
                         io.get_package().get_pretty_name(),
@@ -752,7 +752,7 @@ impl Installer {
                         continue;
                     }
 
-                    installs_updates.push(operation.clone_box());
+                    installs_updates.push(operation.clone());
                     update_names.push(format!(
                         "{}:{}",
                         uo.get_target_package().get_pretty_name(),
@@ -762,7 +762,7 @@ impl Installer {
                         )
                     ));
                 } else if let Some(uo) = operation.as_uninstall_operation() {
-                    uninstalls.push(operation.clone_box());
+                    uninstalls.push(operation.clone());
                     uninstall_names.push(uo.get_package().get_pretty_name().to_string());
                 }
             }
@@ -809,24 +809,25 @@ impl Installer {
             }
         }
 
-        let sort_by_name =
-            |a: &Box<dyn OperationInterface>, b: &Box<dyn OperationInterface>| -> i64 {
-                let a_name: String = if let Some(uo) = a.as_update_operation() {
-                    uo.get_target_package().get_name().to_string()
-                } else {
-                    a.get_package().get_name().to_string()
-                };
-                let b_name: String = if let Some(uo) = b.as_update_operation() {
-                    uo.get_target_package().get_name().to_string()
-                } else {
-                    b.get_package().get_name().to_string()
-                };
-                strcmp(&a_name, &b_name)
+        let sort_by_name = |a: &std::rc::Rc<dyn OperationInterface>,
+                            b: &std::rc::Rc<dyn OperationInterface>|
+         -> i64 {
+            let a_name: String = if let Some(uo) = a.as_update_operation() {
+                uo.get_target_package().get_name().to_string()
+            } else {
+                a.get_package().get_name().to_string()
             };
+            let b_name: String = if let Some(uo) = b.as_update_operation() {
+                uo.get_target_package().get_name().to_string()
+            } else {
+                b.get_package().get_name().to_string()
+            };
+            strcmp(&a_name, &b_name)
+        };
         usort(&mut uninstalls, &sort_by_name);
         usort(&mut installs_updates, &sort_by_name);
 
-        let mut merged: Vec<Box<dyn OperationInterface>> = uninstalls;
+        let mut merged: Vec<std::rc::Rc<dyn OperationInterface>> = uninstalls;
         merged.extend(installs_updates);
         for operation in &merged {
             // collect suggestions

@@ -169,7 +169,7 @@ impl InstallationManager {
     pub fn execute(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: Vec<Box<dyn OperationInterface>>,
+        operations: Vec<std::rc::Rc<dyn OperationInterface>>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
@@ -200,8 +200,8 @@ impl InstallationManager {
         let result: Result<()> = (|| -> Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
-            let mut batches: Vec<IndexMap<i64, Box<dyn OperationInterface>>> = vec![];
-            let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
+            let mut batches: Vec<IndexMap<i64, std::rc::Rc<dyn OperationInterface>>> = vec![];
+            let mut batch: IndexMap<i64, std::rc::Rc<dyn OperationInterface>> = IndexMap::new();
             for (index, operation) in operations.into_iter().enumerate() {
                 let index = index as i64;
                 let package: Option<PackageInterfaceHandle> =
@@ -287,7 +287,7 @@ impl InstallationManager {
     async fn download_and_execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: IndexMap<i64, Box<dyn OperationInterface>>,
+        operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
         cleanup_promises: &mut IndexMap<
             i64,
             Box<
@@ -298,7 +298,7 @@ impl InstallationManager {
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
-        all_operations: Vec<Box<dyn OperationInterface>>,
+        all_operations: Vec<std::rc::Rc<dyn OperationInterface>>,
     ) -> Result<()> {
         for (index, operation) in &operations {
             let op_type = operation.get_operation_type();
@@ -359,8 +359,8 @@ impl InstallationManager {
 
         // execute operations in batches to make sure every plugin is installed in the
         // right order and activated before the packages depending on it are installed
-        let mut batches: Vec<IndexMap<i64, Box<dyn OperationInterface>>> = vec![];
-        let mut batch: IndexMap<i64, Box<dyn OperationInterface>> = IndexMap::new();
+        let mut batches: Vec<IndexMap<i64, std::rc::Rc<dyn OperationInterface>>> = vec![];
+        let mut batch: IndexMap<i64, std::rc::Rc<dyn OperationInterface>> = IndexMap::new();
         for (index, operation) in operations {
             let package: Option<PackageInterfaceHandle> =
                 if let Some(update) = operation.as_update_operation() {
@@ -411,7 +411,7 @@ impl InstallationManager {
     async fn execute_batch(
         &mut self,
         repo: &mut dyn InstalledRepositoryInterface,
-        operations: IndexMap<i64, Box<dyn OperationInterface>>,
+        operations: IndexMap<i64, std::rc::Rc<dyn OperationInterface>>,
         cleanup_promises: &IndexMap<
             i64,
             Box<
@@ -421,7 +421,7 @@ impl InstallationManager {
         >,
         dev_mode: bool,
         run_scripts: bool,
-        all_operations: &[Box<dyn OperationInterface>],
+        all_operations: &[std::rc::Rc<dyn OperationInterface>],
     ) -> Result<()> {
         let mut post_exec_callbacks: Vec<Box<dyn Fn()>> = vec![];
 

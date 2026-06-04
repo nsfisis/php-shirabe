@@ -19,7 +19,7 @@ use crate::repository::PlatformRepository;
 #[derive(Debug)]
 pub struct Transaction {
     /// @var OperationInterface[]
-    pub(crate) operations: Vec<Box<dyn OperationInterface>>,
+    pub(crate) operations: Vec<std::rc::Rc<dyn OperationInterface>>,
 
     /// Packages present at the beginning of the transaction
     /// @var PackageInterface[]
@@ -63,7 +63,7 @@ impl Transaction {
     }
 
     /// @return OperationInterface[]
-    pub fn get_operations(&self) -> &Vec<Box<dyn OperationInterface>> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
         &self.operations
     }
 
@@ -114,8 +114,8 @@ impl Transaction {
     }
 
     /// @return OperationInterface[]
-    pub(crate) fn calculate_operations(&mut self) -> Vec<Box<dyn OperationInterface>> {
-        let mut operations: Vec<Box<dyn OperationInterface>> = vec![];
+    pub(crate) fn calculate_operations(&mut self) -> Vec<std::rc::Rc<dyn OperationInterface>> {
+        let mut operations: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
 
         let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut remove_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
@@ -170,7 +170,7 @@ impl Transaction {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
                         // TODO(phase-b): MarkAliasInstalledOperation::new expects AliasPackage by value
-                        operations.push(Box::new(MarkAliasInstalledOperation::new(todo!(
+                        operations.push(std::rc::Rc::new(MarkAliasInstalledOperation::new(todo!(
                             "package as AliasPackage by value"
                         ))));
                     }
@@ -196,14 +196,14 @@ impl Transaction {
                         || package.get_source_reference() != present.get_source_reference()
                         || abandoned_or_replacement_changed
                     {
-                        operations.push(Box::new(UpdateOperation::new(
+                        operations.push(std::rc::Rc::new(UpdateOperation::new(
                             source.clone(),
                             package.clone(),
                         )));
                     }
                     remove_map.shift_remove(&package.get_name());
                 } else {
-                    operations.push(Box::new(InstallOperation::new(package.clone())));
+                    operations.push(std::rc::Rc::new(InstallOperation::new(package.clone())));
                     remove_map.shift_remove(&package.get_name());
                 }
             }
@@ -213,12 +213,13 @@ impl Transaction {
             // PHP: array_unshift($operations, new Operation\UninstallOperation($package));
             array_unshift(
                 &mut operations,
-                Box::new(UninstallOperation::new(package)) as Box<dyn OperationInterface>,
+                std::rc::Rc::new(UninstallOperation::new(package))
+                    as std::rc::Rc<dyn OperationInterface>,
             );
         }
         for (_name_version, _package) in remove_alias_map {
             // TODO(phase-b): MarkAliasUninstalledOperation::new expects AliasPackage by value
-            operations.push(Box::new(MarkAliasUninstalledOperation::new(todo!(
+            operations.push(std::rc::Rc::new(MarkAliasUninstalledOperation::new(todo!(
                 "package as AliasPackage by value"
             ))));
         }
@@ -292,13 +293,13 @@ impl Transaction {
     /// @return OperationInterface[] reordered operation list
     fn move_plugins_to_front(
         &self,
-        mut operations: Vec<Box<dyn OperationInterface>>,
-    ) -> Vec<Box<dyn OperationInterface>> {
-        let mut dl_modifying_plugins_no_deps: Vec<Box<dyn OperationInterface>> = vec![];
-        let mut dl_modifying_plugins_with_deps: Vec<Box<dyn OperationInterface>> = vec![];
+        mut operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+    ) -> Vec<std::rc::Rc<dyn OperationInterface>> {
+        let mut dl_modifying_plugins_no_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut dl_modifying_plugins_with_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         let mut dl_modifying_plugin_requires: Vec<String> = vec![];
-        let mut plugins_no_deps: Vec<Box<dyn OperationInterface>> = vec![];
-        let mut plugins_with_deps: Vec<Box<dyn OperationInterface>> = vec![];
+        let mut plugins_no_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
+        let mut plugins_with_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         let mut plugin_requires: Vec<String> = vec![];
 
         // PHP: foreach (array_reverse($operations, true) as $idx => $op)
@@ -392,7 +393,7 @@ impl Transaction {
         }
 
         // PHP: array_merge($dlModifyingPluginsNoDeps, $dlModifyingPluginsWithDeps, $pluginsNoDeps, $pluginsWithDeps, $operations)
-        let mut result: Vec<Box<dyn OperationInterface>> = vec![];
+        let mut result: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         result.extend(dl_modifying_plugins_no_deps);
         result.extend(dl_modifying_plugins_with_deps);
         result.extend(plugins_no_deps);
@@ -408,9 +409,9 @@ impl Transaction {
     /// @return OperationInterface[] reordered operation list
     fn move_uninstalls_to_front(
         &self,
-        mut operations: Vec<Box<dyn OperationInterface>>,
-    ) -> Vec<Box<dyn OperationInterface>> {
-        let mut uninst_ops: Vec<Box<dyn OperationInterface>> = vec![];
+        mut operations: Vec<std::rc::Rc<dyn OperationInterface>>,
+    ) -> Vec<std::rc::Rc<dyn OperationInterface>> {
+        let mut uninst_ops: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         let mut to_remove: Vec<usize> = vec![];
         for (idx, op) in operations.iter().enumerate() {
             let is_uninstall = op
@@ -435,7 +436,7 @@ impl Transaction {
             operations.remove(idx);
         }
 
-        let mut result: Vec<Box<dyn OperationInterface>> = vec![];
+        let mut result: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         result.extend(uninst_ops);
         result.extend(operations);
         result

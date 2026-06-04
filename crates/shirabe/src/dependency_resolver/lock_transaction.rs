@@ -209,7 +209,7 @@ impl LockTransaction {
 
     pub fn get_operations(
         &self,
-    ) -> &Vec<Box<dyn crate::dependency_resolver::operation::OperationInterface>> {
+    ) -> &Vec<std::rc::Rc<dyn crate::dependency_resolver::operation::OperationInterface>> {
         self.inner.get_operations()
     }
 }
