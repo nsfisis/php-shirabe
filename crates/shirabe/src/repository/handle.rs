@@ -202,6 +202,10 @@ impl LockArrayRepositoryHandle {
         self.0.borrow_mut()
     }
 
+    pub fn add_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        self.0.borrow().add_package(package)
+    }
+
     pub fn ptr_eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }

@@ -16,7 +16,7 @@ use crate::installer::InstallationManager;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
 use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackage;
+use crate::package::CompleteAliasPackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterface;
 use crate::package::PackageInterfaceHandle;
@@ -28,6 +28,7 @@ use crate::package::version::VersionParser;
 use crate::plugin::plugin_interface::{self, PluginInterface};
 use crate::repository::FindPackageConstraint;
 use crate::repository::InstalledRepository;
+use crate::repository::LockArrayRepository;
 use crate::repository::LockArrayRepositoryHandle;
 use crate::repository::PlatformRepository;
 use crate::repository::RootPackageRepository;
@@ -187,9 +188,8 @@ impl Locker {
         with_dev_reqs: bool,
     ) -> Result<LockArrayRepositoryHandle> {
         let lock_data = self.get_lock_data()?;
-        // TODO(phase-b): LockArrayRepository has no `new` constructor yet
-        let mut packages: LockArrayRepositoryHandle =
-            todo!("LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![]))");
+        let packages: LockArrayRepositoryHandle =
+            LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![])?);
 
         let mut locked_packages = lock_data
             .get("packages")
@@ -211,7 +211,6 @@ impl Locker {
             return Ok(packages);
         }
 
-        // PHP: if (isset($lockedPackages[0]['name']))
         let has_name = if let PhpMixed::List(list) = &locked_packages {
             list.first()
                 .map(|v| match v.as_ref() {
@@ -230,12 +229,13 @@ impl Locker {
                         let info_map: IndexMap<String, PhpMixed> =
                             m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect();
                         let package = self.loader.load(info_map, None)?;
-                        // PHP shares the package between repository and map; the handle is the shared Rc.
-                        let _name = package.get_name();
-                        let _ = (&mut packages, &mut package_by_name, package);
-                        todo!(
-                            "packages.add_package(package); package_by_name.insert(name, package); + AliasPackage downcast"
-                        );
+                        packages.add_package(package.clone())?;
+                        package_by_name.insert(package.get_name(), package.clone());
+
+                        if let Some(alias) = package.as_alias() {
+                            let alias_of: BasePackageHandle = alias.get_alias_of().into();
+                            package_by_name.insert(alias_of.get_name(), alias_of);
+                        }
                     }
                 }
             }
@@ -250,10 +250,11 @@ impl Locker {
                                 .unwrap_or("")
                                 .to_string();
                             if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
-                                let mut alias_pkg = CompleteAliasPackage::new(
-                                    todo!(
-                                        "phase-c: narrow base_pkg handle to CompletePackageHandle"
-                                    ),
+                                let alias_of = base_pkg.as_complete_package().expect(
+                                    "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
+                                );
+                                let alias_pkg = CompleteAliasPackageHandle::new(
+                                    alias_of,
                                     m.get("alias_normalized")
                                         .and_then(|v| v.as_string())
                                         .unwrap_or("")
@@ -263,10 +264,8 @@ impl Locker {
                                         .unwrap_or("")
                                         .to_string(),
                                 );
-                                // TODO(phase-b): set_root_package_alias missing on CompleteAliasPackage
-                                let _ = base_pkg;
-                                // TODO(phase-b): packages.add_package(Box::new(alias_pkg))
-                                let _ = alias_pkg;
+                                alias_pkg.set_root_package_alias(true);
+                                packages.add_package(alias_pkg.into())?;
                             }
                         }
                     }

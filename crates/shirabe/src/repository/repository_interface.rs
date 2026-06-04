@@ -109,8 +109,4 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
     fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
         let _ = weak;
     }
-
-    fn clone_box(&self) -> Box<dyn RepositoryInterface> {
-        todo!()
-    }
 }

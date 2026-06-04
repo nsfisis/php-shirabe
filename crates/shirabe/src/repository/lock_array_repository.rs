@@ -19,13 +19,19 @@ pub struct LockArrayRepository {
 
 impl CanonicalPackagesTrait for LockArrayRepository {
     fn get_packages(&self) -> Vec<PackageInterfaceHandle> {
-        todo!()
+        RepositoryInterface::get_packages(&self.inner)
     }
 }
 
 impl LockArrayRepository {
-    pub fn clone_box(&self) -> Box<dyn RepositoryInterface> {
-        todo!()
+    pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
+        Ok(Self {
+            inner: ArrayRepository::new(packages)?,
+        })
+    }
+
+    pub fn add_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        self.inner.add_package(package)
     }
 }
 

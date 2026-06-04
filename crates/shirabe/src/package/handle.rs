@@ -1459,6 +1459,14 @@ impl CompleteAliasPackageHandle {
             _ => unreachable!("CompleteAliasPackageHandle invariant violated"),
         }
     }
+
+    pub fn set_root_package_alias(&self, value: bool) {
+        match &mut *self.0.borrow_mut() {
+            AnyPackage::CompleteAliasPackage(p) => p.set_root_package_alias(value),
+            AnyPackage::RootAliasPackage(p) => p.set_root_package_alias(value),
+            _ => unreachable!("CompleteAliasPackageHandle invariant violated"),
+        }
+    }
 }
 
 impl RootAliasPackageHandle {
