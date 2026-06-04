@@ -618,7 +618,7 @@ impl GitDownloader {
     }
 
     /// @throws \RuntimeException
-    pub(crate) fn view_diff(&mut self, path: &str) {
+    pub(crate) fn view_diff(&mut self, path: &str) -> Result<()> {
         let path = self.normalize_path(path);
         let mut output = String::new();
         if self.inner.process.borrow_mut().execute_args(
@@ -627,13 +627,18 @@ impl GitDownloader {
             Some(path.clone()),
         ) != 0
         {
-            // TODO(phase-b): cannot throw from non-Result fn; bubble error via Result later
-            panic!("{}", format!("Could not view diff\n\n:{}", output));
+            return Err(RuntimeException {
+                message: format!("Could not view diff\n\n:{}", output),
+                code: 0,
+            }
+            .into());
         }
 
         self.inner
             .io
             .write_error3(&output, true, io_interface::NORMAL);
+
+        Ok(())
     }
 
     pub(crate) fn normalize_path(&self, path: &str) -> String {
@@ -1283,7 +1288,7 @@ impl VcsDownloader for GitDownloader {
                         .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
                 }
                 Some("d") => {
-                    self.view_diff(&path);
+                    self.view_diff(&path)?;
                 }
                 _ => {
                     // case '?': default:
