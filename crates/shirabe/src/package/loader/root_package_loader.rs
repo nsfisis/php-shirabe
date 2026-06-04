@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    LogicException, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
+    LogicException, PhpMixed, RuntimeException, UnexpectedValueException, strtolower, ucfirst,
 };
 
 use crate::config::Config;
@@ -17,7 +17,7 @@ use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionGuesser;
 use crate::package::version::VersionParser;
-use crate::package::{BasePackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::{BasePackage, RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryManager;
 use crate::util::Platform;
@@ -62,7 +62,7 @@ impl RootPackageLoader {
 
     pub fn load(
         &mut self,
-        config: IndexMap<String, Box<shirabe_php_shim::PhpMixed>>,
+        config: IndexMap<String, PhpMixed>,
         class: &str,
         cwd: Option<&str>,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
@@ -76,10 +76,7 @@ impl RootPackageLoader {
         let mut config = config;
 
         if !config.contains_key("name") {
-            config.insert(
-                "name".to_string(),
-                Box::new(shirabe_php_shim::PhpMixed::String("__root__".to_string())),
-            );
+            config.insert("name".to_string(), PhpMixed::String("__root__".to_string()));
         } else if let Some(err) = ValidatingArrayLoader::has_package_naming_error(
             config["name"].as_string().unwrap_or(""),
             false,
@@ -96,32 +93,20 @@ impl RootPackageLoader {
 
             if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
                 let version = self.version_guesser.get_root_version_from_env()?;
-                config.insert(
-                    "version".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(version)),
-                );
+                config.insert("version".to_string(), PhpMixed::String(version));
             } else {
                 let cwd_str = cwd
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| Platform::get_cwd(true).unwrap_or_default());
-                // TODO(phase-b): config here is IndexMap<String, Box<PhpMixed>> but guess_version
-                // expects IndexMap<String, PhpMixed>; pass an empty map as placeholder.
-                let unboxed_config: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
-                let version_data = self
-                    .version_guesser
-                    .guess_version(&unboxed_config, &cwd_str)?;
+                let version_data = self.version_guesser.guess_version(&config, &cwd_str)?;
                 if let Some(data) = version_data {
                     config.insert(
                         "version".to_string(),
-                        Box::new(shirabe_php_shim::PhpMixed::String(
-                            data.pretty_version.clone().unwrap_or_default(),
-                        )),
+                        PhpMixed::String(data.pretty_version.clone().unwrap_or_default()),
                     );
                     config.insert(
                         "version_normalized".to_string(),
-                        Box::new(shirabe_php_shim::PhpMixed::String(
-                            data.version.clone().unwrap_or_default(),
-                        )),
+                        PhpMixed::String(data.version.clone().unwrap_or_default()),
                     );
                     commit = data.commit;
                 }
@@ -138,10 +123,7 @@ impl RootPackageLoader {
                         ), &[]);
                     }
                 }
-                config.insert(
-                    "version".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String("1.0.0".to_string())),
-                );
+                config.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
                 auto_versioned = true;
             }
 
@@ -149,46 +131,31 @@ impl RootPackageLoader {
                 let mut source = IndexMap::new();
                 source.insert(
                     "type".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(String::new())),
+                    Box::new(PhpMixed::String(String::new())),
                 );
-                source.insert(
-                    "url".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(String::new())),
-                );
+                source.insert("url".to_string(), Box::new(PhpMixed::String(String::new())));
                 source.insert(
                     "reference".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(commit_hash.clone())),
+                    Box::new(PhpMixed::String(commit_hash.clone())),
                 );
-                config.insert(
-                    "source".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::Array(source)),
-                );
+                config.insert("source".to_string(), PhpMixed::Array(source));
 
                 let mut dist = IndexMap::new();
                 dist.insert(
                     "type".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(String::new())),
+                    Box::new(PhpMixed::String(String::new())),
                 );
-                dist.insert(
-                    "url".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(String::new())),
-                );
+                dist.insert("url".to_string(), Box::new(PhpMixed::String(String::new())));
                 dist.insert(
                     "reference".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::String(commit_hash)),
+                    Box::new(PhpMixed::String(commit_hash)),
                 );
-                config.insert(
-                    "dist".to_string(),
-                    Box::new(shirabe_php_shim::PhpMixed::Array(dist)),
-                );
+                config.insert("dist".to_string(), PhpMixed::Array(dist));
             }
         }
 
-        // TODO(phase-b): config is IndexMap<String, Box<PhpMixed>> but LoaderInterface::load
-        // expects IndexMap<String, PhpMixed>; pass empty placeholder.
-        let unboxed_config: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
-        let mut package = self.inner.load(
-            unboxed_config,
+        let package = self.inner.load(
+            config.clone(),
             Some("Composer\\Package\\RootPackage".to_string()),
         )?;
 
@@ -201,8 +168,10 @@ impl RootPackageLoader {
         };
 
         if auto_versioned {
-            // TODO(phase-b): replace_version is an inherent method on Package, not exposed via trait.
-            todo!("replace_version is not accessible through RootPackage's embedded Package");
+            real_package.replace_version(
+                real_package.get_version(),
+                RootPackage::DEFAULT_PRETTY_VERSION.to_string(),
+            );
         }
 
         if let Some(min_stability) = config.get("minimum-stability").and_then(|v| v.as_string()) {
@@ -217,11 +186,19 @@ impl RootPackageLoader {
 
         for link_type in ["require", "require-dev"] {
             if config.contains_key(link_type) {
-                let link_info = &SUPPORTED_LINK_TYPES[link_type];
-                let _method = format!("get_{}", link_info.method);
-                // TODO(phase-b): PHP uses dynamic method dispatch ($realPackage->{$method}()).
-                // We need a Rust-side equivalent (e.g. a match on link_type) to collect Links.
-                let links: IndexMap<String, String> = IndexMap::new();
+                // PHP dynamic dispatch: $realPackage->{'get'.ucfirst($linkInfo['method'])}()
+                let parsed_links = match link_type {
+                    "require" => real_package.get_requires(),
+                    "require-dev" => real_package.get_dev_requires(),
+                    _ => unreachable!(),
+                };
+                let mut links: IndexMap<String, String> = IndexMap::new();
+                for link in parsed_links.values() {
+                    links.insert(
+                        link.get_target().to_string(),
+                        link.get_constraint().get_pretty_string(),
+                    );
+                }
                 aliases = self.extract_aliases(&links, aliases);
                 stability_flags = Self::extract_stability_flags(
                     &links,
@@ -285,10 +262,7 @@ impl RootPackageLoader {
         for (_, repo) in repos {
             self.manager.borrow_mut().add_repository(repo);
         }
-        // TODO(phase-b): Config::get_repositories returns IndexMap<String, PhpMixed>, but
-        // set_repositories expects Vec<IndexMap<String, PhpMixed>>; pass empty placeholder.
-        real_package.set_repositories(Vec::new());
-        let _ = self.config.borrow().get_repositories();
+        real_package.set_repositories(self.config.borrow().get_repositories());
 
         Ok(package)
     }

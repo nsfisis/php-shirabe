@@ -365,14 +365,10 @@ impl ArrayDumper {
             if !repositories.is_empty() {
                 data.insert(
                     "repositories".to_string(),
-                    PhpMixed::List(
+                    PhpMixed::Array(
                         repositories
                             .into_iter()
-                            .map(|r| {
-                                Box::new(PhpMixed::Array(
-                                    r.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-                                ))
-                            })
+                            .map(|(k, v)| (k, Box::new(v)))
                             .collect(),
                     ),
                 );

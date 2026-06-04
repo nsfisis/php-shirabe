@@ -726,7 +726,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn get_repositories(
                 &self,
-            ) -> Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>> {
+            ) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -736,7 +736,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn set_repositories(
                 &self,
-                repositories: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>,
+                repositories: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1386,6 +1386,13 @@ impl RootPackageHandle {
 
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
         Self::from_root_package(RootPackage::new(name, version, pretty_version))
+    }
+
+    pub fn replace_version(&self, version: String, pretty_version: String) {
+        match &mut *self.0.borrow_mut() {
+            AnyPackage::RootPackage(p) => p.replace_version(version, pretty_version),
+            _ => unreachable!("RootPackageHandle invariant"),
+        }
     }
 }
 

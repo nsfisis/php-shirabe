@@ -673,10 +673,7 @@ impl Factory {
                         io.clone(),
                     );
                     let package = loader.load(
-                        local_config_data
-                            .iter()
-                            .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                            .collect(),
+                        local_config_data.clone(),
                         "Composer\\Package\\RootPackage",
                         Some(&cwd),
                     )?;

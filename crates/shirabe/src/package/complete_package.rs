@@ -11,7 +11,7 @@ use shirabe_php_shim::PhpMixed;
 #[derive(Debug, Clone)]
 pub struct CompletePackage {
     pub(crate) inner: Package,
-    pub(crate) repositories: Vec<IndexMap<String, PhpMixed>>,
+    pub(crate) repositories: IndexMap<String, PhpMixed>,
     pub(crate) license: Vec<String>,
     pub(crate) keywords: Vec<String>,
     pub(crate) authors: Vec<IndexMap<String, String>>,
@@ -29,7 +29,7 @@ impl CompletePackage {
     pub fn new(name: String, version: String, pretty_version: String) -> Self {
         Self {
             inner: crate::package::Package::new(name, version, pretty_version),
-            repositories: Vec::new(),
+            repositories: IndexMap::new(),
             license: Vec::new(),
             keywords: Vec::new(),
             authors: Vec::new(),
@@ -43,6 +43,10 @@ impl CompletePackage {
             archive_excludes: Vec::new(),
         }
     }
+
+    pub fn replace_version(&mut self, version: String, pretty_version: String) {
+        self.inner.replace_version(version, pretty_version);
+    }
 }
 
 impl CompletePackageInterface for CompletePackage {
@@ -54,11 +58,11 @@ impl CompletePackageInterface for CompletePackage {
         self.scripts.clone()
     }
 
-    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
         self.repositories = repositories;
     }
 
-    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
         self.repositories.clone()
     }
 

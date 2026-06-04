@@ -60,11 +60,11 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_scripts(scripts);
     }
 
-    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
         self.alias_of.get_repositories()
     }
 
-    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
         self.alias_of.set_repositories(repositories);
     }
 

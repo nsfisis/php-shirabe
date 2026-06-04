@@ -160,11 +160,11 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_scripts(scripts);
     }
 
-    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
         self.inner.get_repositories()
     }
 
-    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
         self.inner.set_repositories(repositories);
     }
 

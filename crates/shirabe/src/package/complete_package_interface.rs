@@ -10,9 +10,9 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>);
 
-    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>>;
+    fn get_repositories(&self) -> IndexMap<String, PhpMixed>;
 
-    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>);
+    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>);
 
     fn get_license(&self) -> Vec<String>;
 

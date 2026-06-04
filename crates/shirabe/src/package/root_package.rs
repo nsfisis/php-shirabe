@@ -39,6 +39,10 @@ impl RootPackage {
             aliases: Vec::new(),
         }
     }
+
+    pub fn replace_version(&mut self, version: String, pretty_version: String) {
+        self.inner.replace_version(version, pretty_version);
+    }
 }
 
 impl RootPackageInterface for RootPackage {
@@ -136,11 +140,11 @@ impl CompletePackageInterface for RootPackage {
         CompletePackageInterface::set_scripts(&mut self.inner, scripts)
     }
 
-    fn get_repositories(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
         CompletePackageInterface::get_repositories(&self.inner)
     }
 
-    fn set_repositories(&mut self, repositories: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
         CompletePackageInterface::set_repositories(&mut self.inner, repositories)
     }
 
