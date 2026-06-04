@@ -423,7 +423,7 @@ impl RuleSetGenerator {
     pub fn get_rules_for(
         &mut self,
         request: &Request,
-        platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<Rc<dyn PlatformRequirementFilterInterface>>,
     ) -> anyhow::Result<RuleSet> {
         let platform_requirement_filter = platform_requirement_filter
             .unwrap_or_else(PlatformRequirementFilterFactory::ignore_nothing);

@@ -144,7 +144,7 @@ pub struct Installer {
     pub(crate) update_allow_list: Option<Vec<String>>,
     pub(crate) update_allow_transitive_dependencies: i64,
     pub(crate) suggested_packages_reporter: SuggestedPackagesReporter,
-    pub(crate) platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
+    pub(crate) platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     pub(crate) additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
     pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
 }
@@ -404,7 +404,7 @@ impl Installer {
                 .set_run_scripts(self.run_scripts);
             self.autoload_generator
                 .borrow_mut()
-                .set_platform_requirement_filter(self.platform_requirement_filter.clone_box());
+                .set_platform_requirement_filter(self.platform_requirement_filter.clone());
             let local_repo_handle = self.repository_manager.borrow().get_local_repository();
             let local_repo_ref = local_repo_handle.borrow();
             self.autoload_generator.borrow_mut().dump(
@@ -662,7 +662,7 @@ impl Installer {
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, Some(self.platform_requirement_filter.clone_box()))
+            .solve(&request, Some(self.platform_requirement_filter.clone()))
         {
             Ok(t) => {
                 lock_transaction = t;
@@ -951,7 +951,7 @@ impl Installer {
         match solver
             .as_mut()
             .unwrap()
-            .solve(&request, Some(self.platform_requirement_filter.clone_box()))
+            .solve(&request, Some(self.platform_requirement_filter.clone()))
         {
             Ok(t) => {
                 non_dev_lock_transaction = t;
@@ -1093,7 +1093,7 @@ impl Installer {
             match solver
                 .as_mut()
                 .unwrap()
-                .solve(&request, Some(self.platform_requirement_filter.clone_box()))
+                .solve(&request, Some(self.platform_requirement_filter.clone()))
             {
                 Ok(lock_transaction) => {
                     solver = None;
@@ -1866,7 +1866,7 @@ impl Installer {
 
     pub fn set_platform_requirement_filter(
         &mut self,
-        platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
+        platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) -> &mut Self {
         self.platform_requirement_filter = platform_requirement_filter;
 

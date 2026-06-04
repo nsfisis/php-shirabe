@@ -222,7 +222,7 @@ impl CreateProjectCommand {
         disable_scripts: bool,
         no_progress: bool,
         no_install: bool,
-        platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         secure_http: bool,
         add_repository: bool,
     ) -> Result<i64> {
@@ -389,7 +389,7 @@ impl CreateProjectCommand {
                 .set_prefer_source(prefer_source)
                 .set_prefer_dist(prefer_dist)
                 .set_dev_mode(install_dev_packages)
-                .set_platform_requirement_filter(platform_requirement_filter.clone_box())
+                .set_platform_requirement_filter(platform_requirement_filter.clone())
                 .set_suggested_packages_reporter(SuggestedPackagesReporter::new(io.clone()))
                 .set_optimize_autoloader(
                     config

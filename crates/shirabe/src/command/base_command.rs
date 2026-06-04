@@ -221,7 +221,7 @@ pub trait BaseCommand {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Result<Box<dyn PlatformRequirementFilterInterface>>;
+    ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>>;
 
     /// @param array<string> $requirements
     ///
@@ -585,7 +585,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Result<Box<dyn PlatformRequirementFilterInterface>> {
+    ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>> {
         if !input.has_option("ignore-platform-reqs") || !input.has_option("ignore-platform-req") {
             return Err(LogicException {
                 message:

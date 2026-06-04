@@ -73,8 +73,9 @@ impl PackageDiscoveryTrait for InitCommand {
     fn get_platform_requirement_filter(
         &self,
         input: &dyn InputInterface,
-    ) -> Box<dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>
-    {
+    ) -> std::rc::Rc<
+        dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
+    > {
         todo!()
     }
 

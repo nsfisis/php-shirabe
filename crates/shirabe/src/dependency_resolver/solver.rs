@@ -240,7 +240,7 @@ impl Solver {
     pub fn solve(
         &mut self,
         request: &Request,
-        platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<Rc<dyn PlatformRequirementFilterInterface>>,
     ) -> anyhow::Result<LockTransaction> {
         let platform_requirement_filter = platform_requirement_filter
             .unwrap_or_else(|| PlatformRequirementFilterFactory::ignore_nothing());
@@ -250,7 +250,7 @@ impl Solver {
         self.io
             .write_error3("Generating rules", true, crate::io::DEBUG);
         let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone(), self.pool.clone());
-        // TODO(phase-b): get_rules_for takes Option<Box<dyn PlatformRequirementFilterInterface>>;
+        // TODO(phase-b): get_rules_for takes Option<Rc<dyn PlatformRequirementFilterInterface>>;
         // PHP passes the filter directly. Forwarding `None` here keeps the call typecheckable.
         let _ = platform_requirement_filter.as_ref();
         self.rules = rule_set_generator.get_rules_for(request, None)?;

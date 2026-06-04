@@ -8,13 +8,14 @@ use crate::filter::platform_requirement_filter::{
 };
 use anyhow::Result;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use std::rc::Rc;
 
 pub struct PlatformRequirementFilterFactory;
 
 impl PlatformRequirementFilterFactory {
     pub fn from_bool_or_list(
         bool_or_list: PhpMixed,
-    ) -> Result<Box<dyn PlatformRequirementFilterInterface>> {
+    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>> {
         match bool_or_list {
             PhpMixed::Bool(b) => {
                 if b {
@@ -35,7 +36,7 @@ impl PlatformRequirementFilterFactory {
                         .collect(),
                     _ => unreachable!(),
                 };
-                Ok(Box::new(IgnoreListPlatformRequirementFilter::new(list)?))
+                Ok(Rc::new(IgnoreListPlatformRequirementFilter::new(list)?))
             }
             other => Err(anyhow::anyhow!(InvalidArgumentException {
                 message: format!(
@@ -47,11 +48,11 @@ impl PlatformRequirementFilterFactory {
         }
     }
 
-    pub fn ignore_all() -> Box<dyn PlatformRequirementFilterInterface> {
-        Box::new(IgnoreAllPlatformRequirementFilter)
+    pub fn ignore_all() -> Rc<dyn PlatformRequirementFilterInterface> {
+        Rc::new(IgnoreAllPlatformRequirementFilter)
     }
 
-    pub fn ignore_nothing() -> Box<dyn PlatformRequirementFilterInterface> {
-        Box::new(IgnoreNothingPlatformRequirementFilter)
+    pub fn ignore_nothing() -> Rc<dyn PlatformRequirementFilterInterface> {
+        Rc::new(IgnoreNothingPlatformRequirementFilter)
     }
 }

@@ -65,7 +65,7 @@ impl VersionSelector {
         package_name: &str,
         target_package_version: Option<&str>,
         preferred_stability: &str,
-        platform_requirement_filter: Option<Box<dyn PlatformRequirementFilterInterface>>,
+        platform_requirement_filter: Option<std::rc::Rc<dyn PlatformRequirementFilterInterface>>,
         repo_set_flags: i64,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         show_warnings: shirabe_php_shim::PhpMixed,
@@ -81,7 +81,7 @@ impl VersionSelector {
             .into());
         }
 
-        let platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface> =
+        let platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface> =
             match platform_requirement_filter {
                 Some(f) => f,
                 None => PlatformRequirementFilterFactory::ignore_nothing(),

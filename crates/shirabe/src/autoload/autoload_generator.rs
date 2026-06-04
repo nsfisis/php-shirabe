@@ -48,7 +48,7 @@ pub struct AutoloadGenerator {
     apcu_prefix: Option<String>,
     dry_run: bool,
     run_scripts: bool,
-    platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
+    platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
 }
 
 impl AutoloadGenerator {
@@ -117,7 +117,7 @@ impl AutoloadGenerator {
 
     pub fn set_platform_requirement_filter(
         &mut self,
-        platform_requirement_filter: Box<dyn PlatformRequirementFilterInterface>,
+        platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) {
         self.platform_requirement_filter = platform_requirement_filter;
     }
