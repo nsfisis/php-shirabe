@@ -65,11 +65,22 @@ impl DependsCommand {
             );
     }
 
-    pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
-        // TODO(phase-b): wire `do_execute` from BaseDependencyCommand trait without conflicting with
-        // BaseCommand blanket impl
-        let _ = (input, output);
-        todo!()
+    pub fn execute(
+        &mut self,
+        input: &dyn InputInterface,
+        output: &dyn OutputInterface,
+    ) -> anyhow::Result<i64> {
+        self.do_execute(input, output, false)
+    }
+}
+
+impl BaseDependencyCommand for DependsCommand {
+    fn colors(&self) -> &[String] {
+        &self.colors
+    }
+
+    fn colors_mut(&mut self) -> &mut Vec<String> {
+        &mut self.colors
     }
 }
 
