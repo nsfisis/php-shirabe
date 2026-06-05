@@ -211,7 +211,12 @@ impl HomeCommand {
                     composer.get_package(),
                 )),
             ));
-            // TODO(phase-b): get_local_repository / get_repositories return shared refs; needs Rc<dyn ...> migration
+            let repository_manager = composer.get_repository_manager();
+            let repository_manager = repository_manager.borrow();
+            repos.push(repository_manager.get_local_repository());
+            for repo in repository_manager.get_repositories() {
+                repos.push(repo.clone());
+            }
             return Ok(repos);
         }
 
