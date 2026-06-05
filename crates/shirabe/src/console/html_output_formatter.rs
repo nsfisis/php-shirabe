@@ -42,10 +42,8 @@ impl HtmlOutputFormatter {
     ];
 
     pub fn new(styles: IndexMap<String, OutputFormatterStyle>) -> Self {
-        // TODO(phase-b): styles dropped until base OutputFormatter::new accepts a style map
-        let _ = styles;
         Self {
-            inner: OutputFormatter::new(true),
+            inner: OutputFormatter::new(true, styles),
         }
     }
 

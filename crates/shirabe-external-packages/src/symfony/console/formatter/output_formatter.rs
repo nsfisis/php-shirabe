@@ -1,8 +1,13 @@
+use indexmap::IndexMap;
+
 #[derive(Debug)]
 pub struct OutputFormatter;
 
 impl OutputFormatter {
-    pub fn new(_decorated: bool) -> Self {
+    pub fn new(
+        _decorated: bool,
+        _styles: IndexMap<String, crate::symfony::console::formatter::OutputFormatterStyle>,
+    ) -> Self {
         todo!()
     }
 
