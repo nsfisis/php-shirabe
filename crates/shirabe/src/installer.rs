@@ -1214,7 +1214,7 @@ impl Installer {
                 local_repo_ref
                     .as_installed_repository_interface_mut()
                     .unwrap(),
-                local_repo_transaction.get_operations(),
+                local_repo_transaction.get_operations().clone(),
                 self.dev_mode,
                 self.run_scripts,
                 self.download_only,

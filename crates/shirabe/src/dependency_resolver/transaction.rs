@@ -62,7 +62,6 @@ impl Transaction {
         this
     }
 
-    /// @return OperationInterface[]
     pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
         &self.operations
     }
