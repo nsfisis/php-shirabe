@@ -336,9 +336,6 @@ impl Pool {
         let replaces = candidate.get_replaces();
 
         // aliases create multiple replaces/provides for one target so they can not use the shortcut below
-        // TODO(phase-b): PHP uses isset($replaces[0])/isset($provides[0]) to detect numeric-indexed
-        // lists; the Rust IndexMap is string-keyed, so this branch checks the "0" key. Confirm
-        // semantics during Phase B review.
         if replaces.contains_key("0") || provides.contains_key("0") {
             for link in provides.values() {
                 if link.get_target() == name

@@ -83,14 +83,11 @@ impl RootPackageInterface for RootAliasPackage {
     }
 
     fn set_requires(&mut self, requires: IndexMap<String, Link>) {
-        let replaced = self.inner.inner.replace_self_version_dependencies(
-            requires.values().cloned().collect(),
-            Link::TYPE_REQUIRE,
-        );
-        self.inner.inner.requires = replaced
-            .into_iter()
-            .map(|l| (l.get_target().to_string(), l))
-            .collect();
+        self.inner.inner.requires = self
+            .inner
+            .inner
+            .replace_self_version_dependencies(requires.clone(), Link::TYPE_REQUIRE);
+
         self.alias_of.set_requires(requires);
     }
 

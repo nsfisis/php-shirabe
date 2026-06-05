@@ -79,51 +79,22 @@ impl AliasPackage {
         };
 
         for r#type in Link::types() {
-            // PHP: $aliasOf->{'get' . ucfirst($type)}()
-            // TODO(phase-b): dynamic method dispatch — bridge each Link::TYPE_* to BasePackage getter
-            let links: Vec<Link> = match r#type {
-                Link::TYPE_REQUIRE => this.alias_of.get_requires().values().cloned().collect(),
-                Link::TYPE_DEV_REQUIRE => {
-                    this.alias_of.get_dev_requires().values().cloned().collect()
-                }
-                Link::TYPE_PROVIDE => this.alias_of.get_provides().values().cloned().collect(),
-                Link::TYPE_CONFLICT => this.alias_of.get_conflicts().values().cloned().collect(),
-                Link::TYPE_REPLACE => this.alias_of.get_replaces().values().cloned().collect(),
-                _ => vec![],
+            let links: IndexMap<String, Link> = match r#type {
+                Link::TYPE_REQUIRE => this.alias_of.get_requires(),
+                Link::TYPE_DEV_REQUIRE => this.alias_of.get_dev_requires(),
+                Link::TYPE_PROVIDE => this.alias_of.get_provides(),
+                Link::TYPE_CONFLICT => this.alias_of.get_conflicts(),
+                Link::TYPE_REPLACE => this.alias_of.get_replaces(),
+                _ => unreachable!(),
             };
             let replaced = this.replace_self_version_dependencies(links, r#type);
             match r#type {
-                Link::TYPE_REQUIRE => {
-                    this.requires = replaced
-                        .into_iter()
-                        .map(|l| (l.get_target().to_string(), l))
-                        .collect();
-                }
-                Link::TYPE_DEV_REQUIRE => {
-                    this.dev_requires = replaced
-                        .into_iter()
-                        .map(|l| (l.get_target().to_string(), l))
-                        .collect();
-                }
-                Link::TYPE_PROVIDE => {
-                    this.provides = replaced
-                        .into_iter()
-                        .map(|l| (l.get_target().to_string(), l))
-                        .collect()
-                }
-                Link::TYPE_CONFLICT => {
-                    this.conflicts = replaced
-                        .into_iter()
-                        .map(|l| (l.get_target().to_string(), l))
-                        .collect()
-                }
-                Link::TYPE_REPLACE => {
-                    this.replaces = replaced
-                        .into_iter()
-                        .map(|l| (l.get_target().to_string(), l))
-                        .collect()
-                }
-                _ => {}
+                Link::TYPE_REQUIRE => this.requires = replaced,
+                Link::TYPE_DEV_REQUIRE => this.dev_requires = replaced,
+                Link::TYPE_PROVIDE => this.provides = replaced,
+                Link::TYPE_CONFLICT => this.conflicts = replaced,
+                Link::TYPE_REPLACE => this.replaces = replaced,
+                _ => unreachable!(),
             }
         }
 
@@ -152,9 +123,9 @@ impl AliasPackage {
     /// @return Link[]
     pub(crate) fn replace_self_version_dependencies(
         &mut self,
-        mut links: Vec<Link>,
+        mut links: IndexMap<String, Link>,
         link_type: &str,
-    ) -> Vec<Link> {
+    ) -> IndexMap<String, Link> {
         // for self.version requirements, we use the original package's branch name instead, to avoid leaking the magic dev-master-alias to users
         let mut pretty_version = self.pretty_version.clone();
         if pretty_version == VersionParser::DEFAULT_BRANCH_ALIAS {
@@ -171,7 +142,7 @@ impl AliasPackage {
             true,
         ) {
             let mut new_links: Vec<Link> = vec![];
-            for link in &links {
+            for link in links.values() {
                 // link is self.version, but must be replacing also the replaced version
                 if link.get_pretty_constraint().unwrap_or("") == "self.version" {
                     let constraint = SimpleConstraint::new(
@@ -189,11 +160,12 @@ impl AliasPackage {
                     new_links.push(new_link);
                 }
             }
-            links.extend(new_links);
+            for (index, new_link) in new_links.into_iter().enumerate() {
+                links.insert(index.to_string(), new_link);
+            }
         } else {
-            // PHP: foreach ($links as $index => $link)
-            for index in 0..links.len() {
-                if links[index].get_pretty_constraint().unwrap_or("") == "self.version" {
+            for link in links.values_mut() {
+                if link.get_pretty_constraint().unwrap_or("") == "self.version" {
                     if link_type == Link::TYPE_REQUIRE {
                         self.has_self_version_requires = true;
                     }
@@ -202,14 +174,13 @@ impl AliasPackage {
                         self.version.to_string(),
                         Some(pretty_version.clone()),
                     );
-                    let new_link = Link::new(
-                        links[index].get_source().to_string(),
-                        links[index].get_target().to_string(),
+                    *link = Link::new(
+                        link.get_source().to_string(),
+                        link.get_target().to_string(),
                         constraint.into(),
                         Some(link_type.to_string()),
                         Some(pretty_version.clone()),
                     );
-                    links[index] = new_link;
                 }
             }
         }
