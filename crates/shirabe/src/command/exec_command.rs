@@ -122,8 +122,11 @@ impl ExecCommand {
         let dispatcher = crate::command::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
-        // TODO(phase-b): add_listener takes a Callable; wiring binary as callable not yet ported
-        let _ = &binary;
+        dispatcher.borrow_mut().add_listener(
+            "__exec_command",
+            crate::event_dispatcher::Callable::String(binary),
+            0,
+        );
 
         let initial_working_directory = self.get_application()?.get_initial_working_directory();
         if let Some(ref iwd) = initial_working_directory {
