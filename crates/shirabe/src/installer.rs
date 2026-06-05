@@ -348,7 +348,7 @@ impl Installer {
                 .borrow_mut()
                 .get_locked_repository(self.dev_mode)?
                 .into();
-            let installed_repo = InstalledRepository::new(vec![
+            let mut installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
                 crate::repository::RepositoryInterfaceHandle::new(self.create_platform_repo(false)),
                 crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
@@ -360,12 +360,13 @@ impl Installer {
                     .add_suggestions_from_package(self.package.clone().into());
             }
             self.suggested_packages_reporter
-                .output_minimalistic(Some(&installed_repo), None);
+                .output_minimalistic(Some(&mut installed_repo), None)?;
         }
 
         // Find abandoned packages and warn user
         let locked_repository = self.locker.borrow_mut().get_locked_repository(true)?;
-        for package in CanonicalPackagesTrait::get_packages(&*locked_repository.borrow()) {
+        let packages = locked_repository.borrow_mut().get_canonical_packages()?;
+        for package in packages {
             let complete = match package.as_complete_package() {
                 Some(p) if p.is_abandoned() => p,
                 _ => continue,
@@ -406,10 +407,12 @@ impl Installer {
                 .borrow_mut()
                 .set_platform_requirement_filter(self.platform_requirement_filter.clone());
             let local_repo_handle = self.repository_manager.borrow().get_local_repository();
-            let local_repo_ref = local_repo_handle.borrow();
+            let mut local_repo_ref = local_repo_handle.borrow_mut();
             self.autoload_generator.borrow_mut().dump(
                 &*self.config.borrow(),
-                local_repo_ref.as_installed_repository_interface().unwrap(),
+                local_repo_ref
+                    .as_installed_repository_interface_mut()
+                    .unwrap(),
                 self.package.clone(),
                 &mut *self.installation_manager.borrow_mut(),
                 "composer",
@@ -424,7 +427,7 @@ impl Installer {
             // force binaries re-generation in case they are missing
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
-            for package in repository_manager.get_local_repository().get_packages() {
+            for package in repository_manager.get_local_repository().get_packages()? {
                 self.installation_manager
                     .borrow_mut()
                     .ensure_binaries_presence(package.clone());
@@ -444,7 +447,7 @@ impl Installer {
             let mut funding_count: i64 = 0;
             let repository_manager = self.repository_manager.clone();
             let repository_manager = repository_manager.borrow();
-            for package in repository_manager.get_local_repository().get_packages() {
+            for package in repository_manager.get_local_repository().get_packages()? {
                 if let Some(cp) = package.as_complete() {
                     if package.as_alias().is_none() && !cp.get_funding().is_empty() {
                         funding_count += 1;
@@ -490,7 +493,7 @@ impl Installer {
         if audit_config.audit {
             let (packages, target) = if self.update && !self.install {
                 (
-                    locked_repository.borrow().get_canonical_packages(),
+                    locked_repository.borrow_mut().get_canonical_packages()?,
                     "locked",
                 )
             } else {
@@ -498,7 +501,7 @@ impl Installer {
                     self.repository_manager
                         .borrow()
                         .get_local_repository()
-                        .get_canonical_packages(),
+                        .get_canonical_packages()?,
                     "installed",
                 )
             };
@@ -561,7 +564,7 @@ impl Installer {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
     ) -> anyhow::Result<i64> {
-        let platform_repo = self.create_platform_repo(true);
+        let mut platform_repo = self.create_platform_repo(true);
         let aliases = self.get_root_aliases(true);
 
         let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
@@ -616,8 +619,9 @@ impl Installer {
             .write_error("<info>Loading composer repositories with package information</info>");
 
         // creating repository set
-        let policy = self.create_policy(true, locked_repository.as_ref());
-        let mut repository_set = self.create_repository_set(true, &platform_repo, &aliases, None);
+        let policy = self.create_policy(true, locked_repository.as_ref())?;
+        let mut repository_set =
+            self.create_repository_set(true, &platform_repo, &aliases, None)?;
         let repository_manager = self.repository_manager.clone();
         let repository_manager = repository_manager.borrow();
         let repositories = repository_manager.get_repositories();
@@ -631,9 +635,9 @@ impl Installer {
         let fixed_root_package = self.fixed_root_package.clone();
         let mut request = self.create_request(
             fixed_root_package,
-            &platform_repo,
+            &mut platform_repo,
             locked_repository.as_ref(),
-        );
+        )?;
         self.require_packages_for_update(&mut request, locked_repository.as_ref(), true)?;
 
         // pass the allow list into the request, so the pool builder can apply it
@@ -708,7 +712,7 @@ impl Installer {
 
         let exit_code = self.extract_dev_packages(
             &mut lock_transaction,
-            &platform_repo,
+            &mut platform_repo,
             &aliases,
             &*policy,
             locked_repository.as_ref(),
@@ -913,7 +917,7 @@ impl Installer {
     pub(crate) fn extract_dev_packages(
         &mut self,
         lock_transaction: &mut LockTransaction,
-        platform_repo: &PlatformRepository,
+        platform_repo: &mut PlatformRepository,
         aliases: &Vec<IndexMap<String, String>>,
         policy: &dyn PolicyInterface,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
@@ -933,12 +937,13 @@ impl Installer {
             result_repo.add_package(loaded)?;
         }
 
-        let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None);
+        let mut repository_set = self.create_repository_set(true, platform_repo, aliases, None)?;
         repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
             result_repo,
         ))?;
 
-        let mut request = self.create_request(self.fixed_root_package.clone(), platform_repo, None);
+        let mut request =
+            self.create_request(self.fixed_root_package.clone(), platform_repo, None)?;
         self.require_packages_for_update(&mut request, locked_repository, false)?;
 
         let pool = repository_set.create_pool_with_all_packages()?;
@@ -1006,24 +1011,27 @@ impl Installer {
                 "<info>Verifying lock file contents can be installed on current platform.</info>",
             );
 
-            let platform_repo = self.create_platform_repo(false);
+            let mut platform_repo = self.create_platform_repo(false);
             // creating repository set
-            let policy = self.create_policy(false, None);
+            let policy = self.create_policy(false, None)?;
             // use aliases from lock file only, so empty root aliases here
-            let locked_repo_borrow = locked_repository.borrow();
+            let mut locked_repo_borrow = locked_repository.borrow_mut();
             let mut repository_set = self.create_repository_set(
                 false,
                 &platform_repo,
                 &vec![],
-                Some(&*locked_repo_borrow),
-            );
+                Some(&mut *locked_repo_borrow),
+            )?;
             drop(locked_repo_borrow);
             repository_set.add_repository(locked_repository.clone().into())?;
 
             // creating requirements request
             let fixed_root_package = self.fixed_root_package.clone();
-            let mut request =
-                self.create_request(fixed_root_package, &platform_repo, Some(&locked_repository));
+            let mut request = self.create_request(
+                fixed_root_package,
+                &mut platform_repo,
+                Some(&locked_repository),
+            )?;
 
             if !self.locker.borrow_mut().is_fresh()? {
                 self.io.write_error3(
@@ -1052,7 +1060,8 @@ impl Installer {
                 }
             }
 
-            for package in RepositoryInterface::get_packages(&*locked_repository.borrow()) {
+            for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?
+            {
                 request.fix_locked_package(package.clone());
             }
 
@@ -1121,12 +1130,14 @@ impl Installer {
 
         // TODO in how far do we need to do anything here to ensure dev packages being updated to latest in lock without version change are treated correctly?
         let local_repo_transaction = {
-            let local_repo_ref = local_repo.borrow();
-            let locked_repo_ref = locked_repository.borrow();
+            let mut local_repo_ref = local_repo.borrow_mut();
+            let mut locked_repo_ref = locked_repository.borrow_mut();
             LocalRepoTransaction::new(
-                &*locked_repo_ref,
-                local_repo_ref.as_installed_repository_interface().unwrap(),
-            )
+                &mut *locked_repo_ref,
+                local_repo_ref
+                    .as_installed_repository_interface_mut()
+                    .unwrap(),
+            )?
         };
         // TODO(phase-b): dispatch_installer_event takes owned Transaction, not &LocalRepoTransaction
         // self.event_dispatcher.borrow_mut().dispatch_installer_event(
@@ -1270,8 +1281,8 @@ impl Installer {
         for_update: bool,
         platform_repo: &PlatformRepository,
         root_aliases: &Vec<IndexMap<String, String>>,
-        locked_repository: Option<&dyn RepositoryInterface>,
-    ) -> RepositorySet {
+        locked_repository: Option<&mut dyn RepositoryInterface>,
+    ) -> anyhow::Result<RepositorySet> {
         let minimum_stability: String;
         let mut stability_flags: IndexMap<String, i64>;
 
@@ -1313,7 +1324,7 @@ impl Installer {
                 .unwrap_or_default();
 
             let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
-            for package in locked_repository.unwrap().get_packages() {
+            for package in locked_repository.unwrap().get_packages()? {
                 let constraint = SimpleConstraint::new(
                     "=".to_string(),
                     package.get_version().to_string(),
@@ -1395,14 +1406,14 @@ impl Installer {
             let _ = repository_set.add_repository(additional_fixed_repository.clone());
         }
 
-        repository_set
+        Ok(repository_set)
     }
 
     fn create_policy(
         &mut self,
         for_update: bool,
         locked_repo: Option<&crate::repository::LockArrayRepositoryHandle>,
-    ) -> std::rc::Rc<dyn PolicyInterface> {
+    ) -> anyhow::Result<std::rc::Rc<dyn PolicyInterface>> {
         let mut prefer_stable: Option<bool> = None;
         let mut prefer_lowest: Option<bool> = None;
         if !for_update {
@@ -1421,7 +1432,8 @@ impl Installer {
         let mut preferred_versions: Option<IndexMap<String, String>> = None;
         if for_update && self.minimal_update && locked_repo.is_some() {
             let mut versions: IndexMap<String, String> = IndexMap::new();
-            for pkg in CanonicalPackagesTrait::get_packages(&*locked_repo.unwrap().borrow()) {
+            let pkgs = locked_repo.unwrap().borrow_mut().get_canonical_packages()?;
+            for pkg in pkgs {
                 if pkg.as_alias().is_some()
                     || (self.update_allow_list.is_some()
                         && self
@@ -1438,19 +1450,19 @@ impl Installer {
             preferred_versions = Some(versions);
         }
 
-        std::rc::Rc::new(DefaultPolicy::new(
+        Ok(std::rc::Rc::new(DefaultPolicy::new(
             prefer_stable.unwrap(),
             prefer_lowest.unwrap(),
             preferred_versions,
-        ))
+        )))
     }
 
     fn create_request(
         &self,
         root_package: RootPackageInterfaceHandle,
-        platform_repo: &PlatformRepository,
+        platform_repo: &mut PlatformRepository,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
-    ) -> Request {
+    ) -> anyhow::Result<Request> {
         let mut request = Request::new(locked_repository.cloned());
 
         let root_package_handle: PackageInterfaceHandle = root_package.clone().into();
@@ -1459,9 +1471,9 @@ impl Installer {
             request.fix_package(alias.get_alias_of().into());
         }
 
-        let mut fixed_packages = platform_repo.get_packages();
+        let mut fixed_packages = platform_repo.get_packages()?;
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
-            fixed_packages.extend(additional_fixed_repository.get_packages());
+            fixed_packages.extend(additional_fixed_repository.get_packages()?);
         }
 
         // fix the version of all platform packages + additionally installed packages
@@ -1489,7 +1501,7 @@ impl Installer {
             }
         }
 
-        request
+        Ok(request)
     }
 
     fn require_packages_for_update(
@@ -1516,8 +1528,10 @@ impl Installer {
                 IndexMap::new()
             };
 
-            for locked_package in
-                CanonicalPackagesTrait::get_packages(&*locked_repository.unwrap().borrow())
+            for locked_package in locked_repository
+                .unwrap()
+                .borrow_mut()
+                .get_canonical_packages()?
             {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
@@ -1581,9 +1595,9 @@ impl Installer {
     /// Replace local repositories with InstalledArrayRepository instances
     ///
     /// This is to prevent any accidental modification of the existing repos on disk
-    fn mock_local_repositories(&self, rm: &mut RepositoryManager) {
+    fn mock_local_repositories(&self, rm: &mut RepositoryManager) -> anyhow::Result<()> {
         let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        for package in rm.get_local_repository().get_packages() {
+        for package in rm.get_local_repository().get_packages()? {
             packages.insert(package.to_string(), PackageInterfaceHandle::dup(&package));
         }
         let keys: Vec<String> = packages.keys().cloned().collect();
@@ -1614,6 +1628,8 @@ impl Installer {
             InstalledArrayRepository::new_with_packages(packages.into_values().collect())
                 .expect("InstalledArrayRepository::new_with_packages should not fail"),
         ));
+
+        Ok(())
     }
 
     fn create_pool_optimizer(

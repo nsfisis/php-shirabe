@@ -84,46 +84,46 @@ impl RepositoryInterface for CompositeRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         for repository in &self.repositories {
-            let package = repository.find_package(name, constraint.clone());
+            let package = repository.find_package(name, constraint.clone())?;
             if package.is_some() {
-                return package;
+                return Ok(package);
             }
         }
-        None
+        Ok(None)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut packages = vec![];
         for repository in &self.repositories {
-            packages.extend(repository.find_packages(name, constraint.clone()));
+            packages.extend(repository.find_packages(name, constraint.clone())?);
         }
-        packages
+        Ok(packages)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut packages = vec![];
         for repository in &self.repositories {
-            packages.extend(repository.get_packages());
+            packages.extend(repository.get_packages()?);
         }
-        packages
+        Ok(packages)
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
+    ) -> anyhow::Result<LoadPackagesResult> {
         let mut all_packages = IndexMap::new();
         let mut all_names_found = vec![];
 
@@ -137,7 +137,7 @@ impl RepositoryInterface for CompositeRepository {
                 acceptable_stabilities.clone(),
                 stability_flags.clone(),
                 already_loaded.clone(),
-            );
+            )?;
             all_packages.extend(result.packages);
             all_names_found.extend(result.names_found);
         }
@@ -148,26 +148,34 @@ impl RepositoryInterface for CompositeRepository {
             .filter(|s| seen.insert(s.clone()))
             .collect();
 
-        LoadPackagesResult {
+        Ok(LoadPackagesResult {
             packages: all_packages,
             names_found: unique_names,
-        }
+        })
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let mut matches = vec![];
         for repository in &self.repositories {
-            matches.extend(repository.search(query.clone(), mode, r#type.clone()));
+            matches.extend(repository.search(query.clone(), mode, r#type.clone())?);
         }
-        matches
+        Ok(matches)
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         let mut results = IndexMap::new();
         for repository in &self.repositories {
-            results.extend(repository.get_providers(package_name.clone()));
+            results.extend(repository.get_providers(package_name.clone())?);
         }
-        results
+        Ok(results)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

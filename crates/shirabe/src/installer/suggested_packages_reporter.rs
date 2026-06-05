@@ -53,11 +53,11 @@ impl SuggestedPackagesReporter {
     pub fn output(
         &self,
         mode: i64,
-        installed_repo: Option<&InstalledRepository>,
+        mut installed_repo: Option<&mut InstalledRepository>,
         only_dependents_of: Option<PackageInterfaceHandle>,
-    ) {
-        let suggested_packages =
-            self.get_filtered_suggestions(installed_repo, only_dependents_of.clone());
+    ) -> anyhow::Result<()> {
+        let suggested_packages = self
+            .get_filtered_suggestions(installed_repo.as_deref_mut(), only_dependents_of.clone())?;
 
         let mut suggesters: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
         let mut suggested: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
@@ -80,7 +80,7 @@ impl SuggestedPackagesReporter {
                 self.io.write(&format!("<info>{}</info>", name));
             }
 
-            return;
+            return Ok(());
         }
 
         // Grouped by package
@@ -132,37 +132,43 @@ impl SuggestedPackagesReporter {
         }
 
         if let Some(only_dependents_of) = only_dependents_of {
-            let all_suggested_packages = self.get_filtered_suggestions(installed_repo, None);
+            let all_suggested_packages =
+                self.get_filtered_suggestions(installed_repo.as_deref_mut(), None)?;
             let diff = all_suggested_packages.len() as i64 - suggested_packages.len() as i64;
             if diff != 0 {
                 self.io.write(&format!("<info>{} additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>", diff));
             }
         }
+
+        Ok(())
     }
 
     pub fn output_minimalistic(
         &self,
-        installed_repo: Option<&InstalledRepository>,
+        installed_repo: Option<&mut InstalledRepository>,
         only_dependents_of: Option<PackageInterfaceHandle>,
-    ) {
-        let suggested_packages = self.get_filtered_suggestions(installed_repo, only_dependents_of);
+    ) -> anyhow::Result<()> {
+        let suggested_packages =
+            self.get_filtered_suggestions(installed_repo, only_dependents_of)?;
         if !suggested_packages.is_empty() {
             self.io.write_error(&format!(
                 "<info>{} package suggestions were added by new dependencies, use `composer suggest` to see details.</info>",
                 suggested_packages.len()
             ));
         }
+
+        Ok(())
     }
 
     fn get_filtered_suggestions(
         &self,
-        installed_repo: Option<&InstalledRepository>,
+        installed_repo: Option<&mut InstalledRepository>,
         only_dependents_of: Option<PackageInterfaceHandle>,
-    ) -> Vec<IndexMap<String, String>> {
+    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let suggested_packages = self.get_packages();
         let mut installed_names: Vec<String> = Vec::new();
         if installed_repo.is_some() && !suggested_packages.is_empty() {
-            for package in installed_repo.unwrap().get_packages() {
+            for package in installed_repo.unwrap().get_packages()? {
                 installed_names.extend(package.get_names(true));
             }
         }
@@ -190,7 +196,7 @@ impl SuggestedPackagesReporter {
             suggestions.push(suggestion.clone());
         }
 
-        suggestions
+        Ok(suggestions)
     }
 
     fn escape_output(&self, string: &str) -> String {

@@ -1615,7 +1615,7 @@ impl PlatformRepository {
             let overrider = self.inner.find_package(
                 &name,
                 crate::repository::FindPackageConstraint::String("*".to_string()),
-            );
+            )?;
             let actual_text = if let Some(ref ov) = overrider {
                 if package.get_version() == ov.get_version() {
                     "same as actual".to_string()
@@ -1888,14 +1888,14 @@ impl PlatformRepository {
     }
 
     pub fn search(
-        &self,
+        &mut self,
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Vec<crate::repository::SearchResult> {
+    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
         // suppress vendor search as there are no vendors to match in platform packages
         if mode == crate::repository::SEARCH_VENDOR {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         self.inner.search(query, mode, r#type)
@@ -1954,32 +1954,32 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: crate::repository::FindPackageConstraint,
-    ) -> Option<crate::package::BasePackageHandle> {
+    ) -> anyhow::Result<Option<crate::package::BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<crate::repository::FindPackageConstraint>,
-    ) -> Vec<crate::package::BasePackageHandle> {
+    ) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<crate::package::BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
         self.inner.get_packages()
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, crate::package::PackageInterfaceHandle>>,
-    ) -> crate::repository::LoadPackagesResult {
+    ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -1989,18 +1989,18 @@ impl crate::repository::RepositoryInterface for PlatformRepository {
     }
 
     fn search(
-        &self,
+        &mut self,
         query: String,
         mode: i64,
         r#type: Option<String>,
-    ) -> Vec<crate::repository::SearchResult> {
+    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
     fn get_providers(
-        &self,
+        &mut self,
         package_name: String,
-    ) -> IndexMap<String, crate::repository::ProviderInfo> {
+    ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

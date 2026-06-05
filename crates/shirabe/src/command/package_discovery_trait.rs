@@ -56,7 +56,7 @@ pub trait PackageDiscoveryTrait {
 
     fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>>;
 
-    fn get_repos(&mut self) -> &CompositeRepository {
+    fn get_repos(&mut self) -> &mut CompositeRepository {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
             let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![
@@ -75,7 +75,7 @@ pub trait PackageDiscoveryTrait {
             *self.get_repos_mut() = Some(CompositeRepository::new(repos));
         }
 
-        self.get_repos_mut().as_ref().unwrap()
+        self.get_repos_mut().as_mut().unwrap()
     }
 
     /// @param key-of<BasePackage::STABILITIES>|null $minimumStability
@@ -238,7 +238,7 @@ pub trait PackageDiscoveryTrait {
             .map(|rm| rm.get_local_repository());
         let mut existing_packages: Vec<String> = vec![];
         if let Some(repo) = &installed_repo {
-            for package in repo.get_packages() {
+            for package in repo.get_packages()? {
                 existing_packages.push(package.get_name().to_string());
             }
         }
@@ -533,7 +533,7 @@ pub trait PackageDiscoveryTrait {
             }
 
             // Check if it is a virtual package provided by others
-            let providers = repo_set.get_providers(name);
+            let providers = repo_set.get_providers(name)?;
             if count(&PhpMixed::List(
                 providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
             )) > 0
@@ -593,7 +593,7 @@ pub trait PackageDiscoveryTrait {
                                 self.get_platform_exception_details(
                                     candidate.clone(),
                                     platform_repo,
-                                ),
+                                )?,
                             ),
                             &[PhpMixed::String(name.to_string())],
                         ),
@@ -694,7 +694,7 @@ pub trait PackageDiscoveryTrait {
                                 self.get_platform_exception_details(
                                     candidate.clone(),
                                     platform_repo,
-                                ),
+                                )?,
                             ),
                             &[
                                 PhpMixed::String(name.to_string()),
@@ -816,11 +816,10 @@ pub trait PackageDiscoveryTrait {
                 }
                 .into());
             }
-            Ok(self
-                .get_repos_mut()
+            self.get_repos_mut()
                 .as_mut()
                 .unwrap()
-                .search(package.to_string(), 0, None))
+                .search(package.to_string(), 0, None)
         })() {
             Ok(r) => r,
             Err(e) => {
@@ -847,7 +846,7 @@ pub trait PackageDiscoveryTrait {
                 .find_package(
                     &result.name,
                     crate::repository::FindPackageConstraint::String("*".to_string()),
-                )
+                )?
                 .is_some()
             {
                 // Ignore installed package
@@ -864,13 +863,13 @@ pub trait PackageDiscoveryTrait {
         &self,
         candidate: PackageInterfaceHandle,
         platform_repo: Option<&PlatformRepositoryHandle>,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         let mut details: Vec<String> = vec![];
         let platform_repo = match platform_repo {
-            None => return String::new(),
+            None => return Ok(String::new()),
             Some(p) => p,
         };
-        let platform_repo = platform_repo.borrow();
+        let mut platform_repo = platform_repo.borrow_mut();
 
         for link in candidate.get_requires().values() {
             if !PlatformRepository::is_platform_package(link.get_target()) {
@@ -879,7 +878,7 @@ pub trait PackageDiscoveryTrait {
             let platform_pkg = platform_repo.find_package(
                 link.get_target(),
                 crate::repository::FindPackageConstraint::String("*".to_string()),
-            );
+            )?;
             let platform_pkg = match platform_pkg {
                 None => {
                     if platform_repo.is_platform_package_disabled(link.get_target()) {
@@ -941,13 +940,13 @@ pub trait PackageDiscoveryTrait {
             details.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
         )) == 0
         {
-            return String::new();
+            return Ok(String::new());
         }
 
-        format!(
+        Ok(format!(
             ":{}  - {}",
             PHP_EOL,
             implode(&format!("{}  - ", PHP_EOL), &details)
-        )
+        ))
     }
 }

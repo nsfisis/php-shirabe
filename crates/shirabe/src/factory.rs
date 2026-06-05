@@ -1234,10 +1234,10 @@ impl Factory {
 
     fn purge_packages(
         &self,
-        repo: &dyn InstalledRepositoryInterface,
+        repo: &mut dyn InstalledRepositoryInterface,
         im: &mut InstallationManager,
     ) -> anyhow::Result<()> {
-        for package in repo.get_packages() {
+        for package in repo.get_packages()? {
             if !im.is_package_installed(repo, package.clone())? {
                 let _ = package;
             }

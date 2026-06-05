@@ -162,12 +162,13 @@ impl DiagnoseCommand {
             .into_iter()
             .map(|(k, v)| (k, *v))
             .collect();
-        let platform_repo = PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
+        let mut platform_repo =
+            PlatformRepository::new(vec![], platform_overrides_unboxed).unwrap();
         let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
-            &platform_repo,
+            &mut platform_repo,
             "php",
             crate::repository::FindPackageConstraint::String("*".to_string()),
-        )
+        )?
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version().to_string();
         if let Some(cp) = php_pkg.as_complete() {
@@ -933,16 +934,14 @@ impl DiagnoseCommand {
             "url".to_string(),
             PhpMixed::String("https://packagist.org".to_string()),
         );
-        // TODO(phase-b): ComposerRepository does not implement RepositoryInterface yet
-        let _composer_repo = ComposerRepository::new(
-            repo_config,
-            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
-            config,
-            self.http_downloader.clone().unwrap(),
-            None,
-        )?;
-        let composer_repo_as_repo: crate::repository::RepositoryInterfaceHandle =
-            todo!("ComposerRepository as RepositoryInterface");
+        let composer_repo_as_repo =
+            crate::repository::RepositoryInterfaceHandle::new(ComposerRepository::new(
+                repo_config,
+                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+                config,
+                self.http_downloader.clone().unwrap(),
+                None,
+            )?);
         repo_set.add_repository(composer_repo_as_repo)?;
 
         let mut io = BufferIO::new(String::new(), 0, None)?;

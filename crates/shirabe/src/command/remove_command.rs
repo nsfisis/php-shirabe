@@ -22,6 +22,7 @@ use crate::json::JsonFile;
 use crate::package::BasePackage;
 use crate::package::base_package;
 use crate::repository::CanonicalPackagesTrait;
+use crate::repository::RepositoryInterface;
 
 #[derive(Debug)]
 pub struct RemoveCommand {
@@ -198,12 +199,11 @@ impl RemoveCommand {
                 }
             }
 
-            let locked_packages = composer
+            let mut locked_repo = composer
                 .get_locker()
                 .borrow_mut()
-                .get_locked_repository(true)?
-                .borrow()
-                .get_packages();
+                .get_locked_repository(true)?;
+            let locked_packages = locked_repo.borrow_mut().get_packages()?;
 
             let mut required: IndexMap<String, bool> = IndexMap::new();
             for link in composer
@@ -435,7 +435,7 @@ impl RemoveCommand {
             composer_opt
                 .get_plugin_manager()
                 .borrow_mut()
-                .deactivate_installed_plugins();
+                .deactivate_installed_plugins()?;
         }
 
         self.reset_composer();
@@ -626,7 +626,7 @@ impl RemoveCommand {
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .find_packages(package, None)
+                    .find_packages(package, None)?
                     .is_empty()
                 {
                     io.write_error(&format!(

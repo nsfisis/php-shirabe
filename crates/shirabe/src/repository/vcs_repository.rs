@@ -520,7 +520,7 @@ impl VcsRepository {
                         )
                         .into(),
                     ),
-                ) {
+                )? {
                     if is_very_verbose {
                         self.io.write_error(&format!(
                             "<warning>Skipped tag {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
@@ -763,7 +763,7 @@ impl VcsRepository {
                 .overwrite_error4("", false, None, io_interface::NORMAL);
         }
 
-        if self.inner.get_packages().is_empty() {
+        if self.inner.get_packages()?.is_empty() {
             return Err(InvalidRepositoryException::new(format!(
                 "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
                 self.url
@@ -948,7 +948,7 @@ impl VcsRepository {
                     SimpleConstraint::new("=".to_string(), version_normalized.to_string(), None)
                         .into(),
                 ),
-            ) {
+            )? {
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",

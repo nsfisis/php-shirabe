@@ -151,7 +151,16 @@ impl FilterRepository {
 impl shirabe_php_shim::Countable for FilterRepository {
     fn count(&self) -> i64 {
         if self.repo.count() > 0 {
-            self.get_packages().len() as i64
+            // TODO(phase-b): propagate the error
+            // self.get_packages()?.len() as i64
+            self.repo
+                .get_packages()
+                .map(|pkgs| {
+                    pkgs.iter()
+                        .filter(|p| self.is_allowed(&p.get_name()))
+                        .count() as i64
+                })
+                .unwrap_or(0)
         } else {
             0
         }
@@ -164,43 +173,43 @@ impl RepositoryInterface for FilterRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         if !self.is_allowed(name) {
-            return None;
+            return Ok(None);
         }
 
         self.repo.find_package(name, constraint)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         if !self.is_allowed(name) {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         self.repo.find_packages(name, constraint)
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
+    ) -> anyhow::Result<LoadPackagesResult> {
         package_name_map.retain(|name, _| self.is_allowed(name));
 
         if package_name_map.is_empty() {
-            return LoadPackagesResult {
+            return Ok(LoadPackagesResult {
                 names_found: Vec::new(),
                 packages: IndexMap::new(),
-            };
+            });
         }
 
         let mut result = self.repo.load_packages(
@@ -208,46 +217,54 @@ impl RepositoryInterface for FilterRepository {
             acceptable_stabilities,
             stability_flags,
             already_loaded,
-        );
+        )?;
         if !self.canonical {
             result.names_found = Vec::new();
         }
 
-        result
+        Ok(result)
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let mut result = Vec::new();
 
-        for package in self.repo.search(query, mode, r#type) {
+        for package in self.repo.search(query, mode, r#type)? {
             if self.is_allowed(&package.name) {
                 result.push(package);
             }
         }
 
-        result
+        Ok(result)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut result = Vec::new();
-        for package in self.repo.get_packages() {
+        for package in self.repo.get_packages()? {
             if self.is_allowed(&package.get_name()) {
                 result.push(package);
             }
         }
 
-        result
+        Ok(result)
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         let mut result = IndexMap::new();
-        for (name, provider) in self.repo.get_providers(package_name) {
+        for (name, provider) in self.repo.get_providers(package_name)? {
             if self.is_allowed(&provider.name) {
                 result.insert(name, provider);
             }
         }
 
-        result
+        Ok(result)
     }
 
     fn get_repo_name(&self) -> String {
@@ -264,29 +281,37 @@ impl RepositoryInterface for FilterRepository {
         }
     }
 
+    fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
+        if self.repo.borrow().as_advisory_provider().is_some() {
+            Some(self)
+        } else {
+            None
+        }
+    }
+
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
 }
 
 impl AdvisoryProviderInterface for FilterRepository {
-    fn has_security_advisories(&self) -> bool {
-        let repo = self.repo.borrow();
-        if let Some(advisory_repo) = repo.as_advisory_provider() {
+    fn has_security_advisories(&mut self) -> anyhow::Result<bool> {
+        let mut repo = self.repo.borrow_mut();
+        if let Some(advisory_repo) = repo.as_advisory_provider_mut() {
             advisory_repo.has_security_advisories()
         } else {
-            false
+            Ok(false)
         }
     }
 
     fn get_security_advisories(
-        &self,
+        &mut self,
         mut package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
-        let repo = self.repo.borrow();
-        if let Some(advisory_repo) = repo.as_advisory_provider() {
-            package_constraint_map.retain(|name, _| self.is_allowed(name));
+        package_constraint_map.retain(|name, _| self.is_allowed(name));
+        let mut repo = self.repo.borrow_mut();
+        if let Some(advisory_repo) = repo.as_advisory_provider_mut() {
             advisory_repo.get_security_advisories(package_constraint_map, allow_partial_advisories)
         } else {
             Ok(SecurityAdvisoryResult {

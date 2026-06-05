@@ -162,10 +162,12 @@ impl PoolBuilder {
                 .into());
             }
 
-            let locked_packages = CanonicalPackagesTrait::get_packages(
-                &*request.get_locked_repository().unwrap().borrow(),
-            );
-            for locked_package in locked_packages {
+            for locked_package in request
+                .get_locked_repository()
+                .unwrap()
+                .borrow_mut()
+                .get_canonical_packages()?
+            {
                 if !self.is_update_allowed(locked_package.clone()) {
                     // Path repo packages are never loaded from lock, to force them to always remain in sync
                     // unless symlinking is disabled in which case we probably should rather treat them like
@@ -530,7 +532,7 @@ impl PoolBuilder {
                                 .collect()
                         })
                         .unwrap_or_default(),
-                );
+                )?;
 
                 let names_found = result.names_found;
                 for name in &names_found {
@@ -819,9 +821,12 @@ impl PoolBuilder {
 
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
             // update pattern matches a locked package? => all good
-            for package in CanonicalPackagesTrait::get_packages(
-                &*request.get_locked_repository().unwrap().borrow(),
-            ) {
+            for package in request
+                .get_locked_repository()
+                .unwrap()
+                .borrow_mut()
+                .get_canonical_packages()?
+            {
                 if Preg::is_match3(&pattern_regexp, &package.get_name(), None).unwrap_or(false) {
                     continue 'outer;
                 }

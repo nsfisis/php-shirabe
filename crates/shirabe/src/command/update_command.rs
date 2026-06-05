@@ -212,8 +212,8 @@ impl UpdateCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_locked_repository(true)?
-                .borrow()
-                .get_canonical_packages()
+                .borrow_mut()
+                .get_canonical_packages()?
             {
                 if package.is_dev() {
                     continue;
@@ -498,19 +498,17 @@ impl UpdateCommand {
         let mut autocompleter_values: IndexMap<String, String> = IndexMap::new();
         let installed_packages: Vec<crate::package::PackageInterfaceHandle> =
             if composer_ref.get_locker().borrow_mut().is_locked() {
-                CanonicalPackagesTrait::get_packages(
-                    &*composer_ref
-                        .get_locker()
-                        .borrow_mut()
-                        .get_locked_repository(true)?
-                        .borrow(),
-                )
+                let locked_repo = composer_ref
+                    .get_locker()
+                    .borrow_mut()
+                    .get_locked_repository(true)?;
+                locked_repo.borrow_mut().get_canonical_packages()?
             } else {
                 composer_ref
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .get_packages()
+                    .get_packages()?
             };
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {

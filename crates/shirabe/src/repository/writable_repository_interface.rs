@@ -12,7 +12,7 @@ pub trait WritableRepositoryInterface: RepositoryInterface {
 
     fn remove_package(&mut self, package: PackageInterfaceHandle) -> Result<()>;
 
-    fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle>;
+    fn get_canonical_packages(&mut self) -> Result<Vec<PackageInterfaceHandle>>;
 
     fn reload(&mut self);
 

@@ -56,34 +56,46 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
     fn has_package(&self, package: PackageInterfaceHandle) -> bool;
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle>;
+    ) -> anyhow::Result<Option<BasePackageHandle>>;
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle>;
+    ) -> anyhow::Result<Vec<BasePackageHandle>>;
 
-    fn get_packages(&self) -> Vec<BasePackageHandle>;
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>>;
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult;
+    ) -> anyhow::Result<LoadPackagesResult>;
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult>;
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>>;
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo>;
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>>;
 
     fn get_repo_name(&self) -> String;
 
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
+        None
+    }
+
+    fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
         None
     }
 

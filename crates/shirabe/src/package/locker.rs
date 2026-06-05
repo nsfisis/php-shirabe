@@ -966,11 +966,11 @@ impl Locker {
                         Some(FindPackageConstraint::Constraint(
                             link.get_constraint().clone(),
                         )),
-                    )
+                    )?
                     .is_empty()
                 {
                     let results = installed_repo
-                        .find_packages_with_replacers_and_providers(&link.get_target(), None);
+                        .find_packages_with_replacers_and_providers(&link.get_target(), None)?;
 
                     if !results.is_empty() {
                         // PHP `reset($results)` returns the first shared package; clone the handle.

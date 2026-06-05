@@ -156,11 +156,9 @@ impl AuditCommand {
                     code: 0,
                 }.into());
             }
-            return Ok(CanonicalPackagesTrait::get_packages(
-                &*locker
-                    .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?
-                    .borrow(),
-            ));
+            let locked_repo = locker
+                .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
+            return locked_repo.borrow_mut().get_canonical_packages();
         }
 
         let _root_pkg = composer.get_package();

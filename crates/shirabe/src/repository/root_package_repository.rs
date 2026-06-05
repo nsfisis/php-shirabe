@@ -37,32 +37,32 @@ impl RepositoryInterface for RootPackageRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: crate::repository::FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<crate::repository::FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.get_packages()
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> crate::repository::LoadPackagesResult {
+    ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -71,11 +71,19 @@ impl RepositoryInterface for RootPackageRepository {
         )
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

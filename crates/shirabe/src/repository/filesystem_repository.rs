@@ -463,7 +463,7 @@ impl FilesystemRepository {
 
     /// @param array<string, string> $installPaths
     fn generate_installed_versions(
-        &self,
+        &mut self,
         installation_manager: &InstallationManager,
         install_paths: &IndexMap<String, Option<String>>,
         dev_mode: bool,
@@ -478,7 +478,7 @@ impl FilesystemRepository {
         ));
         let mut packages: Vec<PackageInterfaceHandle> = self
             .inner
-            .get_packages()
+            .get_packages()?
             .into_iter()
             .map(|p| p.into())
             .collect();

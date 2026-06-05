@@ -241,7 +241,7 @@ impl BumpCommand {
                 let package_opt = repo.find_package(
                     pkg_name,
                     crate::repository::FindPackageConstraint::String("*".to_string()),
-                );
+                )?;
                 let mut package = match package_opt {
                     None => continue,
                     Some(p) => p,

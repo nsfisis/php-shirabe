@@ -1,15 +1,14 @@
 //! ref: composer/src/Composer/Repository/CanonicalPackagesTrait.php
 
 use crate::package::PackageInterfaceHandle;
+use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 
 /// Provides get_canonical_packages() to various repository implementations.
-pub trait CanonicalPackagesTrait {
-    fn get_packages(&self) -> Vec<PackageInterfaceHandle>;
-
+pub trait CanonicalPackagesTrait: RepositoryInterface {
     /// Get unique packages (at most one package of each name), with aliases resolved and removed.
-    fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle> {
-        let packages = self.get_packages();
+    fn get_canonical_packages(&mut self) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
+        let packages = self.get_packages()?;
 
         // get at most one package of each name, preferring non-aliased ones
         let mut packages_by_name: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
@@ -34,6 +33,6 @@ pub trait CanonicalPackagesTrait {
             canonical_packages.push(package);
         }
 
-        canonical_packages
+        Ok(canonical_packages)
     }
 }

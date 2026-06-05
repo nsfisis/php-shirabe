@@ -11,10 +11,10 @@ pub struct SecurityAdvisoryResult {
 }
 
 pub trait AdvisoryProviderInterface {
-    fn has_security_advisories(&self) -> bool;
+    fn has_security_advisories(&mut self) -> anyhow::Result<bool>;
 
     fn get_security_advisories(
-        &self,
+        &mut self,
         package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult>;

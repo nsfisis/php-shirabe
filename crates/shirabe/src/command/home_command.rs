@@ -103,7 +103,7 @@ impl HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in repo.find_packages(&package_name, None) {
+                for package in repo.find_packages(&package_name, None)? {
                     package_exists = true;
                     if let Some(complete_pkg) = package.as_complete() {
                         if self.handle_package(complete_pkg, show_homepage, show_only) {

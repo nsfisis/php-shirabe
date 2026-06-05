@@ -788,7 +788,7 @@ impl CreateProjectCommand {
         }
 
         let platform_overrides = config.borrow_mut().get("platform");
-        let platform_repo = PlatformRepository::new(
+        let mut platform_repo = PlatformRepository::new(
             vec![],
             match platform_overrides {
                 PhpMixed::Array(m) => m
@@ -805,7 +805,7 @@ impl CreateProjectCommand {
         )?;
 
         // find the latest version if there are multiple
-        let mut version_selector = VersionSelector::new(repository_set, Some(&platform_repo))?;
+        let mut version_selector = VersionSelector::new(repository_set, Some(&mut platform_repo))?;
         // TODO(phase-b): platform_requirement_filter is &dyn here but VersionSelector expects
         // Option<Box<dyn ...>>; pass None as placeholder.
         let _ = platform_requirement_filter;

@@ -36,12 +36,11 @@ pub struct VersionSelector {
 impl VersionSelector {
     pub fn new(
         repository_set: RepositorySet,
-        platform_repo: Option<&crate::repository::PlatformRepository>,
+        platform_repo: Option<&mut crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
         let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
-            for package in <PlatformRepository as RepositoryInterface>::get_packages(platform_repo)
-            {
+            for package in platform_repo.get_packages()? {
                 let constraint = SimpleConstraint::new(
                     "==".to_string(),
                     package.get_version().to_string(),
@@ -95,7 +94,7 @@ impl VersionSelector {
             &strtolower(package_name),
             constraint.as_ref().map(|c| c.clone()),
             repo_set_flags,
-        );
+        )?;
 
         let min_priority = *base_package::STABILITIES.get(preferred_stability).unwrap();
         candidates.sort_by(|a, b| {

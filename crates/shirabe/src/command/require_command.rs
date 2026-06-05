@@ -337,7 +337,7 @@ impl RequireCommand {
 
                 let found_packages: Vec<crate::package::PackageInterfaceHandle> = self
                     .get_repos()
-                    .find_packages(name, None)
+                    .find_packages(name, None)?
                     .into_iter()
                     .map(|p| p.into())
                     .collect();
@@ -557,7 +557,7 @@ impl RequireCommand {
         composer
             .get_plugin_manager()
             .borrow_mut()
-            .deactivate_installed_plugins();
+            .deactivate_installed_plugins()?;
 
         let io = self.get_io().clone();
         let do_update_result =
@@ -955,7 +955,7 @@ impl RequireCommand {
             let mut package = repo.find_package(
                 package_name,
                 crate::repository::FindPackageConstraint::String("*".to_string()),
-            );
+            )?;
             while let Some(alias) = package.as_ref().and_then(|p| p.as_alias()) {
                 package = Some(alias.get_alias_of().into());
             }

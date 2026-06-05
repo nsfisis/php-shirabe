@@ -328,148 +328,6 @@ impl ComposerRepository {
         self.repo_config.clone()
     }
 
-    /// @inheritDoc
-    pub fn find_package(
-        &mut self,
-        name: String,
-        constraint: PhpMixed,
-    ) -> anyhow::Result<Option<BasePackageHandle>> {
-        // this call initializes loadRootServerFile which is needed for the rest below to work
-        let has_providers = self.has_providers()?;
-
-        let name = strtolower(&name);
-        let constraint: AnyConstraint = match constraint {
-            PhpMixed::String(s) => self.version_parser.parse_constraints(&s)?.clone(),
-            _ => {
-                // already a ConstraintInterface object passed as opaque PhpMixed
-                self.version_parser.parse_constraints("")?.clone()
-            }
-        };
-
-        if self.lazy_providers_url.is_some() {
-            if self.has_partial_packages()?
-                && self
-                    .partial_packages_by_name
-                    .as_ref()
-                    .map_or(false, |m| m.contains_key(&name))
-            {
-                let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
-                return Ok(
-                    match self.filter_packages(packages_vec, Some(&constraint), true) {
-                        FindPackageReturn::Package(p) => Some(p),
-                        _ => None,
-                    },
-                );
-            }
-
-            if self.has_available_package_list && !self.lazy_providers_repo_contains(&name)? {
-                return Ok(None);
-            }
-
-            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-            map.insert(name.clone(), Some(constraint));
-            let packages = self.load_async_packages(map, None, None, IndexMap::new())?;
-
-            if !packages.packages.is_empty() {
-                return Ok(packages.packages.into_iter().next().map(|(_, v)| v));
-            }
-
-            return Ok(None);
-        }
-
-        if has_providers {
-            for provider_name in self.get_provider_names()? {
-                if name == provider_name {
-                    let packages =
-                        self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
-                    return Ok(
-                        match self.filter_packages(packages_vec, Some(&constraint), true) {
-                            FindPackageReturn::Package(p) => Some(p),
-                            _ => None,
-                        },
-                    );
-                }
-            }
-
-            return Ok(None);
-        }
-
-        Ok(self.inner.find_package(
-            &name,
-            crate::repository::FindPackageConstraint::Constraint(constraint),
-        ))
-    }
-
-    /// @inheritDoc
-    pub fn find_packages(
-        &mut self,
-        name: String,
-        constraint: Option<PhpMixed>,
-    ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        // this call initializes loadRootServerFile which is needed for the rest below to work
-        let has_providers = self.has_providers()?;
-
-        let name = strtolower(&name);
-        let constraint: Option<AnyConstraint> = match constraint {
-            None => None,
-            Some(PhpMixed::String(s)) => Some(self.version_parser.parse_constraints(&s)?.clone()),
-            Some(_) => None,
-        };
-
-        if self.lazy_providers_url.is_some() {
-            if self.has_partial_packages()?
-                && self
-                    .partial_packages_by_name
-                    .as_ref()
-                    .map_or(false, |m| m.contains_key(&name))
-            {
-                let packages = self.what_provides(&name, None, None, IndexMap::new())?;
-                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
-                return Ok(
-                    match self.filter_packages(packages_vec, constraint.as_ref(), false) {
-                        FindPackageReturn::Packages(v) => v,
-                        _ => vec![],
-                    },
-                );
-            }
-
-            if self.has_available_package_list && !self.lazy_providers_repo_contains(&name)? {
-                return Ok(vec![]);
-            }
-
-            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-            map.insert(name.clone(), constraint);
-            let result = self.load_async_packages(map, None, None, IndexMap::new())?;
-
-            return Ok(result.packages.into_values().collect());
-        }
-
-        if has_providers {
-            for provider_name in self.get_provider_names()? {
-                if name == provider_name {
-                    let packages =
-                        self.what_provides(&provider_name, None, None, IndexMap::new())?;
-                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
-                    return Ok(
-                        match self.filter_packages(packages_vec, constraint.as_ref(), false) {
-                            FindPackageReturn::Packages(v) => v,
-                            _ => vec![],
-                        },
-                    );
-                }
-            }
-
-            return Ok(vec![]);
-        }
-
-        Ok(self.inner.find_packages(
-            &name,
-            constraint.map(crate::repository::FindPackageConstraint::Constraint),
-        ))
-    }
-
     fn filter_packages(
         &self,
         packages: Vec<BasePackageHandle>,
@@ -560,7 +418,7 @@ impl ComposerRepository {
             }.into());
         }
 
-        Ok(self.inner.get_packages())
+        Ok(self.inner.get_packages()?)
     }
 
     /// @param packageFilter Package pattern filter which can include "*" as a wildcard
@@ -734,7 +592,7 @@ impl ComposerRepository {
                 acceptable_stabilities,
                 stability_flags,
                 already_loaded,
-            );
+            )?;
             return Ok(inner_result);
         }
 
@@ -997,7 +855,7 @@ impl ComposerRepository {
         }
 
         // TODO(phase-b): inner.search returns Vec<SearchResult>; convert to PHP-shaped map
-        let inner_results = self.inner.search(query, mode, None);
+        let inner_results = self.inner.search(query, mode, None)?;
         let converted: Vec<IndexMap<String, PhpMixed>> = inner_results
             .into_iter()
             .map(|sr| {
@@ -1350,7 +1208,7 @@ impl ComposerRepository {
         }
 
         if Countable::count(&self.inner) > 0 {
-            for (k, v) in self.inner.get_providers(package_name.to_string()) {
+            for (k, v) in self.inner.get_providers(package_name.to_string())? {
                 // TODO(phase-b): ProviderInfo -> IndexMap<String, PhpMixed> conversion needed
                 let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(v.name));
@@ -3521,5 +3379,279 @@ fn clone_root_data(rd: &RootData) -> RootData {
     match rd {
         RootData::True => RootData::True,
         RootData::Data(d) => RootData::Data(d.clone()),
+    }
+}
+
+impl shirabe_php_shim::Countable for ComposerRepository {
+    fn count(&self) -> i64 {
+        self.inner.count()
+    }
+}
+
+impl RepositoryInterface for ComposerRepository {
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        self.inner.has_package(package)
+    }
+
+    /// @inheritDoc
+    fn find_package(
+        &mut self,
+        name: &str,
+        constraint: crate::repository::FindPackageConstraint,
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        // this call initializes loadRootServerFile which is needed for the rest below to work
+        let has_providers = self.has_providers()?;
+
+        let name = strtolower(name);
+        let constraint: AnyConstraint = match constraint {
+            crate::repository::FindPackageConstraint::String(s) => {
+                self.version_parser.parse_constraints(&s)?.clone()
+            }
+            crate::repository::FindPackageConstraint::Constraint(c) => c,
+        };
+
+        if self.lazy_providers_url.is_some() {
+            if self.has_partial_packages()?
+                && self
+                    .partial_packages_by_name
+                    .as_ref()
+                    .map_or(false, |m| m.contains_key(&name))
+            {
+                let packages = self.what_provides(&name, None, None, IndexMap::new())?;
+                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
+                return Ok(
+                    match self.filter_packages(packages_vec, Some(&constraint), true) {
+                        FindPackageReturn::Package(p) => Some(p),
+                        _ => None,
+                    },
+                );
+            }
+
+            if self.has_available_package_list && !self.lazy_providers_repo_contains(&name)? {
+                return Ok(None);
+            }
+
+            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
+            map.insert(name.clone(), Some(constraint));
+            let packages = self.load_async_packages(map, None, None, IndexMap::new())?;
+
+            if !packages.packages.is_empty() {
+                return Ok(packages.packages.into_iter().next().map(|(_, v)| v));
+            }
+
+            return Ok(None);
+        }
+
+        if has_providers {
+            for provider_name in self.get_provider_names()? {
+                if name == provider_name {
+                    let packages =
+                        self.what_provides(&provider_name, None, None, IndexMap::new())?;
+                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
+                    return Ok(
+                        match self.filter_packages(packages_vec, Some(&constraint), true) {
+                            FindPackageReturn::Package(p) => Some(p),
+                            _ => None,
+                        },
+                    );
+                }
+            }
+
+            return Ok(None);
+        }
+
+        self.inner.find_package(
+            &name,
+            crate::repository::FindPackageConstraint::Constraint(constraint),
+        )
+    }
+
+    /// @inheritDoc
+    fn find_packages(
+        &mut self,
+        name: &str,
+        constraint: Option<crate::repository::FindPackageConstraint>,
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        // this call initializes loadRootServerFile which is needed for the rest below to work
+        let has_providers = self.has_providers()?;
+
+        let name = strtolower(name);
+        let constraint: Option<AnyConstraint> = match constraint {
+            None => None,
+            Some(crate::repository::FindPackageConstraint::String(s)) => {
+                Some(self.version_parser.parse_constraints(&s)?.clone())
+            }
+            Some(crate::repository::FindPackageConstraint::Constraint(c)) => Some(c),
+        };
+
+        if self.lazy_providers_url.is_some() {
+            if self.has_partial_packages()?
+                && self
+                    .partial_packages_by_name
+                    .as_ref()
+                    .map_or(false, |m| m.contains_key(&name))
+            {
+                let packages = self.what_provides(&name, None, None, IndexMap::new())?;
+                let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
+                return Ok(
+                    match self.filter_packages(packages_vec, constraint.as_ref(), false) {
+                        FindPackageReturn::Packages(v) => v,
+                        _ => vec![],
+                    },
+                );
+            }
+
+            if self.has_available_package_list && !self.lazy_providers_repo_contains(&name)? {
+                return Ok(vec![]);
+            }
+
+            let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
+            map.insert(name.clone(), constraint);
+            let result = self.load_async_packages(map, None, None, IndexMap::new())?;
+
+            return Ok(result.packages.into_values().collect());
+        }
+
+        if has_providers {
+            for provider_name in self.get_provider_names()? {
+                if name == provider_name {
+                    let packages =
+                        self.what_provides(&provider_name, None, None, IndexMap::new())?;
+                    let packages_vec: Vec<BasePackageHandle> = packages.into_values().collect();
+                    return Ok(
+                        match self.filter_packages(packages_vec, constraint.as_ref(), false) {
+                            FindPackageReturn::Packages(v) => v,
+                            _ => vec![],
+                        },
+                    );
+                }
+            }
+
+            return Ok(vec![]);
+        }
+
+        self.inner.find_packages(
+            &name,
+            constraint.map(crate::repository::FindPackageConstraint::Constraint),
+        )
+    }
+
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        ComposerRepository::get_packages(self)
+    }
+
+    fn load_packages(
+        &mut self,
+        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> anyhow::Result<LoadPackagesResult> {
+        ComposerRepository::load_packages(
+            self,
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
+        let raw = ComposerRepository::search(self, query, mode, r#type)?;
+        Ok(raw
+            .into_iter()
+            .map(|m| crate::repository::SearchResult {
+                name: m
+                    .get("name")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string(),
+                description: m
+                    .get("description")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string()),
+                abandoned: None,
+                url: m
+                    .get("url")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string()),
+            })
+            .collect())
+    }
+
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
+        let raw = ComposerRepository::get_providers(self, &package_name)?;
+        Ok(raw
+            .into_iter()
+            .map(|(k, m)| {
+                (
+                    k,
+                    crate::repository::ProviderInfo {
+                        name: m
+                            .get("name")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string(),
+                        description: m
+                            .get("description")
+                            .and_then(|v| v.as_string())
+                            .map(|s| s.to_string()),
+                        r#type: m
+                            .get("type")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string(),
+                    },
+                )
+            })
+            .collect())
+    }
+
+    fn get_repo_name(&self) -> String {
+        ComposerRepository::get_repo_name(self)
+    }
+
+    fn as_advisory_provider(&self) -> Option<&dyn crate::repository::AdvisoryProviderInterface> {
+        Some(self)
+    }
+
+    fn as_advisory_provider_mut(
+        &mut self,
+    ) -> Option<&mut dyn crate::repository::AdvisoryProviderInterface> {
+        Some(self)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: RepositoryInterfaceWeakHandle) {
+        ComposerRepository::set_self_handle(self, weak);
+    }
+}
+
+impl crate::repository::AdvisoryProviderInterface for ComposerRepository {
+    fn has_security_advisories(&mut self) -> anyhow::Result<bool> {
+        ComposerRepository::has_security_advisories(self)
+    }
+
+    fn get_security_advisories(
+        &mut self,
+        package_constraint_map: IndexMap<String, shirabe_semver::constraint::AnyConstraint>,
+        allow_partial_advisories: bool,
+    ) -> anyhow::Result<SecurityAdvisoryResult> {
+        ComposerRepository::get_security_advisories(
+            self,
+            package_constraint_map,
+            allow_partial_advisories,
+        )
     }
 }

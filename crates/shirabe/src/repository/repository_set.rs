@@ -206,7 +206,7 @@ impl RepositorySet {
         name: &str,
         constraint: Option<AnyConstraint>,
         flags: i64,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         let ignore_stability = (flags & Self::ALLOW_UNACCEPTABLE_STABILITIES) != 0;
         let load_from_all_repos = (flags & Self::ALLOW_SHADOWED_REPOSITORIES) != 0;
 
@@ -217,7 +217,7 @@ impl RepositorySet {
                 let constraint_clone = constraint
                     .as_ref()
                     .map(|c| FindPackageConstraint::Constraint(c.clone()));
-                let found = repository.find_packages(name, constraint_clone);
+                let found = repository.find_packages(name, constraint_clone)?;
                 packages.push(found);
             }
         } else {
@@ -243,7 +243,7 @@ impl RepositorySet {
                     acceptable,
                     stability_flags,
                     IndexMap::new(),
-                );
+                )?;
 
                 packages.push(result.packages.into_values().collect());
                 for name_found in result.names_found {
@@ -264,7 +264,7 @@ impl RepositorySet {
 
         // when using loadPackages above (!$loadFromAllRepos) the repos already filter for stability so no need to do it again
         if ignore_stability || !load_from_all_repos {
-            return candidates;
+            return Ok(candidates);
         }
 
         let mut result: Vec<BasePackageHandle> = vec![];
@@ -274,7 +274,7 @@ impl RepositorySet {
             }
         }
 
-        result
+        Ok(result)
     }
 
     /// @param string[] $packageNames
@@ -375,17 +375,16 @@ impl RepositorySet {
         let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
             let attempt: Result<()> = (|| -> Result<()> {
-                let repo_ref = repository.borrow();
-                let Some(advisory_repo) = repo_ref.as_advisory_provider() else {
+                let mut repo_ref = repository.borrow_mut();
+                let Some(advisory_repo) = repo_ref.as_advisory_provider_mut() else {
                     return Ok(());
                 };
-                if !advisory_repo.has_security_advisories() {
+                if !advisory_repo.has_security_advisories()? {
                     return Ok(());
                 }
 
                 let result = advisory_repo.get_security_advisories(
-                    // TODO(phase-b): clone package_constraint_map values
-                    todo!("clone package_constraint_map"),
+                    package_constraint_map.clone(),
                     allow_partial_advisories,
                 )?;
                 repo_advisories.push(result.advisories);
@@ -429,16 +428,16 @@ impl RepositorySet {
     pub fn get_providers(
         &self,
         package_name: &str,
-    ) -> IndexMap<String, crate::repository::ProviderInfo> {
+    ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
         let mut providers: IndexMap<String, crate::repository::ProviderInfo> = IndexMap::new();
         for repository in &self.repositories {
-            let repo_providers = repository.get_providers(package_name.to_string());
+            let repo_providers = repository.get_providers(package_name.to_string())?;
             if !repo_providers.is_empty() {
                 providers.extend(repo_providers);
             }
         }
 
-        providers
+        Ok(providers)
     }
 
     /// Check for each given package name whether it would be accepted by this RepositorySet in the given $stability
@@ -531,7 +530,7 @@ impl RepositorySet {
 
         let mut packages: Vec<BasePackageHandle> = vec![];
         for repository in &self.repositories {
-            for mut package in repository.get_packages() {
+            for mut package in repository.get_packages()? {
                 let name = package.get_name();
                 let version = package.get_version();
                 packages.push(package.clone());

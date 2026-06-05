@@ -195,11 +195,12 @@ impl Request {
     pub fn get_present_map(
         &self,
         package_ids: bool,
-    ) -> IndexMap<String, crate::package::BasePackageHandle> {
+    ) -> anyhow::Result<IndexMap<String, crate::package::BasePackageHandle>> {
         let mut present_map: IndexMap<String, crate::package::BasePackageHandle> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
-            for package in RepositoryInterface::get_packages(&*locked_repository.borrow()) {
+            for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?
+            {
                 let key = if package_ids {
                     package.get_id().to_string()
                 } else {
@@ -218,7 +219,7 @@ impl Request {
             present_map.insert(key, package.clone());
         }
 
-        present_map
+        Ok(present_map)
     }
 
     pub fn get_fixed_packages_map(&self) -> IndexMap<i64, BasePackageHandle> {

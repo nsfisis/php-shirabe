@@ -118,7 +118,7 @@ impl StatusCommand {
             .get_repository_manager()
             .borrow()
             .get_local_repository()
-            .get_canonical_packages();
+            .get_canonical_packages()?;
         for package in packages {
             let target_dir = composer
                 .get_installation_manager()

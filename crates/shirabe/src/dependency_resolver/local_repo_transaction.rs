@@ -11,15 +11,15 @@ pub struct LocalRepoTransaction {
 
 impl LocalRepoTransaction {
     pub fn new(
-        locked_repository: &dyn RepositoryInterface,
-        local_repository: &dyn InstalledRepositoryInterface,
-    ) -> Self {
-        Self {
+        locked_repository: &mut dyn RepositoryInterface,
+        local_repository: &mut dyn InstalledRepositoryInterface,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             inner: Transaction::new(
-                local_repository.get_packages(),
-                locked_repository.get_packages(),
+                local_repository.get_packages()?,
+                locked_repository.get_packages()?,
             ),
-        }
+        })
     }
 
     pub fn get_operations(

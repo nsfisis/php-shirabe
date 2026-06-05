@@ -56,7 +56,7 @@ impl FundCommand {
         let repository_manager = composer.get_repository_manager().clone();
         let repository_manager = repository_manager.borrow();
         let repo = repository_manager.get_local_repository();
-        let remote_repos = CompositeRepository::new(
+        let mut remote_repos = CompositeRepository::new(
             repository_manager
                 .get_repositories()
                 .iter()
@@ -67,7 +67,7 @@ impl FundCommand {
 
         let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
         let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
-        for package in repo.get_packages() {
+        for package in repo.get_packages()? {
             if package.as_alias().is_some() {
                 continue;
             }
@@ -84,7 +84,7 @@ impl FundCommand {
             IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
             IndexMap::new(),
             IndexMap::new(),
-        );
+        )?;
 
         // collect funding data from default branches
         for (_, package) in &result.packages {
@@ -103,7 +103,7 @@ impl FundCommand {
         }
 
         // collect funding from installed packages if none was found in the default branch above
-        for package in repo.get_packages() {
+        for package in repo.get_packages()? {
             if package.as_alias().is_some() || !packages_to_load_names.contains(&package.get_name())
             {
                 continue;

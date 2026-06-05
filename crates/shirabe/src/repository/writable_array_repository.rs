@@ -76,8 +76,8 @@ impl WritableArrayRepository {
         Vec::new()
     }
 
-    pub fn get_packages(&self) -> Vec<crate::package::BasePackageHandle> {
-        crate::repository::RepositoryInterface::get_packages(&self.inner)
+    pub fn get_packages(&mut self) -> anyhow::Result<Vec<crate::package::BasePackageHandle>> {
+        self.inner.get_packages()
     }
 
     pub fn get_repo_name(&self) -> String {

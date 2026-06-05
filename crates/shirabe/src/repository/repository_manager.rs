@@ -55,23 +55,23 @@ impl RepositoryManager {
         &self,
         name: &str,
         constraint: &AnyConstraint,
-    ) -> Option<PackageInterfaceHandle> {
+    ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         for repository in &self.repositories {
             if let Some(package) = repository.find_package(
                 name,
                 crate::repository::FindPackageConstraint::Constraint(constraint.clone()),
-            ) {
-                return Some(package.into());
+            )? {
+                return Ok(Some(package.into()));
             }
         }
-        None
+        Ok(None)
     }
 
     pub fn find_packages(
         &self,
         name: &str,
         constraint: &AnyConstraint,
-    ) -> Vec<PackageInterfaceHandle> {
+    ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
         for repository in self.get_repositories() {
             for p in repository.find_packages(
@@ -79,11 +79,11 @@ impl RepositoryManager {
                 Some(crate::repository::FindPackageConstraint::Constraint(
                     constraint.clone(),
                 )),
-            ) {
+            )? {
                 packages.push(p);
             }
         }
-        packages
+        Ok(packages)
     }
 
     pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {

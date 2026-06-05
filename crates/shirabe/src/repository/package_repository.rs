@@ -82,12 +82,12 @@ impl PackageRepository {
 }
 
 impl AdvisoryProviderInterface for PackageRepository {
-    fn has_security_advisories(&self) -> bool {
-        !self.security_advisories.is_empty()
+    fn has_security_advisories(&mut self) -> anyhow::Result<bool> {
+        Ok(!self.security_advisories.is_empty())
     }
 
     fn get_security_advisories(
-        &self,
+        &mut self,
         package_constraint_map: IndexMap<String, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {

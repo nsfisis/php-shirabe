@@ -37,6 +37,33 @@ pub struct ArrayRepository {
 }
 
 impl ArrayRepository {
+    fn get_packages_internal(&self) -> Vec<BasePackageHandle> {
+        if self.packages.borrow().is_none() {
+            self.initialize();
+        }
+
+        if self.packages.borrow().is_none() {
+            // TODO(phase-b): propagate the error.
+            // PHP: throw new \LogicException('initialize failed to initialize the packages array')
+            panic!(
+                "{}",
+                LogicException {
+                    message: "initialize failed to initialize the packages array".to_string(),
+                    code: 0,
+                }
+                .message
+            );
+        }
+
+        self.packages
+            .borrow()
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|p| p.clone())
+            .collect()
+    }
+
     /// @param array<PackageInterface> $packages
     pub fn new(packages: Vec<PackageInterfaceHandle>) -> Result<Self> {
         let this = Self {
@@ -153,13 +180,13 @@ impl RepositoryInterface for ArrayRepository {
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
-        let packages = self.get_packages();
+    ) -> anyhow::Result<LoadPackagesResult> {
+        let packages = self.get_packages_internal();
 
         let mut result: IndexMap<String, BasePackageHandle> = IndexMap::new();
         let mut names_found: IndexMap<String, bool> = IndexMap::new();
@@ -214,17 +241,17 @@ impl RepositoryInterface for ArrayRepository {
             }
         }
 
-        LoadPackagesResult {
+        Ok(LoadPackagesResult {
             names_found: names_found.into_keys().collect(),
             packages: result,
-        }
+        })
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         let name = strtolower(name);
 
         let constraint: AnyConstraint = match constraint {
@@ -235,7 +262,7 @@ impl RepositoryInterface for ArrayRepository {
             }
         };
 
-        for package in self.get_packages() {
+        for package in self.get_packages_internal() {
             if name == package.get_name() {
                 let pkg_constraint = SimpleConstraint::new(
                     "==".to_string(),
@@ -243,19 +270,19 @@ impl RepositoryInterface for ArrayRepository {
                     None,
                 );
                 if constraint.matches(&pkg_constraint.into()) {
-                    return Some(package);
+                    return Ok(Some(package));
                 }
             }
         }
 
-        None
+        Ok(None)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         // normalize name
         let name = strtolower(name);
         let mut packages = vec![];
@@ -269,7 +296,7 @@ impl RepositoryInterface for ArrayRepository {
             }
         };
 
-        for package in self.get_packages() {
+        for package in self.get_packages_internal() {
             if name == package.get_name() {
                 if constraint.is_none()
                     || constraint.as_ref().unwrap().matches(
@@ -286,10 +313,15 @@ impl RepositoryInterface for ArrayRepository {
             }
         }
 
-        packages
+        Ok(packages)
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
             let parts = Preg::split("{\\s+}", &preg_quote(&query, None)).unwrap_or_default();
             format!("{{(?:{})}}i", implode("|", &parts))
@@ -300,7 +332,7 @@ impl RepositoryInterface for ArrayRepository {
         };
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
-        for package in self.get_packages() {
+        for package in self.get_packages_internal() {
             let mut name = package.get_name();
             if mode == crate::repository::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
@@ -373,13 +405,13 @@ impl RepositoryInterface for ArrayRepository {
             }
         }
 
-        matches.into_values().collect()
+        Ok(matches.into_values().collect())
     }
 
     fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         if self.package_map.borrow().is_none() {
             let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
-            for repo_package in self.get_packages() {
+            for repo_package in self.get_packages_internal() {
                 map.insert(repo_package.get_unique_name(), repo_package);
             }
             *self.package_map.borrow_mut() = Some(map);
@@ -392,10 +424,13 @@ impl RepositoryInterface for ArrayRepository {
             .contains_key(&package.get_unique_name())
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         let mut result: IndexMap<String, ProviderInfo> = IndexMap::new();
 
-        'candidates: for candidate in self.get_packages() {
+        'candidates: for candidate in self.get_packages_internal() {
             if result.contains_key(&candidate.get_name()) {
                 continue;
             }
@@ -416,33 +451,11 @@ impl RepositoryInterface for ArrayRepository {
             }
         }
 
-        result
+        Ok(result)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
-        if self.packages.borrow().is_none() {
-            self.initialize();
-        }
-
-        if self.packages.borrow().is_none() {
-            // PHP: throw new \LogicException('initialize failed to initialize the packages array')
-            panic!(
-                "{}",
-                LogicException {
-                    message: "initialize failed to initialize the packages array".to_string(),
-                    code: 0,
-                }
-                .message
-            );
-        }
-
-        self.packages
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|p| p.clone())
-            .collect()
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        Ok(self.get_packages_internal())
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

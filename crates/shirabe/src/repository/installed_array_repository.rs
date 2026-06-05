@@ -68,7 +68,9 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
         todo!()
     }
 
-    fn get_canonical_packages(&self) -> Vec<crate::package::PackageInterfaceHandle> {
+    fn get_canonical_packages(
+        &mut self,
+    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
         todo!()
     }
 
@@ -96,35 +98,43 @@ impl RepositoryInterface for InstalledArrayRepository {
         todo!()
     }
     fn find_package(
-        &self,
+        &mut self,
         _name: &str,
         _constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         todo!()
     }
     fn find_packages(
-        &self,
+        &mut self,
         _name: &str,
         _constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         todo!()
     }
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         todo!()
     }
     fn load_packages(
-        &self,
+        &mut self,
         _package_name_map: IndexMap<String, Option<AnyConstraint>>,
         _acceptable_stabilities: IndexMap<String, i64>,
         _stability_flags: IndexMap<String, i64>,
         _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
+    ) -> anyhow::Result<LoadPackagesResult> {
         todo!()
     }
-    fn search(&self, _query: String, _mode: i64, _type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        _query: String,
+        _mode: i64,
+        _type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         todo!()
     }
-    fn get_providers(&self, _package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        _package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         todo!()
     }
     fn get_repo_name(&self) -> String {

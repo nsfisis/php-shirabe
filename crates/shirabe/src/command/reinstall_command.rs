@@ -97,7 +97,7 @@ impl ReinstallCommand {
                         .collect()
                 })
                 .unwrap_or_default();
-            for package in local_repo.get_canonical_packages() {
+            for package in local_repo.get_canonical_packages()? {
                 if filter_types.contains(&package.get_type()) {
                     package_names_to_reinstall.push(package.get_name());
                     packages_to_reinstall.push(package);
@@ -123,7 +123,7 @@ impl ReinstallCommand {
             for pattern in &patterns {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
                 let mut matched = false;
-                for package in local_repo.get_canonical_packages() {
+                for package in local_repo.get_canonical_packages()? {
                     if Preg::is_match(&pattern_regexp, &package.get_name()).unwrap_or(false) {
                         matched = true;
                         package_names_to_reinstall.push(package.get_name());
@@ -146,7 +146,7 @@ impl ReinstallCommand {
             uninstall_operations.push(UninstallOperation::new(package));
         }
 
-        let present_packages = local_repo.get_packages();
+        let present_packages = local_repo.get_packages()?;
         let result_packages: Vec<crate::package::PackageInterfaceHandle> =
             present_packages.iter().map(|p| p.clone().into()).collect();
         let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages

@@ -110,7 +110,7 @@ impl Problem {
                     is_verbose,
                     &package_name,
                     constraint,
-                );
+                )?;
                 return Ok(format!("\n    {}", implode("", &[missing.0, missing.1])));
             }
         }
@@ -126,7 +126,7 @@ impl Problem {
                 .cmp(&self.get_sortable_string(pool, &rule2.borrow()))
         });
 
-        Ok(Self::format_deduplicated_rules(
+        Self::format_deduplicated_rules(
             &reasons,
             "    ",
             repository_set,
@@ -135,7 +135,7 @@ impl Problem {
             is_verbose,
             installed_map,
             learned_pool,
-        ))
+        )
     }
 
     fn get_sortable_string(&self, pool: &Pool, rule: &Rule) -> String {
@@ -208,7 +208,7 @@ impl Problem {
         is_verbose: bool,
         installed_map: &IndexMap<String, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         let mut messages: Vec<String> = Vec::new();
         let mut templates: IndexMap<String, IndexMap<String, IndexMap<String, String>>> =
             IndexMap::new();
@@ -224,7 +224,7 @@ impl Problem {
                 is_verbose,
                 installed_map,
                 learned_pool,
-            );
+            )?;
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             let matched = if in_array(
                 PhpMixed::Int(rule_ref.get_reason()),
@@ -341,11 +341,11 @@ impl Problem {
             }
         }
 
-        format!(
+        Ok(format!(
             "\n{}- {}",
             indent,
             implode(&format!("\n{}- ", indent), &result)
-        )
+        ))
     }
 
     pub fn is_caused_by_lock(
@@ -394,7 +394,7 @@ impl Problem {
         is_verbose: bool,
         package_name: &str,
         constraint: Option<&AnyConstraint>,
-    ) -> (String, String) {
+    ) -> anyhow::Result<(String, String)> {
         if PlatformRepository::is_platform_package(package_name) {
             // handle php/php-*/hhvm
             if stripos(package_name, "php") == Some(0) || package_name == "hhvm" {
@@ -413,51 +413,51 @@ impl Problem {
                 if defined("HHVM_VERSION")
                     || (package_name == "hhvm" && pool.what_provides(package_name, None).len() > 0)
                 {
-                    return (
+                    return Ok((
                         msg,
                         "your HHVM version does not satisfy that requirement.".to_string(),
-                    );
+                    ));
                 }
 
                 if package_name == "hhvm" {
-                    return (
+                    return Ok((
                         msg,
                         "HHVM was not detected on this machine, make sure it is in your PATH."
                             .to_string(),
-                    );
+                    ));
                 }
 
                 if version.is_none() {
-                    return (
+                    return Ok((
                         msg,
                         format!(
                             "the {} package is disabled by your platform config. Enable it again with \"composer config platform.{} --unset\".",
                             package_name, package_name
                         ),
-                    );
+                    ));
                 }
 
-                return (
+                return Ok((
                     msg,
                     format!(
                         "your {} version ({}) does not satisfy that requirement.",
                         package_name,
                         version.unwrap()
                     ),
-                );
+                ));
             }
 
             // handle php extensions
             if stripos(package_name, "ext-") == Some(0) {
                 if strpos(package_name, " ").is_some() {
-                    return (
+                    return Ok((
                         "- ".to_string(),
                         format!(
                             "PHP extension {} should be required as {}.",
                             package_name,
                             str_replace(" ", "-", package_name)
                         ),
-                    );
+                    ));
                 }
 
                 let ext = substr(package_name, 4, None);
@@ -476,7 +476,7 @@ impl Problem {
                     Self::get_platform_package_version(pool, package_name, &effective_version);
                 if version.is_none() {
                     let providers_str_opt =
-                        Self::get_providers_list(repository_set, package_name, 5);
+                        Self::get_providers_list(repository_set, package_name, 5)?;
                     let providers_str = match providers_str_opt {
                         Some(ps) => format!(
                             "\n\n      Alternatively you can require one of these packages that provide the extension (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{}",
@@ -486,28 +486,28 @@ impl Problem {
                     };
 
                     if extension_loaded(&ext) {
-                        return (
+                        return Ok((
                             msg,
                             format!(
                                 "the {} package is disabled by your platform config. Enable it again with \"composer config platform.{} --unset\".{}",
                                 package_name, package_name, providers_str
                             ),
-                        );
+                        ));
                     }
 
-                    return (
+                    return Ok((
                         msg,
                         format!(
                             "it is missing from your system. Install or enable PHP's {} extension.{}",
                             ext, providers_str
                         ),
-                    );
+                    ));
                 }
 
-                return (
+                return Ok((
                     msg,
                     format!("it has the wrong version installed ({}).", version.unwrap()),
-                );
+                ));
             }
 
             // handle linked libs
@@ -519,17 +519,17 @@ impl Problem {
                         "it is missing from your system, make sure the intl extension is loaded."
                     };
 
-                    return (
+                    return Ok((
                         format!(
                             "- Root composer.json requires linked library {}{} but ",
                             package_name,
                             Self::constraint_to_text(constraint)
                         ),
                         error.to_string(),
-                    );
+                    ));
                 }
 
-                let providers_str_opt = Self::get_providers_list(repository_set, package_name, 5);
+                let providers_str_opt = Self::get_providers_list(repository_set, package_name, 5)?;
                 let providers_str = match providers_str_opt {
                     Some(ps) => format!(
                         "\n\n      Alternatively you can require one of these packages that provide the library (or parts of it):\n      <warning>Keep in mind that the suggestions are automated and may not be valid or safe to use</warning>\n{}",
@@ -538,7 +538,7 @@ impl Problem {
                     None => String::new(),
                 };
 
-                return (
+                return Ok((
                     format!(
                         "- Root composer.json requires linked library {}{} but ",
                         package_name,
@@ -548,7 +548,7 @@ impl Problem {
                         "it has the wrong version installed or is missing from your system, make sure to load the extension providing it.{}",
                         providers_str
                     ),
-                );
+                ));
             }
         }
 
@@ -557,14 +557,14 @@ impl Problem {
             if package.get_name().as_str() == package_name {
                 locked_package = Some(package.clone());
                 if pool.is_unacceptable_fixed_or_locked_package(package.clone()) {
-                    return (
+                    return Ok((
                         "- ".to_string(),
                         format!(
                             "{} is fixed to {} (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command.",
                             package.get_pretty_name(),
                             package.get_pretty_version()
                         ),
-                    );
+                    ));
                 }
                 break;
             }
@@ -600,9 +600,9 @@ impl Problem {
                         .into(),
                     ),
                     0,
-                );
+                )?;
                 if packages.len() > 0 {
-                    return (
+                    return Ok((
                         format!(
                             "- Root composer.json requires {}{}, ",
                             package_name,
@@ -619,14 +619,15 @@ impl Problem {
                             ),
                             str_replace("#", "+", &c.get_pretty_string())
                         ),
-                    );
+                    ));
                 }
             }
         }
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages = repository_set.find_packages(package_name, constraint.map(|c| c.clone()), 0);
+        let packages =
+            repository_set.find_packages(package_name, constraint.map(|c| c.clone()), 0)?;
         if packages.len() > 0 {
             let root_reqs = repository_set.get_root_requires();
             if root_reqs.contains_key(package_name) {
@@ -644,7 +645,7 @@ impl Problem {
                     })
                     .collect();
                 if filtered.len() == 0 {
-                    return (
+                    return Ok((
                         format!(
                             "- Root composer.json requires {}{}, ",
                             package_name,
@@ -666,7 +667,7 @@ impl Problem {
                             },
                             root_reqs[package_name].get_pretty_string()
                         ),
-                    );
+                    ));
                 }
             }
 
@@ -688,7 +689,7 @@ impl Problem {
                         })
                         .collect();
                     if filtered.len() == 0 {
-                        return (
+                        return Ok((
                             format!(
                                 "- Root composer.json requires {}{}, ",
                                 name,
@@ -711,7 +712,7 @@ impl Problem {
                                 name,
                                 temp_reqs[&name].get_pretty_string()
                             ),
-                        );
+                        ));
                     }
                 }
             }
@@ -736,7 +737,7 @@ impl Problem {
                     })
                     .collect();
                 if filtered.len() == 0 {
-                    return (
+                    return Ok((
                         format!(
                             "- Root composer.json requires {}{}, ",
                             package_name,
@@ -753,7 +754,7 @@ impl Problem {
                             ),
                             lp.get_pretty_version()
                         ),
-                    );
+                    ));
                 }
             }
 
@@ -766,7 +767,7 @@ impl Problem {
                 .collect();
 
             if non_locked_packages.len() == 0 {
-                return (
+                return Ok((
                     format!(
                         "- Root composer.json requires {}{}, ",
                         package_name,
@@ -782,11 +783,11 @@ impl Problem {
                             false
                         )
                     ),
-                );
+                ));
             }
 
             if pool.is_abandoned_removed_package_version(package_name, constraint) {
-                return (
+                return Ok((
                     format!(
                         "- Root composer.json requires {}{}, ",
                         package_name,
@@ -802,7 +803,7 @@ impl Problem {
                             false
                         )
                     ),
-                );
+                ));
             }
 
             if pool.is_security_removed_package_version(package_name, constraint) {
@@ -829,7 +830,7 @@ impl Problem {
                     })
                     .collect();
 
-                return (
+                return Ok((
                     format!(
                         "- Root composer.json requires {}{}, ",
                         package_name,
@@ -846,10 +847,10 @@ impl Problem {
                         ),
                         implode("\", \"", &advisories_list)
                     ),
-                );
+                ));
             }
 
-            return (
+            return Ok((
                 format!(
                     "- Root composer.json requires {}{}, ",
                     package_name,
@@ -864,7 +865,7 @@ impl Problem {
                         "it conflicts"
                     }
                 ),
-            );
+            ));
         }
 
         // check if the package is found when bypassing stability checks
@@ -872,16 +873,16 @@ impl Problem {
             package_name,
             constraint.map(|c| c.clone()),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
-        );
+        )?;
         if packages.len() > 0 {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
                 constraint.map(|c| c.clone()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
-            );
+            )?;
             if all_repos_packages.len() > 0 {
-                return Self::compute_check_for_lower_prio_repo(
+                return Ok(Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
                     package_name,
@@ -889,10 +890,10 @@ impl Problem {
                     &all_repos_packages,
                     "minimum-stability",
                     constraint,
-                );
+                ));
             }
 
-            return (
+            return Ok((
                 format!(
                     "- Root composer.json requires {}{}, ",
                     package_name,
@@ -907,7 +908,7 @@ impl Problem {
                         "it does"
                     }
                 ),
-            );
+            ));
         }
 
         // check if the package is found when bypassing the constraint and stability checks
@@ -915,16 +916,16 @@ impl Problem {
             package_name,
             None,
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
-        );
+        )?;
         if packages.len() > 0 {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
                 package_name,
                 constraint.map(|c| c.clone()),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
-            );
+            )?;
             if all_repos_packages.len() > 0 {
-                return Self::compute_check_for_lower_prio_repo(
+                return Ok(Self::compute_check_for_lower_prio_repo(
                     pool,
                     is_verbose,
                     package_name,
@@ -932,7 +933,7 @@ impl Problem {
                     &all_repos_packages,
                     "constraint",
                     constraint,
-                );
+                ));
             }
 
             let mut suffix = String::new();
@@ -967,7 +968,7 @@ impl Problem {
                 }
             }
 
-            return (
+            return Ok((
                 format!(
                     "- Root composer.json requires {}{}, ",
                     package_name,
@@ -983,25 +984,25 @@ impl Problem {
                     },
                     suffix
                 ),
-            );
+            ));
         }
 
         if !Preg::is_match3(r"{^[A-Za-z0-9_./-]+$}", package_name, None).unwrap_or(false) {
             let illegal_chars =
                 Preg::replace(r"{[A-Za-z0-9_./-]+}", "", package_name).unwrap_or_default();
 
-            return (
+            return Ok((
                 format!("- Root composer.json requires {}, it ", package_name),
                 format!(
                     "could not be found, it looks like its name is invalid, \"{}\" is not allowed in package names.",
                     illegal_chars
                 ),
-            );
+            ));
         }
 
-        let providers_str = Self::get_providers_list(repository_set, package_name, 15);
+        let providers_str = Self::get_providers_list(repository_set, package_name, 15)?;
         if let Some(ps) = providers_str {
-            return (
+            return Ok((
                 format!(
                     "- Root composer.json requires {}{}, it ",
                     package_name,
@@ -1011,14 +1012,14 @@ impl Problem {
                     "could not be found in any version, but the following packages provide it:\n{}      Consider requiring one of these to satisfy the {} requirement.",
                     ps, package_name
                 ),
-            );
+            ));
         }
 
-        (
+        Ok((
             format!("- Root composer.json requires {}, it ", package_name),
             "could not be found in any version, there may be a typo in the package name."
                 .to_string(),
-        )
+        ))
     }
 
     /// @internal
@@ -1428,8 +1429,8 @@ impl Problem {
         repository_set: &RepositorySet,
         package_name: &str,
         max_providers: i64,
-    ) -> Option<String> {
-        let providers = repository_set.get_providers(package_name);
+    ) -> anyhow::Result<Option<String>> {
+        let providers = repository_set.get_providers(package_name)?;
         if providers.len() > 0 {
             let provider_count = providers.len() as i64;
             let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
@@ -1463,9 +1464,9 @@ impl Problem {
                 ));
             }
 
-            return Some(providers_str);
+            return Ok(Some(providers_str));
         }
 
-        None
+        Ok(None)
     }
 }

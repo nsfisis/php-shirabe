@@ -299,7 +299,7 @@ impl Solver {
         // LockTransaction stores PackageInterfaceHandle maps; widen the request's BasePackageHandle
         // maps into them.
         let present_map = request
-            .get_present_map(false)
+            .get_present_map(false)?
             .into_iter()
             .map(|(k, v)| (k, v.into()))
             .collect();

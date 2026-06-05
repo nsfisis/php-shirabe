@@ -210,7 +210,7 @@ impl ValidateCommand {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository()
-                .get_packages();
+                .get_packages()?;
             for package in packages {
                 let path = composer
                     .get_installation_manager()

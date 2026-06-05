@@ -195,7 +195,7 @@ impl ShowCommand {
         // TODO(phase-b): PHP shares a single $platformRepo instance by reference.
         // We clone the overrides and re-construct as needed because PlatformRepository
         // is not Clone (PHP class semantics; Phase D will introduce Rc sharing).
-        let platform_repo = PlatformRepository::new(vec![], platform_overrides.clone())?;
+        let mut platform_repo = PlatformRepository::new(vec![], platform_overrides.clone())?;
         let make_platform_repo = || -> anyhow::Result<PlatformRepository> {
             PlatformRepository::new(vec![], platform_overrides.clone())
         };
@@ -396,7 +396,7 @@ impl ShowCommand {
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .get_packages();
+                    .get_packages()?;
                 let packages = RepositoryUtils::filter_required_packages(
                     &local_packages,
                     root_pkg.clone().into(),
@@ -431,7 +431,7 @@ impl ShowCommand {
                     RepositoryInterfaceHandle::new(InstalledRepository::new(vec![root_repo, lr]));
             }
 
-            if installed_repo.get_packages().is_empty() {
+            if installed_repo.get_packages()?.is_empty() {
                 let has_non_platform_reqs = |reqs: &IndexMap<String, Link>| -> bool {
                     reqs.keys()
                         .any(|name| !PlatformRepository::is_platform_package(name))
@@ -590,7 +590,7 @@ impl ShowCommand {
                 latest_package = self.find_latest_package(
                     package.clone().into(),
                     composer.as_ref().unwrap(),
-                    &platform_repo,
+                    &mut platform_repo,
                     input.get_option("major-only").as_bool().unwrap_or(false),
                     input.get_option("minor-only").as_bool().unwrap_or(false),
                     input.get_option("patch-only").as_bool().unwrap_or(false),
@@ -645,7 +645,7 @@ impl ShowCommand {
                 self.print_package_info(
                     package.clone(),
                     &versions_map,
-                    &*installed_repo.borrow(),
+                    &mut *installed_repo.borrow_mut(),
                     latest_package,
                 )?;
             }
@@ -656,7 +656,7 @@ impl ShowCommand {
         // show tree view if requested
         if input.get_option("tree").as_bool() == Some(true) {
             let root_requires = self.get_root_requires();
-            let mut packages = installed_repo.get_packages();
+            let mut packages = installed_repo.get_packages()?;
             packages.sort_by(|a, b| {
                 let sa: String = a.to_string();
                 let sb: String = b.to_string();
@@ -746,7 +746,7 @@ impl ShowCommand {
             if false {
                 let _ = package_filter.as_deref();
             } else {
-                for package in repo.get_packages() {
+                for package in repo.get_packages()? {
                     let existing = packages
                         .get(&type_owned)
                         .and_then(|m| m.get(&package.get_name()));
@@ -849,7 +849,7 @@ impl ShowCommand {
                                 let latest = self.find_latest_package(
                                     package.clone(),
                                     composer.as_ref().unwrap(),
-                                    &platform_repo,
+                                    &mut platform_repo,
                                     show_major_only,
                                     show_minor_only,
                                     show_patch_only,
@@ -1574,10 +1574,10 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        self.print_meta(package.clone(), versions, installed_repo, latest_package);
+        self.print_meta(package.clone(), versions, installed_repo, latest_package)?;
         self.print_links(package.clone(), Link::TYPE_REQUIRE, None);
         self.print_links(
             package.clone(),
@@ -1604,9 +1604,9 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &dyn RepositoryInterface,
+        installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
-    ) {
+    ) -> anyhow::Result<()> {
         let is_installed_package = !PlatformRepository::is_platform_package(&package.get_name())
             && installed_repo.has_package(package.clone().into());
 
@@ -1621,7 +1621,7 @@ impl ShowCommand {
         let keywords = package.get_keywords();
         self.get_io()
             .write(&format!("<info>keywords</info> : {}", keywords.join(", ")));
-        self.print_versions(package.clone(), versions, installed_repo);
+        self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package {
             if let Some(rd) = package.get_release_date() {
                 let rel = self.get_relative_time(&rd);
@@ -1755,6 +1755,8 @@ impl ShowCommand {
                 self.get_io().write(&include_paths.join(", "));
             }
         }
+
+        Ok(())
     }
 
     /// Prints all available versions of this package and highlights the installed one if any.
@@ -1762,13 +1764,13 @@ impl ShowCommand {
         &mut self,
         package: CompletePackageInterfaceHandle,
         versions: &IndexMap<String, String>,
-        installed_repo: &dyn RepositoryInterface,
-    ) {
+        installed_repo: &mut dyn RepositoryInterface,
+    ) -> anyhow::Result<()> {
         let mut versions_keys: Vec<String> = versions.keys().cloned().collect();
         versions_keys = Semver::rsort(versions_keys);
 
         // highlight installed version
-        let installed_packages = installed_repo.find_packages(&package.get_name(), None);
+        let installed_packages = installed_repo.find_packages(&package.get_name(), None)?;
         if !installed_packages.is_empty() {
             for installed_package in installed_packages.iter() {
                 let installed_version = installed_package.get_pretty_version();
@@ -1788,6 +1790,8 @@ impl ShowCommand {
 
         self.get_io()
             .write(&format!("<info>versions</info> : {}", versions_str));
+
+        Ok(())
     }
 
     /// print link objects
@@ -2561,7 +2565,7 @@ impl ShowCommand {
         &mut self,
         package: PackageInterfaceHandle,
         composer: &PartialComposerHandle,
-        platform_repo: &PlatformRepository,
+        platform_repo: &mut PlatformRepository,
         major_only: bool,
         minor_only: bool,
         patch_only: bool,

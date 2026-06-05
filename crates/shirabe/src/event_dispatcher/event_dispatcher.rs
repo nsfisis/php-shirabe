@@ -308,7 +308,7 @@ impl EventDispatcher {
             if !is_string_callable {
                 // TODO(plugin): non-string callable handling — verify is_callable, invoke,
                 // and replicate the get_class / write_error / is_callable error path from PHP.
-                self.make_autoloader(event, &callable);
+                let _ = self.make_autoloader(event, &callable);
                 if !is_callable(&PhpMixed::Null) {
                     let (class_name, method) = match &callable {
                         Callable::ArrayCallable(first, m) => {
@@ -504,7 +504,8 @@ impl EventDispatcher {
                         let class_name = substr(callable_str, 0, Some(pos));
                         let method_name = substr(callable_str, pos + 2, None);
 
-                        self.make_autoloader(event, &Callable::String(callable_str.clone()));
+                        let _ =
+                            self.make_autoloader(event, &Callable::String(callable_str.clone()));
                         if !class_exists(&class_name) {
                             self.io.write_error3(&format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
@@ -550,7 +551,7 @@ impl EventDispatcher {
                     Callable::String(ref callable_str) if self.is_command_class(callable_str) => {
                         let class_name = callable_str.clone();
 
-                        self.make_autoloader(
+                        let _ = self.make_autoloader(
                             event,
                             &Callable::ArrayCallable(
                                 Box::new(PhpMixed::String(callable_str.clone())),
@@ -1223,11 +1224,11 @@ impl EventDispatcher {
         "unsupported".to_string()
     }
 
-    fn make_autoloader(&mut self, event: &Event, callable: &Callable) {
+    fn make_autoloader(&mut self, event: &Event, callable: &Callable) -> anyhow::Result<()> {
         let composer = self.composer();
         // TODO(plugin): full autoloader rebuild on plugin-supplied callables — currently a stub.
         let Some(composer) = composer.as_full() else {
-            return;
+            return Ok(());
         };
         let composer = composer.borrow_mut();
 
@@ -1244,7 +1245,7 @@ impl EventDispatcher {
             Callable::Closure => "closure".to_string(),
         };
         if self.previous_listeners.contains_key(&callable_key) {
-            return;
+            return Ok(());
         }
         self.previous_listeners.insert(callable_key, true);
 
@@ -1253,7 +1254,7 @@ impl EventDispatcher {
             .get_repository_manager()
             .borrow()
             .get_local_repository()
-            .get_canonical_packages();
+            .get_canonical_packages()?;
         let generator = composer.get_autoload_generator().clone();
         let generator = generator.borrow();
         let mut hash_input = packages
@@ -1269,7 +1270,7 @@ impl EventDispatcher {
         let hash_value = hash("sha256", &hash_input);
 
         if self.previous_hash.as_deref() == Some(hash_value.as_str()) {
-            return;
+            return Ok(());
         }
 
         self.previous_hash = Some(hash_value);
@@ -1302,6 +1303,7 @@ impl EventDispatcher {
         let mut loader = generator.create_loader(&map, Some(vendor_dir.clone()));
         loader.register(false);
         self.loader = Some(loader);
+        Ok(())
     }
 
     // ---- helpers ----

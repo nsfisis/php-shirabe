@@ -53,7 +53,7 @@ impl InstalledRepository {
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         let name = name.to_lowercase();
 
         let constraint: Option<AnyConstraint> = match constraint {
@@ -67,7 +67,7 @@ impl InstalledRepository {
 
         let mut matches = vec![];
         for repo in self.inner.get_repositories() {
-            'candidates: for candidate in repo.get_packages() {
+            'candidates: for candidate in repo.get_packages()? {
                 if name == candidate.get_name() {
                     if constraint.is_none()
                         || constraint.as_ref().unwrap().matches(
@@ -105,17 +105,17 @@ impl InstalledRepository {
             }
         }
 
-        matches
+        Ok(matches)
     }
 
     pub fn get_dependents(
-        &self,
+        &mut self,
         needle: NeedleInput,
         constraint: Option<AnyConstraint>,
         invert: bool,
         recurse: bool,
         packages_found: Option<Vec<String>>,
-    ) -> Vec<DependentsEntry> {
+    ) -> anyhow::Result<Vec<DependentsEntry>> {
         let mut needles: Vec<String> = match needle {
             NeedleInput::Single(s) => vec![s.to_lowercase()],
             NeedleInput::Multiple(v) => v.into_iter().map(|s| s.to_lowercase()).collect(),
@@ -125,14 +125,14 @@ impl InstalledRepository {
         let mut packages_found = packages_found.unwrap_or_else(|| needles.clone());
 
         let mut root_package: Option<BasePackageHandle> = None;
-        for package in self.inner.get_packages() {
+        for package in self.inner.get_packages()? {
             if package.as_root().is_some() {
                 root_package = Some(package.clone());
                 break;
             }
         }
 
-        for package in self.inner.get_packages() {
+        for package in self.inner.get_packages()? {
             let mut links: IndexMap<String, Link> = package.get_requires();
             let mut packages_in_tree = packages_found.clone();
 
@@ -164,7 +164,7 @@ impl InstalledRepository {
                                         false,
                                         true,
                                         Some(packages_in_tree.clone()),
-                                    )
+                                    )?
                                 } else {
                                     vec![]
                                 };
@@ -205,7 +205,7 @@ impl InstalledRepository {
                                     false,
                                     true,
                                     Some(packages_in_tree.clone()),
-                                )
+                                )?
                             } else {
                                 vec![]
                             };
@@ -221,7 +221,7 @@ impl InstalledRepository {
 
             if invert && needles.contains(&package.get_name().to_string()) {
                 for link in package.get_conflicts().values() {
-                    for pkg in self.find_packages(link.get_target(), None) {
+                    for pkg in self.find_packages(link.get_target(), None)? {
                         let version = SimpleConstraint::new(
                             "=".to_string(),
                             pkg.get_version().to_string(),
@@ -236,7 +236,7 @@ impl InstalledRepository {
 
             for link in package.get_conflicts().values() {
                 if needles.contains(&link.get_target().to_string()) {
-                    for pkg in self.find_packages(link.get_target(), None) {
+                    for pkg in self.find_packages(link.get_target(), None)? {
                         let version = SimpleConstraint::new(
                             "=".to_string(),
                             pkg.get_version().to_string(),
@@ -267,7 +267,7 @@ impl InstalledRepository {
                             .find_package(
                                 link.get_target(),
                                 FindPackageConstraint::Constraint(link.get_constraint().clone()),
-                            )
+                            )?
                             .is_some()
                         {
                             continue;
@@ -276,7 +276,7 @@ impl InstalledRepository {
                         let platform_pkg = self.find_package(
                             link.get_target(),
                             FindPackageConstraint::String("*".to_string()),
-                        );
+                        )?;
                         let description = platform_pkg
                             .as_ref()
                             .map(|p| format!("but {} is installed", p.get_pretty_version()))
@@ -300,7 +300,7 @@ impl InstalledRepository {
                         continue;
                     }
 
-                    for pkg in self.get_packages() {
+                    for pkg in self.get_packages()? {
                         if !pkg.get_names(true).contains(&link.get_target().to_string()) {
                             continue;
                         }
@@ -379,7 +379,7 @@ impl InstalledRepository {
         }
 
         // ksort($results) - no-op for a numerically-indexed Vec
-        results
+        Ok(results)
     }
 
     pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
@@ -425,32 +425,32 @@ impl RepositoryInterface for InstalledRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.get_packages()
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -459,11 +459,19 @@ impl RepositoryInterface for InstalledRepository {
         )
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

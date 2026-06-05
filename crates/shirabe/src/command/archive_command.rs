@@ -305,7 +305,7 @@ impl ArchiveCommand {
             Some(v) => Some(parser.parse_constraints(v)?.clone()),
             None => None,
         };
-        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0);
+        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0)?;
 
         let package = if packages.len() > 1 {
             let mut version_selector = VersionSelector::new(repo_set, None)?;

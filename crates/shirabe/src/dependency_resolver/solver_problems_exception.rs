@@ -52,8 +52,8 @@ impl SolverProblemsException {
         pool: &mut Pool,
         is_verbose: bool,
         is_dev_extraction: bool,
-    ) -> String {
-        let installed_map = request.get_present_map(true);
+    ) -> anyhow::Result<String> {
+        let installed_map = request.get_present_map(true)?;
         let mut missing_extensions: Vec<String> = Vec::new();
         let mut is_caused_by_lock = false;
 
@@ -61,16 +61,14 @@ impl SolverProblemsException {
         for problem in &self.problems {
             problems.push(format!(
                 "{}\n",
-                problem
-                    .get_pretty_string(
-                        repository_set,
-                        request,
-                        pool,
-                        is_verbose,
-                        &installed_map,
-                        &self.learned_pool
-                    )
-                    .unwrap_or_default()
+                problem.get_pretty_string(
+                    repository_set,
+                    request,
+                    pool,
+                    is_verbose,
+                    &installed_map,
+                    &self.learned_pool
+                )?
             ));
             // TODO(phase-b): get_reasons returns an IndexMap; flatten its values into Vec<Vec<...>>.
             let reasons_vec: Vec<Vec<Rc<RefCell<Rule>>>> = problem
@@ -126,7 +124,7 @@ impl SolverProblemsException {
             text.push_str(&hints.join("\n\n"));
         }
 
-        text
+        Ok(text)
     }
 
     pub fn get_problems(&self) -> &Vec<Problem> {

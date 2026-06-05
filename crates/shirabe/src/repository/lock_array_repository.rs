@@ -17,11 +17,7 @@ pub struct LockArrayRepository {
     inner: ArrayRepository,
 }
 
-impl CanonicalPackagesTrait for LockArrayRepository {
-    fn get_packages(&self) -> Vec<PackageInterfaceHandle> {
-        RepositoryInterface::get_packages(&self.inner)
-    }
-}
+impl CanonicalPackagesTrait for LockArrayRepository {}
 
 impl LockArrayRepository {
     pub fn new(packages: Vec<PackageInterfaceHandle>) -> anyhow::Result<Self> {
@@ -47,32 +43,32 @@ impl RepositoryInterface for LockArrayRepository {
     }
 
     fn find_package(
-        &self,
+        &mut self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
     }
 
     fn find_packages(
-        &self,
+        &mut self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
     }
 
-    fn get_packages(&self) -> Vec<BasePackageHandle> {
-        RepositoryInterface::get_packages(&self.inner)
+    fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        RepositoryInterface::get_packages(&mut self.inner)
     }
 
     fn load_packages(
-        &self,
+        &mut self,
         package_name_map: IndexMap<String, Option<AnyConstraint>>,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
+    ) -> anyhow::Result<LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
             acceptable_stabilities,
@@ -81,11 +77,19 @@ impl RepositoryInterface for LockArrayRepository {
         )
     }
 
-    fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
-    fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
+    fn get_providers(
+        &mut self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

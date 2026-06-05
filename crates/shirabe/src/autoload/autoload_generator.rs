@@ -125,7 +125,7 @@ impl AutoloadGenerator {
     pub fn dump(
         &mut self,
         config: &Config,
-        local_repo: &dyn InstalledRepositoryInterface,
+        local_repo: &mut dyn InstalledRepositoryInterface,
         root_package: RootPackageInterfaceHandle,
         installation_manager: &mut InstallationManager,
         target_dir: &str,
@@ -244,12 +244,12 @@ impl AutoloadGenerator {
         );
 
         // Collect information from all packages.
-        let dev_package_names = local_repo.get_dev_package_names();
         let package_map = self.build_package_map(
             installation_manager,
             root_package.clone(),
-            local_repo.get_canonical_packages(),
+            local_repo.get_canonical_packages()?,
         )?;
+        let dev_package_names = local_repo.get_dev_package_names();
         let filtered_dev_packages: PhpMixed = if self.dev_mode.unwrap_or(false) {
             // if dev mode is enabled, then we do not filter any dev packages out so disable this entirely
             PhpMixed::Bool(false)

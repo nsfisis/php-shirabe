@@ -87,11 +87,11 @@ impl SuggestsCommand {
             );
         }
 
-        let installed_repo = InstalledRepository::new(installed_repos);
+        let mut installed_repo = InstalledRepository::new(installed_repos);
         let mut reporter = SuggestedPackagesReporter::new(self.get_io().clone());
 
         let filter = input.get_argument("packages");
-        let mut packages = RepositoryInterface::get_packages(&installed_repo);
+        let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
         let root_pkg_as_base: crate::package::BasePackageHandle =
             composer.get_package().clone().into();
         packages.push(root_pkg_as_base);
@@ -121,7 +121,7 @@ impl SuggestsCommand {
                 None
             };
 
-        reporter.output(mode, Some(&installed_repo), only_dependents_of);
+        reporter.output(mode, Some(&mut installed_repo), only_dependents_of)?;
 
         Ok(0)
     }

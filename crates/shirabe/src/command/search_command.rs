@@ -96,7 +96,7 @@ impl SearchCommand {
         {
             all_repos.push(r.clone());
         }
-        let repos = CompositeRepository::new(all_repos);
+        let mut repos = CompositeRepository::new(all_repos);
 
         // TODO(plugin): dispatch CommandEvent for search command
         let command_event = CommandEvent::new(PluginEvents::COMMAND, "search", input, output);
@@ -136,7 +136,7 @@ impl SearchCommand {
             query = preg_quote(&query, None);
         }
 
-        let results = repos.search(query, mode, r#type);
+        let results = repos.search(query, mode, r#type)?;
 
         if results.len() > 0 && format == "text" {
             let width = self.get_terminal_width();

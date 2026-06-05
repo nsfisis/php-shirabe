@@ -88,7 +88,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let local_repo = repository_manager.get_local_repository();
             let root_pkg = composer.get_package();
 
-            if local_repo.get_packages().len() == 0
+            if local_repo.get_packages()?.len() == 0
                 && (root_pkg.get_requires().len() > 0 || root_pkg.get_dev_requires().len() > 0)
             {
                 output.writeln(
@@ -132,7 +132,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             "*".to_string()
         };
 
-        let packages = installed_repo.find_packages_with_replacers_and_providers(&needle, None);
+        let packages = installed_repo.find_packages_with_replacers_and_providers(&needle, None)?;
         if packages.is_empty() {
             return Err(anyhow::anyhow!(InvalidArgumentException {
                 message: format!("Could not find package \"{}\" in your project", needle),
@@ -143,9 +143,9 @@ pub trait BaseDependencyCommand: BaseCommand {
         let matched_package = installed_repo.find_package(
             &needle,
             FindPackageConstraint::String(text_constraint.clone()),
-        );
+        )?;
         if matched_package.is_none() {
-            let default_repos = CompositeRepository::new(
+            let mut default_repos = CompositeRepository::new(
                 RepositoryFactory::default_repos(
                     Some(self.get_io()),
                     Some(composer.get_config()),
@@ -158,7 +158,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             if let Some(r#match) = default_repos.find_package(
                 &needle,
                 FindPackageConstraint::String(text_constraint.clone()),
-            ) {
+            )? {
                 installed_repo.add_repository(
                     crate::repository::RepositoryInterfaceHandle::new(
                         InstalledArrayRepository::new_with_packages(vec![
@@ -259,7 +259,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             inverted,
             recursive,
             None,
-        );
+        )?;
         if results.is_empty() {
             let extra = if has_constraint {
                 format!(

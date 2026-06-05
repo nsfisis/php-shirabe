@@ -81,7 +81,7 @@ impl CheckPlatformReqsCommand {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
-            if local_repo.get_packages().is_empty() {
+            if local_repo.get_packages()?.is_empty() {
                 io.write_error(&format!(
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
@@ -115,12 +115,12 @@ impl CheckPlatformReqsCommand {
         let root_pkg_repo = RootPackageRepository::new(
             crate::package::RootPackageInterfaceHandle::dup(composer.get_package()),
         );
-        let installed_repo = InstalledRepository::new(vec![
+        let mut installed_repo = InstalledRepository::new(vec![
             installed_repo_base,
             crate::repository::RepositoryInterfaceHandle::new(root_pkg_repo),
         ]);
 
-        for package in installed_repo.get_packages() {
+        for package in installed_repo.get_packages()? {
             if remove_packages.contains(&package.get_name().to_string()) {
                 continue;
             }
@@ -149,7 +149,7 @@ impl CheckPlatformReqsCommand {
         'requirements: for (require, links) in &requires_sorted {
             if PlatformRepository::is_platform_package(require) {
                 let candidates = installed_repo_with_platform
-                    .find_packages_with_replacers_and_providers(require, None);
+                    .find_packages_with_replacers_and_providers(require, None)?;
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {

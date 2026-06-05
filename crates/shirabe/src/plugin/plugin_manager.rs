@@ -138,7 +138,7 @@ impl PluginManager {
             let root_package = crate::package::RootPackageInterfaceHandle::dup(
                 self.composer_full().borrow().get_package(),
             );
-            self.load_repository(&*repo.borrow(), false, Some(root_package))?;
+            self.load_repository(&mut *repo.borrow_mut(), false, Some(root_package))?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
@@ -150,13 +150,13 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.load_repository(&*repo.borrow(), true, None)?;
+            self.load_repository(&mut *repo.borrow_mut(), true, None)?;
         }
         Ok(())
     }
 
     /// Deactivate all plugins from currently installed plugin packages
-    pub fn deactivate_installed_plugins(&mut self) {
+    pub fn deactivate_installed_plugins(&mut self) -> anyhow::Result<()> {
         // TODO(plugin): deactivation is part of the plugin API
         if !self.are_plugins_disabled("local") {
             let repo = self
@@ -165,7 +165,7 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.deactivate_repository(&*repo.borrow(), false);
+            self.deactivate_repository(&mut *repo.borrow_mut(), false)?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {
@@ -177,8 +177,10 @@ impl PluginManager {
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            self.deactivate_repository(&*repo.borrow(), true);
+            self.deactivate_repository(&mut *repo.borrow_mut(), true)?;
         }
+
+        Ok(())
     }
 
     /// Gets all currently active plugin instances
@@ -498,12 +500,12 @@ impl PluginManager {
 
     fn load_repository(
         &mut self,
-        repo: &dyn RepositoryInterface,
+        repo: &mut dyn RepositoryInterface,
         is_global_repo: bool,
         root_package: Option<RootPackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         // TODO(plugin): repository scan for plugin packages
-        let packages = repo.get_packages();
+        let packages = repo.get_packages()?;
 
         let mut weights: IndexMap<String, i64> = IndexMap::new();
         for package in &packages {
@@ -574,9 +576,13 @@ impl PluginManager {
         Ok(())
     }
 
-    fn deactivate_repository(&mut self, repo: &dyn RepositoryInterface, _is_global_repo: bool) {
+    fn deactivate_repository(
+        &mut self,
+        repo: &mut dyn RepositoryInterface,
+        _is_global_repo: bool,
+    ) -> anyhow::Result<()> {
         // TODO(plugin): deactivate plugins from a repository
-        let packages = repo.get_packages();
+        let packages = repo.get_packages()?;
         // PHP: $sortedPackages = array_reverse(PackageSorter::sortPackages($packages));
         let mut sorted_packages = PackageSorter::sort_packages(
             packages.iter().map(|p| p.clone().into()).collect(),
@@ -595,6 +601,8 @@ impl PluginManager {
                 self.deactivate_package(package.clone());
             }
         }
+
+        Ok(())
     }
 
     fn collect_dependencies(
@@ -602,11 +610,11 @@ impl PluginManager {
         installed_repo: &InstalledRepository,
         mut collected: IndexMap<String, PackageInterfaceHandle>,
         package: PackageInterfaceHandle,
-    ) -> IndexMap<String, PackageInterfaceHandle> {
+    ) -> anyhow::Result<IndexMap<String, PackageInterfaceHandle>> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in &package.get_requires() {
             for required_package in installed_repo
-                .find_packages_with_replacers_and_providers(require_link.get_target(), None)
+                .find_packages_with_replacers_and_providers(require_link.get_target(), None)?
             {
                 if !collected.contains_key(&required_package.get_name()) {
                     collected.insert(required_package.get_name(), required_package.clone().into());
@@ -614,12 +622,12 @@ impl PluginManager {
                         installed_repo,
                         collected,
                         required_package.clone().into(),
-                    );
+                    )?;
                 }
             }
         }
 
-        collected
+        Ok(collected)
     }
 
     /// Retrieves the path a package is installed to.

@@ -74,8 +74,8 @@ impl RepositoryInterfaceHandle {
         self.0.borrow().get_repo_name()
     }
 
-    pub fn get_packages(&self) -> Vec<BasePackageHandle> {
-        self.0.borrow().get_packages()
+    pub fn get_packages(&self) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.0.borrow_mut().get_packages()
     }
 
     pub fn has_package(&self, package: PackageInterfaceHandle) -> bool {
@@ -86,16 +86,16 @@ impl RepositoryInterfaceHandle {
         &self,
         name: &str,
         constraint: FindPackageConstraint,
-    ) -> Option<BasePackageHandle> {
-        self.0.borrow().find_package(name, constraint)
+    ) -> anyhow::Result<Option<BasePackageHandle>> {
+        self.0.borrow_mut().find_package(name, constraint)
     }
 
     pub fn find_packages(
         &self,
         name: &str,
         constraint: Option<FindPackageConstraint>,
-    ) -> Vec<BasePackageHandle> {
-        self.0.borrow().find_packages(name, constraint)
+    ) -> anyhow::Result<Vec<BasePackageHandle>> {
+        self.0.borrow_mut().find_packages(name, constraint)
     }
 
     pub fn load_packages(
@@ -104,8 +104,8 @@ impl RepositoryInterfaceHandle {
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
         already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
-    ) -> LoadPackagesResult {
-        self.0.borrow().load_packages(
+    ) -> anyhow::Result<LoadPackagesResult> {
+        self.0.borrow_mut().load_packages(
             package_name_map,
             acceptable_stabilities,
             stability_flags,
@@ -113,12 +113,20 @@ impl RepositoryInterfaceHandle {
         )
     }
 
-    pub fn search(&self, query: String, mode: i64, r#type: Option<String>) -> Vec<SearchResult> {
-        self.0.borrow().search(query, mode, r#type)
+    pub fn search(
+        &self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        self.0.borrow_mut().search(query, mode, r#type)
     }
 
-    pub fn get_providers(&self, package_name: String) -> IndexMap<String, ProviderInfo> {
-        self.0.borrow().get_providers(package_name)
+    pub fn get_providers(
+        &self,
+        package_name: String,
+    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        self.0.borrow_mut().get_providers(package_name)
     }
 
     // --- InstalledRepositoryInterface helpers (valid only when the wrapped repository is one) ---
@@ -137,12 +145,11 @@ impl RepositoryInterfaceHandle {
             .and_then(|r| r.get_dev_mode())
     }
 
-    pub fn get_canonical_packages(&self) -> Vec<PackageInterfaceHandle> {
-        self.0
-            .borrow()
-            .as_installed_repository_interface()
-            .map(|r| r.get_canonical_packages())
-            .unwrap_or_default()
+    pub fn get_canonical_packages(&self) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
+        match self.0.borrow_mut().as_installed_repository_interface_mut() {
+            Some(r) => r.get_canonical_packages(),
+            None => Ok(Vec::new()),
+        }
     }
 
     pub fn get_dev_package_names(&self) -> Vec<String> {

@@ -105,20 +105,20 @@ impl LicensesCommand {
             }
             let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
-            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&*repo.borrow())
+            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&mut *repo.borrow_mut())?
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let repo = repository_manager.get_local_repository();
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 RepositoryUtils::filter_required_packages(
-                    &repo.get_packages(),
+                    &repo.get_packages()?,
                     composer.get_package().clone().into(),
                     false,
                     vec![],
                 )
             } else {
-                repo.get_packages()
+                repo.get_packages()?
             }
         };
         let _ = composer.get_package();

@@ -347,10 +347,10 @@ impl Rule {
         is_verbose: bool,
         installed_map: &IndexMap<String, BasePackageHandle>,
         _learned_pool: &Vec<Vec<Rc<RefCell<Rule>>>>,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         let mut literals = self.get_literals();
 
-        match self.get_reason() {
+        Ok(match self.get_reason() {
             r if r == RULE_ROOT_REQUIRE => {
                 let reason_data = self.get_reason_data();
                 let (package_name, constraint): (&str, &AnyConstraint) = match reason_data {
@@ -358,16 +358,16 @@ impl Rule {
                         package_name,
                         constraint,
                     } => (package_name.as_str(), constraint),
-                    _ => return String::new(),
+                    _ => return Ok(String::new()),
                 };
 
                 let packages = pool.what_provides(package_name, Some(constraint));
                 if 0 == packages.len() {
-                    return format!(
+                    return Ok(format!(
                         "No package found to satisfy root composer.json require {} {}",
                         package_name,
                         constraint.get_pretty_string(),
-                    );
+                    ));
                 }
 
                 let packages_non_alias: Vec<BasePackageHandle> = packages
@@ -378,11 +378,11 @@ impl Rule {
                 if packages_non_alias.len() == 1 {
                     let package = &packages_non_alias[0];
                     if request.is_locked_package(package.clone()) {
-                        return format!(
+                        return Ok(format!(
                             "{} is locked to version {} and an update of this package was not requested.",
                             package.get_pretty_name(),
                             package.get_pretty_version(),
-                        );
+                        ));
                     }
                 }
 
@@ -403,16 +403,16 @@ impl Rule {
             r if r == RULE_FIXED => {
                 let package_in = match self.get_reason_data() {
                     ReasonData::Fixed { package } => package.clone(),
-                    _ => return String::new(),
+                    _ => return Ok(String::new()),
                 };
                 let package = self.deduplicate_default_branch_alias(package_in);
 
                 if request.is_locked_package(package.clone()) {
-                    return format!(
+                    return Ok(format!(
                         "{} is locked to version {} and an update of this package was not requested.",
                         package.get_pretty_name(),
                         package.get_pretty_version(),
-                    );
+                    ));
                 }
 
                 format!(
@@ -433,7 +433,7 @@ impl Rule {
 
                 let link = match reason_data {
                     ReasonData::Link(l) => l,
-                    _ => return String::new(),
+                    _ => return Ok(String::new()),
                 };
                 // swap literals if they are not in the right order with package2 being the conflicter
                 if link.get_source() == package1.get_name() {
@@ -494,7 +494,7 @@ impl Rule {
                 let reason_data = self.get_reason_data();
                 let link = match reason_data {
                     ReasonData::Link(l) => l,
-                    _ => return String::new(),
+                    _ => return Ok(String::new()),
                 };
 
                 let mut requires: Vec<BasePackageHandle> = vec![];
@@ -525,9 +525,9 @@ impl Rule {
                         is_verbose,
                         target_name,
                         Some(link.get_constraint()),
-                    );
+                    )?;
 
-                    return format!("{} -> {}", text, reason.1);
+                    return Ok(format!("{} -> {}", text, reason.1));
                 }
             }
 
@@ -577,7 +577,7 @@ impl Rule {
                     }
 
                     if installed_packages.len() > 0 && removable_packages.len() > 0 {
-                        return format!(
+                        return Ok(format!(
                             "{} cannot be installed as that would require removing {}. {}",
                             self.format_packages_unique_from_packages(
                                 pool,
@@ -594,16 +594,16 @@ impl Rule {
                                 true,
                             ),
                             reason,
-                        );
+                        ));
                     }
 
-                    return format!(
+                    return Ok(format!(
                         "Only one of these can be installed: {}. {}",
                         self.format_packages_unique_from_literals(
                             pool, &literals, is_verbose, None, true
                         ),
                         reason,
-                    );
+                    ));
                 }
 
                 format!(
@@ -665,7 +665,7 @@ impl Rule {
 
                 // avoid returning content like "9999999-dev is an alias of dev-master" as it is useless
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                    return String::new();
+                    return Ok(String::new());
                 }
                 let package =
                     self.deduplicate_default_branch_alias(pool.literal_to_package(literals[1]));
@@ -682,7 +682,7 @@ impl Rule {
 
                 // avoid returning content like "9999999-dev is an alias of dev-master" as it is useless
                 if alias_package.get_version() == VersionParser::DEFAULT_BRANCH_ALIAS {
-                    return String::new();
+                    return Ok(String::new());
                 }
                 let package =
                     self.deduplicate_default_branch_alias(pool.literal_to_package(literals[0]));
@@ -704,7 +704,7 @@ impl Rule {
 
                 format!("({})", rule_text)
             }
-        }
+        })
     }
 
     // Corresponds the variant formatPackagesUnique() that takes an array of BasePackages.
