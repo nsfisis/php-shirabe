@@ -134,7 +134,6 @@ impl StatusCommand {
             };
             let mut downloader = downloader_handle.borrow_mut();
 
-            // TODO(phase-b): isinstance checks using ChangeReportInterface/VcsCapableDownloaderInterface/DvcsDownloaderInterface
             if let Some(change_reporter) = downloader.as_change_report_interface() {
                 if std::path::Path::new(&target_dir).is_symlink() {
                     errors.insert(

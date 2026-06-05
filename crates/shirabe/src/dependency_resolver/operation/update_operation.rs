@@ -32,10 +32,10 @@ impl UpdateOperation {
         target_package: PackageInterfaceHandle,
         lock: bool,
     ) -> String {
-        let mut from_version =
-            initial_package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRef);
-        let mut to_version =
-            target_package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRef);
+        let mut from_version = initial_package
+            .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
+        let mut to_version = target_package
+            .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev);
 
         if from_version == to_version
             && initial_package.get_source_reference() != target_package.get_source_reference()

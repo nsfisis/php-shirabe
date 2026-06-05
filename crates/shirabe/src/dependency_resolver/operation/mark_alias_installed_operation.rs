@@ -41,7 +41,7 @@ impl OperationInterface for MarkAliasInstalledOperation {
             self.package.get_alias_of().get_pretty_name(),
             self.package
                 .get_alias_of()
-                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev,),
+                .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
         )
     }
 

@@ -89,10 +89,7 @@ impl LicensesCommand {
             .borrow_mut()
             .dispatch(Some(command_event.get_name()), None);
 
-        // TODO(phase-b): snapshot root package fields up-front to release the immutable borrow.
-        let root_name = composer.get_package().get_pretty_name().to_string();
-        let root_version = composer.get_package().get_pretty_version().to_string();
-        let root_licenses_snap = composer.get_package().get_license().clone();
+        let root = composer.get_package();
 
         let packages = if input.get_option("locked").as_bool().unwrap_or(false) {
             let locker = composer.get_locker().clone();
@@ -105,11 +102,12 @@ impl LicensesCommand {
             }
             let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
-            <crate::repository::LockArrayRepository as crate::repository::RepositoryInterface>::get_packages(&mut *repo.borrow_mut())?
+            repo.borrow_mut().get_packages()?
         } else {
             let repository_manager = composer.get_repository_manager().clone();
             let repository_manager = repository_manager.borrow();
             let repo = repository_manager.get_local_repository();
+
             if input.get_option("no-dev").as_bool().unwrap_or(false) {
                 RepositoryUtils::filter_required_packages(
                     &repo.get_packages()?,
@@ -121,11 +119,10 @@ impl LicensesCommand {
                 repo.get_packages()?
             }
         };
-        let _ = composer.get_package();
 
-        let pkg_pi: Vec<crate::package::PackageInterfaceHandle> =
+        let packages: Vec<crate::package::PackageInterfaceHandle> =
             packages.into_iter().map(|p| p.into()).collect();
-        let packages = PackageSorter::sort_packages_alphabetically(pkg_pi);
+        let packages = PackageSorter::sort_packages_alphabetically(packages);
         let io = self.get_io();
 
         let format = input
@@ -135,14 +132,20 @@ impl LicensesCommand {
             .to_string();
         match format.as_str() {
             "text" => {
-                let root_licenses = root_licenses_snap.clone();
+                let root_licenses = root.get_license();
                 let licenses_str = if root_licenses.is_empty() {
                     "none".to_string()
                 } else {
                     root_licenses.join(", ")
                 };
-                io.write(&format!("Name: <comment>{}</comment>", root_name));
-                io.write(&format!("Version: <comment>{}</comment>", root_version));
+                io.write(&format!(
+                    "Name: <comment>{}</comment>",
+                    root.get_pretty_name()
+                ));
+                io.write(&format!(
+                    "Version: <comment>{}</comment>",
+                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                ));
                 io.write(&format!("Licenses: <comment>{}</comment>", licenses_str));
                 io.write("Dependencies:");
                 io.write("");
@@ -178,7 +181,7 @@ impl LicensesCommand {
                     table.add_row(PhpMixed::List(vec![
                         Box::new(PhpMixed::String(name)),
                         Box::new(PhpMixed::String(package.get_full_pretty_version(
-                            false,
+                            true,
                             crate::package::DisplayMode::SourceRefIfDev,
                         ))),
                         Box::new(PhpMixed::String(licenses_str)),
@@ -216,12 +219,21 @@ impl LicensesCommand {
                 }
 
                 let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                output_map.insert("name".to_string(), PhpMixed::String(root_name.clone()));
+                output_map.insert(
+                    "name".to_string(),
+                    PhpMixed::String(root.get_pretty_name().clone()),
+                );
                 output_map.insert(
                     "version".to_string(),
-                    PhpMixed::String(root_version.clone()),
+                    PhpMixed::String(
+                        root.get_full_pretty_version(
+                            true,
+                            crate::package::DisplayMode::SourceRefIfDev,
+                        )
+                        .clone(),
+                    ),
                 );
-                let root_licenses = root_licenses_snap.clone();
+                let root_licenses = root.get_license();
                 output_map.insert(
                     "license".to_string(),
                     PhpMixed::List(
