@@ -43,9 +43,7 @@ impl InstalledRepository {
             inner: CompositeRepository::new(vec![]),
         };
         for repo in repositories {
-            // TODO(phase-b): add_repository validates the inner repo type and may return Err;
-            // ignoring the error during Phase B since callers do not handle it.
-            let _ = this.add_repository(repo);
+            this.add_repository(repo);
         }
         this
     }
@@ -366,24 +364,16 @@ impl InstalledRepository {
         Ok(results)
     }
 
-    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
-        if repository.is::<LockArrayRepository>()
-            || repository.is::<RootPackageRepository>()
-            || repository.is::<PlatformRepository>()
-        {
-            self.inner.add_repository(repository);
-            return Ok(());
-        }
+    pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {
+        // TODO: type guard?
+        assert!(
+            repository.is::<LockArrayRepository>()
+                || repository.is::<RootPackageRepository>()
+                || repository.is::<PlatformRepository>(),
+            "An InstalledRepository can contain a repository of type: LockArrayRepository, RootPackageRepository or PlatformRepository"
+        );
 
-        let type_name = std::any::type_name_of_val(&*repository.borrow()).to_string();
-        let repo_name = repository.get_repo_name();
-        Err(anyhow::anyhow!(LogicException {
-            message: format!(
-                "An InstalledRepository can not contain a repository of type {} ({})",
-                type_name, repo_name,
-            ),
-            code: 0,
-        }))
+        self.inner.add_repository(repository);
     }
 }
 

@@ -270,7 +270,7 @@ impl ShowCommand {
                         .get_repository_manager()
                         .borrow()
                         .get_local_repository(),
-                )?;
+                );
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             } else {
                 let default_repos =

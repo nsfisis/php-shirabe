@@ -166,13 +166,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                 &needle,
                 FindPackageConstraint::String(text_constraint.clone()),
             )? {
-                installed_repo.add_repository(
-                    crate::repository::RepositoryInterfaceHandle::new(
-                        InstalledArrayRepository::new_with_packages(vec![
-                            crate::package::PackageInterfaceHandle::dup(&r#match),
-                        ])?,
-                    ),
-                )?;
+                installed_repo.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+                    InstalledArrayRepository::new_with_packages(vec![
+                        crate::package::PackageInterfaceHandle::dup(&r#match),
+                    ])?,
+                ));
             } else if PlatformRepository::is_platform_package(&needle) {
                 let parser = VersionParser::new();
                 let platform_constraint = parser.parse_constraints(&text_constraint)?;
@@ -189,7 +187,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                                     .into(),
                             ])?,
                         ),
-                    )?;
+                    );
                 }
             } else {
                 self.get_io().write_error(&format!(
