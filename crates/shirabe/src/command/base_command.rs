@@ -157,14 +157,6 @@ pub trait BaseCommand {
     /// Gets the application instance for this command.
     fn get_application(&self) -> Result<Application>;
 
-    /// @deprecated since Composer 2.3.0 use requireComposer or tryComposer depending on whether you have $required set to true or false
-    fn get_composer(
-        &mut self,
-        required: bool,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Result<Option<PartialComposerHandle>>;
-
     /// Retrieves the default Composer\Composer instance or throws
     fn require_composer(
         &mut self,
@@ -293,21 +285,6 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn get_application(&self) -> Result<Application> {
         // TODO(phase-b): requires inner Symfony Command access
         todo!()
-    }
-
-    fn get_composer(
-        &mut self,
-        required: bool,
-        disable_plugins: Option<bool>,
-        disable_scripts: Option<bool>,
-    ) -> Result<Option<PartialComposerHandle>> {
-        if required {
-            return Ok(Some(
-                self.require_composer(disable_plugins, disable_scripts)?,
-            ));
-        }
-
-        Ok(self.try_composer(disable_plugins, disable_scripts))
     }
 
     fn require_composer(

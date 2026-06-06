@@ -12,7 +12,6 @@ use shirabe_php_shim::{
 };
 
 pub struct Versions {
-    pub channels: Vec<String>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     channel: Option<String>,
@@ -36,7 +35,6 @@ impl Versions {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     ) -> Self {
         Self {
-            channels: Self::CHANNELS.iter().map(|s| s.to_string()).collect(),
             http_downloader,
             config,
             channel: None,

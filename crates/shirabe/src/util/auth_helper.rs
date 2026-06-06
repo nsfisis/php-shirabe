@@ -5,9 +5,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException,
-    base64_encode, explode, in_array, is_array, is_string, json_decode, parse_url, sprintf,
-    str_replace, strpos, strtolower, substr, trigger_error, trim,
+    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
+    in_array, is_array, is_string, json_decode, parse_url, sprintf, str_replace, strpos,
+    strtolower, substr, trim,
 };
 
 use crate::config::Config;
@@ -476,47 +476,6 @@ impl AuthHelper {
             retry: true,
             store_auth,
         })
-    }
-
-    /// @deprecated use addAuthenticationOptions instead
-    ///
-    /// @param string[] $headers
-    ///
-    /// @return string[] updated headers array
-    pub fn add_authentication_header(
-        &mut self,
-        headers: Vec<String>,
-        origin: &str,
-        url: &str,
-    ) -> Result<Vec<String>> {
-        trigger_error(
-            "AuthHelper::addAuthenticationHeader is deprecated since Composer 2.9 use addAuthenticationOptions instead.",
-            E_USER_DEPRECATED,
-        );
-
-        // PHP: $options = ['http' => ['header' => &$headers]];
-        // PHP uses references so subsequent mutations affect $headers
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut http: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-        http.insert(
-            "header".to_string(),
-            Box::new(PhpMixed::List(
-                headers
-                    .iter()
-                    .map(|h| Box::new(PhpMixed::String(h.clone())))
-                    .collect(),
-            )),
-        );
-        options.insert("http".to_string(), PhpMixed::Array(http));
-
-        let options = self.add_authentication_options(options, origin, url)?;
-
-        let http = options.get("http").and_then(|v| v.as_array()).unwrap();
-        let header = http.get("header").and_then(|v| v.as_list()).unwrap();
-        Ok(header
-            .iter()
-            .filter_map(|v| v.as_string().map(|s| s.to_string()))
-            .collect())
     }
 
     /// @param array<string, mixed> $options

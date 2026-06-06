@@ -7,12 +7,12 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, InvalidArgumentException, PhpMixed, RuntimeException, array_filter,
-    array_keys, array_map, array_merge, array_merge_map, array_merge_recursive, array_reverse,
-    array_shift, array_slice, array_slice_strs, array_unique, bin2hex, explode, file_exists,
-    file_get_contents, hash, implode, in_array, is_array, krsort, ksort, ltrim, preg_quote,
-    random_bytes, realpath, sprintf, str_contains, str_replace, str_starts_with, strlen, strpos,
-    strtr, substr, substr_count, trigger_error, trim, unlink, var_export,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_keys, array_map,
+    array_merge, array_merge_map, array_merge_recursive, array_reverse, array_shift, array_slice,
+    array_slice_strs, array_unique, bin2hex, explode, file_exists, file_get_contents, hash,
+    implode, in_array, is_array, krsort, ksort, ltrim, preg_quote, random_bytes, realpath, sprintf,
+    str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr, substr_count, trim,
+    unlink, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
@@ -95,24 +95,6 @@ impl AutoloadGenerator {
     /// Whether to run in drymode or not
     pub fn set_dry_run(&mut self, dry_run: bool) {
         self.dry_run = dry_run;
-    }
-
-    /// Whether platform requirements should be ignored.
-    ///
-    /// If this is set to true, the platform check file will not be generated
-    /// If this is set to false, the platform check file will be generated with all requirements
-    /// If this is set to string[], those packages will be ignored from the platform check file
-    ///
-    /// Deprecated: use setPlatformRequirementFilter instead
-    pub fn set_ignore_platform_requirements(&mut self, ignore_platform_reqs: PhpMixed) {
-        trigger_error(
-            "AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
-            E_USER_DEPRECATED,
-        );
-
-        self.set_platform_requirement_filter(
-            PlatformRequirementFilterFactory::from_bool_or_list(ignore_platform_reqs).unwrap(),
-        );
     }
 
     pub fn set_platform_requirement_filter(

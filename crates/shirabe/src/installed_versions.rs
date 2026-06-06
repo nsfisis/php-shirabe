@@ -5,9 +5,8 @@ use std::sync::Mutex;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge,
-    call_user_func_array, implode, is_file, method_exists, php_dir, require_php_file, strtr_array,
-    substr, trigger_error,
+    OutOfBoundsException, PhpMixed, array_flip, array_keys, array_merge, call_user_func_array,
+    implode, is_file, method_exists, php_dir, require_php_file, strtr_array, substr,
 };
 use shirabe_semver::version_parser::VersionParser;
 
@@ -391,36 +390,6 @@ impl InstalledVersions {
             .and_then(|d| d.get("root").and_then(|v| v.as_array()).cloned())
             .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect())
             .unwrap_or_default()
-    }
-
-    /// Returns the raw installed.php data for custom implementations
-    ///
-    /// @deprecated Use getAllRawData() instead which returns all datasets for all autoloaders present in the process. getRawData only returns the first dataset loaded, which may not be what you expect.
-    /// @return array[]
-    pub fn get_raw_data() -> IndexMap<String, PhpMixed> {
-        // PHP: @trigger_error(...)
-        // TODO(phase-b): Silencer::call wraps trigger_error
-        trigger_error(
-            "getRawData only returns the first dataset loaded, which may not be what you expect. Use getAllRawData() instead which returns all datasets for all autoloaders present in the process.",
-            E_USER_DEPRECATED,
-        );
-
-        let mut installed = INSTALLED.lock().unwrap();
-        if installed.is_none() {
-            // only require the installed.php file if this file is loaded from its dumped location,
-            // and not from its source location in the composer/composer package, see https://github.com/composer/composer/issues/9937
-            if substr(&php_dir(), -8, Some(1)) != "C" {
-                let required = require_php_file(&format!("{}/installed.php", php_dir()));
-                *installed = required
-                    .as_array()
-                    .cloned()
-                    .map(|m| m.into_iter().map(|(k, v)| (k, *v)).collect());
-            } else {
-                *installed = Some(IndexMap::new());
-            }
-        }
-
-        installed.clone().unwrap_or_default()
     }
 
     /// Returns the raw data of all installed.php which are currently loaded for custom implementations

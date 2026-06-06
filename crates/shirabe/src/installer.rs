@@ -38,7 +38,7 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_flip, array_map, array_merge, array_unique, array_values,
     clone, count, defined, gc_collect_cycles, gc_disable, gc_enable, get_class, implode, in_array,
     intval, is_dir, is_numeric, is_string, max_i64, sprintf, strcmp, strpos, strtolower, touch,
-    trigger_error, usort,
+    usort,
 };
 use shirabe_semver;
 
@@ -1828,17 +1828,6 @@ impl Installer {
         self
     }
 
-    /// set whether to run scripts or not
-    ///
-    /// This is disabled implicitly when enabling dryRun
-    ///
-    /// Deprecated: Use setRunScripts(false) on the EventDispatcher instance being injected instead
-    pub fn set_run_scripts(&mut self, run_scripts: bool) -> &mut Self {
-        self.run_scripts = run_scripts;
-
-        self
-    }
-
     /// set the config instance
     pub fn set_config(&mut self, config: std::rc::Rc<std::cell::RefCell<Config>>) -> &mut Self {
         self.config = config;
@@ -1856,27 +1845,6 @@ impl Installer {
     /// Checks, if running in verbose mode.
     pub fn is_verbose(&self) -> bool {
         self.verbose
-    }
-
-    /// set ignore Platform Package requirements
-    ///
-    /// If this is set to true, all platform requirements are ignored
-    /// If this is set to false, no platform requirements are ignored
-    /// If this is set to string[], those packages will be ignored
-    ///
-    /// Deprecated: use setPlatformRequirementFilter instead
-    pub fn set_ignore_platform_requirements(
-        &mut self,
-        ignore_platform_reqs: shirabe_php_shim::PhpMixed,
-    ) -> anyhow::Result<&mut Self> {
-        trigger_error(
-            "Installer::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.",
-            shirabe_php_shim::E_USER_DEPRECATED,
-        );
-
-        Ok(self.set_platform_requirement_filter(
-            PlatformRequirementFilterFactory::from_bool_or_list(ignore_platform_reqs)?,
-        ))
     }
 
     pub fn set_platform_requirement_filter(
@@ -1976,29 +1944,9 @@ impl Installer {
         self
     }
 
-    /// Should an audit be run after installation is complete?
-    ///
-    /// Deprecated: Use setAuditConfig instead of calling this
-    pub fn set_audit(&mut self, audit: bool) -> &mut Self {
-        self.audit = audit;
-        self.audit_config = None; // Invalidate cached config
-
-        self
-    }
-
     /// Should exit with status code 5 on audit error
     pub fn set_error_on_audit(&mut self, error_on_audit: bool) -> &mut Self {
         self.error_on_audit = error_on_audit;
-
-        self
-    }
-
-    /// What format should be used for audit output?
-    ///
-    /// Deprecated: Use setAuditConfig instead of calling this
-    pub fn set_audit_format(&mut self, audit_format: String) -> &mut Self {
-        self.audit_format = audit_format;
-        self.audit_config = None; // Invalidate cached config
 
         self
     }

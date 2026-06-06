@@ -87,13 +87,6 @@ impl JsonFile {
     pub const AUTH_SCHEMA: i64 = 3;
     pub const LOCK_SCHEMA: i64 = 4;
 
-    /// @deprecated Use \JSON_UNESCAPED_SLASHES
-    pub const JSON_UNESCAPED_SLASHES: i64 = 64;
-    /// @deprecated Use \JSON_PRETTY_PRINT
-    pub const JSON_PRETTY_PRINT: i64 = 128;
-    /// @deprecated Use \JSON_UNESCAPED_UNICODE
-    pub const JSON_UNESCAPED_UNICODE: i64 = 256;
-
     pub const INDENT_DEFAULT: &'static str = "    ";
 
     /// PHP: __DIR__ . '/../../../res/composer-schema.json'

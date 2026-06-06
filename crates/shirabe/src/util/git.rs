@@ -135,8 +135,7 @@ impl Git {
     /// @param callable|array<callable> $commandCallable
     /// @param mixed       $commandOutput  the output will be written into this var if passed by ref
     ///                                    if a callable is passed it will be used as output handler
-    /// @deprecated Use runCommands with placeholders instead of callbacks for simplicity
-    pub fn run_command(
+    fn run_command(
         &mut self,
         command_callable: Vec<Box<dyn Fn(&str) -> Vec<String>>>,
         url: &str,

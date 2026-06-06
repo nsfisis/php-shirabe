@@ -53,8 +53,6 @@ impl PostFileDownloadEvent {
         &self.context
     }
 
-    // TODO(plugin): getPackage is deprecated since Composer 2.1, use getContext instead
-
     pub fn get_type(&self) -> &str {
         &self.r#type
     }
