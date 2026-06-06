@@ -10,6 +10,7 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule;
 use crate::dependency_resolver::RuleSetIterator;
+use crate::package::BasePackageHandle;
 use crate::repository::RepositorySet;
 
 #[derive(Debug)]
@@ -135,19 +136,31 @@ impl RuleSet {
         &self,
         repository_set: Option<&RepositorySet>,
         request: Option<&Request>,
-        pool: Option<&Pool>,
+        mut pool: Option<&mut Pool>,
         is_verbose: bool,
-    ) -> String {
-        let types = Self::types();
+    ) -> anyhow::Result<String> {
         let mut string = "\n".to_string();
+        let types = Self::types();
+        let dummy_installed_map = IndexMap::new();
+        let dummy_learned_pool = Vec::new();
         for (r#type, rules) in &self.rules {
-            let type_name = types.get(r#type).copied().unwrap_or("");
-            string.push_str(&format!("{:<8}: ", type_name));
+            string.push_str(&format!(
+                "{:<8}: ",
+                types.get(r#type).expect("unknown type")
+            ));
             for rule in rules {
-                if repository_set.is_some() && request.is_some() && pool.is_some() {
-                    // TODO(phase-b): get_pretty_string needs &mut Pool plus installed_map and learned_pool.
-                    let _ = (repository_set, request, pool, is_verbose);
-                    string.push_str(&rule.borrow().to_string());
+                if let Some(repository_set) = repository_set
+                    && let Some(request) = request
+                    && let Some(pool) = pool.as_deref_mut()
+                {
+                    string.push_str(&rule.borrow().get_pretty_string(
+                        repository_set,
+                        request,
+                        pool,
+                        is_verbose,
+                        &dummy_installed_map,
+                        &dummy_learned_pool,
+                    )?);
                 } else {
                     string.push_str(&rule.borrow().to_string());
                 }
@@ -155,12 +168,16 @@ impl RuleSet {
             }
             string.push_str("\n\n");
         }
-        string
+
+        Ok(string)
     }
 }
 
 impl std::fmt::Display for RuleSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_pretty_string(None, None, None, false))
+        let pretty = self
+            .get_pretty_string(None, None, None, false)
+            .expect("RuleSet::get_pretty_string() is infallible without a repository set, a request and a pool");
+        write!(f, "{}", pretty)
     }
 }
