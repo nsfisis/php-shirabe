@@ -84,6 +84,24 @@ impl SvnDownloader {
 
         Ok(None)
     }
+
+    /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
+    /// local changes.
+    fn fail_on_local_changes(
+        &mut self,
+        package: PackageInterfaceHandle,
+        path: &str,
+    ) -> anyhow::Result<()> {
+        if self.get_local_changes(package, path)?.is_some() {
+            return Err(RuntimeException {
+                message: format!("Source directory {} has uncommitted changes.", path),
+                code: 0,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
 }
 
 impl VcsDownloader for SvnDownloader {
@@ -257,7 +275,8 @@ impl VcsDownloader for SvnDownloader {
                 return self.discard_changes(path).await;
             }
 
-            return self.inner.clean_changes(package, path, update).await;
+            self.fail_on_local_changes(package, path)?;
+            return Ok(None);
         }
 
         let changes_str = changes.unwrap();

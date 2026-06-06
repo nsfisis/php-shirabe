@@ -55,21 +55,6 @@ impl VcsDownloaderBase {
         }
     }
 
-    /// Equivalent of PHP `parent::cleanChanges()`. Subclasses that override the trait method
-    /// call this when they need to invoke the base behavior. Since this lives on the data struct,
-    /// it cannot consult subclass-specific `get_local_changes`; it assumes any callers have
-    /// already verified that no local changes exist.
-    pub async fn clean_changes(
-        &self,
-        _package: PackageInterfaceHandle,
-        _path: &str,
-        _update: bool,
-    ) -> Result<Option<PhpMixed>> {
-        // TODO(phase-b): parent::cleanChanges() rechecks getLocalChanges via dynamic dispatch.
-        // Callers in subclasses must do that check themselves (they already have).
-        Ok(None)
-    }
-
     pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(

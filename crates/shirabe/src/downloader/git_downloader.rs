@@ -680,6 +680,20 @@ impl GitDownloader {
 
         reference.to_string()
     }
+
+    /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
+    /// local changes.
+    fn fail_on_local_changes(&mut self, package: PackageInterfaceHandle, path: &str) -> Result<()> {
+        if self.get_local_changes(package, path)?.is_some() {
+            return Err(RuntimeException {
+                message: format!("Source directory {} has uncommitted changes.", path),
+                code: 0,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
 }
 
 impl DvcsDownloaderInterface for GitDownloader {
@@ -1206,16 +1220,15 @@ impl VcsDownloader for GitDownloader {
             }
             if discard_changes.as_string() == Some("stash") {
                 if !update {
-                    return self
-                        .inner
-                        .clean_changes(package.clone(), &path, update)
-                        .await;
+                    self.fail_on_local_changes(package.clone(), &path)?;
+                    return Ok(None);
                 }
 
                 return self.stash_changes(&path).await;
             }
 
-            return self.inner.clean_changes(package, &path, update).await;
+            self.fail_on_local_changes(package, &path)?;
+            return Ok(None);
         }
 
         let changes: Vec<String> = array_map(
