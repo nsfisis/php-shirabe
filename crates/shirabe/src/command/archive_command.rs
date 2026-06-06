@@ -114,10 +114,9 @@ impl ArchiveCommand {
                     .to_string()
             });
 
-        // TODO(phase-b): clone_box to release self borrow held by get_io.
-        let io_box = self.get_io().clone();
+        let io = self.get_io().clone();
         let return_code = self.archive(
-            io_box.clone(),
+            io.clone(),
             &config,
             input
                 .borrow()
@@ -175,13 +174,13 @@ impl ArchiveCommand {
         composer: Option<&PartialComposerHandle>,
     ) -> Result<i64> {
         let composer_guard = composer.map(crate::command::composer_full);
-        let owned_archive_manager;
+        let mut owned_archive_manager;
         let composer_archive_manager;
-        let composer_archive_manager_ref;
-        let archive_manager: &ArchiveManager = if let Some(composer) = &composer_guard {
+        let mut composer_archive_manager_ref;
+        let archive_manager: &mut ArchiveManager = if let Some(composer) = &composer_guard {
             composer_archive_manager = composer.get_archive_manager().clone();
-            composer_archive_manager_ref = composer_archive_manager.borrow();
-            &composer_archive_manager_ref
+            composer_archive_manager_ref = composer_archive_manager.borrow_mut();
+            &mut composer_archive_manager_ref
         } else {
             let factory = Factory;
             let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
@@ -201,7 +200,7 @@ impl ArchiveCommand {
             )));
             owned_archive_manager =
                 factory.create_archive_manager(&*config.borrow(), &download_manager, &loop_)?;
-            &owned_archive_manager
+            &mut owned_archive_manager
         };
 
         let package: crate::package::CompletePackageInterfaceHandle =
@@ -220,11 +219,13 @@ impl ArchiveCommand {
             "<info>Creating the archive into \"{}\".</info>",
             dest
         ));
-        // TODO(phase-b): ArchiveManager.archive needs &mut self and &mut CompletePackageInterface;
-        // current composer.get_archive_manager() returns &ArchiveManager. Needs RefCell wrapper.
-        let _ = archive_manager;
-        let _ = (&package, format, dest, file_name.as_deref(), ignore_filters);
-        let package_path: String = todo!("ArchiveManager.archive call");
+        let package_path: String = archive_manager.archive(
+            package,
+            format.to_string(),
+            dest.to_string(),
+            file_name,
+            ignore_filters,
+        )?;
         let fs = Filesystem::new(None);
         let short_path =
             fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false);

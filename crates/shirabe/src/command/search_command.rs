@@ -75,9 +75,7 @@ impl SearchCommand {
         let composer = if let Some(c) = self.try_composer(None, None) {
             c
         } else {
-            // TODO(phase-b): clone_box to release self borrow held by get_io.
-            let io_box = self.get_io().clone();
-            self.create_composer_instance(input.clone(), io_box, None, false, None)?
+            self.create_composer_instance(input.clone(), io.clone(), None, false, None)?
         };
         let composer_ref = crate::command::composer_full(&composer);
         let local_repo = composer_ref
