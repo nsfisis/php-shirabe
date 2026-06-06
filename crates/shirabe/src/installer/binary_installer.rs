@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
-    file_get_contents, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir, substr,
-    trim, umask,
+    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, realpath, rmdir,
+    substr, trim, umask,
 };
 
 use crate::io::IOInterface;
@@ -245,7 +245,6 @@ impl BinaryInstaller {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.bin_dir);
-        // TODO(phase-b): PHP assigns realpath(...) even when realpath returns false
         self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
     }
 
@@ -294,9 +293,8 @@ impl BinaryInstaller {
         let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
         let bin_file = basename(&bin_path);
 
-        // PHP: file_get_contents($bin, false, null, 0, 500) — limit 500 bytes
-        // TODO(phase-b): file_get_contents shim does not support offset/maxlen
-        let bin_contents = file_get_contents(bin).unwrap_or_default();
+        let bin_contents =
+            file_get_contents5(bin, false, PhpMixed::Null, 0, Some(500)).unwrap_or_default();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
         if let Some(m) =

@@ -1421,6 +1421,16 @@ pub fn file_get_contents(_path: &str) -> Option<String> {
     todo!()
 }
 
+pub fn file_get_contents5(
+    _path: &str,
+    _use_include_path: bool,
+    _context: PhpMixed,
+    _offset: i64,
+    _length: Option<i64>,
+) -> Option<String> {
+    todo!()
+}
+
 pub fn strtolower(_s: &str) -> String {
     todo!()
 }
