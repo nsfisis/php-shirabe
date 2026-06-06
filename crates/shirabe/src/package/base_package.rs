@@ -84,31 +84,14 @@ pub trait BasePackage: PackageInterface + std::fmt::Display {
     fn set_repository_box(&mut self, repository: RepositoryInterfaceHandle);
     fn take_repository(&mut self) -> Option<RepositoryInterfaceHandle>;
 
-    // as_alias_package / as_complete_package_interface inherited from PackageInterface.
-
     fn as_alias_package_mut(&mut self) -> Option<&mut crate::package::AliasPackage> {
         None
     }
-
-    // get_name / get_pretty_name / get_names live on PackageInterface; the BasePackage
-    // duplicates were causing ambiguity at every call site (`pkg.get_name()` with
-    // pkg: &dyn BasePackage). Concrete impls already forward to name()/pretty_name().
-
-    // set_id, get_id, get_repository, get_unique_name, set_repository are inherited
-    // from PackageInterface; do not redeclare here to avoid trait-method ambiguity.
 
     fn is_platform(&self) -> bool {
         self.repository_opt()
             .map_or(false, |r| r.is::<PlatformRepository>())
     }
-
-    fn equals(&self, _package: &dyn PackageInterface) -> bool {
-        // TODO(phase-b): implement via reference identity (requires Rc/Arc)
-        // PHP uses === which is reference equality; unwraps AliasPackage on both sides
-        todo!("equals requires reference identity which needs Rc/Arc")
-    }
-
-    // get_pretty_string is inherited from PackageInterface.
 
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
         if display_mode == DisplayMode::SourceRefIfDev

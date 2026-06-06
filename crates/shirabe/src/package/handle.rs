@@ -1359,6 +1359,20 @@ macro_rules! impl_handle_downcasts {
 
 impl_handle_downcasts!(PackageInterfaceHandle);
 
+impl PackageInterfaceHandle {
+    pub fn equals(&self, package: &PackageInterfaceHandle) -> bool {
+        let self_real = match self.as_alias() {
+            Some(alias) => PackageInterfaceHandle::from(alias.get_alias_of()),
+            None => self.clone(),
+        };
+        let other_real = match package.as_alias() {
+            Some(alias) => PackageInterfaceHandle::from(alias.get_alias_of()),
+            None => package.clone(),
+        };
+        self_real.ptr_eq(&other_real)
+    }
+}
+
 impl PackageHandle {
     pub fn from_package(package: Package) -> Self {
         Self(Rc::new(RefCell::new(AnyPackage::Package(package))))
