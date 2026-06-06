@@ -130,6 +130,57 @@ impl VcsDriverBase {
 
         Ok(Some(composer))
     }
+
+    // Caching layer of the base `getComposerInformation`. Concrete drivers that
+    // inherit the base implementation thread their own `get_file_content` /
+    // `get_change_date` fetch between these two calls; splitting read and write
+    // keeps each `self.inner` borrow disjoint from the fetch's `self` borrow.
+    // Returns `Some(_)` when the value is already known (in-memory or on-disk
+    // cache), or `None` when the caller must fetch it.
+    pub fn read_cached_composer(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<Option<IndexMap<String, PhpMixed>>>> {
+        if self.info_cache.contains_key(identifier) {
+            return Ok(Some(
+                self.info_cache.get(identifier).and_then(|v| v.clone()),
+            ));
+        }
+        if self.should_cache(identifier) {
+            if let Some(res) = self.cache.as_mut().and_then(|c| c.read(identifier)) {
+                let parsed = JsonFile::parse_json(Some(&res), None)?;
+                let composer: Option<IndexMap<String, PhpMixed>> = parsed
+                    .as_array()
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                self.info_cache
+                    .insert(identifier.to_string(), composer.clone());
+                return Ok(Some(composer));
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn write_cached_composer(
+        &mut self,
+        identifier: &str,
+        composer: Option<IndexMap<String, PhpMixed>>,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        if self.should_cache(identifier) {
+            let encoded = JsonFile::encode_with_options(
+                &composer
+                    .clone()
+                    .map(PhpMixed::from)
+                    .unwrap_or(PhpMixed::Null),
+                JsonEncodeOptions {
+                    pretty_print: false,
+                    ..Default::default()
+                },
+            );
+            self.cache.as_mut().map(|c| c.write(identifier, &encoded));
+        }
+        self.info_cache.insert(identifier.to_string(), composer);
+        Ok(self.info_cache.get(identifier).and_then(|v| v.clone()))
+    }
 }
 
 // TODO(phase-b): the constructor is `final` in PHP; concrete implementations must replicate the
@@ -245,7 +296,7 @@ pub trait VcsDriver: VcsDriverInterface {
     }
 
     fn has_composer_file(&mut self, identifier: &str) -> bool {
-        match self.get_composer_information(identifier) {
+        match VcsDriver::get_composer_information(self, identifier) {
             Ok(Some(_)) => true,
             _ => false,
         }

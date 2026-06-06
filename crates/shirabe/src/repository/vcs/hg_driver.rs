@@ -2,6 +2,7 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
+use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
@@ -12,7 +13,7 @@ use crate::util::Url;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{RuntimeException, dirname, is_dir, is_writable};
+use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
 pub struct HgDriver {
@@ -311,23 +312,23 @@ impl HgDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &Config,
+        _config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         if Preg::is_match(
             r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i",
             url,
         )
         .unwrap_or(false)
         {
-            return true;
+            return Ok(true);
         }
 
         if Filesystem::is_local_path(url) {
             let url = Filesystem::get_platform_path(url);
             if !is_dir(&url) {
-                return false;
+                return Ok(false);
             }
 
             let mut process = crate::util::ProcessExecutor::new(Some(io.clone()));
@@ -338,12 +339,12 @@ impl HgDriver {
                 Some(url),
             ) == 0
             {
-                return true;
+                return Ok(true);
             }
         }
 
         if !deep {
-            return false;
+            return Ok(false);
         }
 
         let mut process = crate::util::ProcessExecutor::new(Some(io));
@@ -356,6 +357,94 @@ impl HgDriver {
             (),
         );
 
-        exit == 0
+        Ok(exit == 0)
+    }
+
+    pub fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        if let Some(cached) = self.inner.read_cached_composer(identifier)? {
+            return Ok(cached);
+        }
+
+        let file_content = self.get_file_content("composer.json", identifier)?;
+        let composer =
+            VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
+                self.get_change_date(identifier)
+            })?;
+
+        self.inner.write_cached_composer(identifier, composer)
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for HgDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        HgDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        HgDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        HgDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        HgDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        HgDriver::get_root_identifier(self)
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        HgDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        HgDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(HgDriver::get_dist(self, identifier))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(HgDriver::get_source(self, identifier))
+    }
+
+    fn get_url(&self) -> String {
+        HgDriver::get_url(self)
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        HgDriver::supports(io, config, url, deep)
     }
 }

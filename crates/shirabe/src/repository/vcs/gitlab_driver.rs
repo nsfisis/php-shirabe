@@ -972,14 +972,14 @@ impl GitLabDriver {
     /// repository given.
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         _deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match_strict_groups3(Self::URL_REGEX, url, Some(&mut match_)).unwrap_or(false)
         {
-            return false;
+            return Ok(false);
         }
 
         let scheme = match_
@@ -1005,14 +1005,14 @@ impl GitLabDriver {
         );
 
         if Self::determine_origin(
-            &config.get("gitlab-domains"),
+            &config.borrow().get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
             match_.get(&CaptureKey::ByName("port".to_string())).cloned(),
         )
         .is_none()
         {
-            return false;
+            return Ok(false);
         }
 
         if scheme == "https" && !extension_loaded("openssl") {
@@ -1025,10 +1025,10 @@ impl GitLabDriver {
                 io_interface::VERBOSE,
             );
 
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     /// Gives back the loaded <gitlab-api>/projects/<owner>/<repo> result
@@ -1120,5 +1120,83 @@ impl GitLabDriver {
         }
 
         None
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        GitLabDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        GitLabDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        GitLabDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        GitLabDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        GitLabDriver::get_root_identifier(self)
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitLabDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitLabDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(GitLabDriver::get_dist(self, identifier).map(|m| {
+            m.into_iter()
+                .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+                .collect()
+        }))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(GitLabDriver::get_source(self, identifier)
+            .into_iter()
+            .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+            .collect())
+    }
+
+    fn get_url(&self) -> String {
+        GitLabDriver::get_url(self)
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        GitLabDriver::supports(io, config, url, deep)
     }
 }

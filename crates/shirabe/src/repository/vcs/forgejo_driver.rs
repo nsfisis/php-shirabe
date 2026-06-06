@@ -463,8 +463,8 @@ impl ForgejoDriver {
             .and_then(|v| v.clone()))
     }
 
-    pub fn get_source(&mut self, identifier: &str) -> IndexMap<String, String> {
-        if let Some(ref mut git_driver) = self.git_driver {
+    pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+        if let Some(ref git_driver) = self.git_driver {
             return git_driver.get_source(identifier);
         }
 
@@ -490,17 +490,17 @@ impl ForgejoDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         _deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         let forgejo_url = ForgejoUrl::try_from(Some(url));
         if forgejo_url.is_none() {
-            return false;
+            return Ok(false);
         }
         let forgejo_url = forgejo_url.unwrap();
 
-        let forgejo_domains = config.get("forgejo-domains");
+        let forgejo_domains = config.borrow().get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
                 d.as_string().map_or(false, |s| {
@@ -511,7 +511,7 @@ impl ForgejoDriver {
             false
         };
         if !in_domains {
-            return false;
+            return Ok(false);
         }
 
         if !extension_loaded("openssl") {
@@ -524,10 +524,10 @@ impl ForgejoDriver {
                 io_interface::VERBOSE,
             );
 
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     fn setup_git_driver(&mut self, url: &str) -> Result<()> {
@@ -685,5 +685,79 @@ impl ForgejoDriver {
                 Err(e)
             }
         }
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        ForgejoDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        ForgejoDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        ForgejoDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+        ForgejoDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        ForgejoDriver::get_root_identifier(self)
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        ForgejoDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        ForgejoDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(ForgejoDriver::get_dist(self, identifier))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(ForgejoDriver::get_source(self, identifier))
+    }
+
+    fn get_url(&self) -> String {
+        ForgejoDriver::get_url(self)
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        ForgejoDriver::supports(io, config, url, deep)
     }
 }

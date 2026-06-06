@@ -12,6 +12,7 @@ use shirabe_php_shim::{
 
 use crate::cache::Cache;
 use crate::config::Config;
+use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::repository::vcs::VcsDriverBase;
@@ -19,6 +20,7 @@ use crate::util::Filesystem;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct GitDriver {
@@ -401,7 +403,7 @@ impl GitDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: &Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
@@ -446,22 +448,15 @@ impl GitDriver {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
-        // TODO(phase-b): supports() takes &Config; GitUtil now needs Rc<RefCell<Config>>.
-        // Skipping clean Rc construction since we cannot reconstruct one from a borrowed &Config.
-        let _ = _config;
-        return Err(anyhow::anyhow!(
-            "GitDriver::supports requires Rc<RefCell<Config>>: not yet ported"
-        ));
-        #[allow(unreachable_code)]
         let mut git_util = GitUtil::new(
             io.clone(),
-            todo!(),
+            config.clone(),
             process.clone(),
             std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
         );
         GitUtil::clean_env(&process);
 
-        let result = git_util.run_commands(
+        match git_util.run_commands(
             vec![vec![
                 "git".to_string(),
                 "ls-remote".to_string(),
@@ -473,63 +468,91 @@ impl GitDriver {
             Some(&sys_get_temp_dir()),
             false,
             None,
-        );
-        match result {
+        ) {
             Ok(_) => Ok(true),
-            Err(_) => Ok(false),
+            Err(e) => {
+                if e.downcast_ref::<RuntimeException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
         }
+    }
+
+    pub fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        if let Some(cached) = self.inner.read_cached_composer(identifier)? {
+            return Ok(cached);
+        }
+
+        let file_content = self.get_file_content("composer.json", identifier)?;
+        let composer =
+            VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
+                self.get_change_date(identifier)
+            })?;
+
+        self.inner.write_cached_composer(identifier, composer)
     }
 }
 
-// TODO(phase-b): implement VcsDriverInterface for GitDriver — signatures here
-// differ from the trait (some &mut self vs &self, different return shapes), so
-// each method delegates via todo!() until reconciled.
 impl crate::repository::vcs::VcsDriverInterface for GitDriver {
     fn initialize(&mut self) -> anyhow::Result<()> {
         GitDriver::initialize(self)
     }
 
     fn get_composer_information(
-        &self,
-        _identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, shirabe_php_shim::PhpMixed>>> {
-        todo!()
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        GitDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&self, _file: &str, _identifier: &str) -> anyhow::Result<Option<String>> {
-        todo!()
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        GitDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&self, _identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
-        todo!()
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        GitDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&self) -> anyhow::Result<String> {
-        todo!()
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        GitDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&self) -> anyhow::Result<IndexMap<String, String>> {
-        todo!()
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitDriver::get_branches(self)
     }
 
-    fn get_tags(&self) -> anyhow::Result<IndexMap<String, String>> {
-        todo!()
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitDriver::get_tags(self)
     }
 
-    fn get_dist(&self, _identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
-        todo!()
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(GitDriver::get_dist(self, identifier))
     }
 
-    fn get_source(&self, _identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
-        todo!()
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(GitDriver::get_source(self, identifier))
     }
 
     fn get_url(&self) -> String {
         GitDriver::get_url(self)
     }
 
-    fn has_composer_file(&self, _identifier: &str) -> anyhow::Result<bool> {
-        todo!()
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
     }
 
     fn cleanup(&mut self) -> anyhow::Result<()> {
@@ -537,11 +560,11 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
     }
 
     fn supports(
-        _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: &Config,
-        _url: &str,
-        _deep: bool,
-    ) -> bool {
-        todo!()
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        GitDriver::supports(io, config, url, deep)
     }
 }

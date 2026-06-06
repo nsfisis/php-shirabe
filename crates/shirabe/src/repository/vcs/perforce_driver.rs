@@ -169,14 +169,34 @@ impl PerforceDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: &Config,
+        _config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         if deep || Preg::is_match(r"#\b(perforce|p4)\b#i", url).unwrap_or(false) {
-            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(Some(io)));
+            return Ok(Perforce::check_server_exists(
+                url,
+                &mut ProcessExecutor::new(Some(io)),
+            ));
         }
-        false
+        Ok(false)
+    }
+
+    pub fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        if let Some(cached) = self.inner.read_cached_composer(identifier)? {
+            return Ok(cached);
+        }
+
+        let file_content = self.get_file_content("composer.json", identifier)?;
+        let composer =
+            VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
+                self.get_change_date(identifier)
+            })?;
+
+        self.inner.write_cached_composer(identifier, composer)
     }
 
     pub fn cleanup(&mut self) -> anyhow::Result<()> {
@@ -191,5 +211,77 @@ impl PerforceDriver {
 
     pub fn get_branch(&self) -> &str {
         &self.branch
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        PerforceDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        PerforceDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        PerforceDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+        PerforceDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        Ok(PerforceDriver::get_root_identifier(self).to_string())
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        PerforceDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        PerforceDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(PerforceDriver::get_dist(self, identifier).map(|m| {
+            m.into_iter()
+                .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+                .collect()
+        }))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(PerforceDriver::get_source(self, identifier)
+            .into_iter()
+            .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+            .collect())
+    }
+
+    fn get_url(&self) -> String {
+        PerforceDriver::get_url(self).to_string()
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        Ok(PerforceDriver::has_composer_file(self, identifier))
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        PerforceDriver::cleanup(self)
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        PerforceDriver::supports(io, config, url, deep)
     }
 }

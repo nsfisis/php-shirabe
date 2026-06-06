@@ -12,19 +12,19 @@ pub trait VcsDriverInterface: std::fmt::Debug {
     fn initialize(&mut self) -> anyhow::Result<()>;
 
     fn get_composer_information(
-        &self,
+        &mut self,
         identifier: &str,
     ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
 
-    fn get_file_content(&self, file: &str, identifier: &str) -> anyhow::Result<Option<String>>;
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>>;
 
-    fn get_change_date(&self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>>;
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>>;
 
-    fn get_root_identifier(&self) -> anyhow::Result<String>;
+    fn get_root_identifier(&mut self) -> anyhow::Result<String>;
 
-    fn get_branches(&self) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>>;
 
-    fn get_tags(&self) -> anyhow::Result<IndexMap<String, String>>;
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>>;
 
     fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>>;
 
@@ -32,11 +32,16 @@ pub trait VcsDriverInterface: std::fmt::Debug {
 
     fn get_url(&self) -> String;
 
-    fn has_composer_file(&self, identifier: &str) -> anyhow::Result<bool>;
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool>;
 
     fn cleanup(&mut self) -> anyhow::Result<()>;
 
-    fn supports(io: Rc<RefCell<dyn IOInterface>>, config: &Config, url: &str, deep: bool) -> bool
+    fn supports(
+        io: Rc<RefCell<dyn IOInterface>>,
+        config: Rc<RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool>
     where
         Self: Sized;
 }

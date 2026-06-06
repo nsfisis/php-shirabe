@@ -416,7 +416,7 @@ impl VcsRepository {
             }
 
             let result: Result<()> = (|| -> Result<()> {
-                let driver = self.driver.as_ref().unwrap();
+                let driver = self.driver.as_mut().unwrap();
                 let data_opt = driver.get_composer_information(&identifier)?;
                 if data_opt.is_none() {
                     if is_very_verbose {
@@ -667,8 +667,11 @@ impl VcsRepository {
             }
 
             let result: Result<()> = (|| -> Result<()> {
-                let driver = self.driver.as_ref().unwrap();
-                let data_opt = driver.get_composer_information(&identifier)?;
+                let data_opt = self
+                    .driver
+                    .as_mut()
+                    .unwrap()
+                    .get_composer_information(&identifier)?;
                 if data_opt.is_none() {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -689,7 +692,7 @@ impl VcsRepository {
                 );
 
                 data.shift_remove("default-branch");
-                if driver.get_root_identifier()? == branch {
+                if self.driver.as_mut().unwrap().get_root_identifier()? == branch {
                     data.insert("default-branch".to_string(), PhpMixed::Bool(true));
                 }
 
@@ -703,6 +706,7 @@ impl VcsRepository {
                     ));
                 }
 
+                let driver = self.driver.as_ref().unwrap();
                 let package_data = self.pre_process(&**driver, data, &identifier)?;
                 let package = self
                     .loader

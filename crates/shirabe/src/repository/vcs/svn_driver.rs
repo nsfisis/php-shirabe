@@ -481,18 +481,18 @@ impl SvnDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: &Config,
+        _config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         deep: bool,
-    ) -> bool {
+    ) -> Result<bool> {
         let url = Self::normalize_url(url);
         if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url).unwrap_or(false) {
-            return true;
+            return Ok(true);
         }
 
         // proceed with deep check for local urls since they are fast to process
         if !deep && !Filesystem::is_local_path(&url) {
-            return false;
+            return Ok(false);
         }
 
         let mut process = ProcessExecutor::new(Some(io));
@@ -511,24 +511,24 @@ impl SvnDriver {
 
         if exit == 0 {
             // This is definitely a Subversion repository.
-            return true;
+            return Ok(true);
         }
 
         // Subversion client 1.7 and older
         if stripos(&process.get_error_output(), "authorization failed:").is_some() {
             // This is likely a remote Subversion repository that requires
             // authentication. We will handle actual authentication later.
-            return true;
+            return Ok(true);
         }
 
         // Subversion client 1.8 and newer
         if stripos(&process.get_error_output(), "Authentication failed").is_some() {
             // This is likely a remote Subversion or newer repository that requires
             // authentication. We will handle actual authentication later.
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     /// An absolute path (leading '/') is converted to a file:// url.
@@ -605,5 +605,76 @@ impl SvnDriver {
             self.package_path,
             revision,
         )
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        SvnDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        SvnDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        SvnDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        SvnDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        Ok(SvnDriver::get_root_identifier(self))
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(self.get_branches().clone())
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(self.get_tags().clone())
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(SvnDriver::get_dist(self, identifier))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(SvnDriver::get_source(self, identifier))
+    }
+
+    fn get_url(&self) -> String {
+        SvnDriver::get_url(self).to_string()
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        SvnDriver::supports(io, config, url, deep)
     }
 }

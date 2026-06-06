@@ -939,10 +939,10 @@ impl GitHubDriver {
 
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: &Config,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         _deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match_strict_groups3(
             r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
@@ -951,7 +951,7 @@ impl GitHubDriver {
         )
         .unwrap_or(false)
         {
-            return false;
+            return Ok(false);
         }
 
         let origin_url = matches
@@ -968,10 +968,10 @@ impl GitHubDriver {
             PhpMixed::String(strtolower(
                 &Preg::replace(r"{^www\.}i", "", &origin_url).unwrap_or_default(),
             )),
-            &config.get("github-domains"),
+            &config.borrow().get("github-domains"),
             false,
         ) {
-            return false;
+            return Ok(false);
         }
 
         if !extension_loaded("openssl") {
@@ -984,10 +984,10 @@ impl GitHubDriver {
                 io_interface::VERBOSE,
             );
 
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     /// Gives back the loaded <github-api>/repos/<owner>/<repo> result
@@ -1322,5 +1322,83 @@ impl GitHubDriver {
         }
 
         None
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        GitHubDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        GitHubDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        GitHubDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        GitHubDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        GitHubDriver::get_root_identifier(self)
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitHubDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitHubDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(GitHubDriver::get_dist(self, identifier).map(|m| {
+            m.into_iter()
+                .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+                .collect()
+        }))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(GitHubDriver::get_source(self, identifier)
+            .into_iter()
+            .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+            .collect())
+    }
+
+    fn get_url(&self) -> String {
+        GitHubDriver::get_url(self)
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        GitHubDriver::supports(io, config, url, deep)
     }
 }

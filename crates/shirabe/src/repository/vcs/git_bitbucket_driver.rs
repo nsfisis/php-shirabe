@@ -858,17 +858,17 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        _config: &Config,
+        _config: std::rc::Rc<std::cell::RefCell<Config>>,
         url: &str,
         _deep: bool,
-    ) -> bool {
+    ) -> anyhow::Result<bool> {
         if !Preg::is_match(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
             url,
         )
         .unwrap_or(false)
         {
-            return false;
+            return Ok(false);
         }
 
         if !extension_loaded("openssl") {
@@ -881,9 +881,80 @@ impl GitBitbucketDriver {
             // PHP: writeError(..., true, io_interface::VERBOSE)
             // TODO(phase-b): io_interface::VERBOSE verbosity argument
 
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
+    }
+}
+
+impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
+    fn initialize(&mut self) -> anyhow::Result<()> {
+        GitBitbucketDriver::initialize(self)
+    }
+
+    fn get_composer_information(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+        GitBitbucketDriver::get_composer_information(self, identifier)
+    }
+
+    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+        GitBitbucketDriver::get_file_content(self, file, identifier)
+    }
+
+    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+        GitBitbucketDriver::get_change_date(self, identifier)
+    }
+
+    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+        GitBitbucketDriver::get_root_identifier(self)
+    }
+
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitBitbucketDriver::get_branches(self)
+    }
+
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+        GitBitbucketDriver::get_tags(self)
+    }
+
+    fn get_dist(&self, identifier: &str) -> anyhow::Result<Option<IndexMap<String, String>>> {
+        Ok(GitBitbucketDriver::get_dist(self, identifier))
+    }
+
+    fn get_source(&self, identifier: &str) -> anyhow::Result<IndexMap<String, String>> {
+        Ok(GitBitbucketDriver::get_source(self, identifier))
+    }
+
+    fn get_url(&self) -> String {
+        GitBitbucketDriver::get_url(self)
+    }
+
+    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+        match self.get_composer_information(identifier) {
+            Ok(info) => Ok(info.is_some()),
+            Err(e) => {
+                if e.downcast_ref::<TransportException>().is_some() {
+                    Ok(false)
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }
+
+    fn cleanup(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn supports(
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        url: &str,
+        deep: bool,
+    ) -> anyhow::Result<bool> {
+        GitBitbucketDriver::supports(io, config, url, deep)
     }
 }
