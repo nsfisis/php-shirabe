@@ -211,9 +211,7 @@ impl DownloadManager {
 
         let mut sources = self.get_available_sources(package.clone(), prev_package.clone())?;
 
-        // PHP closure: uses recursive variable $download and captures $sources by reference
-        // TODO(phase-b): recursive closure with mutable shared state needs Rc<RefCell<>> or similar
-        let mut retry_state = false;
+        let mut retry = false;
         loop {
             let source = match array_shift(&mut sources) {
                 Some(s) => s,
@@ -221,7 +219,7 @@ impl DownloadManager {
                     return Ok(None);
                 }
             };
-            if retry_state {
+            if retry {
                 self.io.write_error3(
                     &format!(
                         "    <warning>Now trying to download from {}</warning>",
@@ -231,14 +229,10 @@ impl DownloadManager {
                     io_interface::NORMAL,
                 );
             }
-            // TODO(phase-b): &mut on shared package — PHP mutates by reference
-            todo!("package.set_installation_source(Some(source.clone()))");
+            package.set_installation_source(Some(source.clone()));
 
-            let downloader = match self.get_downloader_for_package(package.clone())? {
-                Some(d) => d,
-                None => {
-                    return Ok(None);
-                }
+            let Some(downloader) = self.get_downloader_for_package(package.clone())? else {
+                return Ok(None);
             };
 
             let result = match downloader
@@ -248,7 +242,6 @@ impl DownloadManager {
             {
                 Ok(r) => r,
                 Err(e) => {
-                    // PHP closure handleError: rethrow if not RuntimeException or if IrrecoverableDownloadException
                     let is_runtime = e.downcast_ref::<RuntimeException>().is_some();
                     let is_irrecoverable =
                         e.downcast_ref::<IrrecoverableDownloadException>().is_some();
@@ -273,7 +266,7 @@ impl DownloadManager {
                             io_interface::NORMAL,
                         );
 
-                        retry_state = true;
+                        retry = true;
                         continue;
                     }
 
@@ -281,8 +274,6 @@ impl DownloadManager {
                 }
             };
 
-            // PHP: $result->then(static fn ($res) => $res, $handleError);
-            // The rejection handler ($handleError) is already applied via the try/catch (the Err arm above).
             return Ok(result);
         }
     }
