@@ -70,13 +70,7 @@ impl SolverProblemsException {
                     &self.learned_pool
                 )?
             ));
-            // TODO(phase-b): get_reasons returns an IndexMap; flatten its values into Vec<Vec<...>>.
-            let reasons_vec: Vec<Vec<Rc<RefCell<Rule>>>> = problem
-                .get_reasons()
-                .values()
-                .map(|v| v.iter().map(|r| r.clone()).collect())
-                .collect();
-            missing_extensions.extend(self.get_extension_problems(reasons_vec));
+            missing_extensions.extend(self.get_extension_problems(problem.get_reasons()));
             is_caused_by_lock =
                 is_caused_by_lock || problem.is_caused_by_lock(repository_set, request, pool);
         }
@@ -160,9 +154,12 @@ impl SolverProblemsException {
         text
     }
 
-    fn get_extension_problems(&self, reason_sets: Vec<Vec<Rc<RefCell<Rule>>>>) -> Vec<String> {
+    fn get_extension_problems(
+        &self,
+        reason_sets: &indexmap::IndexMap<i64, Vec<Rc<RefCell<Rule>>>>,
+    ) -> Vec<String> {
         let mut missing_extensions: indexmap::IndexMap<String, i64> = indexmap::IndexMap::new();
-        for reason_set in reason_sets {
+        for reason_set in reason_sets.values() {
             for rule in reason_set {
                 let required = rule.borrow().get_required_package();
                 if let Some(req) = required {
