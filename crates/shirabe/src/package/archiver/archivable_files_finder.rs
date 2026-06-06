@@ -74,11 +74,10 @@ impl ArchivableFilesFinder {
 
         finder
             .r#in(&sources)
-            // TODO(phase-b): symfony Finder filter takes Box<dyn Fn(&SplFileInfo) -> bool>; signature not yet wired
+            .filter(Box::new(filter))
             .ignore_vcs(true)
             .ignore_dot_files(false)
             .sort_by_name();
-        let _ = filter;
 
         let inner_iter: Box<dyn Iterator<Item = SplFileInfo>> = Box::new(finder.get_iterator());
 

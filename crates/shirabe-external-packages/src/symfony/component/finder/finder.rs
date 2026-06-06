@@ -44,6 +44,10 @@ impl Finder {
         todo!()
     }
 
+    pub fn filter(&mut self, _closure: Box<dyn FnMut(&SplFileInfo) -> bool>) -> &mut Self {
+        todo!()
+    }
+
     pub fn follow_links(&mut self) -> &mut Self {
         todo!()
     }
