@@ -3253,14 +3253,15 @@ impl ComposerRepository {
 
         // if the file is in the cache, we fake a 304 Not Modified to allow the process to continue
         if last_modified_time.is_some() {
-            let resp = Response::new_fake(&self.url, 304, IndexMap::new(), String::new());
+            let resp = Response::new(self.url.clone(), Some(304), Vec::new(), Some(String::new()));
             return self.async_fetch_file_accept(resp, filename, cache_key);
         }
 
         // special error code returned when network is being artificially disabled
         if let Some(te) = e.downcast_ref::<TransportException>() {
             if te.get_status_code() == Some(499) {
-                let resp = Response::new_fake(&self.url, 404, IndexMap::new(), String::new());
+                let resp =
+                    Response::new(self.url.clone(), Some(404), Vec::new(), Some(String::new()));
                 return self.async_fetch_file_accept(resp, filename, cache_key);
             }
         }

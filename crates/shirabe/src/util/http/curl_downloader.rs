@@ -1060,31 +1060,19 @@ impl CurlDownloader {
                         );
                     }
                     contents = c;
-                    response = Some(
-                        CurlResponse::new(
-                            {
-                                let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                                m.insert(
-                                    "url".to_string(),
-                                    PhpMixed::String(
-                                        job.get("url")
-                                            .and_then(|v| v.as_string())
-                                            .unwrap_or("")
-                                            .to_string(),
-                                    ),
-                                );
-                                m
-                            },
-                            status_code,
-                            headers.clone().unwrap_or_default(),
-                            contents.as_string().map(|s| s.to_string()),
-                            progress
-                                .iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
-                                .collect(),
-                        )?
-                        .map_err(|e| anyhow::anyhow!(e.message))?,
-                    );
+                    response = Some(CurlResponse::new(
+                        job.get("url")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string(),
+                        status_code,
+                        headers.clone().unwrap_or_default(),
+                        contents.as_string().map(|s| s.to_string()),
+                        progress
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect(),
+                    ));
                     self.io.write_error3(
                         &format!(
                             "[{}] {}",
@@ -1139,31 +1127,19 @@ impl CurlDownloader {
                         );
                     }
 
-                    response = Some(
-                        CurlResponse::new(
-                            {
-                                let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                                m.insert(
-                                    "url".to_string(),
-                                    PhpMixed::String(
-                                        job.get("url")
-                                            .and_then(|v| v.as_string())
-                                            .unwrap_or("")
-                                            .to_string(),
-                                    ),
-                                );
-                                m
-                            },
-                            status_code,
-                            headers.clone().unwrap_or_default(),
-                            contents.as_string().map(|s| s.to_string()),
-                            progress
-                                .iter()
-                                .map(|(k, v)| (k.clone(), (**v).clone()))
-                                .collect(),
-                        )?
-                        .map_err(|e| anyhow::anyhow!(e.message))?,
-                    );
+                    response = Some(CurlResponse::new(
+                        job.get("url")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("")
+                            .to_string(),
+                        status_code,
+                        headers.clone().unwrap_or_default(),
+                        contents.as_string().map(|s| s.to_string()),
+                        progress
+                            .iter()
+                            .map(|(k, v)| (k.clone(), (**v).clone()))
+                            .collect(),
+                    ));
                     self.io.write_error3(
                         &format!(
                             "[{}] {}",

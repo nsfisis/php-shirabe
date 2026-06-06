@@ -1046,16 +1046,12 @@ impl GitHubDriver {
                             self.attempt_clone_fallback(Some(&e))
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                            let mut req = IndexMap::new();
-                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                req,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
+                            ));
                         }
 
                         let mut scopes_issued: Vec<String> = vec![];
@@ -1112,16 +1108,12 @@ impl GitHubDriver {
                             self.attempt_clone_fallback(Some(&e))
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                            let mut req = IndexMap::new();
-                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                req,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
+                            ));
                         }
 
                         let rate_limited = git_hub_util

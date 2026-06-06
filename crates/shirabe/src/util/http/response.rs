@@ -1,37 +1,25 @@
 //! ref: composer/src/Composer/Util/Http/Response.php
 
 use crate::json::JsonFile;
-use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{LogicException, PhpMixed, preg_quote};
+use shirabe_php_shim::{PhpMixed, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
-    request: IndexMap<String, PhpMixed>,
+    url: String,
     code: i64,
     headers: Vec<String>,
     body: Option<String>,
 }
 
 impl Response {
-    pub fn new(
-        request: IndexMap<String, PhpMixed>,
-        code: Option<i64>,
-        headers: Vec<String>,
-        body: Option<String>,
-    ) -> anyhow::Result<Result<Self, LogicException>> {
-        if !request.contains_key("url") {
-            return Ok(Err(LogicException {
-                message: "url key missing from request array".to_string(),
-                code: 0,
-            }));
-        }
-        Ok(Ok(Self {
-            request,
+    pub fn new(url: String, code: Option<i64>, headers: Vec<String>, body: Option<String>) -> Self {
+        Self {
+            url,
             code: code.unwrap_or(0),
             headers,
             body,
-        }))
+        }
     }
 
     pub fn get_status_code(&self) -> i64 {
@@ -63,16 +51,11 @@ impl Response {
     }
 
     pub fn decode_json(&self) -> anyhow::Result<PhpMixed> {
-        let url = self
-            .request
-            .get("url")
-            .and_then(|u| u.as_string())
-            .unwrap_or("");
-        JsonFile::parse_json(self.body.as_deref(), Some(url))
+        JsonFile::parse_json(self.body.as_deref(), Some(self.url.as_str()))
     }
 
     pub fn collect(&mut self) {
-        self.request = IndexMap::new();
+        self.url = String::new();
         self.code = 0;
         self.headers = vec![];
         self.body = None;
@@ -95,23 +78,5 @@ impl Response {
             }
         }
         value
-    }
-
-    // TODO(phase-b): historical helpers used in composer_repository — provide stubs.
-    pub fn from_php_mixed(_data: PhpMixed) -> Self {
-        todo!()
-    }
-
-    pub fn to_php_mixed(&self) -> PhpMixed {
-        todo!()
-    }
-
-    pub fn new_fake(
-        _url: &str,
-        _code: i64,
-        _headers: IndexMap<String, PhpMixed>,
-        _body: String,
-    ) -> Self {
-        todo!()
     }
 }

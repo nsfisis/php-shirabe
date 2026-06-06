@@ -841,16 +841,12 @@ impl GitLabDriver {
                             self.attempt_clone_fallback()
                                 .map_err(|e| TransportException::new(e.to_string(), 0))?;
 
-                            let mut req = IndexMap::new();
-                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                req,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
+                            ));
                         }
                     }
 
@@ -919,16 +915,12 @@ impl GitLabDriver {
                             self.attempt_clone_fallback()
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                            let mut req = IndexMap::new();
-                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                req,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
+                            ));
                         }
                         self.inner.io.write_error3(
                             &format!(
@@ -960,16 +952,12 @@ impl GitLabDriver {
                             self.attempt_clone_fallback()
                                 .map_err(|err| TransportException::new(err.to_string(), 0))?;
 
-                            let mut req = IndexMap::new();
-                            req.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                req,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )
-                            .unwrap()
-                            .unwrap());
+                            ));
                         }
 
                         Err(e)

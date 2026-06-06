@@ -625,17 +625,11 @@ impl ForgejoDriver {
                             })?;
 
                         return Ok(Response::new(
-                            {
-                                let mut m = IndexMap::new();
-                                m.insert("url".to_string(), PhpMixed::String("dummy".to_string()));
-                                m
-                            },
+                            "dummy".to_string(),
                             Some(200),
                             vec![],
                             Some("null".to_string()),
-                        )
-                        .unwrap()
-                        .unwrap());
+                        ));
                     }
 
                     if !self.inner.io.has_authentication(&self.inner.origin_url) {

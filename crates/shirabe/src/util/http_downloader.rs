@@ -388,10 +388,7 @@ impl HttpDownloader {
                     let headers = rfs.get_last_headers().to_vec();
                     let code = RemoteFilesystem::find_status_code(&headers);
                     let body = Some(format!("{}~", copy_to));
-                    match Response::new(Self::request_to_map(&request), code, headers, body)? {
-                        Ok(r) => Ok(r),
-                        Err(e) => Err(e.into()),
-                    }
+                    Ok(Response::new(request.url.clone(), code, headers, body))
                 } else {
                     let body = match rfs.get_contents(&origin, &url, false, options.clone())? {
                         GetResult::Content(s) => Some(s),
@@ -399,39 +396,12 @@ impl HttpDownloader {
                     };
                     let headers = rfs.get_last_headers().to_vec();
                     let code = RemoteFilesystem::find_status_code(&headers);
-                    match Response::new(Self::request_to_map(&request), code, headers, body)? {
-                        Ok(r) => Ok(r),
-                        Err(e) => Err(e.into()),
-                    }
+                    Ok(Response::new(request.url.clone(), code, headers, body))
                 }
             })()
         };
 
         self.settle_job(id, result);
-    }
-
-    /// PHP `new Response($job['request'], ...)` is fed the whole request array; reproduce it.
-    fn request_to_map(request: &Request) -> IndexMap<String, PhpMixed> {
-        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-        m.insert("url".to_string(), PhpMixed::String(request.url.clone()));
-        m.insert(
-            "options".to_string(),
-            PhpMixed::Array(
-                request
-                    .options
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Box::new(v.clone())))
-                    .collect(),
-            ),
-        );
-        m.insert(
-            "copyTo".to_string(),
-            match &request.copy_to {
-                Some(s) => PhpMixed::String(s.clone()),
-                None => PhpMixed::Null,
-            },
-        );
-        m
     }
 
     /// Applies the effect of PHP's promise `.then` handlers: records the response/exception,
@@ -508,14 +478,12 @@ impl HttpDownloader {
                 }
             };
             if has_if_modified_since {
-                let mut req_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                req_map.insert("url".to_string(), PhpMixed::String(url.clone()));
-                let response =
-                    match Response::new(req_map, Some(304), Vec::new(), Some(String::new())) {
-                        Ok(Ok(r)) => Ok(r),
-                        Ok(Err(e)) => Err(e.into()),
-                        Err(e) => Err(e),
-                    };
+                let response = Ok(Response::new(
+                    url.clone(),
+                    Some(304),
+                    Vec::new(),
+                    Some(String::new()),
+                ));
                 self.settle_job(id, response);
             } else {
                 let mut e = TransportException::new(

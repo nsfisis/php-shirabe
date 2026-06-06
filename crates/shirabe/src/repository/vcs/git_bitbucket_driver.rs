@@ -728,15 +728,12 @@ impl GitBitbucketDriver {
                         if !self.inner.io.is_interactive() && fetching_repo_data {
                             self.attempt_clone_fallback()?;
 
-                            let mut headers: IndexMap<String, PhpMixed> = IndexMap::new();
-                            headers
-                                .insert("url".to_string(), PhpMixed::String("dummy".to_string()));
                             return Ok(Response::new(
-                                headers,
+                                "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            )??);
+                            ));
                         }
                     }
                 }

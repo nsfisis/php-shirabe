@@ -13,16 +13,14 @@ pub struct CurlResponse {
 
 impl CurlResponse {
     pub fn new(
-        request: IndexMap<String, PhpMixed>,
+        url: String,
         code: Option<i64>,
         headers: Vec<String>,
         body: Option<String>,
         curl_info: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Result<Self, shirabe_php_shim::LogicException>> {
-        match Response::new(request, code, headers, body)? {
-            Ok(inner) => Ok(Ok(Self { inner, curl_info })),
-            Err(e) => Ok(Err(e)),
-        }
+    ) -> Self {
+        let inner = Response::new(url, code, headers, body);
+        Self { inner, curl_info }
     }
 
     pub fn get_curl_info(&self) -> &IndexMap<String, PhpMixed> {
