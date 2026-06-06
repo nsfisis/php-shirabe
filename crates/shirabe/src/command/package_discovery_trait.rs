@@ -49,7 +49,7 @@ pub trait PackageDiscoveryTrait {
     ) -> PartialComposerHandle;
     fn get_platform_requirement_filter(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> std::rc::Rc<
         dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
     >;
@@ -81,7 +81,7 @@ pub trait PackageDiscoveryTrait {
     /// @param key-of<BasePackage::STABILITIES>|null $minimumStability
     fn get_repository_set(
         &mut self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         minimum_stability: Option<&str>,
     ) -> &RepositorySet {
         let key = minimum_stability.unwrap_or("default").to_string();
@@ -109,11 +109,15 @@ pub trait PackageDiscoveryTrait {
     }
 
     /// @return key-of<BasePackage::STABILITIES>
-    fn get_minimum_stability(&self, input: &dyn InputInterface) -> String {
-        if input.has_option("stability") {
+    fn get_minimum_stability(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> String {
+        if input.borrow().has_option("stability") {
             // @phpstan-ignore-line as InitCommand does have this option but not all classes using this trait do
             return VersionParser::normalize_stability(
                 &input
+                    .borrow()
                     .get_option("stability")
                     .as_string()
                     .map(|s| s.to_string())
@@ -147,8 +151,8 @@ pub trait PackageDiscoveryTrait {
     /// @throws \Exception
     fn determine_requirements(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         mut requires: Vec<String>,
         platform_repo: Option<&PlatformRepositoryHandle>,
         preferred_stability: &str,
@@ -184,7 +188,7 @@ pub trait PackageDiscoveryTrait {
                     let (name, version): (String, String) = self
                         .find_best_version_and_name_for_package(
                             io.clone(),
-                            input,
+                            input.clone(),
                             requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
                             platform_repo,
                             preferred_stability,
@@ -492,27 +496,27 @@ pub trait PackageDiscoveryTrait {
     fn find_best_version_and_name_for_package(
         &mut self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         name: &str,
         platform_repo: Option<&PlatformRepositoryHandle>,
         preferred_stability: &str,
         fixed: bool,
     ) -> Result<(String, String)> {
         // handle ignore-platform-reqs flag if present
-        let platform_requirement_filter = if input.has_option("ignore-platform-reqs")
-            && input.has_option("ignore-platform-req")
+        let platform_requirement_filter = if input.borrow().has_option("ignore-platform-reqs")
+            && input.borrow().has_option("ignore-platform-req")
         {
-            self.get_platform_requirement_filter(input)
+            self.get_platform_requirement_filter(input.clone())
         } else {
             PlatformRequirementFilterFactory::ignore_nothing()
         };
 
         // find the latest version allowed in this repo set
-        let repo_set = self.get_repository_set(input, None);
+        let repo_set = self.get_repository_set(input.clone(), None);
         // TODO(phase-b): VersionSelector::new takes owned RepositorySet; we have a shared reference
         let mut version_selector: VersionSelector =
             todo!("VersionSelector::new with owned repo_set");
-        let effective_minimum_stability = self.get_minimum_stability(input);
+        let effective_minimum_stability = self.get_minimum_stability(input.clone());
 
         let package = version_selector.find_best_candidate(
             name,
@@ -539,7 +543,7 @@ pub trait PackageDiscoveryTrait {
             )) > 0
             {
                 let mut constraint = "*".to_string();
-                if input.is_interactive() {
+                if input.borrow().is_interactive() {
                     let providers_count = providers.len();
                     let name_owned = name.to_string();
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
@@ -733,7 +737,7 @@ pub trait PackageDiscoveryTrait {
                     .into());
                 }
 
-                if input.is_interactive() {
+                if input.borrow().is_interactive() {
                     let result_mixed = io.select(
                         format!(
                             "<error>Could not find package {}.</error>\nPick one of these or leave empty to abort:",

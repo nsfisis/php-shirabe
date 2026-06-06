@@ -6,7 +6,10 @@ use shirabe_php_shim::PhpMixed;
 pub struct SymfonyStyle;
 
 impl SymfonyStyle {
-    pub fn new(_input: &dyn InputInterface, _output: &dyn OutputInterface) -> Self {
+    pub fn new(
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> Self {
         todo!()
     }
 

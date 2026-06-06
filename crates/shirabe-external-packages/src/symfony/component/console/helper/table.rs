@@ -5,7 +5,7 @@ use shirabe_php_shim::PhpMixed;
 pub struct Table;
 
 impl Table {
-    pub fn new(_output: &dyn OutputInterface) -> Self {
+    pub fn new(_output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) -> Self {
         todo!()
     }
 

@@ -7,14 +7,26 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 #[derive(Debug)]
 pub struct PreCommandRunEvent {
     inner: Event,
+    input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     command: String,
 }
 
 impl PreCommandRunEvent {
-    // TODO(phase-b): input dropped because storing a &dyn reference would need lifetime params.
-    pub fn new(name: String, _input: &dyn InputInterface, command: String) -> Self {
+    pub fn new(
+        name: String,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        command: String,
+    ) -> Self {
         let inner = Event::new(name, vec![], indexmap::IndexMap::new());
-        Self { inner, command }
+        Self {
+            inner,
+            input,
+            command,
+        }
+    }
+
+    pub fn get_input(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
+        self.input.clone()
     }
 
     pub fn get_name(&self) -> &str {

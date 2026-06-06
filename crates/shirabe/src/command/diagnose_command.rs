@@ -75,8 +75,8 @@ impl DiagnoseCommand {
 
     pub(crate) fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let mut composer = self.try_composer(None, None);
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();

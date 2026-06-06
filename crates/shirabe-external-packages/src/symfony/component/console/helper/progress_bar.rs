@@ -4,7 +4,7 @@ use crate::symfony::component::console::output::OutputInterface;
 pub struct ProgressBar;
 
 impl ProgressBar {
-    pub fn new(_output: &dyn OutputInterface, _max: i64) -> Self {
+    pub fn new(_output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>, _max: i64) -> Self {
         todo!()
     }
 

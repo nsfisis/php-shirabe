@@ -93,15 +93,15 @@ impl ScriptAliasCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let dispatcher = crate::command::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
 
-        let args = input.get_arguments();
+        let args = input.borrow().get_arguments();
 
         // TODO(phase-b): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
@@ -113,8 +113,12 @@ impl ScriptAliasCommand {
             .into());
         }
 
-        let dev_mode = input.get_option("dev").as_bool().unwrap_or(false)
-            || !input.get_option("no-dev").as_bool().unwrap_or(false);
+        let dev_mode = input.borrow().get_option("dev").as_bool().unwrap_or(false)
+            || !input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false);
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 

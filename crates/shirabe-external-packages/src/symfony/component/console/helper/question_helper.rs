@@ -9,8 +9,8 @@ pub struct QuestionHelper;
 impl QuestionHelper {
     pub fn ask(
         &self,
-        _input: &mut dyn InputInterface,
-        _output: &mut dyn OutputInterface,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         _question: &Question,
     ) -> Option<PhpMixed> {
         todo!()

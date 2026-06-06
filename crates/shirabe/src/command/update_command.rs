@@ -73,18 +73,23 @@ impl UpdateCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let io = self.get_io().clone();
-        if input.get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
                 true,
                 io_interface::NORMAL,
             );
         }
-        if input.get_option("no-suggest").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-suggest")
+            .as_bool()
+            .unwrap_or(false)
+        {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>",
                 true,
@@ -104,6 +109,7 @@ impl UpdateCommand {
         }
 
         let mut packages: Vec<String> = input
+            .borrow()
             .get_argument("packages")
             .as_list()
             .map(|l| {
@@ -114,6 +120,7 @@ impl UpdateCommand {
             .unwrap_or_default();
         let mut reqs: IndexMap<String, String> = self.format_requirements(
             input
+                .borrow()
                 .get_option("with")
                 .as_list()
                 .map(|l| {
@@ -200,7 +207,12 @@ impl UpdateCommand {
             }
         }
 
-        if input.get_option("patch-only").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("patch-only")
+            .as_bool()
+            .unwrap_or(false)
+        {
             if !composer.get_locker().borrow_mut().is_locked() {
                 return Err(InvalidArgumentException {
                     message: "patch-only can only be used with a lock file present".to_string(),
@@ -245,7 +257,12 @@ impl UpdateCommand {
             }
         }
 
-        if input.get_option("interactive").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("interactive")
+            .as_bool()
+            .unwrap_or(false)
+        {
             packages = self.get_packages_interactively(
                 io.clone(),
                 input,
@@ -255,9 +272,19 @@ impl UpdateCommand {
             )?;
         }
 
-        if input.get_option("root-reqs").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("root-reqs")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let mut requires: Vec<String> = array_keys(&root_package.get_requires());
-            if !input.get_option("no-dev").as_bool().unwrap_or(false) {
+            if !input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 requires = array_merge(
                     // TODO(phase-b): array_merge for Vec<String>
                     todo!("requires as PhpMixed"),
@@ -292,7 +319,7 @@ impl UpdateCommand {
                 true,
             )
         });
-        let update_mirrors = input.get_option("lock").as_bool().unwrap_or(false)
+        let update_mirrors = input.borrow().get_option("lock").as_bool().unwrap_or(false)
             || filtered_packages.len() != packages.len();
         packages = filtered_packages;
 
@@ -313,7 +340,13 @@ impl UpdateCommand {
         composer
             .get_installation_manager()
             .borrow_mut()
-            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+            .set_output_progress(
+                !input
+                    .borrow()
+                    .get_option("no-progress")
+                    .as_bool()
+                    .unwrap_or(false),
+            );
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
@@ -322,6 +355,7 @@ impl UpdateCommand {
             self.get_preferred_install_options(&*config.borrow(), input, false)?;
 
         let optimize = input
+            .borrow()
             .get_option("optimize-autoloader")
             .as_bool()
             .unwrap_or(false)
@@ -331,6 +365,7 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false);
         let authoritative = input
+            .borrow()
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
@@ -340,11 +375,13 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false);
         let apcu_prefix: Option<String> = input
+            .borrow()
             .get_option("apcu-autoloader-prefix")
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
+                .borrow()
                 .get_option("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false)
@@ -354,6 +391,7 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false);
         let minimal_changes = input
+            .borrow()
             .get_option("minimal-changes")
             .as_bool()
             .unwrap_or(false)
@@ -365,12 +403,14 @@ impl UpdateCommand {
 
         let mut update_allow_transitive_dependencies: i64 = Request::UPDATE_ONLY_LISTED;
         if input
+            .borrow()
             .get_option("with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
         {
             update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
         } else if input
+            .borrow()
             .get_option("with-dependencies")
             .as_bool()
             .unwrap_or(false)
@@ -382,23 +422,65 @@ impl UpdateCommand {
         let _ = UpdateAllowTransitiveDeps::UpdateOnlyListed;
 
         install
-            .set_dry_run(input.get_option("dry-run").as_bool().unwrap_or(false))
-            .set_verbose(input.get_option("verbose").as_bool().unwrap_or(false))
+            .set_dry_run(
+                input
+                    .borrow()
+                    .get_option("dry-run")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_verbose(
+                input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_prefer_source(prefer_source)
             .set_prefer_dist(prefer_dist)
-            .set_dev_mode(!input.get_option("no-dev").as_bool().unwrap_or(false))
-            .set_dump_autoloader(!input.get_option("no-autoloader").as_bool().unwrap_or(false))
+            .set_dev_mode(
+                !input
+                    .borrow()
+                    .get_option("no-dev")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_dump_autoloader(
+                !input
+                    .borrow()
+                    .get_option("no-autoloader")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
             .set_apcu_autoloader(apcu, apcu_prefix.clone())
             .set_update(true)
-            .set_install(!input.get_option("no-install").as_bool().unwrap_or(false))
+            .set_install(
+                !input
+                    .borrow()
+                    .get_option("no-install")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_update_mirrors(update_mirrors)
             .set_update_allow_list(packages.clone())
             .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)?
             .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?)
-            .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
-            .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
+            .set_prefer_stable(
+                input
+                    .borrow()
+                    .get_option("prefer-stable")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_prefer_lowest(
+                input
+                    .borrow()
+                    .get_option("prefer-lowest")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             // TODO(phase-b): VersionParser::parse_constraints returns Arc<dyn ...> but
             // Installer::set_temporary_constraints expects IndexMap<String, Box<dyn ...>>;
             // bridge the constraint storage types later.
@@ -411,14 +493,19 @@ impl UpdateCommand {
             )
             .set_minimal_update(minimal_changes);
 
-        if input.get_option("no-plugins").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-plugins")
+            .as_bool()
+            .unwrap_or(false)
+        {
             install.disable_plugins();
         }
 
         let mut result = install.run()?;
 
-        if result == 0 && !input.get_option("lock").as_bool().unwrap_or(false) {
-            let mut bump_after_update = input.get_option("bump-after-update");
+        if result == 0 && !input.borrow().get_option("lock").as_bool().unwrap_or(false) {
+            let mut bump_after_update = input.borrow().get_option("bump-after-update");
             // PHP: false === $bumpAfterUpdate (strict)
             if matches!(bump_after_update, PhpMixed::Bool(false)) {
                 bump_after_update = composer.get_config().borrow().get("bump-after-update");
@@ -438,8 +525,13 @@ impl UpdateCommand {
                     io.clone(),
                     bump_after_update.as_string() == Some("dev"),
                     bump_after_update.as_string() == Some("no-dev"),
-                    input.get_option("dry-run").as_bool().unwrap_or(false),
                     input
+                        .borrow()
+                        .get_option("dry-run")
+                        .as_bool()
+                        .unwrap_or(false),
+                    input
+                        .borrow()
                         .get_argument("packages")
                         .as_list()
                         .map(|l| {
@@ -461,12 +553,12 @@ impl UpdateCommand {
     fn get_packages_interactively(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         composer: &PartialComposerHandle,
         packages: Vec<String>,
     ) -> Result<Vec<String>> {
-        if !input.is_interactive() {
+        if !input.borrow().is_interactive() {
             return Err(InvalidArgumentException {
                 message: "--interactive cannot be used in non-interactive terminals.".to_string(),
                 code: 0,

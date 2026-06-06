@@ -1,6 +1,6 @@
 use shirabe_php_shim::PhpMixed;
 
-pub trait InputInterface {
+pub trait InputInterface: std::fmt::Debug {
     fn get_first_argument(&self) -> Option<String>;
     fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool;
     fn get_parameter_option(

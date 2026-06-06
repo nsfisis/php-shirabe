@@ -165,10 +165,10 @@ impl Application {
 
     pub fn run(
         &mut self,
-        input: Option<&mut dyn InputInterface>,
-        output: Option<&mut dyn OutputInterface>,
+        input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
+        output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i64> {
-        // TODO(phase-b): Factory::create_output returns ConsoleOutput, not Box<dyn OutputInterface>.
+        // TODO(phase-b): Factory::create_output returns ConsoleOutput, not std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>.
         // The PHP code falls back to a default output when none is supplied; for now we
         // forward the caller-provided output as-is.
         self.inner.run(input, output)
@@ -176,11 +176,15 @@ impl Application {
 
     pub fn do_run(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        self.disable_plugins_by_default = input.has_parameter_option(&["--no-plugins"], false);
-        self.disable_scripts_by_default = input.has_parameter_option(&["--no-scripts"], false);
+        self.disable_plugins_by_default = input
+            .borrow()
+            .has_parameter_option(&["--no-plugins"], false);
+        self.disable_scripts_by_default = input
+            .borrow()
+            .has_parameter_option(&["--no-scripts"], false);
 
         // PHP: static $stdin = null;
         // We use an Option here to mimic the lazy initialization.
@@ -196,7 +200,7 @@ impl Application {
                 || matches!(stdin, PhpMixed::Null)
                 || !Platform::is_tty(Some(stdin)))
         {
-            input.set_interactive(false);
+            input.borrow_mut().set_interactive(false);
         }
 
         let mut helpers: Vec<PhpMixed> = vec![];
@@ -217,7 +221,7 @@ impl Application {
         // not a borrow; passing None until the IO sharing story is settled.
         ErrorHandler::register(None);
 
-        if input.has_parameter_option(&["--no-cache"], false) {
+        if input.borrow().has_parameter_option(&["--no-cache"], false) {
             self.io
                 .write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
@@ -231,7 +235,7 @@ impl Application {
         }
 
         // switch working dir
-        let new_work_dir = self.get_new_working_dir(input)?;
+        let new_work_dir = self.get_new_working_dir(input.clone())?;
         let mut old_working_dir: Option<String> = None;
         if let Some(ref nwd) = new_work_dir {
             old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
@@ -254,7 +258,7 @@ impl Application {
 
         // determine command name to be executed without including plugin commands
         let mut command_name: Option<String> = Some(String::new());
-        let raw_command_name = self.get_command_name_before_binding(input);
+        let raw_command_name = self.get_command_name_before_binding(input.clone());
         if let Some(ref raw) = raw_command_name {
             match self.inner.find(raw) {
                 Ok(cmd) => {
@@ -302,10 +306,10 @@ impl Application {
             && !file_exists(&Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
-                || (input.has_parameter_option(&["--file"], true) == false
-                    && input.has_parameter_option(&["-f"], true) == false))
-            && input.has_parameter_option(&["--help"], true) == false
-            && input.has_parameter_option(&["-h"], true) == false
+                || (input.borrow().has_parameter_option(&["--file"], true) == false
+                    && input.borrow().has_parameter_option(&["-f"], true) == false))
+            && input.borrow().has_parameter_option(&["--help"], true) == false
+            && input.borrow().has_parameter_option(&["-h"], true) == false
         {
             let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
@@ -386,7 +390,9 @@ impl Application {
             Box::new(PhpMixed::String("list".to_string())),
             Box::new(PhpMixed::String("help".to_string())),
         ]);
-        let may_need_plugin_command = !input.has_parameter_option(&["--version", "-V"], false)
+        let may_need_plugin_command = !input
+            .borrow()
+            .has_parameter_option(&["--version", "-V"], false)
             && (command_name.is_none()
                 || in_array(
                     command_name.as_deref().unwrap_or("").into(),
@@ -478,7 +484,7 @@ impl Application {
 
         // determine command name to be executed incl plugin commands, and check if it's a proxy command
         let is_proxy_command = false;
-        if let Some(ref name) = self.get_command_name_before_binding(input) {
+        if let Some(ref name) = self.get_command_name_before_binding(input.clone()) {
             if let Ok(command) = self.inner.find(name) {
                 // TODO(phase-b): BaseApplication::find returns PhpMixed; we cannot yet
                 // extract a typed command name or detect proxy commands without the
@@ -714,7 +720,7 @@ impl Application {
 
         let mut start_time: Option<f64> = None;
         let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
-            if input.has_parameter_option(&["--profile"], false) {
+            if input.borrow().has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime(true));
                 // TODO(phase-b): enable_debugging is defined only on ConsoleIO, not
                 // through IOInterface. Skip until the IO concrete type is known here.
@@ -724,7 +730,10 @@ impl Application {
             // TODO(phase-b): BaseApplication exposes only `run`, not `do_run`.
             let result: i64 = todo!("BaseApplication::do_run");
 
-            if input.has_parameter_option(&["--version", "-V"], true) {
+            if input
+                .borrow()
+                .has_parameter_option(&["--version", "-V"], true)
+            {
                 self.io.write_error(&sprintf(
                     "<info>PHP</info> version <comment>%s</comment> (%s)",
                     &[PHP_VERSION.into(), PHP_BINARY.into()],
@@ -780,20 +789,6 @@ impl Application {
 
                     self.hint_common_errors(&e, output);
 
-                    // TODO(phase-b): method_exists/as_any on the inner application and
-                    // output trait objects are not yet supported; replicate the catch-all
-                    // branch unconditionally.
-                    if false {
-                        let _ = <dyn ConsoleOutputInterface>::is_console_output_interface;
-                        // self.inner.render_throwable expects &mut dyn OutputInterface.
-                        // Skipped while output is &dyn OutputInterface here.
-                        let code = e
-                            .downcast_ref::<RuntimeException>()
-                            .map(|r| r.code)
-                            .unwrap_or(0);
-                        return Ok(max_i64(1, code));
-                    }
-
                     // override TransportException's code for the purpose of parent::run() using it as process exit code
                     // as http error codes are all beyond the 255 range of permitted exit codes
                     if e.downcast_ref::<TransportException>().is_some() {
@@ -814,8 +809,12 @@ impl Application {
         outcome
     }
 
-    fn get_new_working_dir(&self, input: &dyn InputInterface) -> anyhow::Result<Option<String>> {
+    fn get_new_working_dir(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> anyhow::Result<Option<String>> {
         let working_dir = input
+            .borrow()
             .get_parameter_option(&["--working-dir", "-d"], PhpMixed::Null, true)
             .as_string()
             .map(|s| s.to_string());
@@ -835,10 +834,18 @@ impl Application {
         Ok(working_dir)
     }
 
-    fn hint_common_errors(&mut self, exception: &anyhow::Error, output: &dyn OutputInterface) {
+    fn hint_common_errors(
+        &mut self,
+        exception: &anyhow::Error,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         let is_logic_or_error = exception.downcast_ref::<ShimLogicException>().is_some();
-        if is_logic_or_error && output.get_verbosity() < output_interface::VERBOSITY_VERBOSE {
-            output.set_verbosity(output_interface::VERBOSITY_VERBOSE);
+        if is_logic_or_error
+            && output.borrow().get_verbosity() < output_interface::VERBOSITY_VERBOSE
+        {
+            output
+                .borrow_mut()
+                .set_verbosity(output_interface::VERBOSITY_VERBOSE);
         }
 
         Silencer::suppress(None);
@@ -1051,7 +1058,10 @@ impl Application {
     }
 
     /// This ensures we can find the correct command name even if a global input option is present before it
-    fn get_command_name_before_binding(&self, input: &dyn InputInterface) -> Option<String> {
+    fn get_command_name_before_binding(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> Option<String> {
         let mut input = clone(&input);
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
         // TODO(phase-b): BaseApplication::get_definition returns PhpMixed, not InputDefinition.

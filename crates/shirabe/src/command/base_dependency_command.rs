@@ -45,8 +45,8 @@ pub trait BaseDependencyCommand: BaseCommand {
 
     fn do_execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         inverted: bool,
     ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
@@ -60,7 +60,12 @@ pub trait BaseDependencyCommand: BaseCommand {
                 )),
             )];
 
-        if input.get_option("locked").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("locked")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
 
@@ -91,7 +96,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             if local_repo.get_packages()?.len() == 0
                 && (root_pkg.get_requires().len() > 0 || root_pkg.get_dev_requires().len() > 0)
             {
-                output.writeln(
+                output.borrow().writeln(
                     "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>",
                     shirabe_external_packages::symfony::console::output::OUTPUT_NORMAL,
                 );
@@ -118,12 +123,14 @@ pub trait BaseDependencyCommand: BaseCommand {
         let mut installed_repo = InstalledRepository::new(repos);
 
         let needle = input
+            .borrow()
             .get_argument(Self::ARGUMENT_PACKAGE)
             .as_string()
             .unwrap_or_default()
             .to_string();
-        let text_constraint: String = if input.has_argument(Self::ARGUMENT_CONSTRAINT) {
+        let text_constraint: String = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
             input
+                .borrow()
                 .get_argument(Self::ARGUMENT_CONSTRAINT)
                 .as_string()
                 .unwrap_or("*")
@@ -242,11 +249,13 @@ pub trait BaseDependencyCommand: BaseCommand {
         };
 
         let render_tree = input
+            .borrow()
             .get_option(Self::OPTION_TREE)
             .as_bool()
             .unwrap_or(false);
         let recursive = render_tree
             || input
+                .borrow()
                 .get_option(Self::OPTION_RECURSIVE)
                 .as_bool()
                 .unwrap_or(false);
@@ -294,7 +303,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
 
         if inverted
-            && input.has_argument(Self::ARGUMENT_CONSTRAINT)
+            && input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT)
             && !PlatformRepository::is_platform_package(&needle)
         {
             let mut composer_command = "update";
@@ -322,7 +331,11 @@ pub trait BaseDependencyCommand: BaseCommand {
         Ok(r#return)
     }
 
-    fn print_table(&self, output: &dyn OutputInterface, results: Vec<DependentsEntry>) {
+    fn print_table(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        results: Vec<DependentsEntry>,
+    ) {
         let mut table: Vec<Vec<String>> = vec![];
         let mut doubles: IndexMap<String, bool> = IndexMap::new();
         let mut results = results;
@@ -383,7 +396,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         self.render_table(table_as_mixed, output);
     }
 
-    fn init_styles(&mut self, output: &dyn OutputInterface) {
+    fn init_styles(&mut self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         *self.colors_mut() = vec![
             "green".to_string(),
             "yellow".to_string(),
@@ -395,7 +408,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             // TODO(phase-b): output.get_formatter() returns &OutputFormatter; set_style needs
             // &mut. Need interior mutability or `get_formatter_mut`.
             let _ = OutputFormatterStyle::new(Some(color), None, None);
-            let _ = output.get_formatter();
+            let _ = output.borrow().get_formatter();
         }
     }
 

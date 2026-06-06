@@ -22,7 +22,11 @@ impl AboutCommand {
             .set_help("<info>php composer.phar about</info>");
     }
 
-    pub fn execute(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> i64 {
+    pub fn execute(
+        &mut self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> i64 {
         let composer_version = composer::get_version();
         let _ = (input, output);
 

@@ -41,16 +41,16 @@ impl ExecCommand {
 
     pub fn interact(
         &mut self,
-        input: &mut dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()> {
         let binaries = self.get_binaries(false)?;
         if binaries.is_empty() {
             return Ok(());
         }
 
-        if input.get_argument("binary").as_string().is_some()
-            || input.get_option("list").as_bool().unwrap_or(false)
+        if input.borrow().get_argument("binary").as_string().is_some()
+            || input.borrow().get_option("list").as_bool().unwrap_or(false)
         {
             return Ok(());
         }
@@ -66,7 +66,7 @@ impl ExecCommand {
         );
 
         if let Some(idx) = binary.as_int() {
-            input.set_argument(
+            input.borrow_mut().set_argument(
                 "binary",
                 shirabe_php_shim::PhpMixed::String(binaries[idx as usize].clone()),
             );
@@ -77,13 +77,13 @@ impl ExecCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
 
-        if input.get_option("list").as_bool().unwrap_or(false)
-            || input.get_argument("binary").as_string().is_none()
+        if input.borrow().get_option("list").as_bool().unwrap_or(false)
+            || input.borrow().get_argument("binary").as_string().is_none()
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
@@ -114,6 +114,7 @@ impl ExecCommand {
         }
 
         let binary = input
+            .borrow()
             .get_argument("binary")
             .as_string()
             .unwrap_or("")
@@ -139,6 +140,7 @@ impl ExecCommand {
         }
 
         let args = input
+            .borrow()
             .get_argument("args")
             .as_list()
             .map(|l| {

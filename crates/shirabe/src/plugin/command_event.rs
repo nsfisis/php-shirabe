@@ -10,25 +10,25 @@ use shirabe_php_shim::PhpMixed;
 pub struct CommandEvent {
     inner: Event,
     command_name: String,
+    input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 }
 
 impl CommandEvent {
-    // TODO(phase-b): input/output dropped because storing &dyn references in an event would
-    // require lifetime parameters; restore once Plugin API needs them.
     pub fn new(
         name: &str,
         command_name: &str,
-        _input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
-        Self::new6(name, command_name, _input, _output, vec![], IndexMap::new())
+        Self::new6(name, command_name, input, output, vec![], IndexMap::new())
     }
 
     pub fn new6(
         name: &str,
         command_name: &str,
-        _input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         args: Vec<String>,
         flags: IndexMap<String, PhpMixed>,
     ) -> Self {
@@ -36,7 +36,17 @@ impl CommandEvent {
         Self {
             inner,
             command_name: command_name.to_string(),
+            input,
+            output,
         }
+    }
+
+    pub fn get_input(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
+        self.input.clone()
+    }
+
+    pub fn get_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
+        self.output.clone()
     }
 
     pub fn get_name(&self) -> &str {

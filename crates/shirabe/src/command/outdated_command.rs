@@ -53,73 +53,130 @@ impl OutdatedCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let mut args: IndexMap<String, PhpMixed> = IndexMap::new();
         args.insert("command".to_string(), PhpMixed::String("show".to_string()));
         args.insert("--latest".to_string(), PhpMixed::Bool(true));
 
         if input
+            .borrow()
             .get_option("no-interaction")
             .as_bool()
             .unwrap_or(false)
         {
             args.insert("--no-interaction".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("no-plugins").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-plugins")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--no-plugins".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("no-scripts").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-scripts")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--no-scripts".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("no-cache").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-cache")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--no-cache".to_string(), PhpMixed::Bool(true));
         }
-        if !input.get_option("all").as_bool().unwrap_or(false) {
+        if !input.borrow().get_option("all").as_bool().unwrap_or(false) {
             args.insert("--outdated".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("direct").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("direct")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--direct".to_string(), PhpMixed::Bool(true));
         }
-        let package_arg = input.get_argument("package");
+        let package_arg = input.borrow().get_argument("package");
         if !matches!(package_arg, PhpMixed::Null) {
             args.insert("package".to_string(), package_arg);
         }
-        if input.get_option("strict").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("strict")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--strict".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("major-only").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("major-only")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--major-only".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("minor-only").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("minor-only")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--minor-only".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("patch-only").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("patch-only")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--patch-only".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("locked").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("locked")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--locked".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("no-dev").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-dev")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--no-dev".to_string(), PhpMixed::Bool(true));
         }
-        if input.get_option("sort-by-age").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("sort-by-age")
+            .as_bool()
+            .unwrap_or(false)
+        {
             args.insert("--sort-by-age".to_string(), PhpMixed::Bool(true));
         }
         args.insert(
             "--ignore-platform-req".to_string(),
-            input.get_option("ignore-platform-req"),
+            input.borrow().get_option("ignore-platform-req"),
         );
         if input
+            .borrow()
             .get_option("ignore-platform-reqs")
             .as_bool()
             .unwrap_or(false)
         {
             args.insert("--ignore-platform-reqs".to_string(), PhpMixed::Bool(true));
         }
-        args.insert("--format".to_string(), input.get_option("format"));
-        args.insert("--ignore".to_string(), input.get_option("ignore"));
+        args.insert("--format".to_string(), input.borrow().get_option("format"));
+        args.insert("--ignore".to_string(), input.borrow().get_option("ignore"));
 
         let input = ArrayInput::new(args);
 

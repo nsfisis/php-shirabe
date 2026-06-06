@@ -72,7 +72,7 @@ impl PackageDiscoveryTrait for InitCommand {
 
     fn get_platform_requirement_filter(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> std::rc::Rc<
         dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
     > {
@@ -116,8 +116,8 @@ impl InitCommand {
     /// @throws \Seld\JsonLint\ParsingException
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let io = PackageDiscoveryTrait::get_io(self);
 
@@ -134,11 +134,13 @@ impl InitCommand {
             "autoload".to_string(),
         ];
         // TODO(phase-b): adapt PhpMixed<->Box<PhpMixed> for array_filter_map
-        let filtered_input: IndexMap<String, Box<PhpMixed>> =
-            array_intersect_key(&input.get_options(), &array_flip_strings(&allowlist))
-                .into_iter()
-                .map(|(k, v)| (k, Box::new(v)))
-                .collect();
+        let filtered_input: IndexMap<String, Box<PhpMixed>> = array_intersect_key(
+            &input.borrow().get_options(),
+            &array_flip_strings(&allowlist),
+        )
+        .into_iter()
+        .map(|(k, v)| (k, Box::new(v)))
+        .collect();
         let mut options = shirabe_php_shim::array_filter_map(&filtered_input, |val: &PhpMixed| {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
         });
@@ -186,6 +188,7 @@ impl InitCommand {
         }
 
         let repositories: Vec<String> = input
+            .borrow()
             .get_option("repository")
             .as_list()
             .map(|l| {
@@ -283,6 +286,7 @@ impl InitCommand {
                 .to_string();
             autoload_path = Some(ap.clone());
             let name = input
+                .borrow()
                 .get_option("name")
                 .as_string()
                 .unwrap_or("")
@@ -303,7 +307,7 @@ impl InitCommand {
             .collect();
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()));
 
-        if input.is_interactive() {
+        if input.borrow().is_interactive() {
             io.write_error3(&format!("\n{}\n", json), true, io_interface::NORMAL);
             if !io.ask_confirmation(
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
@@ -358,11 +362,11 @@ impl InitCommand {
 
             // dump-autoload only for projects without added dependencies.
             if !self.has_dependencies(&options) {
-                self.run_dump_autoload_command(output);
+                self.run_dump_autoload_command(output.clone());
             }
         }
 
-        if input.is_interactive() && is_dir(".git") {
+        if input.borrow().is_interactive() && is_dir(".git") {
             let mut ignore_file = realpath(".gitignore").unwrap_or_default();
 
             if ignore_file.is_empty() {
@@ -380,7 +384,7 @@ impl InitCommand {
 
         let question =
             "Would you like to install dependencies now [<comment>yes</comment>]? ".to_string();
-        if input.is_interactive()
+        if input.borrow().is_interactive()
             && self.has_dependencies(&options)
             && io.ask_confirmation(question, true)
         {
@@ -390,6 +394,7 @@ impl InitCommand {
         // --autoload - Show post-install configuration info
         if autoload_path.is_some() {
             let name = input
+                .borrow()
                 .get_option("name")
                 .as_string()
                 .unwrap_or("")
@@ -411,15 +416,19 @@ impl InitCommand {
         Ok(0)
     }
 
-    pub(crate) fn initialize(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) {
-        self.initialize(input, output);
+    pub(crate) fn initialize(
+        &mut self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        self.initialize(input.clone(), output);
 
-        if !input.is_interactive() {
-            if input.get_option("name").is_null() {
+        if !input.borrow().is_interactive() {
+            if input.borrow().get_option("name").is_null() {
                 // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
             }
 
-            if input.get_option("author").is_null() {
+            if input.borrow().get_option("author").is_null() {
                 // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
             }
         }
@@ -427,8 +436,8 @@ impl InitCommand {
 
     pub(crate) fn interact(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()> {
         let io = self.get_io();
         // @var FormatterHelper $formatter
@@ -439,6 +448,7 @@ impl InitCommand {
 
         // initialize repos if configured
         let repositories: Vec<String> = input
+            .borrow()
             .get_option("repository")
             .as_list()
             .map(|l| {
@@ -527,6 +537,7 @@ impl InitCommand {
         );
 
         let mut name = input
+            .borrow()
             .get_option("name")
             .as_string()
             .map(|s| s.to_string())
@@ -569,9 +580,12 @@ impl InitCommand {
             .as_string()
             .unwrap_or("")
             .to_string();
-        input.set_option("name", PhpMixed::String(name));
+        input
+            .borrow_mut()
+            .set_option("name", PhpMixed::String(name));
 
         let description = input
+            .borrow()
             .get_option("description")
             .as_string()
             .map(|s| s.to_string());
@@ -585,9 +599,10 @@ impl InitCommand {
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
         );
-        input.set_option("description", description);
+        input.borrow_mut().set_option("description", description);
 
         let author = input
+            .borrow()
             .get_option("author")
             .as_string()
             .map(|s| s.to_string())
@@ -623,9 +638,10 @@ impl InitCommand {
             None,
             PhpMixed::String(author_default),
         )?;
-        input.set_option("author", author_value);
+        input.borrow_mut().set_option("author", author_value);
 
         let minimum_stability = input
+            .borrow()
             .get_option("stability")
             .as_string()
             .map(|s| s.to_string());
@@ -669,9 +685,11 @@ impl InitCommand {
                 .map(PhpMixed::String)
                 .unwrap_or(PhpMixed::Null),
         )?;
-        input.set_option("stability", minimum_stability_value);
+        input
+            .borrow_mut()
+            .set_option("stability", minimum_stability_value);
 
-        let type_val = input.get_option("type");
+        let type_val = input.borrow().get_option("type");
         let type_str = type_val.as_string().unwrap_or("").to_string();
         let mut type_value = io.ask(
             format!(
@@ -683,9 +701,10 @@ impl InitCommand {
         if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
             type_value = PhpMixed::Null;
         }
-        input.set_option("type", type_value);
+        input.borrow_mut().set_option("type", type_value);
 
         let mut license = input
+            .borrow()
             .get_option("license")
             .as_string()
             .map(|s| s.to_string());
@@ -722,7 +741,7 @@ impl InitCommand {
             }
             .into());
         }
-        input.set_option("license", license);
+        input.borrow_mut().set_option("license", license);
 
         io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
@@ -741,6 +760,7 @@ impl InitCommand {
 
         let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
         let require: Vec<String> = input
+            .borrow()
             .get_option("require")
             .as_list()
             .map(|l| {
@@ -762,7 +782,7 @@ impl InitCommand {
         } else {
             vec![]
         };
-        input.set_option(
+        input.borrow_mut().set_option(
             "require",
             PhpMixed::List(
                 requirements
@@ -774,6 +794,7 @@ impl InitCommand {
 
         let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
         let require_dev: Vec<String> = input
+            .borrow()
             .get_option("require-dev")
             .as_list()
             .map(|l| {
@@ -796,7 +817,7 @@ impl InitCommand {
             } else {
                 vec![]
             };
-        input.set_option(
+        input.borrow_mut().set_option(
             "require-dev",
             PhpMixed::List(
                 dev_requirements
@@ -808,12 +829,14 @@ impl InitCommand {
 
         // --autoload - input and validation
         let mut autoload = input
+            .borrow()
             .get_option("autoload")
             .as_string()
             .map(|s| s.to_string())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "src/".to_string());
         let name_str = input
+            .borrow()
             .get_option("name")
             .as_string()
             .unwrap_or("")
@@ -861,7 +884,7 @@ impl InitCommand {
             None,
             PhpMixed::String(autoload_default),
         )?;
-        input.set_option("autoload", autoload_value);
+        input.borrow_mut().set_option("autoload", autoload_value);
 
         Ok(())
     }
@@ -1035,7 +1058,7 @@ impl InitCommand {
         shirabe_php_shim::filter_var(email, FILTER_VALIDATE_EMAIL)
     }
 
-    fn update_dependencies(&self, output: &dyn OutputInterface) {
+    fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         // PHP try/catch: catch \Exception
         let result = self.get_application().and_then(|mut app| {
             let _update_command = app.find("update")?;
@@ -1054,7 +1077,10 @@ impl InitCommand {
         }
     }
 
-    fn run_dump_autoload_command(&self, output: &dyn OutputInterface) {
+    fn run_dump_autoload_command(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         let result = self.get_application().and_then(|mut app| {
             let _command = app.find("dump-autoload")?;
             app.reset_composer();

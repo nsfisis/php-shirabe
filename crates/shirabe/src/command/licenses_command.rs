@@ -76,14 +76,19 @@ impl LicensesCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
         // TODO(plugin): dispatch COMMAND event for plugin hooks
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "licenses", input, output);
+        let command_event = CommandEvent::new(
+            PluginEvents::COMMAND,
+            "licenses",
+            input.clone(),
+            output.clone(),
+        );
         composer
             .get_event_dispatcher()
             .borrow_mut()
@@ -91,7 +96,12 @@ impl LicensesCommand {
 
         let root = composer.get_package();
 
-        let packages = if input.get_option("locked").as_bool().unwrap_or(false) {
+        let packages = if input
+            .borrow()
+            .get_option("locked")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
@@ -100,7 +110,11 @@ impl LicensesCommand {
                     code: 0,
                 }.into());
             }
-            let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
+            let no_dev = input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
             repo.borrow_mut().get_packages()?
         } else {
@@ -108,7 +122,12 @@ impl LicensesCommand {
             let repository_manager = repository_manager.borrow();
             let repo = repository_manager.get_local_repository();
 
-            if input.get_option("no-dev").as_bool().unwrap_or(false) {
+            if input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 RepositoryUtils::filter_required_packages(
                     &repo.get_packages()?,
                     composer.get_package().clone().into(),
@@ -126,6 +145,7 @@ impl LicensesCommand {
         let io = self.get_io();
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .unwrap_or("text")

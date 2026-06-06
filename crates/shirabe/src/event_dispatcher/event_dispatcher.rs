@@ -627,7 +627,10 @@ impl EventDispatcher {
                                 .to_string();
                             let mut input = StringInput::new(&input_str);
                             let mut output = output;
-                            Ok(app.run(Some(&mut input), Some(&mut output))?)
+                            Ok(app.run(
+                                Some(std::rc::Rc::new(std::cell::RefCell::new(input))),
+                                Some(std::rc::Rc::new(std::cell::RefCell::new(output))),
+                            )?)
                         })();
                         match result {
                             Ok(v) => r#return = v,

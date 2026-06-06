@@ -12,8 +12,8 @@ impl Application {
 
     pub fn run(
         &mut self,
-        _input: Option<&mut dyn InputInterface>,
-        _output: Option<&mut dyn OutputInterface>,
+        _input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
+        _output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i64> {
         todo!()
     }
@@ -90,7 +90,11 @@ impl Application {
         todo!()
     }
 
-    pub fn render_throwable(&self, _exception: &anyhow::Error, _output: &mut dyn OutputInterface) {
+    pub fn render_throwable(
+        &self,
+        _exception: &anyhow::Error,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         todo!()
     }
 

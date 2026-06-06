@@ -75,8 +75,8 @@ impl SelfUpdateCommand {
     /// @throws FilesystemException
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         // TODO(phase-b): __FILE__ / __DIR__ have no direct Rust equivalent
         let file_path: &str = "";
@@ -85,27 +85,27 @@ impl SelfUpdateCommand {
         if strpos(file_path, "phar:") != Some(0) {
             if str_contains(&strtr(dir_path, "\\", "/"), "vendor/composer/composer") {
                 let proj_dir = shirabe_php_shim::dirname_levels(dir_path, 6);
-                output.writeln(
+                output.borrow().writeln(
                     "<error>This instance of Composer does not have the self-update command.</error>",
                     io_interface::NORMAL,
                 );
-                output.writeln(
+                output.borrow().writeln(
                     &format!(
                         "<comment>You are running Composer installed as a package in your current project (\"{}\").</comment>",
                         proj_dir
                     ),
                     io_interface::NORMAL,
                 );
-                output.writeln(
+                output.borrow().writeln(
                     "<comment>To update Composer, download a composer.phar from https://getcomposer.org and then run `composer.phar update composer/composer` in your project.</comment>",
                     io_interface::NORMAL,
                 );
             } else {
-                output.writeln(
+                output.borrow().writeln(
                     "<error>This instance of Composer does not have the self-update command.</error>",
                     io_interface::NORMAL,
                 );
-                output.writeln(
+                output.borrow().writeln(
                     "<comment>This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.</comment>",
                     io_interface::NORMAL,
                 );
@@ -141,7 +141,12 @@ impl SelfUpdateCommand {
         // switch channel if requested
         let mut requested_channel: Option<String> = None;
         for channel in Versions::CHANNELS {
-            if input.get_option(channel).as_bool().unwrap_or(false) {
+            if input
+                .borrow()
+                .get_option(channel)
+                .as_bool()
+                .unwrap_or(false)
+            {
                 requested_channel = Some(channel.to_string());
                 versions_util.set_channel(channel.to_string(), Some(io.clone()))??;
                 break;
@@ -149,6 +154,7 @@ impl SelfUpdateCommand {
         }
 
         if input
+            .borrow()
             .get_option("set-channel-only")
             .as_bool()
             .unwrap_or(false)
@@ -183,7 +189,12 @@ impl SelfUpdateCommand {
             .into());
         }
 
-        if input.get_option("update-keys").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("update-keys")
+            .as_bool()
+            .unwrap_or(false)
+        {
             self.fetch_keys(io.clone(), &*config.borrow())?;
             return Ok(0);
         }
@@ -252,12 +263,17 @@ impl SelfUpdateCommand {
             }
         }
 
-        if input.get_option("rollback").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("rollback")
+            .as_bool()
+            .unwrap_or(false)
+        {
             return self.rollback(output, &rollback_dir, &local_filename);
         }
 
-        if input.get_argument("command").as_string() == Some("self")
-            && input.get_argument("version").as_string() == Some("update")
+        if input.borrow().get_argument("command").as_string() == Some("self")
+            && input.borrow().get_argument("version").as_string() == Some("update")
         {
             // TODO(phase-b): set_argument requires &mut InputInterface; input is &dyn here
         }
@@ -274,6 +290,7 @@ impl SelfUpdateCommand {
             .unwrap_or("")
             .to_string();
         let mut update_version = input
+            .borrow()
             .get_argument("version")
             .as_string()
             .map(|s| s.to_string())
@@ -289,7 +306,9 @@ impl SelfUpdateCommand {
                 .unwrap_or(""),
         )?;
 
-        if versions_util.get_channel()? == "stable" && input.get_argument("version").is_null() {
+        if versions_util.get_channel()? == "stable"
+            && input.borrow().get_argument("version").is_null()
+        {
             // if requesting stable channel and no specific version, avoid automatically upgrading to the next major
             // simply output a warning that the next major stable is available and let users upgrade to it manually
             if version_compare(&current_major_version, &update_major_version, "<") {
@@ -394,7 +413,12 @@ impl SelfUpdateCommand {
             );
 
             // remove all backups except for the most recent, if any
-            if input.get_option("clean-backups").as_bool().unwrap_or(false) {
+            if input
+                .borrow()
+                .get_option("clean-backups")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 let last_backup = self.get_last_backup_version(&rollback_dir);
                 self.clean_backups(&rollback_dir, last_backup.as_deref());
             }
@@ -616,7 +640,12 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
         }
 
         // remove saved installations of composer
-        if input.get_option("clean-backups").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("clean-backups")
+            .as_bool()
+            .unwrap_or(false)
+        {
             // TODO(phase-b): self.clean_backups conflicts with earlier `self.get_io()` borrow
         }
 
@@ -807,7 +836,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
     /// @throws FilesystemException
     pub(crate) fn rollback(
         &mut self,
-        _output: &dyn OutputInterface,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         rollback_dir: &str,
         local_filename: &str,
     ) -> Result<i64> {

@@ -157,15 +157,20 @@ impl RemoveCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         if input
+            .borrow()
             .get_argument("packages")
             .as_list()
             .map(|l| l.is_empty())
             .unwrap_or(true)
-            && !input.get_option("unused").as_bool().unwrap_or(false)
+            && !input
+                .borrow()
+                .get_option("unused")
+                .as_bool()
+                .unwrap_or(false)
         {
             return Err(anyhow::anyhow!(InvalidArgumentException {
                 message: "Not enough arguments (missing: \"packages\").".to_string(),
@@ -174,6 +179,7 @@ impl RemoveCommand {
         }
 
         let mut packages: Vec<String> = input
+            .borrow()
             .get_argument("packages")
             .as_list()
             .map(|l| {
@@ -183,7 +189,12 @@ impl RemoveCommand {
             })
             .unwrap_or_default();
 
-        if input.get_option("unused").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("unused")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let composer = self.require_composer(None, None)?;
             let mut composer = crate::command::composer_full_mut(&composer);
             {
@@ -261,12 +272,12 @@ impl RemoveCommand {
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
         let mut json = JsonConfigSource::new(json_file_for_source, false);
 
-        let r#type = if input.get_option("dev").as_bool().unwrap_or(false) {
+        let r#type = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
         };
-        let alt_type = if !input.get_option("dev").as_bool().unwrap_or(false) {
+        let alt_type = if !input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
@@ -274,6 +285,7 @@ impl RemoveCommand {
         let io = self.get_io();
 
         if input
+            .borrow()
             .get_option("update-with-dependencies")
             .as_bool()
             .unwrap_or(false)
@@ -299,7 +311,11 @@ impl RemoveCommand {
             }
         }
 
-        let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
+        let dry_run = input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false);
         let mut to_remove: IndexMap<String, Vec<String>> = IndexMap::new();
         for package in &packages {
             let in_type = composer_data
@@ -425,7 +441,12 @@ impl RemoveCommand {
 
         io.write_error(&format!("<info>{} has been updated</info>", file));
 
-        if input.get_option("no-update").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-update")
+            .as_bool()
+            .unwrap_or(false)
+        {
             return Ok(0);
         }
 
@@ -468,7 +489,7 @@ impl RemoveCommand {
         let command_event = crate::plugin::CommandEvent::new(
             crate::plugin::PluginEvents::COMMAND,
             "remove",
-            input,
+            input.clone(),
             output,
         );
         composer
@@ -510,12 +531,23 @@ impl RemoveCommand {
         composer
             .get_installation_manager()
             .borrow_mut()
-            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+            .set_output_progress(
+                !input
+                    .borrow()
+                    .get_option("no-progress")
+                    .as_bool()
+                    .unwrap_or(false),
+            );
 
         let mut install = Installer::create(self.get_io().clone(), &composer_handle);
 
-        let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
+        let update_dev_mode = !input
+            .borrow()
+            .get_option("update-no-dev")
+            .as_bool()
+            .unwrap_or(false);
         let optimize = input
+            .borrow()
             .get_option("optimize-autoloader")
             .as_bool()
             .unwrap_or(false)
@@ -526,6 +558,7 @@ impl RemoveCommand {
                 .as_bool()
                 .unwrap_or(false);
         let authoritative = input
+            .borrow()
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
@@ -536,11 +569,13 @@ impl RemoveCommand {
                 .as_bool()
                 .unwrap_or(false);
         let apcu_prefix = input
+            .borrow()
             .get_option("apcu-autoloader-prefix")
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
+                .borrow()
                 .get_option("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false)
@@ -551,6 +586,7 @@ impl RemoveCommand {
                 .as_bool()
                 .unwrap_or(false);
         let minimal_changes = input
+            .borrow()
             .get_option("minimal-changes")
             .as_bool()
             .unwrap_or(false)
@@ -565,10 +601,12 @@ impl RemoveCommand {
             Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
         let mut flags = String::new();
         if input
+            .borrow()
             .get_option("update-with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
             || input
+                .borrow()
                 .get_option("with-all-dependencies")
                 .as_bool()
                 .unwrap_or(false)
@@ -576,6 +614,7 @@ impl RemoveCommand {
             update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             flags += " --with-all-dependencies";
         } else if input
+            .borrow()
             .get_option("no-update-with-dependencies")
             .as_bool()
             .unwrap_or(false)
@@ -590,15 +629,28 @@ impl RemoveCommand {
             flags
         ));
 
-        install.set_verbose(input.get_option("verbose").as_bool().unwrap_or(false));
+        install.set_verbose(
+            input
+                .borrow()
+                .get_option("verbose")
+                .as_bool()
+                .unwrap_or(false),
+        );
         install.set_dev_mode(update_dev_mode);
         install.set_optimize_autoloader(optimize);
         install.set_class_map_authoritative(authoritative);
         install.set_apcu_autoloader(apcu, apcu_prefix);
         install.set_update(true);
-        install.set_install(!input.get_option("no-install").as_bool().unwrap_or(false));
+        install.set_install(
+            !input
+                .borrow()
+                .get_option("no-install")
+                .as_bool()
+                .unwrap_or(false),
+        );
         install.set_update_allow_transitive_dependencies(update_allow_transitive_dependencies);
-        install.set_platform_requirement_filter(self.get_platform_requirement_filter(input)?);
+        install
+            .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?);
         install.set_dry_run(dry_run);
         install.set_audit_config(
             self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,

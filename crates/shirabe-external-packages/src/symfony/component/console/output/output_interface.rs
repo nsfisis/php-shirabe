@@ -1,7 +1,7 @@
 use crate::symfony::component::console::formatter::OutputFormatter;
 use crate::symfony::component::console::output::ConsoleOutputInterface;
 
-pub trait OutputInterface {
+pub trait OutputInterface: std::fmt::Debug {
     // PHP class semantics: OutputInterface methods take &self with interior mutability,
     // because output objects are shared by reference across the PHP code.
     fn write(&self, messages: &str, newline: bool, r#type: i64);

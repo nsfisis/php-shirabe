@@ -61,15 +61,16 @@ impl ArchiveCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.try_composer(None, None);
 
         let config = if let Some(ref composer) = composer {
             let config = composer.borrow_partial().get_config();
             // TODO(plugin): dispatch CommandEvent
-            let command_event = CommandEvent::new(PluginEvents::COMMAND, "archive", input, output);
+            let command_event =
+                CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
             let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
             event_dispatcher
                 .borrow_mut()
@@ -86,6 +87,7 @@ impl ArchiveCommand {
         };
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .map(|s| s.to_string())
@@ -99,6 +101,7 @@ impl ArchiveCommand {
             });
 
         let dir = input
+            .borrow()
             .get_option("dir")
             .as_string()
             .map(|s| s.to_string())
@@ -117,17 +120,24 @@ impl ArchiveCommand {
             io_box.clone(),
             &config,
             input
+                .borrow()
                 .get_argument("package")
                 .as_string()
                 .map(|s| s.to_string()),
             input
+                .borrow()
                 .get_argument("version")
                 .as_string()
                 .map(|s| s.to_string()),
             &format,
             &dir,
-            input.get_option("file").as_string().map(|s| s.to_string()),
             input
+                .borrow()
+                .get_option("file")
+                .as_string()
+                .map(|s| s.to_string()),
+            input
+                .borrow()
                 .get_option("ignore-filters")
                 .as_bool()
                 .unwrap_or(false),

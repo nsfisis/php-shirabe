@@ -69,14 +69,15 @@ impl HomeCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let repos = self.initialize_repos()?;
         let io = self.get_io().clone();
         let mut return_code: i64 = 0;
 
         let packages: Vec<String> = input
+            .borrow()
             .get_argument("packages")
             .as_list()
             .map(|l| {
@@ -95,8 +96,12 @@ impl HomeCommand {
             packages
         };
 
-        let show_homepage = input.get_option("homepage").as_bool().unwrap_or(false);
-        let show_only = input.get_option("show").as_bool().unwrap_or(false);
+        let show_homepage = input
+            .borrow()
+            .get_option("homepage")
+            .as_bool()
+            .unwrap_or(false);
+        let show_only = input.borrow().get_option("show").as_bool().unwrap_or(false);
 
         for package_name in &packages {
             let mut handled = false;

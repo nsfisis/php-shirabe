@@ -140,8 +140,8 @@ pub trait BaseCommand {
 
     fn run(
         &mut self,
-        _input: &mut dyn InputInterface,
-        _output: &mut dyn OutputInterface,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         todo!()
     }
@@ -196,14 +196,14 @@ pub trait BaseCommand {
     /// @inheritDoc
     fn initialize(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()>;
 
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
@@ -214,13 +214,13 @@ pub trait BaseCommand {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> Result<(bool, bool)>;
 
     fn get_platform_requirement_filter(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>>;
 
     /// @param array<string> $requirements
@@ -237,20 +237,28 @@ pub trait BaseCommand {
     ) -> Result<Vec<IndexMap<String, String>>>;
 
     /// @param array<TableSeparator|mixed[]> $table
-    fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface);
+    fn render_table(
+        &self,
+        table: Vec<PhpMixed>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    );
 
     fn get_terminal_width(&self) -> i64;
 
     /// @internal
     /// @param 'format'|'audit-format' $optName
     /// @return Auditor::FORMAT_*
-    fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String>;
+    fn get_audit_format(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        opt_name: &str,
+    ) -> Result<String>;
 
     /// Creates an AuditConfig from the Config object, optionally overriding security blocking based on input options
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<AuditConfig>;
 }
 
@@ -355,12 +363,16 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn initialize(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()> {
         // initialize a plugin-enabled Composer instance, either local or global
-        let mut disable_plugins = input.has_parameter_option(&["--no-plugins"], false);
-        let mut disable_scripts = input.has_parameter_option(&["--no-scripts"], false);
+        let mut disable_plugins = input
+            .borrow()
+            .has_parameter_option(&["--no-plugins"], false);
+        let mut disable_scripts = input
+            .borrow()
+            .has_parameter_option(&["--no-scripts"], false);
 
         // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
         // TODO(phase-b): `$this instanceof SelfUpdateCommand` not representable
@@ -392,8 +404,12 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             let _ = pre_command_run_event.get_name();
         }
 
-        if input.has_parameter_option(&["--no-ansi"], false) && input.has_option("no-progress") {
-            input.set_option("no-progress", PhpMixed::Bool(true));
+        if input.borrow().has_parameter_option(&["--no-ansi"], false)
+            && input.borrow().has_option("no-progress")
+        {
+            input
+                .borrow_mut()
+                .set_option("no-progress", PhpMixed::Bool(true));
         }
 
         let env_options: IndexMap<&str, Vec<&str>> = [
@@ -416,44 +432,55 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         .collect();
         for (env_name, option_names) in &env_options {
             for option_name in option_names {
-                if true == input.has_option(option_name) {
-                    if false == input.get_option(option_name).as_bool().unwrap_or(false)
+                if true == input.borrow().has_option(option_name) {
+                    if false
+                        == input
+                            .borrow()
+                            .get_option(option_name)
+                            .as_bool()
+                            .unwrap_or(false)
                         && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
                     {
-                        input.set_option(option_name, PhpMixed::Bool(true));
+                        input
+                            .borrow_mut()
+                            .set_option(option_name, PhpMixed::Bool(true));
                     }
                 }
             }
         }
 
-        if true == input.has_option("ignore-platform-reqs") {
+        if true == input.borrow().has_option("ignore-platform-reqs") {
             if !input
+                .borrow()
                 .get_option("ignore-platform-reqs")
                 .as_bool()
                 .unwrap_or(false)
                 && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
                     .map_or(false, |s| !s.is_empty() && s != "0")
             {
-                input.set_option("ignore-platform-reqs", PhpMixed::Bool(true));
+                input
+                    .borrow_mut()
+                    .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
 
                 io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
             }
         }
 
-        if true == input.has_option("ignore-platform-req")
-            && (!input.has_option("ignore-platform-reqs")
+        if true == input.borrow().has_option("ignore-platform-req")
+            && (!input.borrow().has_option("ignore-platform-reqs")
                 || !input
+                    .borrow()
                     .get_option("ignore-platform-reqs")
                     .as_bool()
                     .unwrap_or(false))
         {
             let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
             let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
-            if 0 == count(&input.get_option("ignore-platform-req"))
+            if 0 == count(&input.borrow().get_option("ignore-platform-req"))
                 && ignore_platform_req_env.is_some()
                 && "" != ignore_str
             {
-                input.set_option(
+                input.borrow_mut().set_option(
                     "ignore-platform-req",
                     PhpMixed::List(
                         explode(",", &ignore_str)
@@ -476,16 +503,20 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn create_composer_instance(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> Result<PartialComposerHandle> {
-        let disable_plugins =
-            disable_plugins || input.has_parameter_option(&["--no-plugins"], false);
+        let disable_plugins = disable_plugins
+            || input
+                .borrow()
+                .has_parameter_option(&["--no-plugins"], false);
         let disable_scripts = disable_scripts.unwrap_or(false)
-            || input.has_parameter_option(&["--no-scripts"], false);
+            || input
+                .borrow()
+                .has_parameter_option(&["--no-scripts"], false);
 
         // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
         let disable_plugins_kind = if disable_plugins {
@@ -501,7 +532,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> Result<(bool, bool)> {
         let mut prefer_source = false;
@@ -519,12 +550,20 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             }
         }
 
-        if !input.has_option("prefer-dist") || !input.has_option("prefer-source") {
+        if !input.borrow().has_option("prefer-dist") || !input.borrow().has_option("prefer-source")
+        {
             return Ok((prefer_source, prefer_dist));
         }
 
-        if input.has_option("prefer-install") && is_string(&input.get_option("prefer-install")) {
-            if input.get_option("prefer-source").as_bool().unwrap_or(false) {
+        if input.borrow().has_option("prefer-install")
+            && is_string(&input.borrow().get_option("prefer-install"))
+        {
+            if input
+                .borrow()
+                .get_option("prefer-source")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 return Err(InvalidArgumentException {
                     message: "--prefer-source can not be used together with --prefer-install"
                         .to_string(),
@@ -532,7 +571,12 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 }
                 .into());
             }
-            if input.get_option("prefer-dist").as_bool().unwrap_or(false) {
+            if input
+                .borrow()
+                .get_option("prefer-dist")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 return Err(InvalidArgumentException {
                     message: "--prefer-dist can not be used together with --prefer-install"
                         .to_string(),
@@ -540,7 +584,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 }
                 .into());
             }
-            let prefer_install = input.get_option("prefer-install");
+            let prefer_install = input.borrow().get_option("prefer-install");
             match prefer_install.as_string().unwrap_or("") {
                 "dist" => {
                     // TODO(phase-b): InputInterface set_option needs &mut self
@@ -566,17 +610,41 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             }
         }
 
-        if input.get_option("prefer-source").as_bool().unwrap_or(false)
-            || input.get_option("prefer-dist").as_bool().unwrap_or(false)
+        if input
+            .borrow()
+            .get_option("prefer-source")
+            .as_bool()
+            .unwrap_or(false)
+            || input
+                .borrow()
+                .get_option("prefer-dist")
+                .as_bool()
+                .unwrap_or(false)
             || (keep_vcs_requires_prefer_source
-                && input.has_option("keep-vcs")
-                && input.get_option("keep-vcs").as_bool().unwrap_or(false))
+                && input.borrow().has_option("keep-vcs")
+                && input
+                    .borrow()
+                    .get_option("keep-vcs")
+                    .as_bool()
+                    .unwrap_or(false))
         {
-            prefer_source = input.get_option("prefer-source").as_bool().unwrap_or(false)
+            prefer_source = input
+                .borrow()
+                .get_option("prefer-source")
+                .as_bool()
+                .unwrap_or(false)
                 || (keep_vcs_requires_prefer_source
-                    && input.has_option("keep-vcs")
-                    && input.get_option("keep-vcs").as_bool().unwrap_or(false));
-            prefer_dist = input.get_option("prefer-dist").as_bool().unwrap_or(false);
+                    && input.borrow().has_option("keep-vcs")
+                    && input
+                        .borrow()
+                        .get_option("keep-vcs")
+                        .as_bool()
+                        .unwrap_or(false));
+            prefer_dist = input
+                .borrow()
+                .get_option("prefer-dist")
+                .as_bool()
+                .unwrap_or(false);
         }
 
         Ok((prefer_source, prefer_dist))
@@ -584,9 +652,11 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn get_platform_requirement_filter(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>> {
-        if !input.has_option("ignore-platform-reqs") || !input.has_option("ignore-platform-req") {
+        if !input.borrow().has_option("ignore-platform-reqs")
+            || !input.borrow().has_option("ignore-platform-req")
+        {
             return Err(LogicException {
                 message:
                     "Calling getPlatformRequirementFilter from a command which does not define the --ignore-platform-req[s] flags is not permitted."
@@ -598,6 +668,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
         if true
             == input
+                .borrow()
                 .get_option("ignore-platform-reqs")
                 .as_bool()
                 .unwrap_or(false)
@@ -605,7 +676,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             return Ok(PlatformRequirementFilterFactory::ignore_all());
         }
 
-        let ignores = input.get_option("ignore-platform-req");
+        let ignores = input.borrow().get_option("ignore-platform-req");
         if count(&ignores) > 0 {
             return Ok(PlatformRequirementFilterFactory::from_bool_or_list(
                 ignores,
@@ -648,7 +719,11 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         parser.parse_name_version_pairs(requirements)
     }
 
-    fn render_table(&self, table: Vec<PhpMixed>, output: &dyn OutputInterface) {
+    fn render_table(
+        &self,
+        table: Vec<PhpMixed>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         let mut renderer = Table::new(output);
         renderer.set_style("compact");
         renderer.set_rows(table).render();
@@ -668,8 +743,12 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         width
     }
 
-    fn get_audit_format(&self, input: &dyn InputInterface, opt_name: &str) -> Result<String> {
-        if !input.has_option(opt_name) {
+    fn get_audit_format(
+        &self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        opt_name: &str,
+    ) -> Result<String> {
+        if !input.borrow().has_option(opt_name) {
             return Err(LogicException {
                 message: format!(
                     "This should not be called on a Command which has no {} option defined.",
@@ -680,7 +759,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             .into());
         }
 
-        let val = input.get_option(opt_name);
+        let val = input.borrow().get_option(opt_name);
         let formats: Vec<Box<PhpMixed>> = Auditor::FORMATS
             .iter()
             .map(|s| Box::new(PhpMixed::String(s.to_string())))
@@ -703,17 +782,25 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
-        let audit = if input.has_option("audit") {
-            input.get_option("audit").as_bool().unwrap_or(false)
+        let audit = if input.borrow().has_option("audit") {
+            input
+                .borrow()
+                .get_option("audit")
+                .as_bool()
+                .unwrap_or(false)
         } else {
-            !(input.has_option("no-audit")
-                && input.get_option("no-audit").as_bool().unwrap_or(false))
+            !(input.borrow().has_option("no-audit")
+                && input
+                    .borrow()
+                    .get_option("no-audit")
+                    .as_bool()
+                    .unwrap_or(false))
         };
-        let audit_format = if input.has_option("audit-format") {
-            self.get_audit_format(input, "audit-format")?
+        let audit_format = if input.borrow().has_option("audit-format") {
+            self.get_audit_format(input.clone(), "audit-format")?
         } else {
             Auditor::FORMAT_SUMMARY.to_string()
         };
@@ -722,8 +809,9 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
         if Platform::get_env("COMPOSER_NO_SECURITY_BLOCKING")
             .map_or(false, |s| !s.is_empty() && s != "0")
-            || (input.has_option("no-security-blocking")
+            || (input.borrow().has_option("no-security-blocking")
                 && input
+                    .borrow()
                     .get_option("no-security-blocking")
                     .as_bool()
                     .unwrap_or(false))

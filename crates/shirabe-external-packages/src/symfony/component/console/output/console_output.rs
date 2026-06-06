@@ -16,11 +16,11 @@ impl ConsoleOutput {
 }
 
 impl ConsoleOutputInterface for ConsoleOutput {
-    fn get_error_output(&self) -> &dyn OutputInterface {
+    fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
         todo!()
     }
 
-    fn set_error_output(&mut self, _error: Box<dyn OutputInterface>) {
+    fn set_error_output(&mut self, _error: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
         todo!()
     }
 }

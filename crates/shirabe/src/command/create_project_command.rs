@@ -109,30 +109,35 @@ impl CreateProjectCommand {
 
     fn execute(
         &mut self,
-        input: &mut dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
         // TODO(phase-b): get_io returns &mut Self-borrow; clone_box for an owned Box to dodge.
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
 
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&config.borrow(), input, true)?;
+            self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
 
-        if input.get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
         }
         if input
+            .borrow()
             .get_option("no-custom-installers")
             .as_bool()
             .unwrap_or(false)
         {
             io.write_error("<warning>You are using the deprecated option \"no-custom-installers\". Use \"no-plugins\" instead.</warning>");
-            input.set_option("no-plugins", PhpMixed::Bool(true));
+            input
+                .borrow_mut()
+                .set_option("no-plugins", PhpMixed::Bool(true));
         }
 
-        if input.is_interactive() && input.get_option("ask").as_bool().unwrap_or(false) {
-            let package = input.get_argument("package");
+        if input.borrow().is_interactive()
+            && input.borrow().get_option("ask").as_bool().unwrap_or(false)
+        {
+            let package = input.borrow().get_argument("package");
             if package.is_null() {
                 return Err(RuntimeException {
                     message: "Not enough arguments (missing: \"package\").".to_string(),
@@ -146,11 +151,13 @@ impl CreateProjectCommand {
                 "New project directory [<comment>{}</comment>]: ",
                 array_pop(&mut parts).unwrap_or_default()
             );
-            input.set_argument("directory", io.ask(prompt, PhpMixed::Null));
+            input
+                .borrow_mut()
+                .set_argument("directory", io.ask(prompt, PhpMixed::Null));
         }
 
-        let repository_opt = input.get_option("repository");
-        let repository_url_opt = input.get_option("repository-url");
+        let repository_opt = input.borrow().get_option("repository");
+        let repository_url_opt = input.borrow().get_option("repository-url");
         let repositories = if repository_opt
             .as_list()
             .map(|l| l.len() > 0)
@@ -164,37 +171,63 @@ impl CreateProjectCommand {
         self.install_project(
             io,
             config,
-            input,
+            input.clone(),
             input
+                .borrow()
                 .get_argument("package")
                 .as_string()
                 .map(|s| s.to_string()),
             input
+                .borrow()
                 .get_argument("directory")
                 .as_string()
                 .map(|s| s.to_string()),
             input
+                .borrow()
                 .get_argument("version")
                 .as_string()
                 .map(|s| s.to_string()),
             input
+                .borrow()
                 .get_option("stability")
                 .as_string()
                 .map(|s| s.to_string()),
             prefer_source,
             prefer_dist,
-            !input.get_option("no-dev").as_bool().unwrap_or(false),
-            repositories,
-            input.get_option("no-plugins").as_bool().unwrap_or(false),
-            input.get_option("no-scripts").as_bool().unwrap_or(false),
-            input.get_option("no-progress").as_bool().unwrap_or(false),
-            input.get_option("no-install").as_bool().unwrap_or(false),
-            Some(self.get_platform_requirement_filter(input)?),
             !input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false),
+            repositories,
+            input
+                .borrow()
+                .get_option("no-plugins")
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-scripts")
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-progress")
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-install")
+                .as_bool()
+                .unwrap_or(false),
+            Some(self.get_platform_requirement_filter(input.clone())?),
+            !input
+                .borrow()
                 .get_option("no-secure-http")
                 .as_bool()
                 .unwrap_or(false),
             input
+                .borrow()
                 .get_option("add-repository")
                 .as_bool()
                 .unwrap_or(false),
@@ -209,7 +242,7 @@ impl CreateProjectCommand {
         &mut self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         package_name: Option<String>,
         directory: Option<String>,
         package_version: Option<String>,
@@ -254,7 +287,7 @@ impl CreateProjectCommand {
 
         let installed_from_vcs = if let Some(package_name) = package_name.as_ref() {
             self.install_root_package(
-                input,
+                input.clone(),
                 io.clone(),
                 &config,
                 package_name,
@@ -280,7 +313,7 @@ impl CreateProjectCommand {
         }
 
         let mut composer_handle = self.create_composer_instance(
-            input,
+            input.clone(),
             io.clone(),
             None,
             disable_plugins,
@@ -339,7 +372,7 @@ impl CreateProjectCommand {
                     }
 
                     composer_handle = self.create_composer_instance(
-                        input,
+                        input.clone(),
                         io.clone(),
                         None,
                         disable_plugins,
@@ -371,7 +404,8 @@ impl CreateProjectCommand {
 
         // use the new config including the newly installed project
         let config = composer.get_config();
-        let (ps, pd) = self.get_preferred_install_options(&*config.borrow(), input, false)?;
+        let (ps, pd) =
+            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
         prefer_source = ps;
         prefer_dist = pd;
 
@@ -413,7 +447,9 @@ impl CreateProjectCommand {
                         .unwrap_or(false),
                     None,
                 )
-                .set_audit_config(self.create_audit_config(&mut *config.borrow_mut(), input)?);
+                .set_audit_config(
+                    self.create_audit_config(&mut *config.borrow_mut(), input.clone())?,
+                );
 
             if !composer.get_locker().borrow_mut().is_locked() {
                 installer.set_update(true);
@@ -444,9 +480,9 @@ impl CreateProjectCommand {
         }
 
         let mut has_vcs = installed_from_vcs;
-        let remove_vcs = !input.get_option("keep-vcs").as_bool().unwrap_or(false)
+        let remove_vcs = !input.borrow().get_option("keep-vcs").as_bool().unwrap_or(false)
             && installed_from_vcs
-            && (input.get_option("remove-vcs").as_bool().unwrap_or(false)
+            && (input.borrow().get_option("remove-vcs").as_bool().unwrap_or(false)
                 || !io.is_interactive()
                 || io.ask_confirmation(
                     "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ".to_string(),
@@ -550,7 +586,7 @@ impl CreateProjectCommand {
     #[allow(clippy::too_many_arguments)]
     fn install_root_package(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: &str,
@@ -957,7 +993,7 @@ impl CreateProjectCommand {
     // helpers reachable via $this in PHP, defined on BaseCommand here
     fn create_composer_instance(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: Option<indexmap::IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
@@ -969,7 +1005,7 @@ impl CreateProjectCommand {
     fn create_audit_config(
         &self,
         config: &Config,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<crate::advisory::AuditConfig> {
         self.create_audit_config(config, input)
     }

@@ -51,19 +51,24 @@ impl CheckPlatformReqsCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io();
 
-        let no_dev = input.get_option("no-dev").as_bool().unwrap_or(false);
+        let no_dev = input
+            .borrow()
+            .get_option("no-dev")
+            .as_bool()
+            .unwrap_or(false);
 
         let mut requires: IndexMap<String, Vec<Link>> = IndexMap::new();
         let mut remove_packages: Vec<String> = vec![];
 
         let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
+            .borrow()
             .get_option("lock")
             .as_bool()
             .unwrap_or(false)
@@ -242,6 +247,7 @@ impl CheckPlatformReqsCommand {
         }
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .unwrap_or("text")
@@ -251,7 +257,12 @@ impl CheckPlatformReqsCommand {
         Ok(exit_code)
     }
 
-    fn print_table(&mut self, output: &dyn OutputInterface, results: &[CheckResult], format: &str) {
+    fn print_table(
+        &mut self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        results: &[CheckResult],
+        format: &str,
+    ) {
         let io = self.get_io();
 
         if format == "json" {

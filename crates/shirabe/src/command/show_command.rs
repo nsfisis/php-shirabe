@@ -78,41 +78,49 @@ impl ShowCommand {
 
     pub fn execute(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         self.version_parser = VersionParser::new();
-        if input.get_option("tree").as_bool() == Some(true) {
-            self.init_styles(output);
+        if input.borrow().get_option("tree").as_bool() == Some(true) {
+            self.init_styles(output.clone());
         }
 
         let mut composer = self.try_composer(None, None);
 
-        if input.get_option("installed").as_bool() == Some(true)
-            && input.get_option("self").as_bool() != Some(true)
+        if input.borrow().get_option("installed").as_bool() == Some(true)
+            && input.borrow().get_option("self").as_bool() != Some(true)
         {
             self.get_io().write_error("<warning>You are using the deprecated option \"installed\". Only installed packages are shown by default now. The --all option can be used to show all packages.</warning>");
         }
 
-        if input.get_option("outdated").as_bool() == Some(true) {
-            input.set_option("latest", PhpMixed::Bool(true));
-        } else if input.get_option("ignore").as_list().map_or(0, |l| l.len()) > 0 {
+        if input.borrow().get_option("outdated").as_bool() == Some(true) {
+            input
+                .borrow_mut()
+                .set_option("latest", PhpMixed::Bool(true));
+        } else if input
+            .borrow()
+            .get_option("ignore")
+            .as_list()
+            .map_or(0, |l| l.len())
+            > 0
+        {
             self.get_io().write_error("<warning>You are using the option \"ignore\" for action other than \"outdated\", it will be ignored.</warning>");
         }
 
-        if input.get_option("direct").as_bool() == Some(true)
-            && (input.get_option("all").as_bool() == Some(true)
-                || input.get_option("available").as_bool() == Some(true)
-                || input.get_option("platform").as_bool() == Some(true))
+        if input.borrow().get_option("direct").as_bool() == Some(true)
+            && (input.borrow().get_option("all").as_bool() == Some(true)
+                || input.borrow().get_option("available").as_bool() == Some(true)
+                || input.borrow().get_option("platform").as_bool() == Some(true))
         {
             self.get_io().write_error("The --direct (-D) option is not usable in combination with --all, --platform (-p) or --available (-a)");
 
             return Ok(1);
         }
 
-        if input.get_option("tree").as_bool() == Some(true)
-            && (input.get_option("all").as_bool() == Some(true)
-                || input.get_option("available").as_bool() == Some(true))
+        if input.borrow().get_option("tree").as_bool() == Some(true)
+            && (input.borrow().get_option("all").as_bool() == Some(true)
+                || input.borrow().get_option("available").as_bool() == Some(true))
         {
             self.get_io().write_error("The --tree (-t) option is not usable in combination with --all or --available (-a)");
 
@@ -120,9 +128,9 @@ impl ShowCommand {
         }
 
         let only_count: usize = [
-            input.get_option("patch-only").as_bool() == Some(true),
-            input.get_option("minor-only").as_bool() == Some(true),
-            input.get_option("major-only").as_bool() == Some(true),
+            input.borrow().get_option("patch-only").as_bool() == Some(true),
+            input.borrow().get_option("minor-only").as_bool() == Some(true),
+            input.borrow().get_option("major-only").as_bool() == Some(true),
         ]
         .iter()
         .filter(|b| **b)
@@ -135,8 +143,8 @@ impl ShowCommand {
             return Ok(1);
         }
 
-        if input.get_option("tree").as_bool() == Some(true)
-            && input.get_option("latest").as_bool() == Some(true)
+        if input.borrow().get_option("tree").as_bool() == Some(true)
+            && input.borrow().get_option("latest").as_bool() == Some(true)
         {
             self.get_io().write_error(
                 "The --tree (-t) option is not usable in combination with --latest (-l)",
@@ -145,8 +153,8 @@ impl ShowCommand {
             return Ok(1);
         }
 
-        if input.get_option("tree").as_bool() == Some(true)
-            && input.get_option("path").as_bool() == Some(true)
+        if input.borrow().get_option("tree").as_bool() == Some(true)
+            && input.borrow().get_option("path").as_bool() == Some(true)
         {
             self.get_io().write_error(
                 "The --tree (-t) option is not usable in combination with --path (-P)",
@@ -156,6 +164,7 @@ impl ShowCommand {
         }
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .unwrap_or("text")
@@ -176,7 +185,7 @@ impl ShowCommand {
             return Ok(1);
         }
 
-        let platform_req_filter = self.get_platform_requirement_filter(input)?;
+        let platform_req_filter = self.get_platform_requirement_filter(input.clone())?;
 
         // init repos
         let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -207,20 +216,20 @@ impl ShowCommand {
         let installed_repo: RepositoryInterfaceHandle;
         let repos: RepositoryInterfaceHandle;
 
-        if input.get_option("self").as_bool() == Some(true)
-            && input.get_option("installed").as_bool() != Some(true)
-            && input.get_option("locked").as_bool() != Some(true)
+        if input.borrow().get_option("self").as_bool() == Some(true)
+            && input.borrow().get_option("installed").as_bool() != Some(true)
+            && input.borrow().get_option("locked").as_bool() != Some(true)
         {
             let composer = self.require_composer(None, None)?;
             let package = crate::package::RootPackageInterfaceHandle::dup(
                 composer.borrow_partial().get_package(),
             );
-            if input.get_option("name-only").as_bool() == Some(true) {
+            if input.borrow().get_option("name-only").as_bool() == Some(true) {
                 self.get_io().write(&package.get_name());
 
                 return Ok(0);
             }
-            if input.get_argument("package").as_string().is_some() {
+            if input.borrow().get_argument("package").as_string().is_some() {
                 return Err(InvalidArgumentException {
                     message: "You cannot use --self together with a package name".to_string(),
                     code: 0,
@@ -234,14 +243,14 @@ impl ShowCommand {
                 RepositoryInterfaceHandle::new(RootPackageRepository::new(package.clone())),
             ]));
             single_package = Some(package.clone().into());
-        } else if input.get_option("platform").as_bool() == Some(true) {
+        } else if input.borrow().get_option("platform").as_bool() == Some(true) {
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 RepositoryInterfaceHandle::new(make_platform_repo()?),
             ]));
             repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                 RepositoryInterfaceHandle::new(make_platform_repo()?),
             ]));
-        } else if input.get_option("available").as_bool() == Some(true) {
+        } else if input.borrow().get_option("available").as_bool() == Some(true) {
             let mut ir = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(
                 make_platform_repo()?,
             )]);
@@ -276,7 +285,7 @@ impl ShowCommand {
                 ));
                 installed_repo = RepositoryInterfaceHandle::new(ir);
             }
-        } else if input.get_option("all").as_bool() == Some(true) && composer.is_some() {
+        } else if input.borrow().get_option("all").as_bool() == Some(true) && composer.is_some() {
             let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let local_repo = composer_ref
                 .get_repository_manager()
@@ -316,7 +325,7 @@ impl ShowCommand {
                 composite_input.push(r.clone());
             }
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
-        } else if input.get_option("all").as_bool() == Some(true) {
+        } else if input.borrow().get_option("all").as_bool() == Some(true) {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
             let names: Vec<String> = default_repos.keys().cloned().collect();
@@ -332,7 +341,7 @@ impl ShowCommand {
                 composite_input.push(v);
             }
             repos = RepositoryInterfaceHandle::new(CompositeRepository::new(composite_input));
-        } else if input.get_option("locked").as_bool() == Some(true) {
+        } else if input.borrow().get_option("locked").as_bool() == Some(true) {
             if composer.is_none()
                 || !crate::command::composer_full_mut(composer.as_ref().unwrap())
                     .get_locker()
@@ -348,10 +357,11 @@ impl ShowCommand {
             let mut composer_ref = crate::command::composer_full_mut(composer.as_ref().unwrap());
             let locker_rc = composer_ref.get_locker().clone();
             let mut locker = locker_rc.borrow_mut();
-            let lr =
-                locker.get_locked_repository(input.get_option("no-dev").as_bool() != Some(true))?;
+            let lr = locker.get_locked_repository(
+                input.borrow().get_option("no-dev").as_bool() != Some(true),
+            )?;
             let lr_handle: RepositoryInterfaceHandle = lr.into();
-            if input.get_option("self").as_bool() == Some(true) {
+            if input.borrow().get_option("self").as_bool() == Some(true) {
                 // TODO(phase-b): LockArrayRepository needs add_package via WritableRepositoryInterface;
                 // skipping the insertion here keeps compile clean.
                 let _ = &lr_handle;
@@ -382,16 +392,17 @@ impl ShowCommand {
             };
             let root_pkg = composer_local.get_package();
 
-            let root_repo: RepositoryInterfaceHandle = if input.get_option("self").as_bool()
-                == Some(true)
-            {
-                RepositoryInterfaceHandle::new(RootPackageRepository::new(
-                    crate::package::RootPackageInterfaceHandle::dup(composer_local.get_package()),
-                ))
-            } else {
-                RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
-            };
-            if input.get_option("no-dev").as_bool() == Some(true) {
+            let root_repo: RepositoryInterfaceHandle =
+                if input.borrow().get_option("self").as_bool() == Some(true) {
+                    RepositoryInterfaceHandle::new(RootPackageRepository::new(
+                        crate::package::RootPackageInterfaceHandle::dup(
+                            composer_local.get_package(),
+                        ),
+                    ))
+                } else {
+                    RepositoryInterfaceHandle::new(InstalledArrayRepository::new()?)
+                };
+            if input.borrow().get_option("no-dev").as_bool() == Some(true) {
                 let local_packages = composer_local
                     .get_repository_manager()
                     .borrow()
@@ -452,7 +463,7 @@ impl ShowCommand {
             let command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
-                input,
+                input.clone(),
                 output,
                 vec![],
                 IndexMap::new(),
@@ -466,14 +477,17 @@ impl ShowCommand {
                 .dispatch(Some(&_event_name), None)?;
         }
 
-        if input.get_option("latest").as_bool() == Some(true) && composer.is_none() {
+        if input.borrow().get_option("latest").as_bool() == Some(true) && composer.is_none() {
             self.get_io().write_error(
                 "No composer.json found in the current directory, disabling \"latest\" option",
             );
-            input.set_option("latest", PhpMixed::Bool(false));
+            input
+                .borrow_mut()
+                .set_option("latest", PhpMixed::Bool(false));
         }
 
         let package_filter: Option<String> = input
+            .borrow()
             .get_argument("package")
             .as_string()
             .map(|s| s.to_string());
@@ -487,11 +501,11 @@ impl ShowCommand {
                     &*installed_repo.borrow(),
                     &repos,
                     pf,
-                    input.get_argument("version"),
+                    input.borrow().get_argument("version"),
                 )?;
 
                 if let Some(ref pkg) = matched_package {
-                    if input.get_option("direct").as_bool() == Some(true) {
+                    if input.borrow().get_option("direct").as_bool() == Some(true) {
                         if !in_array(
                             PhpMixed::String(pkg.get_name()),
                             &PhpMixed::List(
@@ -515,9 +529,9 @@ impl ShowCommand {
                 }
 
                 if matched_package.is_none() {
-                    let options = input.get_options();
+                    let options = input.borrow().get_options();
                     let mut hint = String::new();
-                    if input.get_option("locked").as_bool() == Some(true) {
+                    if input.borrow().get_option("locked").as_bool() == Some(true) {
                         hint.push_str(" in lock file");
                     }
                     if options.contains_key("working-dir") {
@@ -530,12 +544,12 @@ impl ShowCommand {
                         ));
                     }
                     if PlatformRepository::is_platform_package(pf)
-                        && input.get_option("platform").as_bool() != Some(true)
+                        && input.borrow().get_option("platform").as_bool() != Some(true)
                     {
                         hint.push_str(", try using --platform (-p) to show platform packages");
                     }
-                    if input.get_option("all").as_bool() != Some(true)
-                        && input.get_option("available").as_bool() != Some(true)
+                    if input.borrow().get_option("all").as_bool() != Some(true)
+                        && input.borrow().get_option("available").as_bool() != Some(true)
                     {
                         hint.push_str(
                             ", try using --available (-a) to show all available packages",
@@ -557,7 +571,7 @@ impl ShowCommand {
             // assert(isset($versions));
 
             let mut exit_code: i64 = 0;
-            if input.get_option("tree").as_bool() == Some(true) {
+            if input.borrow().get_option("tree").as_bool() == Some(true) {
                 let array_tree = self.generate_package_tree(
                     package.clone().into(),
                     &*installed_repo.borrow(),
@@ -586,19 +600,31 @@ impl ShowCommand {
             }
 
             let mut latest_package: Option<crate::package::PackageInterfaceHandle> = None;
-            if input.get_option("latest").as_bool() == Some(true) {
+            if input.borrow().get_option("latest").as_bool() == Some(true) {
                 latest_package = self.find_latest_package(
                     package.clone().into(),
                     composer.as_ref().unwrap(),
                     &mut platform_repo,
-                    input.get_option("major-only").as_bool().unwrap_or(false),
-                    input.get_option("minor-only").as_bool().unwrap_or(false),
-                    input.get_option("patch-only").as_bool().unwrap_or(false),
+                    input
+                        .borrow()
+                        .get_option("major-only")
+                        .as_bool()
+                        .unwrap_or(false),
+                    input
+                        .borrow()
+                        .get_option("minor-only")
+                        .as_bool()
+                        .unwrap_or(false),
+                    input
+                        .borrow()
+                        .get_option("patch-only")
+                        .as_bool()
+                        .unwrap_or(false),
                     &*platform_req_filter,
                 )?;
             }
-            if input.get_option("outdated").as_bool() == Some(true)
-                && input.get_option("strict").as_bool() == Some(true)
+            if input.borrow().get_option("outdated").as_bool() == Some(true)
+                && input.borrow().get_option("strict").as_bool() == Some(true)
                 && latest_package.is_some()
                 && latest_package
                     .as_ref()
@@ -614,7 +640,7 @@ impl ShowCommand {
             {
                 exit_code = 1;
             }
-            if input.get_option("path").as_bool() == Some(true) {
+            if input.borrow().get_option("path").as_bool() == Some(true) {
                 self.get_io().write_no_newline(&package.get_name());
                 let path = {
                     let composer_ref = composer.as_ref().unwrap();
@@ -654,7 +680,7 @@ impl ShowCommand {
         }
 
         // show tree view if requested
-        if input.get_option("tree").as_bool() == Some(true) {
+        if input.borrow().get_option("tree").as_bool() == Some(true) {
             let root_requires = self.get_root_requires();
             let mut packages = installed_repo.get_packages()?;
             packages.sort_by(|a, b| {
@@ -716,15 +742,15 @@ impl ShowCommand {
         }
 
         let mut package_list_filter: Option<Vec<String>> = None;
-        if input.get_option("direct").as_bool() == Some(true) {
+        if input.borrow().get_option("direct").as_bool() == Some(true) {
             package_list_filter = Some(self.get_root_requires());
         }
 
-        if input.get_option("path").as_bool() == Some(true) && composer.is_none() {
+        if input.borrow().get_option("path").as_bool() == Some(true) && composer.is_none() {
             self.get_io().write_error(
                 "No composer.json found in the current directory, disabling \"path\" option",
             );
-            input.set_option("path", PhpMixed::Bool(false));
+            input.borrow_mut().set_option("path", PhpMixed::Bool(false));
         }
 
         for repo in RepositoryUtils::flatten_repositories(repos.clone(), false) {
@@ -799,13 +825,14 @@ impl ShowCommand {
             }
         }
 
-        let show_all_types = input.get_option("all").as_bool() == Some(true);
-        let show_latest = input.get_option("latest").as_bool() == Some(true);
-        let show_major_only = input.get_option("major-only").as_bool() == Some(true);
-        let show_minor_only = input.get_option("minor-only").as_bool() == Some(true);
-        let show_patch_only = input.get_option("patch-only").as_bool() == Some(true);
+        let show_all_types = input.borrow().get_option("all").as_bool() == Some(true);
+        let show_latest = input.borrow().get_option("latest").as_bool() == Some(true);
+        let show_major_only = input.borrow().get_option("major-only").as_bool() == Some(true);
+        let show_minor_only = input.borrow().get_option("minor-only").as_bool() == Some(true);
+        let show_patch_only = input.borrow().get_option("patch-only").as_bool() == Some(true);
         let ignored_packages_regex = base_package::package_names_to_regexp(
             &input
+                .borrow()
                 .get_option("ignore")
                 .as_list()
                 .map(|l| {
@@ -865,21 +892,21 @@ impl ShowCommand {
                     }
                 }
 
-                let write_path = input.get_option("name-only").as_bool() != Some(true)
-                    && input.get_option("path").as_bool() == Some(true);
-                write_version = input.get_option("name-only").as_bool() != Some(true)
-                    && input.get_option("path").as_bool() != Some(true)
+                let write_path = input.borrow().get_option("name-only").as_bool() != Some(true)
+                    && input.borrow().get_option("path").as_bool() == Some(true);
+                write_version = input.borrow().get_option("name-only").as_bool() != Some(true)
+                    && input.borrow().get_option("path").as_bool() != Some(true)
                     && *show_version;
                 let write_latest = write_version && show_latest;
-                write_description = input.get_option("name-only").as_bool() != Some(true)
-                    && input.get_option("path").as_bool() != Some(true);
+                write_description = input.borrow().get_option("name-only").as_bool() != Some(true)
+                    && input.borrow().get_option("path").as_bool() != Some(true);
                 let write_release_date = write_latest
-                    && (input.get_option("sort-by-age").as_bool() == Some(true)
+                    && (input.borrow().get_option("sort-by-age").as_bool() == Some(true)
                         || format == "json");
 
                 let mut has_outdated_packages = false;
 
-                if input.get_option("sort-by-age").as_bool() == Some(true) {
+                if input.borrow().get_option("sort-by-age").as_bool() == Some(true) {
                     type_packages.sort_by(|_ka, a, _kb, b| match (a, b) {
                         (PackageOrName::Pkg(a), PackageOrName::Pkg(b)) => {
                             a.get_release_date().cmp(&b.get_release_date())
@@ -917,14 +944,14 @@ impl ShowCommand {
                             package_is_up_to_date || (latest_package.is_none() && show_major_only);
                         let package_is_ignored =
                             Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())?;
-                        if input.get_option("outdated").as_bool() == Some(true)
+                        if input.borrow().get_option("outdated").as_bool() == Some(true)
                             && (package_is_up_to_date || package_is_ignored)
                         {
                             continue;
                         }
 
-                        if input.get_option("outdated").as_bool() == Some(true)
-                            || input.get_option("strict").as_bool() == Some(true)
+                        if input.borrow().get_option("outdated").as_bool() == Some(true)
+                            || input.borrow().get_option("strict").as_bool() == Some(true)
                         {
                             has_outdated_packages = true;
                         }
@@ -946,7 +973,8 @@ impl ShowCommand {
                                 true,
                             )),
                         );
-                        if format != "json" || input.get_option("name-only").as_bool() != Some(true)
+                        if format != "json"
+                            || input.borrow().get_option("name-only").as_bool() != Some(true)
                         {
                             package_view_data.insert(
                                 "homepage".to_string(),
@@ -1122,7 +1150,9 @@ impl ShowCommand {
                         write_release_date,
                     },
                 );
-                if input.get_option("strict").as_bool() == Some(true) && has_outdated_packages {
+                if input.borrow().get_option("strict").as_bool() == Some(true)
+                    && has_outdated_packages
+                {
                     exit_code = 1;
                     break;
                 }
@@ -1155,7 +1185,7 @@ impl ShowCommand {
                     .collect(),
             )));
         } else {
-            if input.get_option("latest").as_bool() == Some(true)
+            if input.borrow().get_option("latest").as_bool() == Some(true)
                 && view_data.values().any(|v| !v.is_empty())
             {
                 let io = self.get_io();
@@ -1163,7 +1193,7 @@ impl ShowCommand {
                     io.write_error("Legend:");
                     io.write_error("! patch or minor release available - update recommended");
                     io.write_error("~ major release available - update possible");
-                    if input.get_option("outdated").as_bool() != Some(true) {
+                    if input.borrow().get_option("outdated").as_bool() != Some(true) {
                         io.write_error("= up to date version");
                     }
                 } else {
@@ -1172,7 +1202,7 @@ impl ShowCommand {
                     io.write_error(
                         "- <comment>major</comment> release available - update possible",
                     );
-                    if input.get_option("outdated").as_bool() != Some(true) {
+                    if input.borrow().get_option("outdated").as_bool() != Some(true) {
                         io.write_error("- <info>up to date</info> version");
                     }
                 }
@@ -1215,7 +1245,7 @@ impl ShowCommand {
                     }
                 }
 
-                if write_latest && input.get_option("direct").as_bool() != Some(true) {
+                if write_latest && input.borrow().get_option("direct").as_bool() != Some(true) {
                     let mut direct_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
                     let mut transitive_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
                     for pkg in packages.iter() {
@@ -2186,7 +2216,10 @@ impl ShowCommand {
     }
 
     /// Init styles for tree
-    pub(crate) fn init_styles(&mut self, output: &mut dyn OutputInterface) {
+    pub(crate) fn init_styles(
+        &mut self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
         self.colors = vec![
             "green".to_string(),
             "yellow".to_string(),
@@ -2200,7 +2233,7 @@ impl ShowCommand {
             // TODO(phase-b): OutputInterface::get_formatter returns &OutputFormatter, but
             // set_style requires &mut. Resolution requires interior-mutability refactor of
             // OutputFormatter wiring across symfony shim.
-            let _ = (output.get_formatter(), color);
+            let _ = (output.borrow().get_formatter(), color);
         }
     }
 

@@ -47,8 +47,8 @@ impl FundCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::command::composer_full(&composer);
@@ -121,6 +121,7 @@ impl FundCommand {
         let io = self.get_io();
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .unwrap_or("text")

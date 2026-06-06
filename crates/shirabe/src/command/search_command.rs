@@ -45,13 +45,14 @@ impl SearchCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let platform_repo = PlatformRepository::new4(vec![], IndexMap::new(), None, None)?;
         let io = self.get_io();
 
         let format = input
+            .borrow()
             .get_option("format")
             .as_string()
             .map(|s| s.to_string())
@@ -76,7 +77,7 @@ impl SearchCommand {
         } else {
             // TODO(phase-b): clone_box to release self borrow held by get_io.
             let io_box = self.get_io().clone();
-            self.create_composer_instance(input, io_box, None, false, None)?
+            self.create_composer_instance(input.clone(), io_box, None, false, None)?
         };
         let composer_ref = crate::command::composer_full(&composer);
         let local_repo = composer_ref
@@ -99,7 +100,8 @@ impl SearchCommand {
         let mut repos = CompositeRepository::new(all_repos);
 
         // TODO(plugin): dispatch CommandEvent for search command
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "search", input, output);
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "search", input.clone(), output);
         let dispatcher = composer_ref.get_event_dispatcher().clone();
         drop(composer_ref);
         dispatcher
@@ -107,8 +109,18 @@ impl SearchCommand {
             .dispatch(Some(command_event.get_name()), None);
 
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
-        if input.get_option("only-name").as_bool().unwrap_or(false) {
-            if input.get_option("only-vendor").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("only-name")
+            .as_bool()
+            .unwrap_or(false)
+        {
+            if input
+                .borrow()
+                .get_option("only-vendor")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 return Err(InvalidArgumentException {
                     message: "--only-name and --only-vendor cannot be used together".to_string(),
                     code: 0,
@@ -116,13 +128,22 @@ impl SearchCommand {
                 .into());
             }
             mode = repository_interface::SEARCH_NAME;
-        } else if input.get_option("only-vendor").as_bool().unwrap_or(false) {
+        } else if input
+            .borrow()
+            .get_option("only-vendor")
+            .as_bool()
+            .unwrap_or(false)
+        {
             mode = repository_interface::SEARCH_VENDOR;
         }
 
-        let r#type = input.get_option("type").as_string().map(|s| s.to_string());
+        let r#type = input
+            .borrow()
+            .get_option("type")
+            .as_string()
+            .map(|s| s.to_string());
 
-        let tokens_arg = input.get_argument("tokens");
+        let tokens_arg = input.borrow().get_argument("tokens");
         let token_strings: Vec<String> = tokens_arg
             .as_array()
             .map(|arr| {

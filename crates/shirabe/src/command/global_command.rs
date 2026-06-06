@@ -56,8 +56,12 @@ impl GlobalCommand {
             );
     }
 
-    pub fn run(&mut self, input: &dyn InputInterface, output: &dyn OutputInterface) -> Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &input.to_input_string())?;
+    pub fn run(
+        &mut self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> Result<i64> {
+        let tokens = Preg::split(r"{\s+}", &input.borrow().to_input_string())?;
         let mut args: Vec<String> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with('-') {
@@ -76,12 +80,15 @@ impl GlobalCommand {
         let mut sub_input = self.prepare_subcommand_input(input, false)?;
         let mut app = self.get_application()?;
         let _ = output;
-        Ok(app.run(Some(&mut sub_input), None)?)
+        Ok(app.run(
+            Some(std::rc::Rc::new(std::cell::RefCell::new(sub_input))),
+            None,
+        )?)
     }
 
     fn prepare_subcommand_input(
         &mut self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         quiet: bool,
     ) -> Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
@@ -118,7 +125,7 @@ impl GlobalCommand {
         let new_input_str = Preg::replace4(
             r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}",
             "",
-            &input.to_input_string(),
+            &input.borrow().to_input_string(),
             1,
         )?;
         self.get_application()?.reset_composer();

@@ -29,8 +29,8 @@ impl ClearCacheCommand {
 
     pub fn execute(
         &mut self,
-        _input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // TODO(phase-b): port full execute logic once Config sharing model is settled
         let _ = composer::VERSION;

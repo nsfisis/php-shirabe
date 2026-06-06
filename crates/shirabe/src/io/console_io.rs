@@ -34,7 +34,7 @@ pub struct ConsoleIO {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 
     pub(crate) input: Box<dyn InputInterface>,
-    pub(crate) output: Box<dyn OutputInterface>,
+    pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     pub(crate) helper_set: HelperSet,
     pub(crate) last_message: RefCell<String>,
     pub(crate) last_message_err: RefCell<String>,
@@ -68,7 +68,7 @@ impl ConsoleIO {
     /// @param HelperSet       $helperSet The helperSet instance
     pub fn new(
         input: Box<dyn InputInterface>,
-        output: Box<dyn OutputInterface>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         helper_set: HelperSet,
     ) -> Self {
         let mut verbosity_map = IndexMap::new();
@@ -99,7 +99,7 @@ impl ConsoleIO {
     /// @param string[]|string $messages
     fn do_write(&self, messages: PhpMixed, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
-        if sf_verbosity > self.output.get_verbosity() {
+        if sf_verbosity > self.output.borrow().get_verbosity() {
             return;
         }
 
@@ -142,8 +142,8 @@ impl ConsoleIO {
             messages
         };
 
-        if stderr && let Some(console_output) = self.output.as_console_output_interface() {
-            console_output.get_error_output().write(
+        if stderr && let Some(console_output) = self.output.borrow().as_console_output_interface() {
+            console_output.get_error_output().borrow().write(
                 &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
                 newline,
                 sf_verbosity,
@@ -157,7 +157,7 @@ impl ConsoleIO {
             return;
         }
 
-        self.output.write(
+        self.output.borrow().write(
             &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
             newline,
             sf_verbosity,
@@ -256,15 +256,15 @@ impl ConsoleIO {
     }
 
     pub fn get_table(&self) -> Table {
-        Table::new(&*self.output)
+        Table::new(self.output.clone())
     }
 
-    fn get_error_output(&self) -> &dyn OutputInterface {
-        if let Some(console_output) = self.output.as_console_output_interface() {
+    fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
+        if let Some(console_output) = self.output.borrow().as_console_output_interface() {
             return console_output.get_error_output();
         }
 
-        &*self.output
+        self.output.clone()
     }
 
     /// Sanitize string to remove control characters
@@ -379,19 +379,19 @@ impl IOInterfaceImmutable for ConsoleIO {
     }
 
     fn is_verbose(&self) -> bool {
-        self.output.is_verbose()
+        self.output.borrow().is_verbose()
     }
 
     fn is_very_verbose(&self) -> bool {
-        self.output.is_very_verbose()
+        self.output.borrow().is_very_verbose()
     }
 
     fn is_debug(&self) -> bool {
-        self.output.is_debug()
+        self.output.borrow().is_debug()
     }
 
     fn is_decorated(&self) -> bool {
-        self.output.is_decorated()
+        self.output.borrow().is_decorated()
     }
 
     fn write3(&self, message: &str, newline: bool, verbosity: i64) {

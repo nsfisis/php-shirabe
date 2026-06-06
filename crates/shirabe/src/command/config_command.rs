@@ -120,13 +120,13 @@ impl ConfigCommand {
 
     pub(crate) fn initialize(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        self.initialize(input, output)?;
+        self.initialize(input.clone(), output)?;
 
         let auth_config_file =
-            self.get_auth_config_file(input, &*self.config.as_ref().unwrap().borrow());
+            self.get_auth_config_file(input.clone(), &*self.config.as_ref().unwrap().borrow());
 
         self.auth_config_file = Some(JsonFile::new(
             auth_config_file,
@@ -138,7 +138,7 @@ impl ConfigCommand {
         self.auth_config_source = None;
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
-        if input.get_option("global").as_bool() == Some(true)
+        if input.borrow().get_option("global").as_bool() == Some(true)
             && !self.auth_config_file.as_ref().unwrap().exists()
         {
             touch(self.auth_config_file.as_ref().unwrap().get_path());
@@ -177,11 +177,11 @@ impl ConfigCommand {
 
     pub(crate) fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // Open file in editor
-        if input.get_option("editor").as_bool() == Some(true) {
+        if input.borrow().get_option("editor").as_bool() == Some(true) {
             let mut editor = Platform::get_env("EDITOR");
             if editor.is_none() || editor.as_deref() == Some("") {
                 if Platform::is_windows() {
@@ -201,7 +201,7 @@ impl ConfigCommand {
                 editor = Some(escapeshellcmd(&editor.unwrap()));
             }
 
-            let file = if input.get_option("auth").as_bool() == Some(true) {
+            let file = if input.borrow().get_option("auth").as_bool() == Some(true) {
                 self.auth_config_file
                     .as_ref()
                     .unwrap()
@@ -227,7 +227,7 @@ impl ConfigCommand {
             return Ok(0);
         }
 
-        if input.get_option("global").as_bool() != Some(true) {
+        if input.borrow().get_option("global").as_bool() != Some(true) {
             let config_read = self.config_file.as_mut().unwrap().read()?;
             let config_map = match config_read {
                 PhpMixed::Array(m) => m
@@ -263,7 +263,7 @@ impl ConfigCommand {
         }
 
         // List the configuration of the file settings
-        if input.get_option("list").as_bool() == Some(true) {
+        if input.borrow().get_option("list").as_bool() == Some(true) {
             let all_map = self.config.as_ref().unwrap().borrow_mut().all(0)?;
             let raw_map = self.config.as_ref().unwrap().borrow().raw();
             let to_mixed = |m: IndexMap<String, PhpMixed>| -> PhpMixed {
@@ -274,20 +274,20 @@ impl ConfigCommand {
                 to_mixed(raw_map),
                 output,
                 None,
-                input.get_option("source").as_bool() == Some(true),
+                input.borrow().get_option("source").as_bool() == Some(true),
             );
 
             return Ok(0);
         }
 
-        let setting_key_arg = input.get_argument("setting-key");
+        let setting_key_arg = input.borrow().get_argument("setting-key");
         let setting_key = match setting_key_arg.as_string() {
             Some(s) => s.to_string(),
             None => return Ok(0),
         };
 
         // If the user enters in a config variable, parse it and save to file
-        let setting_values_raw = input.get_argument("setting-value");
+        let setting_values_raw = input.borrow().get_argument("setting-value");
         let setting_values: Vec<String> = setting_values_raw
             .as_list()
             .map(|l| {
@@ -296,7 +296,8 @@ impl ConfigCommand {
                     .collect()
             })
             .unwrap_or_default();
-        if !setting_values.is_empty() && input.get_option("unset").as_bool() == Some(true) {
+        if !setting_values.is_empty() && input.borrow().get_option("unset").as_bool() == Some(true)
+        {
             return Err(RuntimeException {
                 message: "You can not combine a setting value with --unset".to_string(),
                 code: 0,
@@ -305,7 +306,7 @@ impl ConfigCommand {
         }
 
         // show the value if no value is provided
-        if setting_values.is_empty() && input.get_option("unset").as_bool() != Some(true) {
+        if setting_values.is_empty() && input.borrow().get_option("unset").as_bool() != Some(true) {
             let properties: Vec<&'static str> = Self::CONFIGURABLE_PACKAGE_PROPERTIES.to_vec();
             let mut properties_defaults: IndexMap<String, PhpMixed> = IndexMap::new();
             properties_defaults.insert("type".to_string(), PhpMixed::String("library".to_string()));
@@ -411,7 +412,7 @@ impl ConfigCommand {
             {
                 value = self.config.as_ref().unwrap().borrow_mut().get_with_flags(
                     &setting_key,
-                    if input.get_option("absolute").as_bool() == Some(true) {
+                    if input.borrow().get_option("absolute").as_bool() == Some(true) {
                         0
                     } else {
                         Config::RELATIVE_PATHS
@@ -488,7 +489,7 @@ impl ConfigCommand {
             };
 
             let mut source_of_config_value = String::new();
-            if input.get_option("source").as_bool() == Some(true) {
+            if input.borrow().get_option("source").as_bool() == Some(true) {
                 source_of_config_value = format!(" ({})", source);
             }
 
@@ -526,7 +527,7 @@ impl ConfigCommand {
         let multi_config_values = build_multi_config_values();
 
         // allow unsetting audit config entirely
-        if input.get_option("unset").as_bool() == Some(true) && setting_key == "audit" {
+        if input.borrow().get_option("unset").as_bool() == Some(true) && setting_key == "audit" {
             self.config_source
                 .as_mut()
                 .unwrap()
@@ -535,7 +536,7 @@ impl ConfigCommand {
             return Ok(0);
         }
 
-        if input.get_option("unset").as_bool() == Some(true)
+        if input.borrow().get_option("unset").as_bool() == Some(true)
             && (unique_config_values.contains_key(&setting_key)
                 || multi_config_values.contains_key(&setting_key))
         {
@@ -580,7 +581,7 @@ impl ConfigCommand {
         )
         .unwrap_or(false)
         {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -621,7 +622,7 @@ impl ConfigCommand {
         )
         .unwrap_or(false)
         {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -652,7 +653,7 @@ impl ConfigCommand {
         let unique_props = build_unique_props();
         let multi_props = build_multi_props();
 
-        if input.get_option("global").as_bool() == Some(true)
+        if input.borrow().get_option("global").as_bool() == Some(true)
             && (unique_props.contains_key(&setting_key)
                 || multi_props.contains_key(&setting_key)
                 || strpos(&setting_key, "extra.") == Some(0))
@@ -663,7 +664,7 @@ impl ConfigCommand {
             }
             .into());
         }
-        if input.get_option("unset").as_bool() == Some(true)
+        if input.borrow().get_option("unset").as_bool() == Some(true)
             && (unique_props.contains_key(&setting_key) || multi_props.contains_key(&setting_key))
         {
             self.config_source
@@ -693,7 +694,7 @@ impl ConfigCommand {
         )
         .unwrap_or(false)
         {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -715,7 +716,7 @@ impl ConfigCommand {
                 self.config_source.as_mut().unwrap().add_repository(
                     &matches[1],
                     PhpMixed::Array(repo),
-                    input.get_option("append").as_bool() == Some(true),
+                    input.borrow().get_option("append").as_bool() == Some(true),
                 );
 
                 return Ok(0);
@@ -731,7 +732,7 @@ impl ConfigCommand {
                         self.config_source.as_mut().unwrap().add_repository(
                             &matches[1],
                             PhpMixed::Bool(false),
-                            input.get_option("append").as_bool() == Some(true),
+                            input.borrow().get_option("append").as_bool() == Some(true),
                         );
 
                         return Ok(0);
@@ -741,7 +742,7 @@ impl ConfigCommand {
                     self.config_source.as_mut().unwrap().add_repository(
                         &matches[1],
                         value,
-                        input.get_option("append").as_bool() == Some(true),
+                        input.borrow().get_option("append").as_bool() == Some(true),
                     );
 
                     return Ok(0);
@@ -758,7 +759,7 @@ impl ConfigCommand {
         // handle extra
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -768,9 +769,9 @@ impl ConfigCommand {
             }
 
             let mut value = PhpMixed::String(values[0].clone());
-            if input.get_option("json").as_bool() == Some(true) {
+            if input.borrow().get_option("json").as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
-                if input.get_option("merge").as_bool() == Some(true) {
+                if input.borrow().get_option("merge").as_bool() == Some(true) {
                     let current_value_outer = self.config_file.as_mut().unwrap().read()?;
                     let bits = explode(".", &setting_key);
                     let mut current_value: PhpMixed = current_value_outer;
@@ -816,7 +817,7 @@ impl ConfigCommand {
         // handle suggest
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -838,7 +839,7 @@ impl ConfigCommand {
             setting_key.as_str().into(),
             &vec!["suggest".to_string(), "extra".to_string()].into(),
             true,
-        ) && input.get_option("unset").as_bool() == Some(true)
+        ) && input.borrow().get_option("unset").as_bool() == Some(true)
         {
             self.config_source
                 .as_mut()
@@ -852,7 +853,7 @@ impl ConfigCommand {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false)
         {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -875,7 +876,7 @@ impl ConfigCommand {
         }
 
         // handle unsetting platform
-        if setting_key == "platform" && input.get_option("unset").as_bool() == Some(true) {
+        if setting_key == "platform" && input.borrow().get_option("unset").as_bool() == Some(true) {
             self.config_source
                 .as_mut()
                 .unwrap()
@@ -894,7 +895,7 @@ impl ConfigCommand {
             .into(),
             true,
         ) {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -909,7 +910,7 @@ impl ConfigCommand {
                     .map(|s| Box::new(PhpMixed::String(s.clone())))
                     .collect(),
             );
-            if input.get_option("json").as_bool() == Some(true) {
+            if input.borrow().get_option("json").as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if !is_array(&value) {
                     return Err(RuntimeException {
@@ -920,7 +921,7 @@ impl ConfigCommand {
                 }
             }
 
-            if input.get_option("merge").as_bool() == Some(true) {
+            if input.borrow().get_option("merge").as_bool() == Some(true) {
                 let current_config = self.config_file.as_mut().unwrap().read()?;
                 let key_suffix = str_replace("audit.", "", &setting_key);
                 let current_value = current_config
@@ -973,7 +974,7 @@ impl ConfigCommand {
         // handle auth
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.auth_config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
                 self.config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
 
@@ -1079,7 +1080,7 @@ impl ConfigCommand {
         // handle script
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
         if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
-            if input.get_option("unset").as_bool() == Some(true) {
+            if input.borrow().get_option("unset").as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
                     .unwrap()
@@ -1107,7 +1108,7 @@ impl ConfigCommand {
         }
 
         // handle unsetting other top level properties
-        if input.get_option("unset").as_bool() == Some(true) {
+        if input.borrow().get_option("unset").as_bool() == Some(true) {
             self.config_source
                 .as_mut()
                 .unwrap()
@@ -1243,7 +1244,7 @@ impl ConfigCommand {
         &mut self,
         contents: PhpMixed,
         raw_contents: PhpMixed,
-        output: &dyn OutputInterface,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         k: Option<String>,
         show_source: bool,
     ) {
@@ -1278,7 +1279,13 @@ impl ConfigCommand {
                     &Preg::replace("{^config\\.}", "", &format!("{}.", key)).unwrap_or_default(),
                 );
                 k = Some(new_k);
-                self.list_configuration(value_inner, raw_val, output, k.clone(), show_source);
+                self.list_configuration(
+                    value_inner,
+                    raw_val,
+                    output.clone(),
+                    k.clone(),
+                    show_source,
+                );
                 k = orig_k.clone();
 
                 continue;

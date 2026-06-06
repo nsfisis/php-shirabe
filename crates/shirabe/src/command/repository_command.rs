@@ -68,25 +68,29 @@ impl RepositoryCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let action = strtolower(
             &input
+                .borrow()
                 .get_argument("action")
                 .as_string()
                 .unwrap_or("")
                 .to_string(),
         );
         let name = input
+            .borrow()
             .get_argument("name")
             .as_string()
             .map(|s| s.to_string());
         let arg1 = input
+            .borrow()
             .get_argument("arg1")
             .as_string()
             .map(|s| s.to_string());
         let arg2 = input
+            .borrow()
             .get_argument("arg2")
             .as_string()
             .map(|s| s.to_string());
@@ -143,10 +147,15 @@ impl RepositoryCommand {
                 };
 
                 let before = input
+                    .borrow()
                     .get_option("before")
                     .as_string()
                     .map(|s| s.to_string());
-                let after = input.get_option("after").as_string().map(|s| s.to_string());
+                let after = input
+                    .borrow()
+                    .get_option("after")
+                    .as_string()
+                    .map(|s| s.to_string());
                 if before.is_some() && after.is_some() {
                     return Err(anyhow::anyhow!(RuntimeException {
                         message: "You can not combine --before and --after".to_string(),
@@ -173,7 +182,11 @@ impl RepositoryCommand {
                     return Ok(0);
                 }
 
-                let append = input.get_option("append").as_bool().unwrap_or(false);
+                let append = input
+                    .borrow()
+                    .get_option("append")
+                    .as_bool()
+                    .unwrap_or(false);
                 self.config_source.as_mut().unwrap().add_repository(
                     name.as_deref().unwrap(),
                     repo_config.clone(),
@@ -270,7 +283,11 @@ impl RepositoryCommand {
                 }
                 let name_str = name.as_deref().unwrap();
                 if ["packagist", "packagist.org"].contains(&name_str) {
-                    let append = input.get_option("append").as_bool().unwrap_or(false);
+                    let append = input
+                        .borrow()
+                        .get_option("append")
+                        .as_bool()
+                        .unwrap_or(false);
                     self.config_source.as_mut().unwrap().add_repository(
                         "packagist.org",
                         PhpMixed::Bool(false),

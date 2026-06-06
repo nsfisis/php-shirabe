@@ -61,8 +61,8 @@ impl ReinstallCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::command::composer_full(&composer);
@@ -74,9 +74,9 @@ impl ReinstallCommand {
         let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
-        let type_option = input.get_option("type");
+        let type_option = input.borrow().get_option("type");
         let type_count = type_option.as_list().map_or(0, |l| l.len());
-        let packages_arg = input.get_argument("packages");
+        let packages_arg = input.borrow().get_argument("packages");
         let packages_count = packages_arg.as_list().map_or(0, |l| l.len());
 
         if type_count > 0 {
@@ -180,7 +180,8 @@ impl ReinstallCommand {
         });
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "reinstall", input, output);
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
         let event_dispatcher = composer.get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
@@ -188,15 +189,23 @@ impl ReinstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input, false)?;
+            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
 
         let installation_manager = composer.get_installation_manager().clone();
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
         // TODO(phase-b): InstallationManager setters need &mut self; conflicts with the &installation_manager / &local_repo / &package borrows held below; needs shared-ownership refactor
-        let _no_progress = !input.get_option("no-progress").as_bool().unwrap_or(false);
-        let _no_plugins = input.get_option("no-plugins").as_bool().unwrap_or(false);
+        let _no_progress = !input
+            .borrow()
+            .get_option("no-progress")
+            .as_bool()
+            .unwrap_or(false);
+        let _no_plugins = input
+            .borrow()
+            .get_option("no-plugins")
+            .as_bool()
+            .unwrap_or(false);
 
         download_manager
             .borrow_mut()
@@ -225,8 +234,14 @@ impl ReinstallCommand {
         // installation_manager.execute(local_repo_mut, uninstall_ops_boxed, dev_mode, true, false);
         // installation_manager.execute(local_repo_mut, install_ops_boxed, dev_mode, true, false);
 
-        if !input.get_option("no-autoloader").as_bool().unwrap_or(false) {
+        if !input
+            .borrow()
+            .get_option("no-autoloader")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let optimize = input
+                .borrow()
                 .get_option("optimize-autoloader")
                 .as_bool()
                 .unwrap_or(false)
@@ -236,6 +251,7 @@ impl ReinstallCommand {
                     .as_bool()
                     .unwrap_or(false);
             let authoritative = input
+                .borrow()
                 .get_option("classmap-authoritative")
                 .as_bool()
                 .unwrap_or(false)
@@ -245,11 +261,13 @@ impl ReinstallCommand {
                     .as_bool()
                     .unwrap_or(false);
             let apcu_prefix = input
+                .borrow()
                 .get_option("apcu-autoloader-prefix")
                 .as_string()
                 .map(|s| s.to_string());
             let apcu = apcu_prefix.is_some()
                 || input
+                    .borrow()
                     .get_option("apcu-autoloader")
                     .as_bool()
                     .unwrap_or(false)

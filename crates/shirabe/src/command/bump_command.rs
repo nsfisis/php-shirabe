@@ -57,10 +57,11 @@ impl BumpCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let packages_filter: Vec<String> = input
+            .borrow()
             .get_argument("packages")
             .as_list()
             .map(|l| {
@@ -70,9 +71,21 @@ impl BumpCommand {
             })
             .unwrap_or_default();
 
-        let dev_only = input.get_option("dev-only").as_bool().unwrap_or(false);
-        let no_dev_only = input.get_option("no-dev-only").as_bool().unwrap_or(false);
-        let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
+        let dev_only = input
+            .borrow()
+            .get_option("dev-only")
+            .as_bool()
+            .unwrap_or(false);
+        let no_dev_only = input
+            .borrow()
+            .get_option("no-dev-only")
+            .as_bool()
+            .unwrap_or(false);
+        let dry_run = input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false);
         let io = self.get_io().clone();
         self.do_bump(
             io,

@@ -64,19 +64,24 @@ impl InstallCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let io = self.get_io().clone();
 
-        if input.get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
         }
-        if input.get_option("no-suggest").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-suggest")
+            .as_bool()
+            .unwrap_or(false)
+        {
             io.write_error("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>");
         }
 
-        let args = input.get_argument("packages");
+        let args = input.borrow().get_argument("packages");
         let args_vec: Vec<String> = args
             .as_list()
             .map(|l| {
@@ -94,7 +99,12 @@ impl InstallCommand {
             return Ok(1);
         }
 
-        if input.get_option("no-install").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-install")
+            .as_bool()
+            .unwrap_or(false)
+        {
             io.write_error("<error>Invalid option \"--no-install\". Use \"composer update --no-install\" instead if you are trying to update the composer.lock file.</error>");
             return Ok(1);
         }
@@ -107,7 +117,8 @@ impl InstallCommand {
         }
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "install", input, output);
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);
         composer
             .get_event_dispatcher()
             .borrow_mut()
@@ -117,9 +128,10 @@ impl InstallCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input, false)?;
+            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
 
         let optimize = input
+            .borrow()
             .get_option("optimize-autoloader")
             .as_bool()
             .unwrap_or(false)
@@ -129,6 +141,7 @@ impl InstallCommand {
                 .as_bool()
                 .unwrap_or(false);
         let authoritative = input
+            .borrow()
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
@@ -138,11 +151,13 @@ impl InstallCommand {
                 .as_bool()
                 .unwrap_or(false);
         let apcu_prefix = input
+            .borrow()
             .get_option("apcu-autoloader-prefix")
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
+                .borrow()
                 .get_option("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false)
@@ -155,26 +170,73 @@ impl InstallCommand {
         composer
             .get_installation_manager()
             .borrow_mut()
-            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+            .set_output_progress(
+                !input
+                    .borrow()
+                    .get_option("no-progress")
+                    .as_bool()
+                    .unwrap_or(false),
+            );
 
         install
-            .set_dry_run(input.get_option("dry-run").as_bool().unwrap_or(false))
-            .set_download_only(input.get_option("download-only").as_bool().unwrap_or(false))
-            .set_verbose(input.get_option("verbose").as_bool().unwrap_or(false))
+            .set_dry_run(
+                input
+                    .borrow()
+                    .get_option("dry-run")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_download_only(
+                input
+                    .borrow()
+                    .get_option("download-only")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_verbose(
+                input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_prefer_source(prefer_source)
             .set_prefer_dist(prefer_dist)
-            .set_dev_mode(!input.get_option("no-dev").as_bool().unwrap_or(false))
-            .set_dump_autoloader(!input.get_option("no-autoloader").as_bool().unwrap_or(false))
+            .set_dev_mode(
+                !input
+                    .borrow()
+                    .get_option("no-dev")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_dump_autoloader(
+                !input
+                    .borrow()
+                    .get_option("no-autoloader")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_optimize_autoloader(optimize)
             .set_class_map_authoritative(authoritative)
             .set_apcu_autoloader(apcu, apcu_prefix.clone())
-            .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?)
+            .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?)
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
+                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
             )
-            .set_error_on_audit(input.get_option("audit").as_bool().unwrap_or(false));
+            .set_error_on_audit(
+                input
+                    .borrow()
+                    .get_option("audit")
+                    .as_bool()
+                    .unwrap_or(false),
+            );
 
-        if input.get_option("no-plugins").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-plugins")
+            .as_bool()
+            .unwrap_or(false)
+        {
             install.disable_plugins();
         }
 

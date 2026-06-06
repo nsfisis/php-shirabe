@@ -44,15 +44,19 @@ impl DumpAutoloadCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
         // TODO(plugin): dispatch CommandEvent
-        let command_event =
-            CommandEvent::new(PluginEvents::COMMAND, "dump-autoload", input, output);
+        let command_event = CommandEvent::new(
+            PluginEvents::COMMAND,
+            "dump-autoload",
+            input.clone(),
+            output,
+        );
         composer
             .get_event_dispatcher()
             .borrow_mut()
@@ -78,13 +82,18 @@ impl DumpAutoloadCommand {
             }
         }
 
-        let optimize = input.get_option("optimize").as_bool().unwrap_or(false)
+        let optimize = input
+            .borrow()
+            .get_option("optimize")
+            .as_bool()
+            .unwrap_or(false)
             || config
                 .borrow_mut()
                 .get("optimize-autoloader")
                 .as_bool()
                 .unwrap_or(false);
         let authoritative = input
+            .borrow()
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
@@ -94,18 +103,25 @@ impl DumpAutoloadCommand {
                 .as_bool()
                 .unwrap_or(false);
         let apcu_prefix = input
+            .borrow()
             .get_option("apcu-prefix")
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
-            || input.get_option("apcu").as_bool().unwrap_or(false)
+            || input.borrow().get_option("apcu").as_bool().unwrap_or(false)
             || config
                 .borrow_mut()
                 .get("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false);
 
-        if input.get_option("strict-psr").as_bool().unwrap_or(false) && !optimize && !authoritative
+        if input
+            .borrow()
+            .get_option("strict-psr")
+            .as_bool()
+            .unwrap_or(false)
+            && !optimize
+            && !authoritative
         {
             return Err(InvalidArgumentException {
                 message: "--strict-psr mode only works with optimized autoloader, use --optimize or --classmap-authoritative if you want a strict return value.".to_string(),
@@ -114,6 +130,7 @@ impl DumpAutoloadCommand {
             .into());
         }
         if input
+            .borrow()
             .get_option("strict-ambiguous")
             .as_bool()
             .unwrap_or(false)
@@ -138,21 +155,36 @@ impl DumpAutoloadCommand {
                 .write("<info>Generating autoload files</info>");
         }
 
-        let platform_requirement_filter = self.get_platform_requirement_filter(input)?;
-        if input.get_option("dry-run").as_bool().unwrap_or(false) {
+        let platform_requirement_filter = self.get_platform_requirement_filter(input.clone())?;
+        if input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false)
+        {
             composer
                 .get_autoload_generator()
                 .borrow_mut()
                 .set_dry_run(true);
         }
-        if input.get_option("no-dev").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-dev")
+            .as_bool()
+            .unwrap_or(false)
+        {
             composer
                 .get_autoload_generator()
                 .borrow_mut()
                 .set_dev_mode(false);
         }
-        if input.get_option("dev").as_bool().unwrap_or(false) {
-            if input.get_option("no-dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+            if input
+                .borrow()
+                .get_option("no-dev")
+                .as_bool()
+                .unwrap_or(false)
+            {
                 return Err(InvalidArgumentException {
                     message:
                         "You can not use both --no-dev and --dev as they conflict with each other."
@@ -199,13 +231,18 @@ impl DumpAutoloadCommand {
         }
 
         if missing_dependencies
-            || (input.get_option("strict-psr").as_bool().unwrap_or(false)
+            || (input
+                .borrow()
+                .get_option("strict-psr")
+                .as_bool()
+                .unwrap_or(false)
                 && !class_map.get_psr_violations().is_empty())
         {
             return Ok(1);
         }
 
         if input
+            .borrow()
             .get_option("strict-ambiguous")
             .as_bool()
             .unwrap_or(false)

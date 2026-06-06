@@ -41,15 +41,16 @@ impl StatusCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer_rc = self.require_composer(None, None)?;
         {
             let composer = crate::command::composer_full(&composer_rc);
 
             // TODO(plugin): dispatch CommandEvent
-            let command_event = CommandEvent::new(PluginEvents::COMMAND, "status", input, output);
+            let command_event =
+                CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
@@ -84,7 +85,10 @@ impl StatusCommand {
         Ok(exit_code)
     }
 
-    fn do_execute(&mut self, input: &dyn InputInterface) -> Result<i64> {
+    fn do_execute(
+        &mut self,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+    ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io().clone();
@@ -212,7 +216,12 @@ impl StatusCommand {
             io.write_error("<error>You have changes in the following dependencies:</error>");
 
             for (path, changes) in &errors {
-                if input.get_option("verbose").as_bool().unwrap_or(false) {
+                if input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false)
+                {
                     let indented_changes = changes
                         .lines()
                         .map(|line| format!("    {}", line.trim_start()))
@@ -230,7 +239,12 @@ impl StatusCommand {
             io.write_error("<warning>You have unpushed changes on the current branch in the following dependencies:</warning>");
 
             for (path, changes) in &unpushed_changes {
-                if input.get_option("verbose").as_bool().unwrap_or(false) {
+                if input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false)
+                {
                     let indented_changes = changes
                         .lines()
                         .map(|line| format!("    {}", line.trim_start()))
@@ -250,7 +264,12 @@ impl StatusCommand {
             );
 
             for (path, changes) in &vcs_version_changes {
-                if input.get_option("verbose").as_bool().unwrap_or(false) {
+                if input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false)
+                {
                     let current_version = {
                         let v = changes["current"]
                             .get("version")
@@ -311,7 +330,11 @@ impl StatusCommand {
         }
 
         if (!errors.is_empty() || !unpushed_changes.is_empty() || !vcs_version_changes.is_empty())
-            && !input.get_option("verbose").as_bool().unwrap_or(false)
+            && !input
+                .borrow()
+                .get_option("verbose")
+                .as_bool()
+                .unwrap_or(false)
         {
             io.write_error("Use --verbose (-v) to see a list of files");
         }

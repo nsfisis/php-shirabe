@@ -48,11 +48,11 @@ impl AuditCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
-        let packages = self.get_packages(&composer, input)?;
+        let packages = self.get_packages(&composer, input.clone())?;
 
         if packages.is_empty() {
             self.get_io().write_error("No packages - skipping audit.");
@@ -84,6 +84,7 @@ impl AuditCommand {
         )?;
 
         let abandoned = input
+            .borrow()
             .get_option("abandoned")
             .as_string()
             .map(|s| s.to_string());
@@ -113,10 +114,11 @@ impl AuditCommand {
         let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
 
         let ignore_severities = array_merge(
-            array_fill_keys(input.get_option("ignore-severity"), PhpMixed::Null),
+            array_fill_keys(input.borrow().get_option("ignore-severity"), PhpMixed::Null),
             PhpMixed::from(audit_config.ignore_severity_for_audit.clone()),
         );
         let ignore_unreachable = input
+            .borrow()
             .get_option("ignore-unreachable")
             .as_bool()
             .unwrap_or(false)
@@ -144,10 +146,15 @@ impl AuditCommand {
     fn get_packages(
         &self,
         composer: &PartialComposerHandle,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> Result<Vec<crate::package::PackageInterfaceHandle>> {
         let mut composer = crate::command::composer_full_mut(composer);
-        if input.get_option("locked").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("locked")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let locker = composer.get_locker().clone();
             let mut locker = locker.borrow_mut();
             if !locker.is_locked() {
@@ -156,8 +163,13 @@ impl AuditCommand {
                     code: 0,
                 }.into());
             }
-            let locked_repo = locker
-                .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
+            let locked_repo = locker.get_locked_repository(
+                !input
+                    .borrow()
+                    .get_option("no-dev")
+                    .as_bool()
+                    .unwrap_or(false),
+            )?;
             return locked_repo.borrow_mut().get_canonical_packages();
         }
 

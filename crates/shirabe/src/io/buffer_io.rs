@@ -44,7 +44,8 @@ impl BufferIO {
         // Real fix requires unifying the two crate paths.
         let _ = formatter;
         let _ = StreamOutput::new(stream, verbosity, Some(decorated));
-        let output: Box<dyn OutputInterface> = todo!("StreamOutput as Box<dyn OutputInterface>");
+        let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
+            todo!("StreamOutput as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>");
 
         // TODO(phase-b): symfony console helper modules live under both `symfony::console`
         // and `symfony::component::console`; QuestionHelper::new is not yet provided.

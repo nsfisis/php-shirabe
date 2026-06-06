@@ -87,7 +87,7 @@ impl PackageDiscoveryTrait for RequireCommand {
 
     fn get_platform_requirement_filter(
         &self,
-        input: &dyn InputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> std::rc::Rc<
         dyn crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface,
     > {
@@ -154,12 +154,17 @@ impl RequireCommand {
     /// @throws \Seld\JsonLint\ParsingException
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         self.file = Factory::get_composer_file()?;
 
-        if input.get_option("no-suggest").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-suggest")
+            .as_bool()
+            .unwrap_or(false)
+        {
             self.get_io().write_error3("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>", true, io_interface::NORMAL);
         }
 
@@ -225,7 +230,7 @@ impl RequireCommand {
             return Ok(1);
         }
 
-        if input.get_option("fixed").as_bool() == Some(true) {
+        if input.borrow().get_option("fixed").as_bool() == Some(true) {
             let config = self.json.as_mut().unwrap().read()?;
 
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
@@ -239,7 +244,9 @@ impl RequireCommand {
             };
 
             /// @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
-            if package_type != "project" && !input.get_option("dev").as_bool().unwrap_or(false) {
+            if package_type != "project"
+                && !input.borrow().get_option("dev").as_bool().unwrap_or(false)
+            {
                 self.get_io().write_error3("<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>", true, io_interface::NORMAL);
 
                 if config.get("type").is_none() {
@@ -278,9 +285,10 @@ impl RequireCommand {
         };
 
         let requirements_result = self.determine_requirements(
-            input,
-            output,
+            input.clone(),
+            output.clone(),
             input
+                .borrow()
                 .get_argument("packages")
                 .as_list()
                 .map(|l| {
@@ -292,8 +300,16 @@ impl RequireCommand {
             Some(&platform_repo),
             &preferred_stability,
             // if there is no update, we need to use the best possible version constraint directly as we cannot rely on the solver to guess the best constraint
-            input.get_option("no-update").as_bool().unwrap_or(false),
-            input.get_option("fixed").as_bool().unwrap_or(false),
+            input
+                .borrow()
+                .get_option("no-update")
+                .as_bool()
+                .unwrap_or(false),
+            input
+                .borrow()
+                .get_option("fixed")
+                .as_bool()
+                .unwrap_or(false),
         );
 
         let requirements = match requirements_result {
@@ -318,7 +334,7 @@ impl RequireCommand {
 
         let mut requirements = self.format_requirements(requirements)?;
 
-        if !input.get_option("dev").as_bool().unwrap_or(false)
+        if !input.borrow().get_option("dev").as_bool().unwrap_or(false)
             && self.get_io().is_interactive()
             && !composer.is_global()
         {
@@ -398,12 +414,12 @@ impl RequireCommand {
             // unset($devPackages, $pkgDevTags);
         }
 
-        let mut require_key = if input.get_option("dev").as_bool().unwrap_or(false) {
+        let mut require_key = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
         };
-        let mut remove_key = if input.get_option("dev").as_bool().unwrap_or(false) {
+        let mut remove_key = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             "require"
         } else {
             "require-dev"
@@ -446,7 +462,7 @@ impl RequireCommand {
                         PhpMixed::String(package.clone()),
                         PhpMixed::String(remove_key.to_string()),
                         PhpMixed::String(
-                            if input.get_option("dev").as_bool().unwrap_or(false) {
+                            if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
                                 "with"
                             } else {
                                 "without"
@@ -475,7 +491,7 @@ impl RequireCommand {
                     let q2 = sprintf(
                         "<info>Do you want to re-run the command %s --dev?</info> [<comment>yes</comment>]? ",
                         &[PhpMixed::String(
-                            if input.get_option("dev").as_bool().unwrap_or(false) {
+                            if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
                                 "without"
                             } else {
                                 "with"
@@ -497,7 +513,11 @@ impl RequireCommand {
             }
         }
 
-        let sort_packages = input.get_option("sort-packages").as_bool().unwrap_or(false)
+        let sort_packages = input
+            .borrow()
+            .get_option("sort-packages")
+            .as_bool()
+            .unwrap_or(false)
             || composer
                 .get_config()
                 .borrow()
@@ -523,7 +543,12 @@ impl RequireCommand {
             }
         }
 
-        if !input.get_option("dry-run").as_bool().unwrap_or(false) {
+        if !input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false)
+        {
             // TODO(phase-b): update_file takes &mut self, but the json argument must be borrowed
             // from self.json, producing an overlapping borrow of self. Commented out until JsonFile
             // is shared (Rc<RefCell> / interior mutability) so it can be passed without holding a
@@ -550,7 +575,12 @@ impl RequireCommand {
         self.get_io()
             .write_error3(&updated_msg, true, io_interface::NORMAL);
 
-        if input.get_option("no-update").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("no-update")
+            .as_bool()
+            .unwrap_or(false)
+        {
             return Ok(0);
         }
 
@@ -560,9 +590,19 @@ impl RequireCommand {
             .deactivate_installed_plugins()?;
 
         let io = self.get_io().clone();
-        let do_update_result =
-            self.do_update(input, output, io, &requirements, require_key, remove_key);
-        let dry_run = input.get_option("dry-run").as_bool().unwrap_or(false);
+        let do_update_result = self.do_update(
+            input.clone(),
+            output,
+            io,
+            &requirements,
+            require_key,
+            remove_key,
+        );
+        let dry_run = input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false);
 
         let result = match do_update_result {
             Ok(result) => {
@@ -573,7 +613,11 @@ impl RequireCommand {
                         remove_key,
                         sort_packages,
                         dry_run,
-                        input.get_option("fixed").as_bool().unwrap_or(false),
+                        input
+                            .borrow()
+                            .get_option("fixed")
+                            .as_bool()
+                            .unwrap_or(false),
                     )?
                 } else {
                     result
@@ -678,8 +722,8 @@ impl RequireCommand {
     /// @throws \Exception
     fn do_update(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         requirements: &IndexMap<String, String>,
         require_key: &str,
@@ -699,7 +743,12 @@ impl RequireCommand {
             10000,
         );
 
-        if input.get_option("dry-run").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("dry-run")
+            .as_bool()
+            .unwrap_or(false)
+        {
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, crate::package::Link>> =
                 IndexMap::new();
@@ -746,8 +795,13 @@ impl RequireCommand {
             // unset($stabilityFlags, $references);
         }
 
-        let update_dev_mode = !input.get_option("update-no-dev").as_bool().unwrap_or(false);
+        let update_dev_mode = !input
+            .borrow()
+            .get_option("update-no-dev")
+            .as_bool()
+            .unwrap_or(false);
         let optimize = input
+            .borrow()
             .get_option("optimize-autoloader")
             .as_bool()
             .unwrap_or(false)
@@ -758,6 +812,7 @@ impl RequireCommand {
                 .as_bool()
                 .unwrap_or(false);
         let authoritative = input
+            .borrow()
             .get_option("classmap-authoritative")
             .as_bool()
             .unwrap_or(false)
@@ -768,11 +823,13 @@ impl RequireCommand {
                 .as_bool()
                 .unwrap_or(false);
         let apcu_prefix = input
+            .borrow()
             .get_option("apcu-autoloader-prefix")
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
+                .borrow()
                 .get_option("apcu-autoloader")
                 .as_bool()
                 .unwrap_or(false)
@@ -783,6 +840,7 @@ impl RequireCommand {
                 .as_bool()
                 .unwrap_or(false);
         let minimal_changes = input
+            .borrow()
             .get_option("minimal-changes")
             .as_bool()
             .unwrap_or(false)
@@ -796,10 +854,12 @@ impl RequireCommand {
         let mut update_allow_transitive_dependencies = Request::UPDATE_ONLY_LISTED;
         let mut flags = String::new();
         if input
+            .borrow()
             .get_option("update-with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
             || input
+                .borrow()
                 .get_option("with-all-dependencies")
                 .as_bool()
                 .unwrap_or(false)
@@ -807,10 +867,12 @@ impl RequireCommand {
             update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             flags += " --with-all-dependencies";
         } else if input
+            .borrow()
             .get_option("update-with-dependencies")
             .as_bool()
             .unwrap_or(false)
             || input
+                .borrow()
                 .get_option("with-dependencies")
                 .as_bool()
                 .unwrap_or(false)
@@ -835,7 +897,8 @@ impl RequireCommand {
             io_interface::NORMAL,
         );
 
-        let command_event = CommandEvent::new(PluginEvents::COMMAND, "require", input, output);
+        let command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "require", input.clone(), output);
         composer
             .get_event_dispatcher()
             .borrow_mut()
@@ -844,16 +907,37 @@ impl RequireCommand {
         composer
             .get_installation_manager()
             .borrow_mut()
-            .set_output_progress(!input.get_option("no-progress").as_bool().unwrap_or(false));
+            .set_output_progress(
+                !input
+                    .borrow()
+                    .get_option("no-progress")
+                    .as_bool()
+                    .unwrap_or(false),
+            );
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 
-        let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*composer.get_config().borrow(), input, false)?;
+        let (prefer_source, prefer_dist) = self.get_preferred_install_options(
+            &*composer.get_config().borrow(),
+            input.clone(),
+            false,
+        )?;
 
         install
-            .set_dry_run(input.get_option("dry-run").as_bool().unwrap_or(false))
-            .set_verbose(input.get_option("verbose").as_bool().unwrap_or(false))
+            .set_dry_run(
+                input
+                    .borrow()
+                    .get_option("dry-run")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_verbose(
+                input
+                    .borrow()
+                    .get_option("verbose")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_prefer_source(prefer_source)
             .set_prefer_dist(prefer_dist)
             .set_dev_mode(update_dev_mode)
@@ -861,15 +945,34 @@ impl RequireCommand {
             .set_class_map_authoritative(authoritative)
             .set_apcu_autoloader(apcu, apcu_prefix.clone())
             .set_update(true)
-            .set_install(!input.get_option("no-install").as_bool().unwrap_or(false))
+            .set_install(
+                !input
+                    .borrow()
+                    .get_option("no-install")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)?
             .set_platform_requirement_filter(BaseCommand::get_platform_requirement_filter(
-                self, input,
+                self,
+                input.clone(),
             )?)
-            .set_prefer_stable(input.get_option("prefer-stable").as_bool().unwrap_or(false))
-            .set_prefer_lowest(input.get_option("prefer-lowest").as_bool().unwrap_or(false))
+            .set_prefer_stable(
+                input
+                    .borrow()
+                    .get_option("prefer-stable")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
+            .set_prefer_lowest(
+                input
+                    .borrow()
+                    .get_option("prefer-lowest")
+                    .as_bool()
+                    .unwrap_or(false),
+            )
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
+                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
             )
             .set_minimal_update(minimal_changes);
 
@@ -889,6 +992,7 @@ impl RequireCommand {
                 for req in BaseCommand::normalize_requirements(
                     self,
                     input
+                        .borrow()
                         .get_argument("packages")
                         .as_list()
                         .map(|l| {
@@ -1138,7 +1242,12 @@ impl RequireCommand {
         true
     }
 
-    pub(crate) fn interact(&self, _input: &dyn InputInterface, _output: &dyn OutputInterface) {}
+    pub(crate) fn interact(
+        &self,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+    }
 
     fn revert_composer_file(&mut self) {
         if self.newly_created {

@@ -42,8 +42,8 @@ impl SuggestsCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        _output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
@@ -65,10 +65,13 @@ impl SuggestsCommand {
                 vec![],
                 platform_overrides,
             )?));
-            let locked_repo = composer
-                .get_locker()
-                .borrow_mut()
-                .get_locked_repository(!input.get_option("no-dev").as_bool().unwrap_or(false))?;
+            let locked_repo = composer.get_locker().borrow_mut().get_locked_repository(
+                !input
+                    .borrow()
+                    .get_option("no-dev")
+                    .as_bool()
+                    .unwrap_or(false),
+            )?;
             installed_repos.push(locked_repo.into());
         } else {
             // TODO(phase-b): Config::get returns PhpMixed; need to coerce to IndexMap<String, PhpMixed>
@@ -90,7 +93,7 @@ impl SuggestsCommand {
         let mut installed_repo = InstalledRepository::new(installed_repos);
         let mut reporter = SuggestedPackagesReporter::new(self.get_io().clone());
 
-        let filter = input.get_argument("packages");
+        let filter = input.borrow().get_argument("packages");
         let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
         let root_pkg_as_base: crate::package::BasePackageHandle =
             composer.get_package().clone().into();
@@ -104,18 +107,28 @@ impl SuggestsCommand {
 
         let mut mode = SuggestedPackagesReporter::MODE_BY_PACKAGE;
 
-        if input.get_option("by-suggestion").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("by-suggestion")
+            .as_bool()
+            .unwrap_or(false)
+        {
             mode = SuggestedPackagesReporter::MODE_BY_SUGGESTION;
         }
-        if input.get_option("by-package").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("by-package")
+            .as_bool()
+            .unwrap_or(false)
+        {
             mode |= SuggestedPackagesReporter::MODE_BY_PACKAGE;
         }
-        if input.get_option("list").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("list").as_bool().unwrap_or(false) {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
         let only_dependents_of: Option<crate::package::PackageInterfaceHandle> =
-            if empty(&filter) && !input.get_option("all").as_bool().unwrap_or(false) {
+            if empty(&filter) && !input.borrow().get_option("all").as_bool().unwrap_or(false) {
                 Some(composer.get_package().clone().into())
             } else {
                 None

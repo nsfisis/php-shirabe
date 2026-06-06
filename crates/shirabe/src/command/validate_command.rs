@@ -110,10 +110,11 @@ impl ValidateCommand {
 
     pub fn execute(
         &mut self,
-        input: &dyn InputInterface,
-        output: &dyn OutputInterface,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let file = input
+            .borrow()
             .get_argument("file")
             .as_string()
             .map(|s| s.to_string())
@@ -131,17 +132,28 @@ impl ValidateCommand {
         }
 
         let validator = ConfigValidator::new(io.clone());
-        let check_all = if input.get_option("no-check-all").as_bool().unwrap_or(false) {
+        let check_all = if input
+            .borrow()
+            .get_option("no-check-all")
+            .as_bool()
+            .unwrap_or(false)
+        {
             0
         } else {
             ValidatingArrayLoader::CHECK_ALL
         };
         let check_publish = !input
+            .borrow()
             .get_option("no-check-publish")
             .as_bool()
             .unwrap_or(false);
-        let check_lock = !input.get_option("no-check-lock").as_bool().unwrap_or(false);
+        let check_lock = !input
+            .borrow()
+            .get_option("no-check-lock")
+            .as_bool()
+            .unwrap_or(false);
         let check_version = if input
+            .borrow()
             .get_option("no-check-version")
             .as_bool()
             .unwrap_or(false)
@@ -150,12 +162,17 @@ impl ValidateCommand {
         } else {
             ConfigValidator::CHECK_VERSION
         };
-        let is_strict = input.get_option("strict").as_bool().unwrap_or(false);
+        let is_strict = input
+            .borrow()
+            .get_option("strict")
+            .as_bool()
+            .unwrap_or(false);
         let (mut errors, mut publish_errors, mut warnings) =
             validator.validate(&file, check_all, check_version);
 
         let mut lock_errors: Vec<String> = vec![];
-        let composer = self.create_composer_instance(input, io.clone(), None, false, None)?;
+        let composer =
+            self.create_composer_instance(input.clone(), io.clone(), None, false, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         let check_lock = (check_lock
             && composer
@@ -164,7 +181,11 @@ impl ValidateCommand {
                 .get("lock")
                 .as_bool()
                 .unwrap_or(true))
-            || input.get_option("check-lock").as_bool().unwrap_or(false);
+            || input
+                .borrow()
+                .get_option("check-lock")
+                .as_bool()
+                .unwrap_or(false);
         // TODO(phase-b): get_missing_requirement_info needs &package from composer while
         // locker holds &mut composer; cloning lock state isn't trivial. Use todo!() for the
         // package-arg subexpression below.
@@ -202,6 +223,7 @@ impl ValidateCommand {
         let mut exit_code = exit_code;
 
         if input
+            .borrow()
             .get_option("with-dependencies")
             .as_bool()
             .unwrap_or(false)
