@@ -92,14 +92,13 @@ impl AdvisoryProviderInterface for PackageRepository {
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();
-        let semver_parser = shirabe_semver::version_parser::VersionParser;
-        let _ = parser;
 
         let mut advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
-            if !package_constraint_map.contains_key(package_name.as_str()) {
+            let Some(package_constraint) = package_constraint_map.get(package_name) else {
                 continue;
-            }
+            };
+
             let list = match package_advisories {
                 PhpMixed::List(list) => list,
                 _ => continue,
@@ -110,14 +109,11 @@ impl AdvisoryProviderInterface for PackageRepository {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect(),
                     _ => continue,
                 };
-                let advisory = match PartialSecurityAdvisory::create(
-                    package_name,
-                    &data_map,
-                    &semver_parser,
-                ) {
-                    Ok(a) => a,
-                    Err(_) => continue,
-                };
+                let advisory =
+                    match PartialSecurityAdvisory::create(package_name, &data_map, &parser) {
+                        Ok(a) => a,
+                        Err(_) => continue,
+                    };
                 if !allow_partial_advisories
                     && matches!(advisory, PartialOrFullSecurityAdvisory::Partial(_))
                 {
@@ -131,8 +127,11 @@ impl AdvisoryProviderInterface for PackageRepository {
                         code: 0,
                     }));
                 }
-                // TODO(phase-b): affected_versions is a method, not a field, and matches() return type may differ
-                let _ = (&advisory, &package_constraint_map);
+
+                if !advisory.affected_versions().matches(package_constraint) {
+                    continue;
+                }
+
                 items.push(advisory);
             }
             advisories.insert(package_name.clone(), items);

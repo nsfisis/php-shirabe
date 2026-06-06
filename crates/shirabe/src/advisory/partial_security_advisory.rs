@@ -2,6 +2,7 @@
 
 use crate::advisory::PartialOrFullSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
+use crate::package::version::VersionParser;
 use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use indexmap::IndexMap;
@@ -9,7 +10,6 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
-use shirabe_semver::version_parser::VersionParser;
 
 fn serialize_constraint<S: serde::Serializer>(
     c: &AnyConstraint,

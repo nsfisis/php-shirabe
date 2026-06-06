@@ -915,13 +915,12 @@ impl ComposerRepository {
         }
 
         let parser = VersionParser::new();
-        let semver_parser = shirabe_semver::version_parser::VersionParser;
         let repo_name = self.get_repo_name();
         let create = |data: &IndexMap<String, PhpMixed>,
                       name: &str,
                       package_constraint_map: &IndexMap<String, AnyConstraint>|
          -> anyhow::Result<Option<PartialOrFullSecurityAdvisory>> {
-            let advisory = PartialSecurityAdvisory::create(name, data, &semver_parser)?;
+            let advisory = PartialSecurityAdvisory::create(name, data, &parser)?;
             let is_full = matches!(advisory, PartialOrFullSecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
                 let data_mixed = PhpMixed::Array(
