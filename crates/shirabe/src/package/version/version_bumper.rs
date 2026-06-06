@@ -28,10 +28,7 @@ impl VersionBumper {
 
         let mut version = package.get_version().to_string();
         if version.starts_with("dev-") {
-            // TODO(phase-b): ArrayLoader::new takes Option<VersionParser> by value; pass None until
-            // VersionParser sharing is reconciled.
-            let _ = &parser;
-            let loader = ArrayLoader::new(None, false);
+            let loader = ArrayLoader::new(Some(parser.clone()), false);
             let dumper = ArrayDumper::new();
             let dumped = dumper.dump(package.clone());
             let extra = loader.get_branch_alias(&dumped)?;
