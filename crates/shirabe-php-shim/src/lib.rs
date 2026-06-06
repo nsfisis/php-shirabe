@@ -1486,9 +1486,9 @@ pub fn openssl_free_key(_key: PhpMixed) {
     todo!()
 }
 
-pub fn iterator_to_array<T>(_iter: T) -> Vec<PhpMixed>
+pub fn iterator_to_array<I>(iter: I) -> Vec<I::Item>
 where
-    T: IntoIterator<Item = PhpMixed>,
+    I: IntoIterator,
 {
     todo!()
 }

@@ -1,6 +1,12 @@
 #[derive(Debug)]
 pub struct SplFileInfo;
 
+impl std::fmt::Display for SplFileInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get_pathname())
+    }
+}
+
 impl SplFileInfo {
     pub fn new(_path: &str) -> Self {
         todo!()

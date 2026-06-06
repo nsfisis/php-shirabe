@@ -976,8 +976,7 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             if file.get_basename(Some(Self::OLD_INSTALL_EXT)) == except.unwrap_or_default() {
                 continue;
             }
-            // TODO(phase-b): SplFileInfo to string conversion (PHP __toString returns the path)
-            let file_str = format!("{:?}", file);
+            let file_str = file.to_string();
             io.write_error3(
                 &format!("<info>Removing: {}</info>", file_str),
                 true,
@@ -990,21 +989,13 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
     pub(crate) fn get_last_backup_version(&self, rollback_dir: &str) -> Option<String> {
         let mut finder = self.get_old_installation_finder(rollback_dir);
         finder.sort_by_name();
-        // TODO(phase-b): iterator_to_array → Vec<PhpMixed>; PHP end() returns last value
-        let files = iterator_to_array(finder.into_iter().map(|_| PhpMixed::Null));
-
-        if (files.len() as i64) > 0 {
-            let last_file = files.last().cloned();
-            return last_file
-                // PHP: end($files)->getBasename(self::OLD_INSTALL_EXT)
-                .and_then(|f| f.as_string().map(|s| s.to_string()));
-        }
-
-        None
+        let files = iterator_to_array(finder);
+        files
+            .last()
+            .map(|f| f.get_basename(Some(Self::OLD_INSTALL_EXT)))
     }
 
     pub(crate) fn get_old_installation_finder(&self, rollback_dir: &str) -> Finder {
-        // TODO(phase-b): builder returns &mut Self; restructure to return owned Finder
         let mut finder = Finder::create();
         finder
             .depth(0)
