@@ -159,8 +159,6 @@ impl Git {
             None
         };
 
-        // TODO(phase-b): closure captures &mut self.process, &mut last_command, etc.
-        // Inlined as a helper that returns (status, last_command, output)
         let cwd_string = cwd.map(|s| s.to_string());
 
         // PHP closure: $runCommands = function ($url) use (...) { ... };
@@ -1342,9 +1340,11 @@ impl Git {
         if version.is_none() {
             *version = Some(None);
             let mut output = String::new();
-            // TODO(phase-b): ProcessExecutor::execute takes &mut self; this static fn takes &ProcessExecutor
-            // For now, mimic the call signature (compilation fix is Phase B)
-            let exit_code: i64 = 0; // process.execute(&["git", "--version"].map(String::from).to_vec(), &mut output, None);
+            let exit_code: i64 = process.borrow_mut().execute_args(
+                &["git".to_string(), "--version".to_string()],
+                &mut output,
+                Option::<&str>::None,
+            );
             if exit_code == 0 {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::is_match_strict_groups3(
