@@ -186,9 +186,6 @@ impl ValidateCommand {
                 .get_option("check-lock")
                 .as_bool()
                 .unwrap_or(false);
-        // TODO(phase-b): get_missing_requirement_info needs &package from composer while
-        // locker holds &mut composer; cloning lock state isn't trivial. Use todo!() for the
-        // package-arg subexpression below.
         let locker = composer.get_locker().clone();
         let mut locker = locker.borrow_mut();
         if locker.is_locked() && !locker.is_fresh()? {
@@ -196,8 +193,8 @@ impl ValidateCommand {
         }
 
         if locker.is_locked() {
-            // TODO(phase-b): borrows composer twice; use todo!() for the package arg.
-            lock_errors.extend(locker.get_missing_requirement_info(todo!(), true)?);
+            lock_errors
+                .extend(locker.get_missing_requirement_info(composer.get_package().clone(), true)?);
         }
 
         self.output_result(
