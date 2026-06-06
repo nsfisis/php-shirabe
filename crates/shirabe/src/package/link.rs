@@ -1,40 +1,15 @@
 //! ref: composer/src/Composer/Package/Link.php
 
+use crate::package::PackageInterfaceHandle;
 use shirabe_semver::constraint::AnyConstraint;
 
-use crate::package::PackageInterfaceHandle;
-
+#[derive(Clone, Debug)]
 pub struct Link {
     pub(crate) source: String,
     pub(crate) target: String,
     pub(crate) constraint: AnyConstraint,
     pub(crate) description: String,
     pub(crate) pretty_constraint: String,
-}
-
-impl Clone for Link {
-    fn clone(&self) -> Self {
-        // TODO(phase-b): Link is a PHP class; this clone is a shallow placeholder until
-        // Link is shared via Rc<Link>.
-        Self {
-            source: self.source.clone(),
-            target: self.target.clone(),
-            constraint: self.constraint.clone(),
-            description: self.description.clone(),
-            pretty_constraint: self.pretty_constraint.clone(),
-        }
-    }
-}
-
-impl std::fmt::Debug for Link {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Link")
-            .field("source", &self.source)
-            .field("target", &self.target)
-            .field("description", &self.description)
-            .field("pretty_constraint", &self.pretty_constraint)
-            .finish()
-    }
 }
 
 impl Link {
