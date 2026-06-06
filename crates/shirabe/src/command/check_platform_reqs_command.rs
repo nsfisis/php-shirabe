@@ -287,9 +287,7 @@ impl CheckPlatformReqsCommand {
                         );
                         failed_req.insert(
                             "constraint".to_string(),
-                            Box::new(PhpMixed::String(
-                                link.get_pretty_constraint().unwrap_or("").to_string(),
-                            )),
+                            Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
                         );
                         row.insert(
                             "failed_requirement".to_string(),
@@ -327,7 +325,7 @@ impl CheckPlatformReqsCommand {
                                 link.get_source(),
                                 link.get_description(),
                                 link.get_target(),
-                                link.get_pretty_constraint().unwrap_or(""),
+                                link.get_pretty_constraint(),
                             ))
                         } else {
                             PhpMixed::String(String::new())

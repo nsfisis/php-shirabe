@@ -1775,7 +1775,7 @@ impl PlatformRepository {
                     "lib-uuid".to_string(),
                     SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_REPLACE.to_string()),
-                    Some(ext.get_pretty_version().to_string()),
+                    ext.get_pretty_version().to_string(),
                 ),
             );
             ext.inner.set_replaces(replaces);
@@ -1840,7 +1840,7 @@ impl PlatformRepository {
                     format!("lib-{}", replace_lower),
                     SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_REPLACE.to_string()),
-                    Some(lib.get_pretty_version().to_string()),
+                    lib.get_pretty_version().to_string(),
                 ),
             );
         }
@@ -1854,7 +1854,7 @@ impl PlatformRepository {
                     format!("lib-{}", provide_lower),
                     SimpleConstraint::new("=".to_string(), version.to_string(), None).into(),
                     Some(Link::TYPE_PROVIDE.to_string()),
-                    Some(lib.get_pretty_version().to_string()),
+                    lib.get_pretty_version().to_string(),
                 ),
             );
         }

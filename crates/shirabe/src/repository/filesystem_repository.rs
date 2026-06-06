@@ -559,7 +559,7 @@ impl FilesystemRepository {
                 todo!("mutate nested versions['versions'][target]['dev_requirement']");
                 #[allow(unreachable_code)]
                 {
-                    let mut replaced = replace.get_pretty_constraint().unwrap_or("").to_string();
+                    let mut replaced = replace.get_pretty_constraint().to_string();
                     if replaced == "self.version" {
                         replaced = package.get_pretty_version().to_string();
                     }
@@ -576,7 +576,7 @@ impl FilesystemRepository {
                 todo!("mutate nested versions['versions'][target]['dev_requirement']");
                 #[allow(unreachable_code)]
                 {
-                    let mut provided = provide.get_pretty_constraint().unwrap_or("").to_string();
+                    let mut provided = provide.get_pretty_constraint().to_string();
                     if provided == "self.version" {
                         provided = package.get_pretty_version().to_string();
                     }

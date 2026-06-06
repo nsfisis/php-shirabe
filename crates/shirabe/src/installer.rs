@@ -1582,9 +1582,7 @@ impl Installer {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 platform_reqs.insert(
                     link.get_target().to_string(),
-                    link.get_pretty_constraint()
-                        .map(|s| s.to_string())
-                        .unwrap_or_default(),
+                    link.get_pretty_constraint().to_string(),
                 );
             }
         }

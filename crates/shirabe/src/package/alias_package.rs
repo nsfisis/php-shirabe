@@ -144,7 +144,7 @@ impl AliasPackage {
             let mut new_links: Vec<Link> = vec![];
             for link in links.values() {
                 // link is self.version, but must be replacing also the replaced version
-                if link.get_pretty_constraint().unwrap_or("") == "self.version" {
+                if link.get_pretty_constraint() == "self.version" {
                     let constraint = SimpleConstraint::new(
                         "=".to_string(),
                         self.version.to_string(),
@@ -155,7 +155,7 @@ impl AliasPackage {
                         link.get_target().to_string(),
                         constraint.into(),
                         Some(link_type.to_string()),
-                        Some(pretty_version.clone()),
+                        pretty_version.clone(),
                     );
                     new_links.push(new_link);
                 }
@@ -165,7 +165,7 @@ impl AliasPackage {
             }
         } else {
             for link in links.values_mut() {
-                if link.get_pretty_constraint().unwrap_or("") == "self.version" {
+                if link.get_pretty_constraint() == "self.version" {
                     if link_type == Link::TYPE_REQUIRE {
                         self.has_self_version_requires = true;
                     }
@@ -179,7 +179,7 @@ impl AliasPackage {
                         link.get_target().to_string(),
                         constraint.into(),
                         Some(link_type.to_string()),
-                        Some(pretty_version.clone()),
+                        pretty_version.clone(),
                     );
                 }
             }

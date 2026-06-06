@@ -357,11 +357,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     name_with_link,
                     version,
                     link.get_description().to_string(),
-                    format!(
-                        "{} ({})",
-                        link.get_target(),
-                        link.get_pretty_constraint().unwrap_or("")
-                    ),
+                    format!("{} ({})", link.get_target(), link.get_pretty_constraint()),
                 ]);
                 if let Some(children_vec) = children {
                     queue.extend(children_vec);
@@ -438,7 +434,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 prev_color,
                 link.get_target(),
                 prev_color,
-                link.get_pretty_constraint().unwrap_or("")
+                link.get_pretty_constraint(),
             );
             let circular_warn = if children.is_none() {
                 "(circular dependency aborted here)"

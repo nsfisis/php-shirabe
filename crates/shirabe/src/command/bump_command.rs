@@ -236,7 +236,7 @@ impl BumpCommand {
                 if PlatformRepository::is_platform_package(pkg_name) {
                     continue;
                 }
-                let current_constraint = link.get_pretty_constraint()?;
+                let current_constraint = link.get_pretty_constraint();
 
                 let package_opt = repo.find_package(
                     pkg_name,

@@ -282,11 +282,7 @@ impl InstalledRepository {
                                 link.get_target().to_string(),
                                 MatchAllConstraint::new(None).into(),
                                 Some(Link::TYPE_REQUIRE.to_string()),
-                                Some(format!(
-                                    "{} {}",
-                                    link.get_pretty_constraint().unwrap_or_default(),
-                                    description
-                                )),
+                                format!("{} {}", link.get_pretty_constraint(), description),
                             ),
                             None,
                         ));
@@ -351,10 +347,7 @@ impl InstalledRepository {
                                         link.get_target().to_string(),
                                         MatchAllConstraint::new(None).into(),
                                         Some(Link::TYPE_DOES_NOT_REQUIRE.to_string()),
-                                        Some(format!(
-                                            "but {} is installed",
-                                            pkg.get_pretty_version()
-                                        )),
+                                        format!("but {} is installed", pkg.get_pretty_version()),
                                     ),
                                     None,
                                 ));

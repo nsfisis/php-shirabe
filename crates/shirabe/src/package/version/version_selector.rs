@@ -200,7 +200,7 @@ impl VersionSelector {
                                     pkg.get_pretty_version(),
                                     link.get_description(),
                                     link.get_target(),
-                                    link.get_pretty_constraint().unwrap_or_default(),
+                                    link.get_pretty_constraint(),
                                     reason
                                 ),
                                 true,

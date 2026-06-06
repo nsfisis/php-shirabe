@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Package/Link.php
 
-use shirabe_php_shim::UnexpectedValueException;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::PackageInterfaceHandle;
@@ -10,7 +9,7 @@ pub struct Link {
     pub(crate) target: String,
     pub(crate) constraint: AnyConstraint,
     pub(crate) description: String,
-    pub(crate) pretty_constraint: Option<String>,
+    pub(crate) pretty_constraint: String,
 }
 
 impl Clone for Link {
@@ -65,7 +64,7 @@ impl Link {
         target: String,
         constraint: AnyConstraint,
         description: Option<String>,
-        pretty_constraint: Option<String>,
+        pretty_constraint: String,
     ) -> Self {
         let description = description.unwrap_or_else(|| Self::TYPE_UNKNOWN.to_string());
         let description = if description == Self::TYPE_DEV_REQUIRE {
@@ -98,17 +97,8 @@ impl Link {
         &self.constraint
     }
 
-    pub fn get_pretty_constraint(&self) -> anyhow::Result<&str> {
-        match &self.pretty_constraint {
-            None => Err(anyhow::anyhow!(UnexpectedValueException {
-                message: format!(
-                    "Link {} has been misconfigured and had no prettyConstraint given.",
-                    self.to_string()
-                ),
-                code: 0,
-            })),
-            Some(s) => Ok(s.as_str()),
-        }
+    pub fn get_pretty_constraint(&self) -> &str {
+        &self.pretty_constraint
     }
 
     pub fn to_string(&self) -> String {

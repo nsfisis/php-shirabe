@@ -874,7 +874,7 @@ impl ArrayLoader {
             target.to_string(),
             parsed_constraint,
             Some(description.to_string()),
-            Some(pretty_constraint.to_string()),
+            pretty_constraint.to_string(),
         ))
     }
 

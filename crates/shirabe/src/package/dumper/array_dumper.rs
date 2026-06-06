@@ -122,21 +122,16 @@ impl ArrayDumper {
             data.insert("dist".to_string(), PhpMixed::Array(dist));
         }
 
-        // corresponds to: foreach (BasePackage::$supportedLinkTypes as $type => $opts) { $links = $package->{'get'.ucfirst($opts['method'])}(); ... }
-        for (type_name, opts) in SUPPORTED_LINK_TYPES.iter() {
-            // TODO(phase-b): PackageInterface needs get_links_by_method to mimic PHP magic call
-            let links: Vec<crate::package::Link> = Vec::new();
-            let _ = (&opts.method, &package);
+        for type_name in SUPPORTED_LINK_TYPES.keys() {
+            let links = package.get_links_for_type(type_name);
             if links.is_empty() {
                 continue;
             }
             let mut link_map: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            for link in &links {
+            for link in links.values() {
                 link_map.insert(
                     link.get_target().to_string(),
-                    Box::new(PhpMixed::String(
-                        link.get_pretty_constraint().unwrap_or_default().to_string(),
-                    )),
+                    Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
                 );
             }
             link_map.sort_keys();

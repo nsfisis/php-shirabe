@@ -1811,7 +1811,7 @@ impl ShowCommand {
                 io.write(&format!(
                     "{} <comment>{}</comment>",
                     link.1.get_target(),
-                    link.1.get_pretty_constraint().unwrap_or("")
+                    link.1.get_pretty_constraint(),
                 ));
             }
         }
@@ -2173,7 +2173,7 @@ impl ShowCommand {
             for link in links.iter() {
                 m.insert(
                     link.1.get_target().to_string(),
-                    PhpMixed::String(link.1.get_pretty_constraint().unwrap_or("").to_string()),
+                    PhpMixed::String(link.1.get_pretty_constraint().to_string()),
                 );
             }
             json.insert(
@@ -2309,7 +2309,7 @@ impl ShowCommand {
             tree_child_desc.insert("name".to_string(), PhpMixed::String(require_name.clone()));
             tree_child_desc.insert(
                 "version".to_string(),
-                PhpMixed::String(require.get_pretty_constraint().unwrap_or("").to_string()),
+                PhpMixed::String(require.get_pretty_constraint().to_string()),
             );
 
             let deep_children = self
@@ -2452,11 +2452,11 @@ impl ShowCommand {
         packages_in_tree: &[PhpMixed],
     ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
         let mut children: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-        let version_arg: PhpMixed = if link.get_pretty_constraint().ok() == Some("self.version") {
+        let version_arg: PhpMixed = if link.get_pretty_constraint() == "self.version" {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
         } else {
-            PhpMixed::String(link.get_pretty_constraint().unwrap_or("").to_string())
+            PhpMixed::String(link.get_pretty_constraint().to_string())
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
@@ -2469,7 +2469,7 @@ impl ShowCommand {
                 tree_child_desc.insert("name".to_string(), PhpMixed::String(require_name.clone()));
                 tree_child_desc.insert(
                     "version".to_string(),
-                    PhpMixed::String(require.get_pretty_constraint().unwrap_or("").to_string()),
+                    PhpMixed::String(require.get_pretty_constraint().to_string()),
                 );
 
                 if !in_array(

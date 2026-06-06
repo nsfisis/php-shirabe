@@ -1153,7 +1153,7 @@ impl Problem {
                     if link.get_target() == package_name {
                         return Some(format!(
                             "{} {}d by {}",
-                            link.get_pretty_constraint().unwrap_or(""),
+                            link.get_pretty_constraint(),
                             substr(link.get_description(), 0, Some(-1)),
                             selected.get_pretty_string()
                         ));

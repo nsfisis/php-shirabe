@@ -887,7 +887,7 @@ pub trait PackageDiscoveryTrait {
                             candidate.get_pretty_name(),
                             candidate.get_pretty_version(),
                             link.get_target(),
-                            link.get_pretty_constraint().unwrap_or(""),
+                            link.get_pretty_constraint(),
                             link.get_target(),
                         ));
                     } else {
@@ -896,7 +896,7 @@ pub trait PackageDiscoveryTrait {
                             candidate.get_pretty_name(),
                             candidate.get_pretty_version(),
                             link.get_target(),
-                            link.get_pretty_constraint().unwrap_or(""),
+                            link.get_pretty_constraint(),
                         ));
                     }
                     continue;
@@ -930,7 +930,7 @@ pub trait PackageDiscoveryTrait {
                     candidate.get_pretty_name(),
                     candidate.get_pretty_version(),
                     link.get_target(),
-                    link.get_pretty_constraint().unwrap_or(""),
+                    link.get_pretty_constraint(),
                     platform_pkg_version,
                 ));
             }

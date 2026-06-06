@@ -517,7 +517,7 @@ impl CreateProjectCommand {
                 let _method = format!("get{}", meta.method);
                 let links: Vec<crate::package::Link> = vec![];
                 for link in links {
-                    if link.get_pretty_constraint().as_deref().ok() == Some("self.version") {
+                    if link.get_pretty_constraint() == "self.version" {
                         config_source.add_link(
                             r#type,
                             link.get_target(),

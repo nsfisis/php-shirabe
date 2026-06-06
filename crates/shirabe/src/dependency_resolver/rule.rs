@@ -441,7 +441,7 @@ impl Rule {
                     conflict_target = format!(
                         "{} {}",
                         package1.get_pretty_name(),
-                        link.get_pretty_constraint().unwrap_or("")
+                        link.get_pretty_constraint(),
                     );
                 }
 
@@ -453,16 +453,14 @@ impl Rule {
                     for provide in package1.get_provides().values() {
                         if provide.get_target() == link.get_target() {
                             provide_type = Some("provides");
-                            provided =
-                                Some(provide.get_pretty_constraint().unwrap_or("").to_string());
+                            provided = Some(provide.get_pretty_constraint().to_string());
                             break;
                         }
                     }
                     for replace in package1.get_replaces().values() {
                         if replace.get_target() == link.get_target() {
                             provide_type = Some("replaces");
-                            provided =
-                                Some(replace.get_pretty_constraint().unwrap_or("").to_string());
+                            provided = Some(replace.get_pretty_constraint().to_string());
                             break;
                         }
                     }
@@ -470,7 +468,7 @@ impl Rule {
                         conflict_target = format!(
                             "{} {} ({} {} {} {})",
                             link.get_target(),
-                            link.get_pretty_constraint().unwrap_or(""),
+                            link.get_pretty_constraint(),
                             package1.get_pretty_string(),
                             pt,
                             link.get_target(),

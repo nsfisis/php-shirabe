@@ -957,7 +957,7 @@ impl Locker {
                 if PlatformRepository::is_platform_package(&link.get_target()) {
                     continue;
                 }
-                if link.get_pretty_constraint().ok() == Some("self.version") {
+                if link.get_pretty_constraint() == "self.version" {
                     continue;
                 }
                 if installed_repo
@@ -995,7 +995,6 @@ impl Locker {
                                                 PhpMixed::String(
                                                     provider_link
                                                         .get_pretty_constraint()
-                                                        .unwrap_or_default()
                                                         .to_string(),
                                                 ),
                                                 PhpMixed::String(format!(
@@ -1015,7 +1014,7 @@ impl Locker {
                             set.description,
                             link.get_target(),
                             description,
-                            link.get_pretty_constraint().unwrap_or_default()
+                            link.get_pretty_constraint(),
                         ));
                     } else {
                         missing_requirement_info.push(format!(
