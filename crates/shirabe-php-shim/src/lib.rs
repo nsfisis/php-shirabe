@@ -311,6 +311,20 @@ impl std::fmt::Display for InvalidArgumentException {
 impl std::error::Error for InvalidArgumentException {}
 
 #[derive(Debug)]
+pub struct TypeError {
+    pub message: String,
+    pub code: i64,
+}
+
+impl std::fmt::Display for TypeError {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for TypeError {}
+
+#[derive(Debug)]
 pub struct LogicException {
     pub message: String,
     pub code: i64,

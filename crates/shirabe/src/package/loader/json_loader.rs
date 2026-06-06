@@ -4,6 +4,8 @@ use crate::json::JsonFile;
 use crate::package::PackageInterfaceHandle;
 use crate::package::loader::LoaderInterface;
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_php_shim::{PhpMixed, TypeError};
 use std::path::Path;
 
 pub enum JsonLoaderInput {
@@ -30,8 +32,17 @@ impl JsonLoader {
             JsonLoaderInput::String(ref s) => JsonFile::parse_json(Some(s), None)?,
         };
 
-        // TODO(phase-b): JsonFile::parse_json returns PhpMixed; loader::load expects IndexMap
-        let _ = config;
-        self.loader.load(indexmap::IndexMap::new(), None)
+        let config: IndexMap<String, PhpMixed> = match config {
+            PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+            _ => {
+                return Err(TypeError {
+                    message: "Composer\\Package\\Loader\\LoaderInterface::load(): Argument #1 ($config) must be of type array".to_string(),
+                    code: 0,
+                }
+                .into());
+            }
+        };
+
+        self.loader.load(config, None)
     }
 }
