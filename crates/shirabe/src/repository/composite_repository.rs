@@ -32,12 +32,16 @@ impl CompositeRepository {
         &self.repositories
     }
 
-    pub fn remove_package(&mut self, _package: PackageInterfaceHandle) {
-        // TODO(phase-b): only call remove_package on WritableRepositoryInterface implementors;
-        // requires a downcast helper such as `as_writable() -> Option<&mut dyn WritableRepositoryInterface>` on RepositoryInterface.
-        for _repository in &mut self.repositories {
-            todo!()
+    pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        for repository in &self.repositories {
+            if let Some(writable) = repository
+                .borrow_mut()
+                .as_writable_repository_interface_mut()
+            {
+                writable.remove_package(package.clone())?;
+            }
         }
+        Ok(())
     }
 
     pub fn add_repository(&mut self, repository: RepositoryInterfaceHandle) {

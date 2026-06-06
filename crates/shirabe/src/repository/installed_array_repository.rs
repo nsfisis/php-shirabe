@@ -151,6 +151,11 @@ impl RepositoryInterface for InstalledArrayRepository {
     ) -> Option<&mut dyn InstalledRepositoryInterface> {
         Some(self)
     }
+    fn as_writable_repository_interface_mut(
+        &mut self,
+    ) -> Option<&mut dyn crate::repository::WritableRepositoryInterface> {
+        Some(self)
+    }
     fn as_any(&self) -> &dyn std::any::Any {
         todo!()
     }

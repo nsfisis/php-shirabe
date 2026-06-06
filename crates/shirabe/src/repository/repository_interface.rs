@@ -111,6 +111,12 @@ pub trait RepositoryInterface: Countable + std::fmt::Debug {
         None
     }
 
+    fn as_writable_repository_interface_mut(
+        &mut self,
+    ) -> Option<&mut dyn crate::repository::WritableRepositoryInterface> {
+        None
+    }
+
     fn as_any(&self) -> &dyn std::any::Any;
 
     /// Injects this repository's own weak handle so that `add_package` can wire package ->
