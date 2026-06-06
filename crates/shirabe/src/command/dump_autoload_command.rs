@@ -67,13 +67,15 @@ impl DumpAutoloadCommand {
 
         let mut missing_dependencies = false;
         {
-            let repository_manager = composer.get_repository_manager().clone();
-            let repository_manager = repository_manager.borrow();
-            let local_repo = repository_manager.get_local_repository();
-            for local_pkg in local_repo.get_canonical_packages() {
-                // TODO(phase-b): get_install_path takes &mut self on installation_manager which conflicts with the &local_repo borrow held by this loop; needs shared-ownership refactor
-                let install_path: Option<String> =
-                    todo!("InstallationManager::get_install_path requires &mut self");
+            let local_repo = composer
+                .get_repository_manager()
+                .borrow()
+                .get_local_repository();
+            for local_pkg in local_repo.get_canonical_packages()? {
+                let install_path = composer
+                    .get_installation_manager()
+                    .borrow_mut()
+                    .get_install_path(local_pkg);
                 if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
                     missing_dependencies = true;
                     self.get_io().write("<warning>Not all dependencies are installed. Make sure to run a \"composer install\" to install missing dependencies</warning>");
@@ -214,9 +216,40 @@ impl DumpAutoloadCommand {
             .get_autoload_generator()
             .borrow_mut()
             .set_platform_requirement_filter(platform_requirement_filter);
-        // TODO(phase-b): dump requires multiple borrows of composer simultaneously (autoload generator mut, repository, package, installation manager, locker); needs shared-ownership refactor
-        let class_map: shirabe_class_map_generator::class_map::ClassMap =
-            todo!("AutoloadGenerator::dump requires concurrent borrows of Composer subsystems");
+        let strict_ambiguous = input
+            .borrow()
+            .get_option("strict-ambiguous")
+            .as_bool()
+            .unwrap_or(false);
+
+        let local_repo_handle = composer
+            .get_repository_manager()
+            .borrow()
+            .get_local_repository();
+        let package = composer.get_package().clone();
+        let installation_manager = composer.get_installation_manager();
+        let locker = composer.get_locker();
+        let autoload_generator = composer.get_autoload_generator();
+
+        let config_ref = config.borrow();
+        let mut local_repo_ref = local_repo_handle.borrow_mut();
+        let local_repo = local_repo_ref
+            .as_installed_repository_interface_mut()
+            .expect("local repository must be an InstalledRepositoryInterface");
+        let mut installation_manager_ref = installation_manager.borrow_mut();
+        let mut locker_ref = locker.borrow_mut();
+
+        let class_map = autoload_generator.borrow_mut().dump(
+            &config_ref,
+            local_repo,
+            package,
+            &mut *installation_manager_ref,
+            "composer",
+            optimize,
+            None,
+            Some(&mut *locker_ref),
+            strict_ambiguous,
+        )?;
         let number_of_classes = class_map.map.len();
 
         if authoritative {
