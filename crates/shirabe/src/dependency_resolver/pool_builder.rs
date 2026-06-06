@@ -1070,15 +1070,11 @@ impl PoolBuilder {
         let before = microtime(true);
         let total = pool.get_packages().len() as f64;
 
-        let pool = match self
+        let pool = self
             .pool_optimizer
             .as_mut()
             .unwrap()
-            .optimize(request, &pool)
-        {
-            Ok(p) => p,
-            Err(_) => return pool,
-        };
+            .optimize(request, &pool);
 
         let filtered = total - (pool.get_packages().len() as f64);
 

@@ -2,9 +2,8 @@
 
 use std::rc::Rc;
 
-use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, PhpMixed, implode, ksort};
+use shirabe_php_shim::{PhpMixed, implode, ksort};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -62,10 +61,10 @@ impl PoolOptimizer {
         }
     }
 
-    pub fn optimize(&mut self, request: &Request, pool: &Pool) -> Result<Pool> {
+    pub fn optimize(&mut self, request: &Request, pool: &Pool) -> Pool {
         self.prepare(request, pool);
 
-        self.optimize_by_identical_dependencies(request, pool)?;
+        self.optimize_by_identical_dependencies(request, pool);
 
         self.optimize_impossible_packages_away(request, pool);
 
@@ -83,7 +82,7 @@ impl PoolOptimizer {
         self.aliases_per_package = IndexMap::new();
         self.removed_versions_by_package = IndexMap::new();
 
-        Ok(optimized_pool)
+        optimized_pool
     }
 
     fn prepare(&mut self, request: &Request, pool: &Pool) {
@@ -216,11 +215,7 @@ impl PoolOptimizer {
         )
     }
 
-    fn optimize_by_identical_dependencies(
-        &mut self,
-        _request: &Request,
-        pool: &Pool,
-    ) -> Result<()> {
+    fn optimize_by_identical_dependencies(&mut self, _request: &Request, pool: &Pool) {
         let mut identical_definitions_per_package: IndexMap<
             String,
             IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
@@ -237,7 +232,7 @@ impl PoolOptimizer {
                 continue;
             }
 
-            self.mark_package_for_removal(package.id())?;
+            self.mark_package_for_removal(package.id());
 
             let dependency_hash = self.calculate_dependency_hash(package.clone());
 
@@ -362,8 +357,6 @@ impl PoolOptimizer {
                 }
             }
         }
-
-        Ok(())
     }
 
     fn calculate_dependency_hash(&self, package: BasePackageHandle) -> String {
@@ -420,19 +413,14 @@ impl PoolOptimizer {
         hash
     }
 
-    fn mark_package_for_removal(&mut self, id: i64) -> Result<()> {
+    fn mark_package_for_removal(&mut self, id: i64) {
         // We are not allowed to remove packages if they have been marked as irremovable
-        if self.irremovable_packages.contains_key(&id) {
-            return Err(LogicException {
-                message: "Attempted removing a package which was previously marked irremovable"
-                    .to_string(),
-                code: 0,
-            }
-            .into());
-        }
+        assert!(
+            !self.irremovable_packages.contains_key(&id),
+            "Attempted removing a package which was previously marked irremovable"
+        );
 
         self.packages_to_remove.insert(id, true);
-        Ok(())
     }
 
     /// @param array<string, array<string, array<string, list<BasePackage>>>> $identicalDefinitionsPerPackage
@@ -627,8 +615,7 @@ impl PoolOptimizer {
                                 version_str,
                             )
                         {
-                            // TODO(phase-b): mark_package_for_removal returns Result; ignoring here
-                            let _ = self.mark_package_for_removal(id);
+                            self.mark_package_for_removal(id);
                             if let Some(map) = package_index.get_mut(require) {
                                 map.shift_remove(&id);
                             }
