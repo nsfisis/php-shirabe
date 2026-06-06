@@ -4,7 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::component::console::input::InputInterface;
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, strip_tags};
+use shirabe_php_shim::{PhpMixed, array_merge_map, strip_tags};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -153,28 +153,27 @@ impl CheckPlatformReqsCommand {
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
-                        let candidate_constraint: Option<AnyConstraint> =
-                            if candidate.get_name() == *require {
-                                let c = SimpleConstraint::new(
-                                    "=".to_string(),
-                                    candidate.get_version().to_string(),
-                                    Some(candidate.get_pretty_version().to_string()),
-                                );
-                                Some(c.into())
-                            } else {
-                                let mut found: Option<AnyConstraint> = None;
-                                for (_, link) in candidate
-                                    .get_provides()
-                                    .iter()
-                                    .chain(candidate.get_replaces().iter())
-                                {
-                                    if link.get_target() == require {
-                                        found = Some(link.get_constraint().clone());
-                                        break;
-                                    }
+                        let candidate_constraint: Option<AnyConstraint> = if candidate.get_name()
+                            == *require
+                        {
+                            let c = SimpleConstraint::new(
+                                "=".to_string(),
+                                candidate.get_version().to_string(),
+                                Some(candidate.get_pretty_version().to_string()),
+                            );
+                            Some(c.into())
+                        } else {
+                            let mut found: Option<AnyConstraint> = None;
+                            let provides_and_replaces =
+                                array_merge_map(candidate.get_provides(), candidate.get_replaces());
+                            for (_, link) in &provides_and_replaces {
+                                if link.get_target() == require {
+                                    found = Some(link.get_constraint().clone());
+                                    break;
                                 }
-                                found
-                            };
+                            }
+                            found
+                        };
 
                         let candidate_constraint = match candidate_constraint {
                             Some(c) => c,

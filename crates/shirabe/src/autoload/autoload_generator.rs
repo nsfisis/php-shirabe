@@ -8,11 +8,11 @@ use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, InvalidArgumentException, PhpMixed, RuntimeException, array_filter,
-    array_keys, array_map, array_merge, array_merge_recursive, array_reverse, array_shift,
-    array_slice, array_slice_strs, array_unique, bin2hex, explode, file_exists, file_get_contents,
-    hash, implode, in_array, is_array, krsort, ksort, ltrim, preg_quote, random_bytes, realpath,
-    sprintf, str_contains, str_replace, str_starts_with, strlen, strpos, strtr, substr,
-    substr_count, trigger_error, trim, unlink, var_export,
+    array_keys, array_map, array_merge, array_merge_map, array_merge_recursive, array_reverse,
+    array_shift, array_slice, array_slice_strs, array_unique, bin2hex, explode, file_exists,
+    file_get_contents, hash, implode, in_array, is_array, krsort, ksort, ltrim, preg_quote,
+    random_bytes, realpath, sprintf, str_contains, str_replace, str_starts_with, strlen, strpos,
+    strtr, substr, substr_count, trigger_error, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
@@ -1104,10 +1104,7 @@ impl AutoloadGenerator {
 
         for item in package_map {
             let package = &item.0;
-            let mut links = package.get_replaces();
-            for (k, v) in package.get_provides() {
-                links.insert(k, v);
-            }
+            let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))

@@ -2,6 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;
+use shirabe_php_shim::array_merge_map;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -84,16 +85,9 @@ impl InstalledRepository {
                     continue;
                 }
 
-                let provides = candidate.get_provides();
-                let replaces = candidate.get_replaces();
-                let mut provides_and_replaces: Vec<&Link> = vec![];
-                for link in provides.values() {
-                    provides_and_replaces.push(link);
-                }
-                for link in replaces.values() {
-                    provides_and_replaces.push(link);
-                }
-                for link in provides_and_replaces {
+                let provides_and_replaces =
+                    array_merge_map(candidate.get_provides(), candidate.get_replaces());
+                for link in provides_and_replaces.values() {
                     if name == link.get_target()
                         && (constraint.is_none()
                             || constraint.as_ref().unwrap().matches(link.get_constraint()))
@@ -313,11 +307,8 @@ impl InstalledRepository {
                         .into();
 
                         if link.get_target() != pkg.get_name().as_str() {
-                            let mut replaces_and_provides: IndexMap<String, Link> =
-                                pkg.get_replaces();
-                            for (k, v) in pkg.get_provides() {
-                                replaces_and_provides.entry(k).or_insert(v);
-                            }
+                            let replaces_and_provides =
+                                array_merge_map(pkg.get_replaces(), pkg.get_provides());
                             for prov in replaces_and_provides.values() {
                                 if link.get_target() == prov.get_target() {
                                     version = prov.get_constraint().clone();

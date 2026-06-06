@@ -1079,7 +1079,34 @@ pub fn array_fill_keys(_keys: PhpMixed, _value: PhpMixed) -> PhpMixed {
     todo!()
 }
 
+/// PHP `array_merge`.
+///
+/// Must reproduce PHP's mixed integer/string key semantics:
+/// - string keys: a later array's value overwrites an earlier one, keeping the
+///   earlier key's position;
+/// - integer-like keys ("0","1",...): values are appended and renumbered
+///   sequentially across all inputs (they are NOT overwritten by key).
+///
+/// A naive per-entry `IndexMap::insert` is INCORRECT for inputs that mix string
+/// and integer keys (e.g. an AliasPackage's provides/replaces, where
+/// self.version expansion appends links under "0","1",... keys). See the typed
+/// [`array_merge_map`] variant used by such call sites.
 pub fn array_merge(_array1: PhpMixed, _array2: PhpMixed) -> PhpMixed {
+    todo!()
+}
+
+/// PHP `array_merge` for a string-keyed map that MAY also contain integer-like
+/// keys. Typed counterpart of [`array_merge`] for `IndexMap<String, V>` values
+/// (e.g. `Link` maps from `getProvides`/`getReplaces`).
+///
+/// Must reproduce the same mixed-key semantics as [`array_merge`]: string keys
+/// overwrite in place (later wins), integer-like keys ("0","1",...) are appended
+/// and renumbered sequentially across both inputs. A naive `IndexMap::insert`
+/// per entry is INCORRECT because it would collide on shared integer keys.
+pub fn array_merge_map<V>(
+    _array1: IndexMap<String, V>,
+    _array2: IndexMap<String, V>,
+) -> IndexMap<String, V> {
     todo!()
 }
 

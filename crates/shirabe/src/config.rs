@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
-    RuntimeException, array_key_exists, array_merge_recursive, array_reverse, array_search_mixed,
+    RuntimeException, array_key_exists, array_merge, array_reverse, array_search_mixed,
     array_unique, current, empty, filter_var, implode, in_array, is_array, is_int, is_string, key,
     max, parse_url, reset, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
 };
@@ -334,10 +334,8 @@ impl Config {
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    self.config.insert(
-                        key.clone(),
-                        array_merge_recursive(vec![existing, val.clone()]),
-                    );
+                    self.config
+                        .insert(key.clone(), array_merge(existing, val.clone()));
                     self.set_source_of_config_value(&val, key, source);
                 } else if in_array(
                     PhpMixed::String(key.clone()),
@@ -354,7 +352,7 @@ impl Config {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                     self.config.insert(
                         key.clone(),
-                        array_merge_recursive(vec![val.clone(), existing, val.clone()]),
+                        array_merge(array_merge(val.clone(), existing), val.clone()),
                     );
                     self.set_source_of_config_value(&val, key, source);
                 } else if in_array(
@@ -367,7 +365,7 @@ impl Config {
                 ) && self.config.contains_key(key)
                 {
                     let existing = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                    let merged = array_merge_recursive(vec![existing, val.clone()]);
+                    let merged = array_merge(existing, val.clone());
                     let unique_list: Vec<String> = match &merged {
                         PhpMixed::List(l) => l
                             .iter()
@@ -406,7 +404,7 @@ impl Config {
                         }
                         let cur = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                         self.config
-                            .insert(key.clone(), array_merge_recursive(vec![cur, val.clone()]));
+                            .insert(key.clone(), array_merge(cur, val.clone()));
                         self.set_source_of_config_value(&val, key, source);
                         // the full match pattern needs to be last
                         let has_wildcard = matches!(
@@ -433,10 +431,10 @@ impl Config {
                         .cloned()
                         .map(|b| *b)
                         .unwrap_or(PhpMixed::List(vec![]));
-                    let merged = array_merge_recursive(vec![
+                    let merged = array_merge(
                         self.config.get("audit").cloned().unwrap_or(PhpMixed::Null),
                         val.clone(),
-                    ]);
+                    );
                     self.config.insert(key.clone(), merged);
                     self.set_source_of_config_value(&val, key, source);
                     let val_ignore = match &val {
@@ -447,7 +445,7 @@ impl Config {
                             .unwrap_or(PhpMixed::List(vec![])),
                         _ => PhpMixed::List(vec![]),
                     };
-                    let new_ignores = array_merge_recursive(vec![current_ignores, val_ignore]);
+                    let new_ignores = array_merge(current_ignores, val_ignore);
                     if let Some(PhpMixed::Array(audit)) = self.config.get_mut("audit") {
                         audit.insert("ignore".to_string(), Box::new(new_ignores));
                     }
