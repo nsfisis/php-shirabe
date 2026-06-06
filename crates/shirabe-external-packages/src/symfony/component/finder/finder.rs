@@ -44,7 +44,7 @@ impl Finder {
         todo!()
     }
 
-    pub fn filter(&mut self, _closure: Box<dyn FnMut(&SplFileInfo) -> bool>) -> &mut Self {
+    pub fn filter(&mut self, _closure: Box<dyn FnMut(&std::path::Path) -> bool>) -> &mut Self {
         todo!()
     }
 

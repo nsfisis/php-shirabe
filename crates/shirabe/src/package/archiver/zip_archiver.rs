@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, ZipArchive, class_exists, fileperms, method_exists, pack, realpath,
 };
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ZipArchiver;
@@ -50,24 +51,34 @@ impl ArchiverInterface for ZipArchiver {
         if zip.open(&target, ZipArchive::CREATE).is_ok() {
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             for file in files {
-                let filepath = file.get_pathname();
-                let mut relative_path = file.get_relative_path_name();
+                let filepath = file;
+                let mut relative_path = filepath
+                    .strip_prefix(&sources)
+                    .unwrap_or(filepath.as_path())
+                    .to_path_buf();
 
                 if Platform::is_windows() {
-                    relative_path = shirabe_php_shim::strtr(&relative_path, "\\", "/");
+                    relative_path = PathBuf::from(shirabe_php_shim::strtr(
+                        &relative_path.to_string_lossy(),
+                        "\\",
+                        "/",
+                    ));
                 }
 
-                if file.is_dir() {
-                    zip.add_empty_dir(&relative_path);
+                if filepath.is_dir() {
+                    zip.add_empty_dir(&relative_path.to_string_lossy());
                 } else {
-                    zip.add_file(&filepath, &relative_path);
+                    zip.add_file(
+                        &filepath.to_string_lossy(),
+                        &relative_path.to_string_lossy(),
+                    );
                 }
 
                 // setExternalAttributesName() is only available with libzip 0.11.2 or above
                 if method_exists(&PhpMixed::Null, "setExternalAttributesName") {
-                    let perms = fileperms(&filepath);
+                    let perms = fileperms(&filepath.to_string_lossy());
                     zip.set_external_attributes_name(
-                        &relative_path,
+                        &relative_path.to_string_lossy(),
                         ZipArchive::OPSYS_UNIX,
                         perms << 16,
                     );

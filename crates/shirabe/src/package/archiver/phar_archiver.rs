@@ -70,10 +70,7 @@ impl ArchiverInterface for PharArchiver {
                 *formats.get(format.as_str()).unwrap_or(&Phar::TAR),
             );
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
-            // TODO(phase-b): unify iterator types (ArchivableFilesFinder yields SplFileInfo,
-            // ArchivableFilesFilter expects PathBuf).
-            let mut files_only =
-                ArchivableFilesFilter::new(Box::new(files.map(|f| f.get_pathname().into())));
+            let mut files_only = ArchivableFilesFilter::new(Box::new(files));
             phar.build_from_iterator(&mut files_only, &sources);
             files_only.add_empty_dir(&phar, &sources);
 

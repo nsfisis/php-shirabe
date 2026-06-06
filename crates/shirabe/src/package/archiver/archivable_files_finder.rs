@@ -5,12 +5,12 @@ use crate::package::archiver::GitExcludeFilter;
 use crate::util::Filesystem;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::component::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::SplFileInfo;
 use shirabe_php_shim::{RuntimeException, preg_quote, realpath};
+use std::path::{Path, PathBuf};
 
 pub struct ArchivableFilesFinder {
     pub(crate) finder: Finder,
-    inner_iter: Box<dyn Iterator<Item = SplFileInfo>>,
+    inner_iter: Box<dyn Iterator<Item = PathBuf>>,
 }
 
 impl std::fmt::Debug for ArchivableFilesFinder {
@@ -47,20 +47,18 @@ impl ArchivableFilesFinder {
         let mut finder = Finder::new();
 
         let sources_clone = sources.clone();
-        let filter = move |file: &SplFileInfo| -> bool {
-            let realpath = file.get_real_path();
-            if realpath.is_none() {
+        let filter = move |file: &Path| -> bool {
+            let Ok(realpath) = file.canonicalize() else {
                 return false;
-            }
-            let realpath = realpath.unwrap();
-            if file.is_link() && !realpath.starts_with(sources_clone.as_str()) {
+            };
+            if file.is_symlink() && !realpath.starts_with(&sources_clone) {
                 return false;
             }
 
             let relative_path = Preg::replace(
                 &format!("^{}", preg_quote(&sources_clone, Some('#'))),
                 "",
-                &fs.normalize_path(&realpath),
+                &fs.normalize_path(&realpath.to_string_lossy()),
             )
             .unwrap_or_default();
 
@@ -79,18 +77,21 @@ impl ArchivableFilesFinder {
             .ignore_dot_files(false)
             .sort_by_name();
 
-        let inner_iter: Box<dyn Iterator<Item = SplFileInfo>> = Box::new(finder.get_iterator());
+        let inner_iter: Box<dyn Iterator<Item = PathBuf>> = Box::new(
+            finder
+                .get_iterator()
+                .map(|f| PathBuf::from(f.get_pathname())),
+        );
 
         Ok(Self { finder, inner_iter })
     }
 
-    pub fn accept(&self, current: &SplFileInfo) -> bool {
+    pub fn accept(&self, current: &Path) -> bool {
         if !current.is_dir() {
             return true;
         }
 
-        let path = current.get_pathname();
-        match std::fs::read_dir(&path) {
+        match std::fs::read_dir(current) {
             Ok(mut iter) => iter.next().is_none(),
             Err(_) => false,
         }
@@ -114,7 +115,7 @@ impl ArchivableFilesFilter for ComposerExcludeFilter {
 }
 
 impl Iterator for ArchivableFilesFinder {
-    type Item = SplFileInfo;
+    type Item = PathBuf;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
