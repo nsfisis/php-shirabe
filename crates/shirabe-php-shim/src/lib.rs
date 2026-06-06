@@ -2154,7 +2154,10 @@ impl RecursiveIteratorFileInfo {
     }
 }
 
-pub fn recursive_directory_iterator(_path: &str, _flags: i64) -> RecursiveDirectoryIterator {
+pub fn recursive_directory_iterator(
+    _path: &str,
+    _flags: i64,
+) -> Result<RecursiveDirectoryIterator, UnexpectedValueException> {
     todo!()
 }
 

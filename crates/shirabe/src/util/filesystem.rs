@@ -219,11 +219,25 @@ impl Filesystem {
             return Ok(r);
         }
 
-        // PHP: $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
-        // TODO(phase-b): PHP throws UnexpectedValueException on iterator creation failure;
-        // shim signature does not yet model this. Skipping the retry/clearstatcache branch.
-        let it =
-            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS);
+        let it = match shirabe_php_shim::recursive_directory_iterator(
+            directory,
+            shirabe_php_shim::SKIP_DOTS,
+        ) {
+            Ok(it) => it,
+            Err(_e) => {
+                // re-try once after clearing the stat cache if it failed as it
+                // sometimes fails without apparent reason, see https://github.com/composer/composer/issues/4009
+                clearstatcache();
+                usleep(100000);
+                if !is_dir(directory) {
+                    return Ok(true);
+                }
+                shirabe_php_shim::recursive_directory_iterator(
+                    directory,
+                    shirabe_php_shim::SKIP_DOTS,
+                )?
+            }
+        };
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
 
         for file in &ri {
@@ -420,7 +434,7 @@ impl Filesystem {
         }
 
         let it =
-            shirabe_php_shim::recursive_directory_iterator(source, shirabe_php_shim::SKIP_DOTS);
+            shirabe_php_shim::recursive_directory_iterator(source, shirabe_php_shim::SKIP_DOTS)?;
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::SELF_FIRST);
         self.ensure_directory_exists(&target)?;
 
@@ -660,7 +674,7 @@ impl Filesystem {
             .into());
         }
         if is_dir(path) {
-            return Ok(self.directory_size(path));
+            return self.directory_size(path);
         }
 
         Ok(filesize(path).unwrap_or(0))
@@ -801,9 +815,9 @@ impl Filesystem {
         false
     }
 
-    pub(crate) fn directory_size(&self, directory: &str) -> i64 {
+    pub(crate) fn directory_size(&self, directory: &str) -> anyhow::Result<i64> {
         let it =
-            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS);
+            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS)?;
         let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
 
         let mut size: i64 = 0;
@@ -813,7 +827,7 @@ impl Filesystem {
             }
         }
 
-        size
+        Ok(size)
     }
 
     pub(crate) fn get_process(&mut self) -> std::cell::RefMut<'_, ProcessExecutor> {
