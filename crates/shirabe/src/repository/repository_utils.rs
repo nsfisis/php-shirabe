@@ -27,8 +27,12 @@ impl RepositoryUtils {
                     let already_in_bucket = bucket.iter().any(|b| b.ptr_eq(candidate));
                     if !already_in_bucket {
                         bucket.push(candidate.clone());
-                        // TODO(phase-b): recursion requires &dyn PackageInterface; cast pending.
-                        let _ = (requires.contains_key("dummy"),);
+                        bucket = Self::filter_required_packages(
+                            packages,
+                            candidate.clone(),
+                            false,
+                            bucket,
+                        );
                     }
                     break;
                 }
