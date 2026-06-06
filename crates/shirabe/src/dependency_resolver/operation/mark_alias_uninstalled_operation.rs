@@ -44,8 +44,10 @@ impl OperationInterface for MarkAliasUninstalledOperation {
                 .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
         )
     }
+}
 
-    fn to_string(&self) -> String {
-        self.show(true)
+impl std::fmt::Display for MarkAliasUninstalledOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.show(false))
     }
 }

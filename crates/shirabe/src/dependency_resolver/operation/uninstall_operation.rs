@@ -44,11 +44,13 @@ impl OperationInterface for UninstallOperation {
         Self::format(self.package.clone(), lock)
     }
 
-    fn to_string(&self) -> String {
-        self.show(true)
-    }
-
     fn as_uninstall_operation(&self) -> Option<&UninstallOperation> {
         Some(self)
+    }
+}
+
+impl std::fmt::Display for UninstallOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.show(false))
     }
 }

@@ -4,14 +4,12 @@ use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
 
-pub trait OperationInterface: std::fmt::Debug {
+pub trait OperationInterface: std::fmt::Display + std::fmt::Debug {
     fn as_any(&self) -> &dyn std::any::Any;
 
     fn get_operation_type(&self) -> String;
 
     fn show(&self, lock: bool) -> String;
-
-    fn to_string(&self) -> String;
 
     fn as_install_operation(&self) -> Option<&InstallOperation> {
         None

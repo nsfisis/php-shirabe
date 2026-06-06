@@ -95,11 +95,13 @@ impl OperationInterface for UpdateOperation {
         )
     }
 
-    fn to_string(&self) -> String {
-        self.show(true)
-    }
-
     fn as_update_operation(&self) -> Option<&UpdateOperation> {
         Some(self)
+    }
+}
+
+impl std::fmt::Display for UpdateOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.show(false))
     }
 }

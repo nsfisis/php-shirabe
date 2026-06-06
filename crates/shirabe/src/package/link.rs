@@ -76,16 +76,6 @@ impl Link {
         &self.pretty_constraint
     }
 
-    pub fn to_string(&self) -> String {
-        format!(
-            "{} {} {} ({})",
-            self.source,
-            self.description,
-            self.target,
-            self.constraint.to_string(),
-        )
-    }
-
     pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> String {
         format!(
             "{} {} {} {}",
@@ -93,6 +83,19 @@ impl Link {
             self.description,
             self.target,
             self.constraint.get_pretty_string()
+        )
+    }
+}
+
+impl std::fmt::Display for Link {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {} ({})",
+            self.source,
+            self.description,
+            self.target,
+            self.constraint.to_string(),
         )
     }
 }

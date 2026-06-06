@@ -45,11 +45,13 @@ impl OperationInterface for InstallOperation {
         Self::format(self.package.clone(), lock)
     }
 
-    fn to_string(&self) -> String {
-        self.show(true)
-    }
-
     fn as_install_operation(&self) -> Option<&InstallOperation> {
         Some(self)
+    }
+}
+
+impl std::fmt::Display for InstallOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.show(false))
     }
 }
