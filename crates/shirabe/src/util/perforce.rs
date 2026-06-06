@@ -842,14 +842,12 @@ impl Perforce {
     }
 
     fn get_p4_executable() -> String {
-        // TODO(phase-b): emulate PHP `static $p4Executable;` — cache across calls
         static P4_EXECUTABLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
         P4_EXECUTABLE
             .get_or_init(|| {
                 let finder = ExecutableFinder::new();
-                finder
-                    .find("p4", None, &[])
-                    .unwrap_or_else(|| "p4".to_string())
+                finder.find("p4", None, &[]).unwrap_or("p4".to_string())
             })
             .clone()
     }
