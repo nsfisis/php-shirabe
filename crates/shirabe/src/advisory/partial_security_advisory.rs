@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Advisory/PartialSecurityAdvisory.php
 
-use crate::advisory::PartialOrFullSecurityAdvisory;
+use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::package::version::VersionParser;
 use anyhow::Result;
@@ -32,7 +32,7 @@ impl PartialSecurityAdvisory {
         package_name: &str,
         data: &IndexMap<String, PhpMixed>,
         parser: &VersionParser,
-    ) -> Result<PartialOrFullSecurityAdvisory> {
+    ) -> Result<AnySecurityAdvisory> {
         let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
 
         let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
@@ -95,10 +95,10 @@ impl PartialSecurityAdvisory {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
             );
-            return Ok(PartialOrFullSecurityAdvisory::Full(advisory));
+            return Ok(AnySecurityAdvisory::Full(advisory));
         }
 
-        Ok(PartialOrFullSecurityAdvisory::Partial(Self {
+        Ok(AnySecurityAdvisory::Partial(Self {
             advisory_id: data["advisoryId"].as_string().unwrap_or("").to_string(),
             package_name: package_name.to_string(),
             affected_versions: constraint,

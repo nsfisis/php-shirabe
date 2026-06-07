@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IgnoredSecurityAdvisory {
     #[serde(flatten)]
@@ -43,5 +43,9 @@ impl IgnoredSecurityAdvisory {
             inner,
             ignore_reason,
         }
+    }
+
+    pub fn as_security_advisory(&self) -> &SecurityAdvisory {
+        &self.inner
     }
 }

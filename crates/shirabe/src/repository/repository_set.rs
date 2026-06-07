@@ -13,7 +13,7 @@ use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
+use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::PoolBuilder;
 use crate::dependency_resolver::PoolOptimizer;
@@ -371,8 +371,8 @@ impl RepositorySet {
         allow_partial_advisories: bool,
         ignore_unreachable: bool,
         unreachable_repos: &mut Vec<String>,
-    ) -> Result<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> {
-        let mut repo_advisories: Vec<IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> = vec![];
+    ) -> Result<IndexMap<String, Vec<AnySecurityAdvisory>>> {
+        let mut repo_advisories: Vec<IndexMap<String, Vec<AnySecurityAdvisory>>> = vec![];
         for repository in &self.repositories {
             let attempt: Result<()> = (|| -> Result<()> {
                 let mut repo_ref = repository.borrow_mut();
@@ -664,6 +664,6 @@ impl RepositorySet {
 
 #[derive(Debug)]
 pub struct SecurityAdvisoriesResult {
-    pub advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
     pub unreachable_repos: Vec<String>,
 }

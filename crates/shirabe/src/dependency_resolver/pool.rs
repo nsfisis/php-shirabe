@@ -8,7 +8,7 @@ use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
-use crate::advisory::PartialOrFullSecurityAdvisory;
+use crate::advisory::AnySecurityAdvisory;
 use crate::package::BasePackage;
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
@@ -31,8 +31,7 @@ pub struct Pool {
     /// @var array<string, array<string, string>> Map of package object hash => removed normalized versions => removed pretty version
     pub(crate) removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
     /// @var array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>> Map of package name => normalized version => security advisories
-    security_removed_versions:
-        IndexMap<String, IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>>,
+    security_removed_versions: IndexMap<String, IndexMap<String, Vec<AnySecurityAdvisory>>>,
     /// @var array<string, array<string, string>> Map of package name => normalized version => pretty version
     abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
 }
@@ -49,10 +48,7 @@ impl Pool {
         unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
         removed_versions: IndexMap<String, IndexMap<String, String>>,
         removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
-        security_removed_versions: IndexMap<
-            String,
-            IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
-        >,
+        security_removed_versions: IndexMap<String, IndexMap<String, Vec<AnySecurityAdvisory>>>,
         abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
     ) -> Self {
         let mut this = Self {
@@ -189,7 +185,7 @@ impl Pool {
     /// @return array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>>
     pub fn get_all_security_removed_package_versions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>> {
+    ) -> &IndexMap<String, IndexMap<String, Vec<AnySecurityAdvisory>>> {
         &self.security_removed_versions
     }
 

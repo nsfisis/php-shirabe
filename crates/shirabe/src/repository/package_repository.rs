@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Repository/PackageRepository.php
 
 use crate::advisory::SecurityAdvisory;
-use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory};
+use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
 use crate::package::loader::ArrayLoader;
 use crate::package::loader::ValidatingArrayLoader;
 use crate::package::version::VersionParser;
@@ -93,7 +93,7 @@ impl AdvisoryProviderInterface for PackageRepository {
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();
 
-        let mut advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = IndexMap::new();
+        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
             let Some(package_constraint) = package_constraint_map.get(package_name) else {
                 continue;
@@ -103,7 +103,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                 PhpMixed::List(list) => list,
                 _ => continue,
             };
-            let mut items: Vec<PartialOrFullSecurityAdvisory> = Vec::new();
+            let mut items: Vec<AnySecurityAdvisory> = Vec::new();
             for data in list {
                 let data_map: IndexMap<String, PhpMixed> = match data.as_ref() {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), *v.clone())).collect(),
@@ -114,8 +114,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                         Ok(a) => a,
                         Err(_) => continue,
                     };
-                if !allow_partial_advisories
-                    && matches!(advisory, PartialOrFullSecurityAdvisory::Partial(_))
+                if !allow_partial_advisories && matches!(advisory, AnySecurityAdvisory::Partial(_))
                 {
                     return Err(anyhow::anyhow!(RuntimeException {
                         message: format!(
@@ -138,7 +137,7 @@ impl AdvisoryProviderInterface for PackageRepository {
         }
 
         let names_found: Vec<String> = advisories.keys().cloned().collect();
-        let advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>> = advisories
+        let advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = advisories
             .into_iter()
             .filter(|(_, adv)| !adv.is_empty())
             .collect();

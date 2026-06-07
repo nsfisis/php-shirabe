@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/DependencyResolver/SecurityAdvisoryPoolFilter.php
 
+use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::advisory::PartialOrFullSecurityAdvisory;
 use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Request;
 use crate::package::BasePackageHandle;
@@ -86,7 +86,7 @@ impl SecurityAdvisoryPoolFilter {
         let mut packages: Vec<BasePackageHandle> = vec![];
         let mut security_removed_versions: IndexMap<
             String,
-            IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
+            IndexMap<String, Vec<AnySecurityAdvisory>>,
         > = IndexMap::new();
         let mut abandoned_removed_versions: IndexMap<String, IndexMap<String, String>> =
             IndexMap::new();
@@ -144,13 +144,13 @@ impl SecurityAdvisoryPoolFilter {
     fn get_matching_advisories(
         &self,
         package: BasePackageHandle,
-        advisory_map: &IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
-    ) -> Vec<PartialOrFullSecurityAdvisory> {
+        advisory_map: &IndexMap<String, Vec<AnySecurityAdvisory>>,
+    ) -> Vec<AnySecurityAdvisory> {
         if package.is_dev() {
             return vec![];
         }
 
-        let mut matching_advisories: Vec<PartialOrFullSecurityAdvisory> = vec![];
+        let mut matching_advisories: Vec<AnySecurityAdvisory> = vec![];
         for package_name in package.get_names(false) {
             if !advisory_map.contains_key(&package_name) {
                 continue;

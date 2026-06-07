@@ -48,6 +48,10 @@ impl SecurityAdvisory {
         &self.inner.advisory_id
     }
 
+    pub fn package_name(&self) -> &str {
+        &self.inner.package_name
+    }
+
     pub fn affected_versions(&self) -> &AnyConstraint {
         &self.inner.affected_versions
     }

@@ -1,13 +1,13 @@
 //! ref: composer/src/Composer/Repository/AdvisoryProviderInterface.php
 
-use crate::advisory::{PartialOrFullSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
+use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct SecurityAdvisoryResult {
     pub names_found: Vec<String>,
-    pub advisories: IndexMap<String, Vec<PartialOrFullSecurityAdvisory>>,
+    pub advisories: IndexMap<String, Vec<AnySecurityAdvisory>>,
 }
 
 pub trait AdvisoryProviderInterface {
