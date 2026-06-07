@@ -15,9 +15,8 @@ use shirabe_php_shim::{PhpMixed, chmod, touch};
 pub trait BaseConfigCommand: BaseCommand {
     fn config(&self) -> Option<&std::rc::Rc<std::cell::RefCell<Config>>>;
     fn config_mut(&mut self) -> &mut Option<std::rc::Rc<std::cell::RefCell<Config>>>;
-    fn config_file(&self) -> Option<&JsonFile>;
-    fn config_file_mut(&mut self) -> Option<&mut JsonFile>;
-    fn set_config_file(&mut self, file: Option<JsonFile>);
+    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>>;
+    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>);
     fn config_source(&self) -> Option<&JsonConfigSource>;
     fn config_source_mut(&mut self) -> Option<&mut JsonConfigSource>;
     fn set_config_source(&mut self, source: Option<JsonConfigSource>);
@@ -40,8 +39,7 @@ pub trait BaseConfigCommand: BaseCommand {
             return Err(anyhow::anyhow!("--file and --global can not be combined"));
         }
 
-        // TODO(phase-b): clone_box to release the &mut self borrow held by get_io.
-        let io = self.get_io().clone();
+        let io = self.get_io();
         *self.config_mut() = Some(std::rc::Rc::new(std::cell::RefCell::new(
             Factory::create_config(Some(io.clone()), None)?,
         )));
@@ -68,14 +66,13 @@ pub trait BaseConfigCommand: BaseCommand {
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
-        self.set_config_file(Some(JsonFile::new(
+        let config_file_jf = std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
             config_file.clone(),
             None,
             Some(io.clone()),
         )?));
-        // TODO(phase-b): JsonConfigSource::new takes owned JsonFile, but PHP shares the same
-        // instance with $this->configFile. Needs Rc<RefCell<JsonFile>> refactor on both sides.
-        self.set_config_source(None);
+        self.set_config_file(Some(config_file_jf.clone()));
+        self.set_config_source(Some(JsonConfigSource::new(config_file_jf, false)));
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
         if input
@@ -83,13 +80,13 @@ pub trait BaseConfigCommand: BaseCommand {
             .get_option("global")
             .as_bool()
             .unwrap_or(false)
-            && !self.config_file().as_ref().unwrap().exists()
+            && !self.config_file().unwrap().borrow().exists()
         {
-            let path = self.config_file().as_ref().unwrap().get_path().to_string();
+            let path = self.config_file().unwrap().borrow().get_path().to_string();
             touch(&path);
-            self.config_file_mut()
-                .as_mut()
+            self.config_file()
                 .unwrap()
+                .borrow()
                 .write(PhpMixed::Array({
                     let mut m = IndexMap::new();
                     m.insert(
@@ -104,7 +101,7 @@ pub trait BaseConfigCommand: BaseCommand {
             });
         }
 
-        if !self.config_file().as_ref().unwrap().exists() {
+        if !self.config_file().unwrap().borrow().exists() {
             return Err(anyhow::anyhow!(
                 "File \"{}\" cannot be found in the current directory",
                 config_file

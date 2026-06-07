@@ -70,7 +70,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     fn is_installed(
-        &self,
+        &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -78,7 +78,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -103,7 +103,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
@@ -166,7 +166,7 @@ impl InstallerInterface for PluginInstaller {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -174,7 +174,7 @@ impl InstallerInterface for PluginInstaller {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
         self.inner.get_install_path(package)
     }
 

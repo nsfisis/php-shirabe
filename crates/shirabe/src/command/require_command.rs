@@ -50,7 +50,7 @@ pub struct RequireCommand {
 
     newly_created: bool,
     first_require: bool,
-    json: Option<JsonFile>,
+    json: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
     file: String,
     composer_backup: String,
     /// file name
@@ -186,10 +186,14 @@ impl RequireCommand {
             file_put_contents(&self.file, b"{\n}\n");
         }
 
-        self.json = Some(JsonFile::new(self.file.clone(), None, None)?);
+        self.json = Some(std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
+            self.file.clone(),
+            None,
+            None,
+        )?)));
         self.lock = Factory::get_lock_file(&self.file);
         self.composer_backup =
-            file_get_contents(self.json.as_ref().unwrap().get_path()).unwrap_or_default();
+            file_get_contents(self.json.as_ref().unwrap().borrow().get_path()).unwrap_or_default();
         self.lock_backup = if file_exists(&self.lock) {
             file_get_contents(&self.lock)
         } else {
@@ -231,7 +235,7 @@ impl RequireCommand {
         }
 
         if input.borrow().get_option("fixed").as_bool() == Some(true) {
-            let config = self.json.as_mut().unwrap().read()?;
+            let config = self.json.as_ref().unwrap().borrow_mut().read()?;
 
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
                 "library".to_string()
@@ -527,7 +531,7 @@ impl RequireCommand {
 
         self.first_require = self.newly_created;
         if !self.first_require {
-            let composer_definition = self.json.as_mut().unwrap().read()?;
+            let composer_definition = self.json.as_ref().unwrap().borrow_mut().read()?;
             let require_count = composer_definition
                 .get("require")
                 .and_then(|v| v.as_array())
@@ -549,18 +553,8 @@ impl RequireCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            // TODO(phase-b): update_file takes &mut self, but the json argument must be borrowed
-            // from self.json, producing an overlapping borrow of self. Commented out until JsonFile
-            // is shared (Rc<RefCell> / interior mutability) so it can be passed without holding a
-            // borrow of self.
-            // self.update_file(
-            //     self.json.as_ref().unwrap(),
-            //     &requirements,
-            //     require_key,
-            //     remove_key,
-            //     sort_packages,
-            // );
-            let _ = sort_packages;
+            let json = self.json.as_ref().unwrap().clone();
+            self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
         }
 
         let updated_msg = format!(
@@ -635,7 +629,7 @@ impl RequireCommand {
         // finally
         if dry_run && self.newly_created {
             // @unlink($this->json->getPath());
-            unlink(self.json.as_ref().unwrap().get_path());
+            unlink(self.json.as_ref().unwrap().borrow().get_path());
         }
         signal_handler.unregister();
 
@@ -665,7 +659,13 @@ impl RequireCommand {
 
     /// @return array<string, string>
     fn get_packages_by_require_key(&mut self) -> IndexMap<String, String> {
-        let composer_definition = self.json.as_mut().unwrap().read().unwrap_or_default();
+        let composer_definition = self
+            .json
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .read()
+            .unwrap_or_default();
         let mut require: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut require_dev: IndexMap<String, PhpMixed> = IndexMap::new();
 
@@ -1122,18 +1122,8 @@ impl RequireCommand {
         }
 
         if !dry_run {
-            // TODO(phase-b): update_file takes &mut self while self.json is borrowed; needs
-            // refactor to pass the JsonFile owned/cloned or use interior mutability.
-            let json_path = self.json.as_ref().unwrap().get_path().to_string();
-            let _ = (
-                json_path,
-                &requirements,
-                require_key,
-                remove_key,
-                sort_packages,
-            );
-            todo!("call self.update_file without overlapping borrows of self.json");
-            #[allow(unreachable_code)]
+            let json = self.json.as_ref().unwrap().clone();
+            self.update_file(&json, &requirements, require_key, remove_key, sort_packages);
             if locker_is_locked
                 && composer
                     .get_config()
@@ -1160,7 +1150,7 @@ impl RequireCommand {
     /// @param array<string, string> $new
     fn update_file(
         &mut self,
-        json: &JsonFile,
+        json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
         new: &IndexMap<String, String>,
         require_key: &str,
         remove_key: &str,
@@ -1170,7 +1160,7 @@ impl RequireCommand {
             return;
         }
 
-        let composer_definition_mixed = self.json.as_mut().unwrap().read().unwrap_or_default();
+        let composer_definition_mixed = json.borrow_mut().read().unwrap_or_default();
         let mut composer_definition: IndexMap<String, Box<PhpMixed>> = composer_definition_mixed
             .as_array()
             .cloned()
@@ -1197,23 +1187,19 @@ impl RequireCommand {
                 composer_definition.shift_remove(remove_key);
             }
         }
-        let _ = self
-            .json
-            .as_ref()
-            .unwrap()
-            .write(PhpMixed::Array(composer_definition));
+        let _ = json.borrow().write(PhpMixed::Array(composer_definition));
     }
 
     /// @param array<string, string> $new
     fn update_file_cleanly(
         &self,
-        json: &JsonFile,
+        json: &std::rc::Rc<std::cell::RefCell<JsonFile>>,
         new: &IndexMap<String, String>,
         require_key: &str,
         remove_key: &str,
         sort_packages: bool,
     ) -> bool {
-        let contents = file_get_contents(json.get_path()).unwrap_or_default();
+        let contents = file_get_contents(json.borrow().get_path()).unwrap_or_default();
 
         let mut manipulator = match JsonManipulator::new(contents) {
             Ok(m) => m,
@@ -1237,7 +1223,10 @@ impl RequireCommand {
 
         let _ = manipulator.remove_main_key_if_empty(remove_key);
 
-        file_put_contents(json.get_path(), manipulator.get_contents().as_bytes());
+        file_put_contents(
+            json.borrow().get_path(),
+            manipulator.get_contents().as_bytes(),
+        );
 
         true
     }
@@ -1256,7 +1245,7 @@ impl RequireCommand {
                 self.file
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
-            unlink(self.json.as_ref().unwrap().get_path());
+            unlink(self.json.as_ref().unwrap().borrow().get_path());
             if file_exists(&self.lock) {
                 unlink(&self.lock);
             }
@@ -1272,7 +1261,7 @@ impl RequireCommand {
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
             file_put_contents(
-                self.json.as_ref().unwrap().get_path(),
+                self.json.as_ref().unwrap().borrow().get_path(),
                 self.composer_backup.as_bytes(),
             );
             if let Some(ref lock_backup) = self.lock_backup {

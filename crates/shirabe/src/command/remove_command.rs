@@ -270,7 +270,10 @@ impl RemoveCommand {
         let composer_backup = std::fs::read_to_string(json_file.get_path())?;
 
         let json_file_for_source = JsonFile::new(file.clone(), None, None)?;
-        let mut json = JsonConfigSource::new(json_file_for_source, false);
+        let mut json = JsonConfigSource::new(
+            std::rc::Rc::new(std::cell::RefCell::new(json_file_for_source)),
+            false,
+        );
 
         let r#type = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
             "require-dev"
@@ -464,7 +467,6 @@ impl RemoveCommand {
         let mut composer = crate::command::composer_full_mut(&composer_handle);
 
         if dry_run {
-            // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface; set_requires/set_dev_requires need &mut self; needs shared-ownership refactor
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
             links.insert("require".to_string(), root_package.get_requires().clone());
@@ -479,10 +481,8 @@ impl RemoveCommand {
                     }
                 }
             }
-            let _ = links.remove("require").unwrap_or_default();
-            let _ = links.remove("require-dev").unwrap_or_default();
-            // root_package.set_requires(links.remove("require").unwrap_or_default().into_values().collect());
-            // root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default().into_values().collect());
+            root_package.set_requires(links.remove("require").unwrap_or_default());
+            root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default());
         }
 
         // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, 'remove', input, output)

@@ -564,11 +564,14 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             let prefer_install = input.borrow().get_option("prefer-install");
             match prefer_install.as_string().unwrap_or("") {
                 "dist" => {
-                    // TODO(phase-b): InputInterface set_option needs &mut self
-                    let _ = "input.set_option('prefer-dist', true)";
+                    input
+                        .borrow_mut()
+                        .set_option("prefer-dist", PhpMixed::Bool(true))?;
                 }
                 "source" => {
-                    let _ = "input.set_option('prefer-source', true)";
+                    input
+                        .borrow_mut()
+                        .set_option("prefer-source", PhpMixed::Bool(true))?;
                 }
                 "auto" => {
                     prefer_dist = false;

@@ -15,7 +15,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     fn is_installed(
-        &self,
+        &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -23,7 +23,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn download(
-        &self,
+        &mut self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -31,7 +31,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -40,7 +40,7 @@ impl InstallerInterface for NoopInstaller {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -99,7 +99,7 @@ impl InstallerInterface for NoopInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String> {
         let target_dir = package.get_target_dir();
         let pretty_name = package.get_pretty_name();
 

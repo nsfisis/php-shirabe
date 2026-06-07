@@ -255,9 +255,8 @@ impl Installer {
             self.execute_operations = false;
             self.write_lock = false;
             self.dump_autoloader = false;
-            // TODO(phase-b): borrow conflict: passing &mut self.repository_manager while &self
-            // is implicit. Refactor mock_local_repositories or split borrow.
-            // self.mock_local_repositories(&mut self.repository_manager);
+            let repository_manager = self.repository_manager.clone();
+            self.mock_local_repositories(&mut repository_manager.borrow_mut())?;
         }
 
         if self.download_only {

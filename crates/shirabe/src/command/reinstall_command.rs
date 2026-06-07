@@ -195,17 +195,21 @@ impl ReinstallCommand {
         let download_manager = composer.get_download_manager();
         let package = composer.get_package();
 
-        // TODO(phase-b): InstallationManager setters need &mut self; conflicts with the &installation_manager / &local_repo / &package borrows held below; needs shared-ownership refactor
-        let _no_progress = !input
-            .borrow()
-            .get_option("no-progress")
-            .as_bool()
-            .unwrap_or(false);
-        let _no_plugins = input
+        installation_manager.borrow_mut().set_output_progress(
+            !input
+                .borrow()
+                .get_option("no-progress")
+                .as_bool()
+                .unwrap_or(false),
+        );
+        if input
             .borrow()
             .get_option("no-plugins")
             .as_bool()
-            .unwrap_or(false);
+            .unwrap_or(false)
+        {
+            installation_manager.borrow_mut().disable_plugins();
+        }
 
         download_manager
             .borrow_mut()

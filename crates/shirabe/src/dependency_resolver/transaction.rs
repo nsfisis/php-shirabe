@@ -231,10 +231,8 @@ impl Transaction {
         // TODO skip updates which don't update? is this needed? we shouldn't schedule this update in the first place?
         // if ('update' === $opType) { ... }
 
-        // PHP: return $this->operations = $operations;
-        // TODO(phase-b): self.operations assignment plus return — caller needs owned Vec
-        self.operations = todo!("operations cloned for both assignment and return");
-        todo!("return cloned operations")
+        self.operations = operations.clone();
+        operations
     }
 
     /// Determine which packages in the result are not required by any other packages in it.
@@ -339,19 +337,12 @@ impl Transaction {
                 // is this a plugin with no meaningful dependencies?
                 if is_downloads_modifying_plugin && requires.is_empty() {
                     // plugins with no dependencies go to the very front
-                    // TODO(phase-b): move ownership of operations[idx] into the new vec
-                    array_unshift(
-                        &mut dl_modifying_plugins_no_deps,
-                        todo!("operations[idx] moved out"),
-                    );
+                    array_unshift(&mut dl_modifying_plugins_no_deps, operations[idx].clone());
                 } else {
                     // capture the requirements for this package so those packages will be moved up as well
                     dl_modifying_plugin_requires.extend(requires);
                     // move the operation to the front
-                    array_unshift(
-                        &mut dl_modifying_plugins_with_deps,
-                        todo!("operations[idx] moved out"),
-                    );
+                    array_unshift(&mut dl_modifying_plugins_with_deps, operations[idx].clone());
                 }
 
                 to_remove.push(idx);
@@ -373,12 +364,12 @@ impl Transaction {
                 // is this a plugin with no meaningful dependencies?
                 if is_plugin && requires.is_empty() {
                     // plugins with no dependencies go to the very front
-                    array_unshift(&mut plugins_no_deps, todo!("operations[idx] moved out"));
+                    array_unshift(&mut plugins_no_deps, operations[idx].clone());
                 } else {
                     // capture the requirements for this package so those packages will be moved up as well
                     plugin_requires.extend(requires);
                     // move the operation to the front
-                    array_unshift(&mut plugins_with_deps, todo!("operations[idx] moved out"));
+                    array_unshift(&mut plugins_with_deps, operations[idx].clone());
                 }
 
                 to_remove.push(idx);
@@ -424,8 +415,7 @@ impl Transaction {
                     .downcast_ref::<MarkAliasUninstalledOperation>()
                     .is_some();
             if is_uninstall {
-                // TODO(phase-b): move ownership out of operations[idx]
-                uninst_ops.push(todo!("operations[idx] moved out"));
+                uninst_ops.push(op.clone());
                 to_remove.push(idx);
             }
         }

@@ -143,8 +143,6 @@ impl Forgejo {
         }
 
         // store value in local/user config
-        // TODO(phase-b): Config getters return references; cross-borrows of self.config.borrow()
-        // cannot live across method calls. Needs Rc<RefCell<dyn ConfigSourceInterface>> shape.
         let setting_key = format!("forgejo-token.{}", origin_url);
         {
             let mut cfg = self.config.borrow_mut();

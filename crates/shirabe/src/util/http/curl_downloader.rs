@@ -197,9 +197,7 @@ impl CurlDownloader {
             share_handle = Some(sh);
         }
 
-        // TODO(phase-b): clone io/config for AuthHelper construction without consuming.
-        let auth_helper =
-            AuthHelper::new(unsafe { std::mem::zeroed() }, unsafe { std::mem::zeroed() });
+        let auth_helper = AuthHelper::new(io.clone(), config.clone());
 
         let mut multi_errors: IndexMap<i64, Vec<String>> = IndexMap::new();
         multi_errors.insert(

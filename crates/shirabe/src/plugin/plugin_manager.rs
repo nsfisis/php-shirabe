@@ -126,19 +126,17 @@ impl PluginManager {
     pub fn load_installed_plugins(&mut self) -> anyhow::Result<()> {
         // TODO(plugin): plugin loading is part of the plugin API
         if !self.are_plugins_disabled("local") {
-            // TODO(phase-b): PHP returns a shared object reference; we clone the repository
-            // box here to side-step a borrow conflict between `&self.composer` and
-            // `&mut self`. The Rust port should eventually share via Rc<RefCell<_>>.
             let repo = self
                 .composer_full()
                 .borrow()
                 .get_repository_manager()
                 .borrow()
                 .get_local_repository();
-            let root_package = crate::package::RootPackageInterfaceHandle::dup(
-                self.composer_full().borrow().get_package(),
-            );
-            self.load_repository(&mut *repo.borrow_mut(), false, Some(root_package))?;
+            self.load_repository(
+                &mut *repo.borrow_mut(),
+                false,
+                Some(self.composer_full().borrow().get_package().clone()),
+            )?;
         }
 
         if self.global_composer.is_some() && !self.are_plugins_disabled("global") {

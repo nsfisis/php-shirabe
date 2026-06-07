@@ -2,7 +2,7 @@
 
 use shirabe_php_shim::PhpMixed;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TransportException {
     pub message: String,
     pub code: i64,

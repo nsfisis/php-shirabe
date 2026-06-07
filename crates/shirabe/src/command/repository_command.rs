@@ -25,7 +25,7 @@ pub struct RepositoryCommand {
     base_command_data: BaseCommandData,
 
     config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    config_file: Option<JsonFile>,
+    config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
     config_source: Option<JsonConfigSource>,
 }
 
@@ -95,8 +95,14 @@ impl RepositoryCommand {
             .as_string()
             .map(|s| s.to_string());
 
-        let config_data = self.config_file.as_mut().unwrap().read()?;
-        let config_file_path = self.config_file.as_ref().unwrap().get_path().to_string();
+        let config_data = self.config_file.as_ref().unwrap().borrow_mut().read()?;
+        let config_file_path = self
+            .config_file
+            .as_ref()
+            .unwrap()
+            .borrow()
+            .get_path()
+            .to_string();
         let config_data_map: IndexMap<String, PhpMixed> = match config_data {
             PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
@@ -416,12 +422,8 @@ impl BaseConfigCommand for RepositoryCommand {
         &mut self.config
     }
 
-    fn config_file(&self) -> Option<&JsonFile> {
+    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>> {
         self.config_file.as_ref()
-    }
-
-    fn config_file_mut(&mut self) -> Option<&mut JsonFile> {
-        self.config_file.as_mut()
     }
 
     fn config_source(&self) -> Option<&JsonConfigSource> {
@@ -432,7 +434,7 @@ impl BaseConfigCommand for RepositoryCommand {
         self.config_source.as_mut()
     }
 
-    fn set_config_file(&mut self, file: Option<JsonFile>) {
+    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
         self.config_file = file;
     }
 

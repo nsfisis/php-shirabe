@@ -459,7 +459,7 @@ impl RepositorySet {
     /// @param list<string>|null $allowedTypes Only packages of those types are allowed if set to non-null
     pub fn create_pool(
         &mut self,
-        request: Request,
+        mut request: Request,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         pool_optimizer: Option<PoolOptimizer>,
@@ -467,17 +467,34 @@ impl RepositorySet {
         allowed_types: Option<Vec<String>>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
     ) -> Result<Pool> {
+        let root_aliases = self
+            .root_aliases
+            .iter()
+            .map(|(name, versions)| {
+                let versions = versions
+                    .iter()
+                    .map(|(version, entry)| {
+                        let mut fields = IndexMap::new();
+                        fields.insert("alias".to_string(), entry.alias.clone());
+                        fields.insert(
+                            "alias_normalized".to_string(),
+                            entry.alias_normalized.clone(),
+                        );
+                        (version.clone(), fields)
+                    })
+                    .collect();
+                (name.clone(), versions)
+            })
+            .collect();
         let mut pool_builder = PoolBuilder::new(
             self.acceptable_stabilities.clone(),
             self.stability_flags.clone(),
-            // TODO(phase-b): clone root_aliases into PoolBuilder's expected type
-            todo!("self.root_aliases.clone()"),
+            root_aliases,
             self.root_references.clone(),
             io,
             event_dispatcher,
             pool_optimizer,
-            // TODO(phase-b): clone temporary_constraints
-            todo!("self.temporary_constraints.clone()"),
+            self.temporary_constraints.clone(),
             security_advisory_pool_filter,
         );
         pool_builder.set_ignored_types(ignored_types);
@@ -501,11 +518,7 @@ impl RepositorySet {
 
         self.locked = true;
 
-        // TODO(phase-b): pool_builder.build_pool takes owned Vec and &mut Request; revisit sharing model
-        pool_builder.build_pool(
-            todo!("share self.repositories"),
-            todo!("share request as &mut"),
-        )
+        pool_builder.build_pool(self.repositories.clone(), &mut request)
     }
 
     /// Create a pool for dependency resolution from the packages in this repository set.

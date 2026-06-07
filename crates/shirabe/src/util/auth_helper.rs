@@ -147,13 +147,7 @@ impl AuthHelper {
             .any(|v| v.as_string() == Some(origin));
 
         if in_github_domains {
-            let mut git_hub_util = GitHub::new(
-                // TODO(phase-b): clone or borrow io/config rather than moving
-                todo!("io clone"),
-                todo!("config clone"),
-                None,
-                None,
-            )?;
+            let mut git_hub_util = GitHub::new(self.io.clone(), self.config.clone(), None, None)?;
             let mut message = "\n".to_string();
 
             let rate_limited = git_hub_util.is_rate_limited(&headers);
@@ -258,13 +252,7 @@ impl AuthHelper {
                     "to go over the API rate limit"
                 },
             );
-            let mut git_lab_util = GitLab::new(
-                // TODO(phase-b): clone or borrow io/config rather than moving
-                todo!("io clone"),
-                todo!("config clone"),
-                None,
-                None,
-            )?;
+            let mut git_lab_util = GitLab::new(self.io.clone(), self.config.clone(), None, None)?;
 
             let mut auth: Option<IndexMap<String, Option<String>>> = None;
             if self.io.has_authentication(origin) {
@@ -330,14 +318,8 @@ impl AuthHelper {
                     .and_then(|v| v.clone())
                     .unwrap_or_default();
                 if username != "x-token-auth" {
-                    let mut bitbucket_util = Bitbucket::new(
-                        // TODO(phase-b): clone or borrow io/config rather than moving
-                        todo!("io clone"),
-                        todo!("config clone"),
-                        None,
-                        None,
-                        None,
-                    )?;
+                    let mut bitbucket_util =
+                        Bitbucket::new(self.io.clone(), self.config.clone(), None, None, None)?;
                     let password = auth
                         .get("password")
                         .and_then(|v| v.clone())
@@ -377,14 +359,8 @@ impl AuthHelper {
                         "go over the API rate limit"
                     },
                 );
-                let mut bit_bucket_util = Bitbucket::new(
-                    // TODO(phase-b): clone or borrow io/config rather than moving
-                    todo!("io clone"),
-                    todo!("config clone"),
-                    None,
-                    None,
-                    None,
-                )?;
+                let mut bit_bucket_util =
+                    Bitbucket::new(self.io.clone(), self.config.clone(), None, None, None)?;
                 if !bit_bucket_util.authorize_oauth(&origin)
                     && (!self.io.is_interactive()
                         || !bit_bucket_util
@@ -506,7 +482,7 @@ impl AuthHelper {
         }
 
         // PHP: $headers = &$options['http']['header'];
-        // TODO(phase-b): captured by reference; pushes below modify the same list
+        // The reference is emulated by writing `headers` back into options below.
         let mut headers: Vec<PhpMixed> = match options
             .get("http")
             .and_then(|v| v.as_array())

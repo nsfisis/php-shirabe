@@ -1641,14 +1641,14 @@ impl PlatformRepository {
                 name: self.overrides["php"].name.clone(),
                 version: self.overrides["php"].version.clone(),
             };
-            let mut overrider =
+            let overrider =
                 self.add_overridden_package(&php_override, Some(package.get_pretty_name()))?;
             let actual_text = if package.get_version() == overrider.get_version() {
                 "same as actual".to_string()
             } else {
                 format!("actual: {}", package.get_pretty_version())
             };
-            let current_description = overrider.get_description().unwrap_or("").to_string();
+            let current_description = overrider.get_description().unwrap_or_default();
             overrider.set_description(format!("{}, {}", current_description, actual_text));
 
             return Ok(());
@@ -1662,7 +1662,7 @@ impl PlatformRepository {
         &mut self,
         r#override: &PlatformOverride,
         name: Option<String>,
-    ) -> anyhow::Result<CompletePackage> {
+    ) -> anyhow::Result<CompletePackageHandle> {
         let version_str = match &r#override.version {
             PhpMixed::String(s) => s.clone(),
             _ => "".to_string(),
@@ -1681,14 +1681,11 @@ impl PlatformRepository {
         let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
         extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
         package.inner.set_extra(extra);
-        // TODO(phase-b): CompletePackage is a PHP class (shared by ref); cannot Clone.
-        // The container should likely store Rc<RefCell<CompletePackage>> so both the inner
-        // ArrayRepository and the function caller can share ownership.
-        let _: () = todo!("share CompletePackage via Rc between add_package and return");
+        let package = CompletePackageHandle::from_complete_package(package);
+        self.add_package(package.clone().into())?;
 
-        #[allow(unreachable_code)]
         if package.get_name() == "php" {
-            let parts = explode(".", package.get_version());
+            let parts = explode(".", &package.get_version());
             let head = array_slice_strs(&parts, 0, Some(3));
             *LAST_SEEN_PLATFORM_PHP.lock().unwrap() = Some(implode(".", &head));
         }

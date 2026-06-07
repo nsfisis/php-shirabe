@@ -70,9 +70,7 @@ pub struct VcsRepository {
     /// @var list<string>
     empty_references: Vec<String>,
     /// @var array<'tags'|'branches', array<string, TransportException>>
-    // TODO(phase-b): TransportException is a PHP class; uses Rc<T> for shared ownership.
-    version_transport_exceptions:
-        IndexMap<String, IndexMap<String, std::rc::Rc<TransportException>>>,
+    version_transport_exceptions: IndexMap<String, IndexMap<String, TransportException>>,
     /// @var ?EventDispatcher (preserved for plugin events)
     _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
@@ -277,7 +275,7 @@ impl VcsRepository {
     /// @return array<'tags'|'branches', array<string, TransportException>>
     pub fn get_version_transport_exceptions(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, std::rc::Rc<TransportException>>> {
+    ) -> &IndexMap<String, IndexMap<String, TransportException>> {
         &self.version_transport_exceptions
     }
 
@@ -543,15 +541,10 @@ impl VcsRepository {
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    // TODO(phase-b): TransportException is a PHP class (shared by ref). We only
-                    // have &TransportException from downcast_ref; obtaining the Rc requires the
-                    // anyhow::Error chain to carry an Rc. For now we insert a todo!() placeholder.
-                    let shared_te: std::rc::Rc<TransportException> =
-                        todo!("share TransportException via Rc through anyhow::Error chain");
                     self.version_transport_exceptions
                         .entry("tags".to_string())
                         .or_insert_with(IndexMap::new)
-                        .insert(tag.clone(), shared_te);
+                        .insert(tag.clone(), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
                     }
@@ -728,14 +721,10 @@ impl VcsRepository {
             })();
             if let Err(e) = result {
                 if let Some(te) = e.downcast_ref::<TransportException>() {
-                    // TODO(phase-b): TransportException is a PHP class (shared by ref).
-                    // See the matching tags block above; same Rc story applies.
-                    let shared_te: std::rc::Rc<TransportException> =
-                        todo!("share TransportException via Rc through anyhow::Error chain");
                     self.version_transport_exceptions
                         .entry("branches".to_string())
                         .or_insert_with(IndexMap::new)
-                        .insert(branch.clone(), shared_te);
+                        .insert(branch.clone(), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.push(identifier.clone());
                     }

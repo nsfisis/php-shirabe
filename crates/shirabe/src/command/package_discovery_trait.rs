@@ -260,8 +260,11 @@ pub trait PackageDiscoveryTrait {
                 Some(s) => s.to_string(),
                 None => break,
             };
-            // TODO(phase-b): self.get_repos() (&mut self) conflicts with io borrow (&self)
-            let mut matches: Vec<SearchResult> = todo!("self.get_repos().search()");
+            let mut matches: Vec<SearchResult> = self.get_repos().search(
+                package.clone(),
+                crate::repository::repository_interface::SEARCH_FULLTEXT,
+                None,
+            )?;
 
             if count(&PhpMixed::List(
                 matches.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
@@ -291,9 +294,8 @@ pub trait PackageDiscoveryTrait {
 
                 // no match, prompt which to pick
                 if !exact_match {
-                    // TODO(phase-b): self.get_repos() (&mut self) conflicts with io borrow (&self)
                     let providers: IndexMap<String, crate::repository::ProviderInfo> =
-                        todo!("self.get_repos().get_providers()");
+                        self.get_repos().get_providers(package.clone())?;
                     if count(&PhpMixed::List(
                         providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
                     )) > 0
@@ -449,7 +451,7 @@ pub trait PackageDiscoveryTrait {
                             let (_name, c): (String, String) = self
                                 .find_best_version_and_name_for_package(
                                     io.clone(),
-                                    input,
+                                    input.clone(),
                                     &package,
                                     platform_repo,
                                     preferred_stability,

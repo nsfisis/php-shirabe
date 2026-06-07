@@ -30,7 +30,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     fn is_installed(
-        &self,
+        &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool {
@@ -38,7 +38,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn download(
-        &self,
+        &mut self,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
@@ -46,7 +46,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -55,7 +55,7 @@ impl InstallerInterface for MetapackageInstaller {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         _type: &str,
         _package: PackageInterfaceHandle,
         _prev_package: Option<PackageInterfaceHandle>,
@@ -132,7 +132,7 @@ impl InstallerInterface for MetapackageInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
         None
     }
 }

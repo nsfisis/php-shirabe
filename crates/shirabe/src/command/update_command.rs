@@ -518,9 +518,7 @@ impl UpdateCommand {
                     io_interface::NORMAL,
                 );
                 let mut bump_command = BumpCommand::new(None);
-                // TODO(phase-b): Composer is a PHP class shared by reference; calling
-                // set_composer here requires a shared PartialComposer handle.
-                // bump_command.set_composer(composer);
+                bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(
                     io.clone(),
                     bump_after_update.as_string() == Some("dev"),

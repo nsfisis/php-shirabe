@@ -18,7 +18,7 @@ use crate::util::Filesystem;
 #[derive(Debug)]
 pub struct JsonConfigSource {
     /// @var JsonFile
-    file: JsonFile,
+    file: std::rc::Rc<std::cell::RefCell<JsonFile>>,
 
     /// @var bool
     auth_config: bool,
@@ -26,7 +26,7 @@ pub struct JsonConfigSource {
 
 impl JsonConfigSource {
     /// Constructor
-    pub fn new(file: JsonFile, auth_config: bool) -> Self {
+    pub fn new(file: std::rc::Rc<std::cell::RefCell<JsonFile>>, auth_config: bool) -> Self {
         Self { file, auth_config }
     }
 
@@ -39,30 +39,30 @@ impl JsonConfigSource {
         mut args: Vec<PhpMixed>,
     ) -> Result<()> {
         let contents;
-        if self.file.exists() {
-            if !is_writable(self.file.get_path()) {
+        if self.file.borrow().exists() {
+            if !is_writable(self.file.borrow().get_path()) {
                 return Err(RuntimeException {
                     message: sprintf(
                         "The file \"%s\" is not writable.",
-                        &[PhpMixed::String(self.file.get_path().to_string())],
+                        &[PhpMixed::String(self.file.borrow().get_path().to_string())],
                     ),
                     code: 0,
                 }
                 .into());
             }
 
-            if !Filesystem::is_readable(self.file.get_path()) {
+            if !Filesystem::is_readable(self.file.borrow().get_path()) {
                 return Err(RuntimeException {
                     message: sprintf(
                         "The file \"%s\" is not readable.",
-                        &[PhpMixed::String(self.file.get_path().to_string())],
+                        &[PhpMixed::String(self.file.borrow().get_path().to_string())],
                     ),
                     code: 0,
                 }
                 .into());
             }
 
-            contents = file_get_contents(self.file.get_path()).unwrap_or_default();
+            contents = file_get_contents(self.file.borrow().get_path()).unwrap_or_default();
         } else if self.auth_config {
             contents = "{\n}\n".to_string();
         } else {
@@ -71,7 +71,7 @@ impl JsonConfigSource {
 
         let mut manipulator = JsonManipulator::new(contents.clone())?;
 
-        let new_file = !self.file.exists();
+        let new_file = !self.file.borrow().exists();
 
         // override manipulator method for auth config files
         let mut method = method.to_string();
@@ -103,10 +103,13 @@ impl JsonConfigSource {
         .as_bool()
         .unwrap_or(false);
         if manipulator_result {
-            file_put_contents(self.file.get_path(), manipulator.get_contents().as_bytes());
+            file_put_contents(
+                self.file.borrow().get_path(),
+                manipulator.get_contents().as_bytes(),
+            );
         } else {
             // on failed clean update, call the fallback and rewrite the whole file
-            let mut config = self.file.read()?;
+            let mut config = self.file.borrow_mut().read()?;
             self.array_unshift_ref(&mut args, &mut config);
             fallback(&mut config, &mut args);
             // avoid ending up with arrays for keys that should be objects
@@ -199,17 +202,21 @@ impl JsonConfigSource {
                     }
                 }
             }
-            self.file.write(config)?;
+            self.file.borrow().write(config)?;
         }
 
-        match self.file.validate_schema(JsonFile::LAX_SCHEMA, None) {
+        match self
+            .file
+            .borrow()
+            .validate_schema(JsonFile::LAX_SCHEMA, None)
+        {
             Ok(_) => {}
             Err(e) => {
                 let Some(jve) = e.downcast_ref::<JsonValidationException>() else {
                     return Err(e);
                 };
                 // restore contents to the original state
-                file_put_contents(self.file.get_path(), contents.as_bytes());
+                file_put_contents(self.file.borrow().get_path(), contents.as_bytes());
                 return Err(RuntimeException {
                     message: format!(
                         "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
@@ -223,7 +230,7 @@ impl JsonConfigSource {
         }
 
         if new_file {
-            let path = self.file.get_path().to_string();
+            let path = self.file.borrow().get_path().to_string();
             let _ = Silencer::call(|| {
                 chmod(&path, 0o600);
                 Ok(())
@@ -250,7 +257,7 @@ impl JsonConfigSource {
 
 impl ConfigSourceInterface for JsonConfigSource {
     fn get_name(&self) -> String {
-        self.file.get_path().to_string()
+        self.file.borrow().get_path().to_string()
     }
 
     fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> Result<()> {

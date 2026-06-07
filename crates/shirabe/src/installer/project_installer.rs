@@ -36,7 +36,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     fn is_installed(
-        &self,
+        &mut self,
         _repo: &dyn InstalledRepositoryInterface,
         _package: PackageInterfaceHandle,
     ) -> bool {
@@ -44,7 +44,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -69,7 +69,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn prepare(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -81,7 +81,7 @@ impl InstallerInterface for ProjectInstaller {
     }
 
     async fn cleanup(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -128,7 +128,7 @@ impl InstallerInterface for ProjectInstaller {
         .into())
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&mut self, _package: PackageInterfaceHandle) -> Option<String> {
         Some(self.install_path.clone())
     }
 }

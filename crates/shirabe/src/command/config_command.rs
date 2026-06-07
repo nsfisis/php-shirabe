@@ -38,10 +38,10 @@ pub struct ConfigCommand {
     base_command_data: BaseCommandData,
 
     config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
-    config_file: Option<JsonFile>,
+    config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
     config_source: Option<JsonConfigSource>,
 
-    pub(crate) auth_config_file: Option<JsonFile>,
+    pub(crate) auth_config_file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>,
     pub(crate) auth_config_source: Option<JsonConfigSource>,
 }
 
@@ -128,20 +128,19 @@ impl ConfigCommand {
         let auth_config_file =
             self.get_auth_config_file(input.clone(), &*self.config.as_ref().unwrap().borrow());
 
-        self.auth_config_file = Some(JsonFile::new(
+        let auth_config_file_jf = std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
             auth_config_file,
             None,
             Some(self.get_io().clone()),
-        )?);
-        // TODO(phase-b): JsonConfigSource::new takes owned JsonFile (PHP sharing semantics).
-        // Skipping auth_config_source assignment until Rc<RefCell<JsonFile>> refactor lands.
-        self.auth_config_source = None;
+        )?));
+        self.auth_config_file = Some(auth_config_file_jf.clone());
+        self.auth_config_source = Some(JsonConfigSource::new(auth_config_file_jf, true));
 
         // Initialize the global file if it's not there, ignoring any warnings or notices
         if input.borrow().get_option("global").as_bool() == Some(true)
-            && !self.auth_config_file.as_ref().unwrap().exists()
+            && !self.auth_config_file.as_ref().unwrap().borrow().exists()
         {
-            touch(self.auth_config_file.as_ref().unwrap().get_path());
+            touch(self.auth_config_file.as_ref().unwrap().borrow().get_path());
             let mut empty_objs: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
             for k in &[
                 "bitbucket-oauth",
@@ -158,13 +157,15 @@ impl ConfigCommand {
                 );
             }
             self.auth_config_file
-                .as_mut()
+                .as_ref()
                 .unwrap()
+                .borrow()
                 .write(PhpMixed::Array(empty_objs))?;
             let path_clone = self
                 .auth_config_file
                 .as_ref()
                 .unwrap()
+                .borrow()
                 .get_path()
                 .to_string();
             Silencer::call(|| {
@@ -205,10 +206,16 @@ impl ConfigCommand {
                 self.auth_config_file
                     .as_ref()
                     .unwrap()
+                    .borrow()
                     .get_path()
                     .to_string()
             } else {
-                self.config_file.as_ref().unwrap().get_path().to_string()
+                self.config_file
+                    .as_ref()
+                    .unwrap()
+                    .borrow()
+                    .get_path()
+                    .to_string()
             };
             system(
                 &format!(
@@ -228,7 +235,7 @@ impl ConfigCommand {
         }
 
         if input.borrow().get_option("global").as_bool() != Some(true) {
-            let config_read = self.config_file.as_mut().unwrap().read()?;
+            let config_read = self.config_file.as_ref().unwrap().borrow_mut().read()?;
             let config_map = match config_read {
                 PhpMixed::Array(m) => m
                     .into_iter()
@@ -236,23 +243,25 @@ impl ConfigCommand {
                     .collect::<IndexMap<String, PhpMixed>>(),
                 _ => IndexMap::new(),
             };
-            self.config
-                .as_mut()
-                .unwrap()
-                .borrow_mut()
-                .merge(&config_map, self.config_file.as_ref().unwrap().get_path());
-            let auth_data: PhpMixed = if self.auth_config_file.as_ref().unwrap().exists() {
-                self.auth_config_file.as_mut().unwrap().read()?
+            self.config.as_mut().unwrap().borrow_mut().merge(
+                &config_map,
+                self.config_file.as_ref().unwrap().borrow().get_path(),
+            );
+            let auth_data: PhpMixed = if self.auth_config_file.as_ref().unwrap().borrow().exists() {
+                self.auth_config_file
+                    .as_ref()
+                    .unwrap()
+                    .borrow_mut()
+                    .read()?
             } else {
                 PhpMixed::Array(IndexMap::new())
             };
             let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
             wrap.insert("config".to_string(), auth_data);
-            self.config
-                .as_mut()
-                .unwrap()
-                .borrow_mut()
-                .merge(&wrap, self.auth_config_file.as_ref().unwrap().get_path());
+            self.config.as_mut().unwrap().borrow_mut().merge(
+                &wrap,
+                self.auth_config_file.as_ref().unwrap().borrow().get_path(),
+            );
         }
 
         {
@@ -321,7 +330,7 @@ impl ConfigCommand {
             properties_defaults.insert("license".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("suggest".to_string(), PhpMixed::List(vec![]));
             properties_defaults.insert("extra".to_string(), PhpMixed::List(vec![]));
-            let raw_data = self.config_file.as_mut().unwrap().read()?;
+            let raw_data = self.config_file.as_ref().unwrap().borrow_mut().read()?;
             let mut data = self.config.as_ref().unwrap().borrow_mut().all(0)?;
             let mut source = self
                 .config
@@ -464,7 +473,13 @@ impl ConfigCommand {
                 && in_array(setting_key.as_str().into(), &properties.into(), true)
             {
                 value = (**raw_data.as_array().unwrap().get(&setting_key).unwrap()).clone();
-                source = self.config_file.as_ref().unwrap().get_path().to_string();
+                source = self
+                    .config_file
+                    .as_ref()
+                    .unwrap()
+                    .borrow()
+                    .get_path()
+                    .to_string();
             } else if let Some(v) = properties_defaults.get(&setting_key) {
                 value = v.clone();
                 source = "defaults".to_string();
@@ -772,7 +787,8 @@ impl ConfigCommand {
             if input.borrow().get_option("json").as_bool() == Some(true) {
                 value = JsonFile::parse_json(Some(&values[0]), Some("composer.json"))?;
                 if input.borrow().get_option("merge").as_bool() == Some(true) {
-                    let current_value_outer = self.config_file.as_mut().unwrap().read()?;
+                    let current_value_outer =
+                        self.config_file.as_ref().unwrap().borrow_mut().read()?;
                     let bits = explode(".", &setting_key);
                     let mut current_value: PhpMixed = current_value_outer;
                     for bit in &bits {
@@ -922,7 +938,7 @@ impl ConfigCommand {
             }
 
             if input.borrow().get_option("merge").as_bool() == Some(true) {
-                let current_config = self.config_file.as_mut().unwrap().read()?;
+                let current_config = self.config_file.as_ref().unwrap().borrow_mut().read()?;
                 let key_suffix = str_replace("audit.", "", &setting_key);
                 let current_value = current_config
                     .as_array()
@@ -2071,15 +2087,11 @@ impl BaseConfigCommand for ConfigCommand {
         &mut self.config
     }
 
-    fn config_file(&self) -> Option<&JsonFile> {
+    fn config_file(&self) -> Option<&std::rc::Rc<std::cell::RefCell<JsonFile>>> {
         self.config_file.as_ref()
     }
 
-    fn config_file_mut(&mut self) -> Option<&mut JsonFile> {
-        self.config_file.as_mut()
-    }
-
-    fn set_config_file(&mut self, file: Option<JsonFile>) {
+    fn set_config_file(&mut self, file: Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>) {
         self.config_file = file;
     }
 

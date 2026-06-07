@@ -373,11 +373,7 @@ impl ShowCommand {
             locked_repo = Some(lr_handle);
         } else {
             // --installed / default case
-            // TODO(phase-b): PHP shares the Composer object by reference. Phase B
-            // can't clone Composer, so we re-fetch via require_composer when missing
-            // but otherwise borrow the existing Option.
             let composer_local_owned;
-            // Borrow guards that keep the Ref alive for the duration of the block.
             let _guard_from_existing;
             let composer_local = match composer.as_ref() {
                 Some(c) => {
@@ -1084,11 +1080,14 @@ impl ShowCommand {
                             }
                         }
                         if write_path {
-                            // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares by ref.
-                            let path: Option<String> = {
-                                let _ = composer.as_ref().unwrap();
-                                None
-                            };
+                            let installation_manager = composer
+                                .as_ref()
+                                .unwrap()
+                                .borrow_partial()
+                                .get_installation_manager();
+                            let path: Option<String> = installation_manager
+                                .borrow_mut()
+                                .get_install_path(package.clone());
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
                                 let trimmed =
@@ -1702,11 +1701,12 @@ impl ShowCommand {
             package.get_dist_reference().unwrap_or_default()
         ));
         if is_installed_package {
-            // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares by ref.
-            // Skipping the install path lookup keeps compile clean.
             let path: Option<String> = self.require_composer(None, None).ok().and_then(|c| {
-                let _ = c;
-                None::<String>
+                let installation_manager = c.borrow_partial().get_installation_manager();
+                let p = installation_manager
+                    .borrow_mut()
+                    .get_install_path(package.clone().into());
+                p
             });
             if let Some(p) = path {
                 self.get_io().write(&format!(
@@ -1982,9 +1982,11 @@ impl ShowCommand {
         if !PlatformRepository::is_platform_package(&package.get_name())
             && installed_repo.has_package(package.clone().into())
         {
-            // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares by ref.
-            let _ = self.require_composer(None, None)?;
-            let path: Option<String> = None;
+            let composer = self.require_composer(None, None)?;
+            let installation_manager = composer.borrow_partial().get_installation_manager();
+            let path: Option<String> = installation_manager
+                .borrow_mut()
+                .get_install_path(package.clone().into());
             match path {
                 Some(p) => {
                     if let Some(r) = realpath(&p) {

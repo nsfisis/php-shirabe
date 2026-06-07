@@ -646,19 +646,16 @@ RGv89BPD+2DLnJysngsvVaUCAwEAAQ==\n\
             .as_bool()
             .unwrap_or(false)
         {
-            // TODO(phase-b): self.clean_backups conflicts with earlier `self.get_io()` borrow
+            self.clean_backups(&rollback_dir, None);
         }
 
-        // TODO(phase-b): self.set_local_phar mutable borrow conflicts with earlier `self.get_io()` borrow
-        let _set_phar_ok: bool = todo!("self.set_local_phar(...)");
-        if !_set_phar_ok {
+        if !self.set_local_phar(&local_filename, &temp_filename, Some(&backup_file))? {
             // @unlink
             let _ = unlink(&temp_filename);
 
             return Ok(1);
         }
 
-        // TODO(phase-b): re-borrow io because earlier borrow conflicts with the &mut self calls above
         let io = self.get_io();
         if file_exists(&backup_file) {
             io.write_error3(

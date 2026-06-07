@@ -261,8 +261,6 @@ impl GitHub {
             }
         }
 
-        // TODO(phase-b): Config getters return references; cross-borrow chains require
-        // Rc<RefCell<dyn ConfigSourceInterface>> shape. For now use _mut variants.
         let use_local = store_in_local_auth_config
             && self
                 .config

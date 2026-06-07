@@ -85,8 +85,7 @@ impl SvnDriver {
         }
 
         self.inner.cache = Some(Cache::new(
-            // TODO(phase-b): pass io by reference/clone
-            todo!("self.inner.io clone"),
+            self.inner.io.clone(),
             &format!(
                 "{}/{}",
                 self.inner
@@ -551,10 +550,9 @@ impl SvnDriver {
         if self.util.is_none() {
             self.util = Some(SvnUtil::new(
                 self.base_url.clone(),
-                // TODO(phase-b): clone or borrow io/config
-                todo!("self.inner.io clone"),
-                todo!("self.inner.config clone"),
-                Some(todo!("self.inner.process clone")),
+                self.inner.io.clone(),
+                self.inner.config.clone(),
+                Some(self.inner.process.clone()),
             ));
             self.util
                 .as_mut()

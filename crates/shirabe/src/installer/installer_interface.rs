@@ -11,19 +11,19 @@ pub trait InstallerInterface: std::fmt::Debug {
     fn supports(&self, package_type: &str) -> bool;
 
     fn is_installed(
-        &self,
+        &mut self,
         repo: &dyn InstalledRepositoryInterface,
         package: PackageInterfaceHandle,
     ) -> bool;
 
     async fn download(
-        &self,
+        &mut self,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
@@ -49,13 +49,13 @@ pub trait InstallerInterface: std::fmt::Debug {
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn cleanup(
-        &self,
+        &mut self,
         r#type: &str,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&mut self, package: PackageInterfaceHandle) -> Option<String>;
 
     fn as_binary_presence_interface(&mut self) -> Option<&mut dyn BinaryPresenceInterface> {
         None

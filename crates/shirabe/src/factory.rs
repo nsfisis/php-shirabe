@@ -295,7 +295,10 @@ impl Factory {
             config.merge(&read_data, &file_path_owned);
         }
         // TODO(phase-b): set_config_source takes Box<dyn ConfigSourceInterface>
-        config.set_config_source(Box::new(JsonConfigSource::new(file, false)));
+        config.set_config_source(Box::new(JsonConfigSource::new(
+            std::rc::Rc::new(std::cell::RefCell::new(file)),
+            false,
+        )));
 
         let htaccess_protect = config.get("htaccess-protect").as_bool().unwrap_or(false);
         if htaccess_protect {
@@ -359,7 +362,10 @@ impl Factory {
             config.merge(&wrapped, &auth_path_owned);
         }
         // TODO(phase-b): set_auth_config_source takes Box<dyn ConfigSourceInterface>
-        config.set_auth_config_source(Box::new(JsonConfigSource::new(auth_file, true)));
+        config.set_auth_config_source(Box::new(JsonConfigSource::new(
+            std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
+            true,
+        )));
 
         Self::load_composer_auth_env(&mut config, io)?;
 
@@ -526,11 +532,11 @@ impl Factory {
                 crate::io::DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
-                JsonFile::new(
+                std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                     realpath(composer_file_path).unwrap_or_default(),
                     None,
                     Some(io.clone()),
-                )?,
+                )?)),
                 false,
             )));
 
@@ -557,7 +563,7 @@ impl Factory {
                 let auth_path = local_auth_file.get_path().to_string();
                 config.merge(&wrapped, &auth_path);
                 config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
-                    local_auth_file,
+                    std::rc::Rc::new(std::cell::RefCell::new(local_auth_file)),
                     true,
                 )));
             }

@@ -113,8 +113,7 @@ impl CreateProjectCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
-        // TODO(phase-b): get_io returns &mut Self-borrow; clone_box for an owned Box to dodge.
-        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io().clone();
+        let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
 
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
@@ -345,7 +344,11 @@ impl CreateProjectCommand {
                         &placeholder_existing,
                     );
                     let mut config_source = JsonConfigSource::new(
-                        JsonFile::new("composer.json".to_string(), None, None)?,
+                        std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
+                            "composer.json".to_string(),
+                            None,
+                            None,
+                        )?)),
                         false,
                     );
 
@@ -544,7 +547,11 @@ impl CreateProjectCommand {
         if !has_vcs {
             let package = composer.get_package();
             let mut config_source = JsonConfigSource::new(
-                JsonFile::new("composer.json".to_string(), None, None)?,
+                std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
+                    "composer.json".to_string(),
+                    None,
+                    None,
+                )?)),
                 false,
             );
             for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
