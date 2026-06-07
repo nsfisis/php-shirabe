@@ -197,6 +197,8 @@ impl InstallationManager {
             }),
         );
 
+        let all_operations: Vec<std::rc::Rc<dyn OperationInterface>> = operations.clone();
+
         let result: Result<()> = (|| -> Result<()> {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
@@ -247,8 +249,7 @@ impl InstallationManager {
                         dev_mode,
                         run_scripts,
                         download_only,
-                        // TODO(phase-b): allOperations should be the original full list; would require clone
-                        vec![],
+                        all_operations.clone(),
                     ),
                 )?;
             }

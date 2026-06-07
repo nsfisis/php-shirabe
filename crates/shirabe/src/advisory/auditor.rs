@@ -81,10 +81,8 @@ impl Auditor {
         ignore_unreachable: bool,
         ignore_abandoned: IndexMap<String, Option<String>>,
     ) -> Result<i64> {
-        // TODO(phase-b): packages is moved into get_matching_security_advisories; PHP keeps the
-        // original $packages alive — needs cloning/borrowing strategy for trait objects
         let result = repo_set.get_matching_security_advisories(
-            packages,
+            packages.clone(),
             format == Self::FORMAT_SUMMARY,
             ignore_unreachable,
         )?;
@@ -96,9 +94,11 @@ impl Auditor {
         if format == Self::FORMAT_SUMMARY
             && self.needs_complete_advisory_load(&all_advisories, &ignore_list)
         {
-            // TODO(phase-b): $packages reused here; see note above
-            let result =
-                repo_set.get_matching_security_advisories(vec![], false, ignore_unreachable)?;
+            let result = repo_set.get_matching_security_advisories(
+                packages.clone(),
+                false,
+                ignore_unreachable,
+            )?;
             all_advisories = result.advisories;
             unreachable_repos.extend(result.unreachable_repos);
         }
@@ -112,8 +112,7 @@ impl Auditor {
         if abandoned == Self::ABANDONED_IGNORE {
             abandoned_packages = vec![];
         } else {
-            // TODO(phase-b): $packages reused here; see note above
-            abandoned_packages = self.filter_abandoned_packages(&[], &ignore_abandoned)?;
+            abandoned_packages = self.filter_abandoned_packages(&packages, &ignore_abandoned)?;
             if abandoned == Self::ABANDONED_FAIL {
                 abandoned_count = abandoned_packages.len() as i64;
             }

@@ -621,10 +621,13 @@ impl ChangeReportInterface for FileDownloader {
         package: PackageInterfaceHandle,
         path: &str,
     ) -> Result<Option<String>> {
-        // TODO(phase-b): swap self.io to NullIO and restore — needs a take/swap helper
-
-        let mut null_io = NullIO::new();
-        null_io.load_configuration(&mut *self.config.borrow_mut())?;
+        let prev_io = std::mem::replace(
+            &mut self.io,
+            std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
+        );
+        self.io
+            .borrow_mut()
+            .load_configuration(&mut *self.config.borrow_mut())?;
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         // PHP attaches an onRejected handler to capture the error and drives the promise via
@@ -664,7 +667,7 @@ impl ChangeReportInterface for FileDownloader {
             Ok(output)
         })();
 
-        // TODO(phase-b): restore self.io = prev_io
+        self.io = prev_io;
 
         let (e, output) = match result {
             Ok(output) => (None, output),

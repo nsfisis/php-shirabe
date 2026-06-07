@@ -850,23 +850,6 @@ impl ProcessExecutor {
     }
 }
 
-impl Clone for ProcessExecutor {
-    fn clone(&self) -> Self {
-        // TODO(phase-b): cloning ProcessExecutor is incidental to Phase A — share state
-        // properly in a Phase B refactor
-        Self {
-            capture_output: self.capture_output,
-            error_output: self.error_output.clone(),
-            io: None,
-            jobs: IndexMap::new(),
-            running_jobs: 0,
-            max_jobs: self.max_jobs,
-            id_gen: 0,
-            allow_async: self.allow_async,
-        }
-    }
-}
-
 /// Phase B helper trait: convert various command argument forms into `PhpMixed`.
 pub trait IntoExecCommand {
     fn into_exec_command(self) -> PhpMixed;

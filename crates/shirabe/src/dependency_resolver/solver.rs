@@ -185,11 +185,8 @@ impl Solver {
         &mut self,
         request: &Request,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
-    ) {
+    ) -> anyhow::Result<()> {
         for (package_name, constraint) in request.get_requires() {
-            // TODO(phase-b): ConstraintInterface is a PHP class — Box<dyn ConstraintInterface>
-            // cannot be cloned. We borrow the original constraint and only allocate a fresh
-            // box when the ignore filter rewrites it.
             let mut filtered: Option<AnyConstraint> = None;
             let constraint_ref: &AnyConstraint = constraint;
             if platform_requirement_filter.is_ignored(package_name) {
@@ -198,11 +195,11 @@ impl Solver {
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
-                // TODO(phase-b): filter_constraint consumes its boxed constraint and would
-                // need an owned clone of the original. Skipping rewrite until Constraint
-                // ownership is reworked.
-                let _ = ignore_filter;
-                let _ = &mut filtered;
+                filtered = Some(ignore_filter.filter_constraint(
+                    package_name,
+                    constraint.clone(),
+                    true,
+                )?);
             }
 
             let active_constraint: &AnyConstraint = filtered.as_ref().unwrap_or(constraint_ref);
@@ -235,6 +232,8 @@ impl Solver {
                 self.problems.push(problem);
             }
         }
+
+        Ok(())
     }
 
     pub fn solve(
@@ -255,7 +254,7 @@ impl Solver {
         let _ = platform_requirement_filter.as_ref();
         self.rules = rule_set_generator.get_rules_for(request, None)?;
         drop(rule_set_generator);
-        self.check_for_root_require_problems(request, platform_requirement_filter.as_ref());
+        self.check_for_root_require_problems(request, platform_requirement_filter.as_ref())?;
         self.decisions = Decisions::new(self.pool.clone());
         self.watch_graph = RuleWatchGraph::new();
 

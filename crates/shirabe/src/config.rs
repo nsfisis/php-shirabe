@@ -41,8 +41,6 @@ pub struct Config {
     warned_hosts: IndexMap<String, bool>,
     /// @var array<string, true>
     ssl_verify_warned_hosts: IndexMap<String, bool>,
-    /// @var array<string, string>
-    // TODO(phase-b): RefCell to allow `&self` access from Config::get / get_with_flags.
     source_of_config_value: RefCell<IndexMap<String, String>>,
 }
 

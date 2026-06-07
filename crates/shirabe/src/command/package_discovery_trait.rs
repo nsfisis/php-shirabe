@@ -531,8 +531,7 @@ pub trait PackageDiscoveryTrait {
             name,
             None,
             preferred_stability,
-            // TODO(phase-b): Box<dyn ...> cannot be cloned; original PHP shares reference
-            Some(PlatformRequirementFilterFactory::ignore_nothing()),
+            Some(platform_requirement_filter.clone()),
             0,
             None,
             shirabe_php_shim::PhpMixed::Null,
@@ -620,8 +619,7 @@ pub trait PackageDiscoveryTrait {
                 name,
                 None,
                 preferred_stability,
-                // TODO(phase-b): Box<dyn ...> cannot be cloned; reusing factory result
-                Some(PlatformRequirementFilterFactory::ignore_nothing()),
+                Some(platform_requirement_filter.clone()),
                 RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
                 None,
                 shirabe_php_shim::PhpMixed::Null,

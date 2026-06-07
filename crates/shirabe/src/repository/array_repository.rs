@@ -24,8 +24,6 @@ use crate::repository::{
 /// A repository implementation that simply stores packages in an array
 #[derive(Debug)]
 pub struct ArrayRepository {
-    /// @var ?array<BasePackage>
-    // TODO(phase-b): RefCell models PHP's lazy init via getPackages()/count() under &self
     pub(crate) packages: RefCell<Option<Vec<BasePackageHandle>>>,
 
     /// @var ?array<BasePackage> indexed by package unique name and used to cache hasPackage calls

@@ -718,19 +718,17 @@ impl UpdateCommand {
             IndexMap::new(),
             IndexMap::new(),
         );
-        // TODO(phase-b): array_filter requires Clone on Box<dyn RepositoryInterface>
-        // which PHP classes must not implement. Skipping the repo filter for now.
-        let _ = &composer
+        let repositories: Vec<crate::repository::RepositoryInterfaceHandle> = composer
             .get_repository_manager()
             .borrow()
-            .get_repositories();
-        let _ = |repository: &crate::repository::RepositoryInterfaceHandle| -> bool {
-            !repository.is::<PlatformRepository>()
-        };
+            .get_repositories()
+            .iter()
+            .filter(|repository| !repository.is::<PlatformRepository>())
+            .cloned()
+            .collect();
         repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
-            CompositeRepository::new(Vec::new()),
+            CompositeRepository::new(repositories),
         ))?;
-        let _ = array_filter::<i64, fn(&i64) -> bool>;
 
         VersionSelector::new(
             std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
