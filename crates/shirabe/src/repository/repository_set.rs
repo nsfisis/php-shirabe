@@ -459,7 +459,7 @@ impl RepositorySet {
     /// @param list<string>|null $allowedTypes Only packages of those types are allowed if set to non-null
     pub fn create_pool(
         &mut self,
-        mut request: Request,
+        request: &mut Request,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         pool_optimizer: Option<PoolOptimizer>,
@@ -518,7 +518,7 @@ impl RepositorySet {
 
         self.locked = true;
 
-        pool_builder.build_pool(self.repositories.clone(), &mut request)
+        pool_builder.build_pool(self.repositories.clone(), request)
     }
 
     /// Create a pool for dependency resolution from the packages in this repository set.
@@ -625,7 +625,7 @@ impl RepositorySet {
         }
 
         self.create_pool(
-            request,
+            &mut request,
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
             None,
             None,

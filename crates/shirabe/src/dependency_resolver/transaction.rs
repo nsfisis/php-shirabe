@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/DependencyResolver/Transaction.php
 
 use indexmap::IndexMap;
+use indexmap::IndexSet;
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
 };
@@ -11,12 +12,13 @@ use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
 use crate::dependency_resolver::operation::UpdateOperation;
+use crate::package::AliasPackageHandle;
 use crate::package::Link;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::PlatformRepository;
 
 /// @internal
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Transaction {
     /// @var OperationInterface[]
     pub(crate) operations: Vec<std::rc::Rc<dyn OperationInterface>>,
@@ -118,13 +120,13 @@ impl Transaction {
 
         let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
         let mut remove_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut present_alias_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut remove_alias_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut present_alias_map: IndexSet<String> = IndexSet::new();
+        let mut remove_alias_map: IndexMap<String, AliasPackageHandle> = IndexMap::new();
         for package in &self.present_packages {
-            if package.as_alias().is_some() {
+            if let Some(alias) = package.as_alias() {
                 let key = format!("{}::{}", package.get_name(), package.get_version());
-                present_alias_map.insert(key.clone(), package.clone());
-                remove_alias_map.insert(key, package.clone());
+                present_alias_map.insert(key.clone());
+                remove_alias_map.insert(key, alias);
             } else {
                 present_package_map.insert(package.get_name().to_string(), package.clone());
                 remove_map.insert(package.get_name().to_string(), package.clone());
@@ -163,15 +165,12 @@ impl Transaction {
             } else if !processed.contains_key(&package.ptr_id().to_string()) {
                 processed.insert(package.ptr_id().to_string(), true);
 
-                if package.as_alias().is_some() {
+                if let Some(alias) = package.as_alias() {
                     let alias_key = format!("{}::{}", package.get_name(), package.get_version());
-                    if present_alias_map.contains_key(&alias_key) {
+                    if present_alias_map.contains(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
-                        // TODO(phase-b): MarkAliasInstalledOperation::new expects AliasPackage by value
-                        operations.push(std::rc::Rc::new(MarkAliasInstalledOperation::new(todo!(
-                            "package as AliasPackage by value"
-                        ))));
+                        operations.push(std::rc::Rc::new(MarkAliasInstalledOperation::new(alias)));
                     }
                 } else if let Some(source) = present_package_map.get(&package.get_name()).cloned() {
                     // do we need to update?
@@ -216,11 +215,10 @@ impl Transaction {
                     as std::rc::Rc<dyn OperationInterface>,
             );
         }
-        for (_name_version, _package) in remove_alias_map {
-            // TODO(phase-b): MarkAliasUninstalledOperation::new expects AliasPackage by value
-            operations.push(std::rc::Rc::new(MarkAliasUninstalledOperation::new(todo!(
-                "package as AliasPackage by value"
-            ))));
+        for (_name_version, package) in remove_alias_map {
+            operations.push(std::rc::Rc::new(MarkAliasUninstalledOperation::new(
+                package,
+            )));
         }
 
         let operations = self.move_plugins_to_front(operations);

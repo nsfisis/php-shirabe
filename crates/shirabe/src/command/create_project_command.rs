@@ -52,7 +52,8 @@ pub struct CreateProjectCommand {
     base_command_data: BaseCommandData,
 
     /// @var SuggestedPackagesReporter
-    pub(crate) suggested_packages_reporter: Option<SuggestedPackagesReporter>,
+    pub(crate) suggested_packages_reporter:
+        Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>,
 }
 
 impl CreateProjectCommand {
@@ -282,7 +283,9 @@ impl CreateProjectCommand {
         io.borrow_mut()
             .load_configuration(&mut *config.borrow_mut())?;
 
-        self.suggested_packages_reporter = Some(SuggestedPackagesReporter::new(io.clone()));
+        self.suggested_packages_reporter = Some(std::rc::Rc::new(std::cell::RefCell::new(
+            SuggestedPackagesReporter::new(io.clone()),
+        )));
 
         let installed_from_vcs = if let Some(package_name) = package_name.as_ref() {
             self.install_root_package(
@@ -420,14 +423,14 @@ impl CreateProjectCommand {
                 .set_output_progress(!no_progress);
 
             let mut installer = Installer::create(io.clone(), &composer_handle);
-            // TODO(phase-b): set_suggested_packages_reporter takes by value but PHP class
-            // means shared ownership; needs Rc<SuggestedPackagesReporter> for proper sharing.
             installer
                 .set_prefer_source(prefer_source)
                 .set_prefer_dist(prefer_dist)
                 .set_dev_mode(install_dev_packages)
                 .set_platform_requirement_filter(platform_requirement_filter.clone())
-                .set_suggested_packages_reporter(SuggestedPackagesReporter::new(io.clone()))
+                .set_suggested_packages_reporter(
+                    self.suggested_packages_reporter.as_ref().unwrap().clone(),
+                )
                 .set_optimize_autoloader(
                     config
                         .borrow_mut()

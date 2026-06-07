@@ -273,14 +273,9 @@ impl Factory {
                     crate::io::DEBUG,
                 );
             }
-            // TODO(phase-b): validate_json_schema takes ownership of JsonFile; recreate it
             Self::validate_json_schema(
                 io.clone(),
-                ValidateJsonInput::File(JsonFile::new(
-                    global_config_path.clone(),
-                    None,
-                    io.clone(),
-                )?),
+                ValidateJsonInput::File(&file),
                 JsonFile::LAX_SCHEMA,
                 None,
             )?;
@@ -337,10 +332,9 @@ impl Factory {
                     crate::io::DEBUG,
                 );
             }
-            // TODO(phase-b): validate_json_schema takes ownership; recreate JsonFile
             Self::validate_json_schema(
                 io.clone(),
-                ValidateJsonInput::File(JsonFile::new(auth_file_path.clone(), None, io.clone())?),
+                ValidateJsonInput::File(&auth_file),
                 JsonFile::AUTH_SCHEMA,
                 None,
             )?;
@@ -554,9 +548,12 @@ impl Factory {
                     true,
                     crate::io::DEBUG,
                 );
-                // TODO(phase-b): validate_json_schema/ValidateJsonInput::File expects an owned
-                // JsonFile (PHP class semantics share refs); needs Rc<RefCell<JsonFile>> refactor.
-                let _ = &local_auth_file;
+                Self::validate_json_schema(
+                    Some(io.clone()),
+                    ValidateJsonInput::File(&local_auth_file),
+                    JsonFile::AUTH_SCHEMA,
+                    None,
+                )?;
                 let auth_read = local_auth_file.read()?;
                 let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
                 wrapped.insert("config".to_string(), auth_read);
@@ -1475,7 +1472,7 @@ impl Factory {
 
     fn validate_json_schema(
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        file_or_data: ValidateJsonInput,
+        file_or_data: ValidateJsonInput<'_>,
         schema: i64,
         source: Option<&str>,
     ) -> anyhow::Result<()> {
@@ -1484,7 +1481,7 @@ impl Factory {
         }
 
         let result = match file_or_data {
-            ValidateJsonInput::File(mut file) => file.validate_schema(schema, None),
+            ValidateJsonInput::File(file) => file.validate_schema(schema, None),
             ValidateJsonInput::Data(data) => {
                 let source = source.ok_or_else(|| {
                     anyhow::anyhow!(InvalidArgumentException {
@@ -1522,7 +1519,7 @@ impl Factory {
     }
 }
 
-enum ValidateJsonInput {
-    File(JsonFile),
+enum ValidateJsonInput<'a> {
+    File(&'a JsonFile),
     Data(PhpMixed),
 }

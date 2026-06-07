@@ -26,4 +26,8 @@ impl LocalRepoTransaction {
     pub fn get_operations(&self) -> &Vec<std::rc::Rc<dyn OperationInterface>> {
         self.inner.get_operations()
     }
+
+    pub(crate) fn to_transaction(&self) -> Transaction {
+        self.inner.clone()
+    }
 }

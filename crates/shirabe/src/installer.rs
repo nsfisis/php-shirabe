@@ -144,7 +144,8 @@ pub struct Installer {
     pub(crate) update_mirrors: bool,
     pub(crate) update_allow_list: Option<Vec<String>>,
     pub(crate) update_allow_transitive_dependencies: i64,
-    pub(crate) suggested_packages_reporter: SuggestedPackagesReporter,
+    pub(crate) suggested_packages_reporter:
+        std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     pub(crate) platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     pub(crate) additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
     pub(crate) temporary_constraints: IndexMap<String, AnyConstraint>,
@@ -172,7 +173,9 @@ impl Installer {
         event_dispatcher: std::rc::Rc<std::cell::RefCell<EventDispatcher>>,
         autoload_generator: std::rc::Rc<std::cell::RefCell<AutoloadGenerator>>,
     ) -> Self {
-        let suggested_packages_reporter = SuggestedPackagesReporter::new(io.clone());
+        let suggested_packages_reporter = std::rc::Rc::new(std::cell::RefCell::new(
+            SuggestedPackagesReporter::new(io.clone()),
+        ));
         let platform_requirement_filter = PlatformRequirementFilterFactory::ignore_nothing();
         let write_lock = config.borrow_mut().get("lock").as_bool().unwrap_or(false);
 
@@ -357,9 +360,11 @@ impl Installer {
             ]);
             if is_fresh_install {
                 self.suggested_packages_reporter
+                    .borrow_mut()
                     .add_suggestions_from_package(self.package.clone().into());
             }
             self.suggested_packages_reporter
+                .borrow()
                 .output_minimalistic(Some(&mut installed_repo), None)?;
         }
 
@@ -488,7 +493,7 @@ impl Installer {
             gc_enable();
         }
 
-        let audit_config = self.get_audit_config()?;
+        let audit_config = self.get_audit_config()?.clone();
 
         if audit_config.audit {
             let (packages, target) = if self.update && !self.install {
@@ -521,12 +526,18 @@ impl Installer {
                     repo_set.add_repository(repo.clone())?;
                 }
 
-                // TODO(phase-b): Auditor::audit takes owned packages/ignore lists; need cloning
-                // strategy. PHP shares these (copy semantics for arrays). Cloning for now is
-                // safe because arrays use copy semantics, but trait objects (packages) cannot
-                // be cloned trivially.
-                let audit_result: anyhow::Result<i64> = todo!();
-                let _ = (&auditor, &repo_set, &packages, &audit_config);
+                let audit_result = auditor.audit(
+                    &mut *self.io.borrow_mut(),
+                    &repo_set,
+                    packages,
+                    &audit_config.audit_format,
+                    true,
+                    audit_config.ignore_list_for_audit.clone(),
+                    &audit_config.audit_abandoned,
+                    audit_config.ignore_severity_for_audit.clone(),
+                    audit_config.ignore_unreachable,
+                    audit_config.ignore_abandoned_for_audit.clone(),
+                );
                 match audit_result {
                     Ok(n) => {
                         return Ok(if n > 0 && self.error_on_audit {
@@ -646,21 +657,21 @@ impl Installer {
             let _ = allow_list;
         }
 
-        // TODO(phase-b): create_pool takes owned Request, std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, Option<Rc<...>>
-        // but locally we only have refs. PHP classes (IO, dispatcher) shouldn't Clone.
-        let mut pool: Option<Pool> = {
-            let _ = (&request, &self.event_dispatcher, &policy, &repository_set);
-            todo!()
-        };
+        let pool = std::rc::Rc::new(std::cell::RefCell::new(repository_set.create_pool(
+            &mut request,
+            self.io.clone(),
+            Some(self.event_dispatcher.clone()),
+            self.create_pool_optimizer(policy.clone()),
+            self.ignored_types.clone(),
+            self.allowed_types.clone(),
+            self.create_security_audit_pool_filter()?,
+        )?));
 
         self.io.write_error("<info>Updating dependencies</info>");
 
         // solve dependencies
-        // TODO(phase-b): Solver::new takes owned policy/pool/io; refactor needed
-        let mut solver: Option<Solver> = {
-            let _ = (&policy, pool.as_ref(), &self.io);
-            todo!()
-        };
+        let mut solver: Option<Solver> =
+            Some(Solver::new(policy.clone(), pool.clone(), self.io.clone()));
         let mut lock_transaction: LockTransaction;
         let rule_set_size;
         match solver
@@ -676,7 +687,7 @@ impl Installer {
             Err(e) => {
                 // TODO(phase-b): SolverProblemsException contains dyn Rule which isn't Send+Sync
                 // so anyhow::Error::downcast_ref can't extract it. Skipping detection.
-                let _ = (&repository_set, &request, pool.as_ref());
+                let _ = (&repository_set, &request, &pool);
                 return Err(e);
             }
         }
@@ -685,7 +696,7 @@ impl Installer {
         self.io.write_error3(
             &format!(
                 "Analyzed {} packages to resolve dependencies",
-                pool.as_ref().unwrap().get_packages().len()
+                pool.borrow().get_packages().len()
             ),
             true,
             io_interface::VERBOSE,
@@ -696,8 +707,7 @@ impl Installer {
             io_interface::VERBOSE,
         );
 
-        pool = None;
-        let _ = pool;
+        drop(pool);
 
         if lock_transaction.get_operations().is_empty() {
             self.io.write_error("Nothing to modify in lock file");
@@ -714,7 +724,7 @@ impl Installer {
             &mut lock_transaction,
             &platform_repo,
             &aliases,
-            &*policy,
+            policy.clone(),
             locked_repository.as_ref(),
         )?;
         if exit_code != 0 {
@@ -837,6 +847,7 @@ impl Installer {
             // collect suggestions
             if let Some(io) = operation.as_install_operation() {
                 self.suggested_packages_reporter
+                    .borrow_mut()
                     .add_suggestions_from_package(io.get_package());
             }
 
@@ -919,7 +930,7 @@ impl Installer {
         lock_transaction: &mut LockTransaction,
         platform_repo: &PlatformRepositoryHandle,
         aliases: &Vec<IndexMap<String, String>>,
-        policy: &dyn PolicyInterface,
+        policy: std::rc::Rc<dyn PolicyInterface>,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
         if self.package.get_dev_requires().is_empty() {
@@ -946,13 +957,11 @@ impl Installer {
             self.create_request(self.fixed_root_package.clone(), platform_repo, None)?;
         self.require_packages_for_update(&mut request, locked_repository, false)?;
 
-        let pool = repository_set.create_pool_with_all_packages()?;
+        let pool = std::rc::Rc::new(std::cell::RefCell::new(
+            repository_set.create_pool_with_all_packages()?,
+        ));
 
-        // TODO(phase-b): Solver::new takes owned policy/pool/io; refactor needed
-        let mut solver: Option<Solver> = {
-            let _ = (policy, &pool, &self.io);
-            todo!()
-        };
+        let mut solver: Option<Solver> = Some(Solver::new(policy, pool.clone(), self.io.clone()));
         let non_dev_lock_transaction: LockTransaction;
         match solver
             .as_mut()
@@ -1085,18 +1094,19 @@ impl Installer {
             }
             drop(root_requires);
 
-            // TODO(phase-b): create_pool takes owned Request, std::rc::Rc<std::cell::RefCell<dyn IOInterface>>, Option<Rc<...>>
-            let pool: Pool = {
-                let _ = (&request, &self.io, &self.event_dispatcher, &repository_set);
-                todo!()
-            };
+            let pool = std::rc::Rc::new(std::cell::RefCell::new(repository_set.create_pool(
+                &mut request,
+                self.io.clone(),
+                Some(self.event_dispatcher.clone()),
+                None,
+                self.ignored_types.clone(),
+                self.allowed_types.clone(),
+                None,
+            )?));
 
             // solve dependencies
-            // TODO(phase-b): Solver::new takes owned policy/pool/io
-            let mut solver: Option<Solver> = {
-                let _ = (&policy, &pool, &self.io);
-                todo!()
-            };
+            let mut solver: Option<Solver> =
+                Some(Solver::new(policy, pool.clone(), self.io.clone()));
             match solver
                 .as_mut()
                 .unwrap()
@@ -1136,13 +1146,14 @@ impl Installer {
                     .unwrap(),
             )?
         };
-        // TODO(phase-b): dispatch_installer_event takes owned Transaction, not &LocalRepoTransaction
-        // self.event_dispatcher.borrow_mut().dispatch_installer_event(
-        //     InstallerEvents::PRE_OPERATIONS_EXEC,
-        //     self.dev_mode,
-        //     self.execute_operations,
-        //     &local_repo_transaction,
-        // );
+        self.event_dispatcher
+            .borrow_mut()
+            .dispatch_installer_event(
+                InstallerEvents::PRE_OPERATIONS_EXEC,
+                self.dev_mode,
+                self.execute_operations,
+                local_repo_transaction.to_transaction(),
+            )?;
 
         let mut installs: Vec<String> = vec![];
         let mut updates: Vec<String> = vec![];
@@ -1968,7 +1979,7 @@ impl Installer {
 
     pub fn set_suggested_packages_reporter(
         &mut self,
-        suggested_packages_reporter: SuggestedPackagesReporter,
+        suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     ) -> &mut Self {
         self.suggested_packages_reporter = suggested_packages_reporter;
 
