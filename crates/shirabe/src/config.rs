@@ -14,7 +14,8 @@ use shirabe_php_shim::{
     E_USER_DEPRECATED, FILTER_VALIDATE_URL, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed,
     RuntimeException, array_key_exists, array_merge, array_reverse, array_search_mixed,
     array_unique, current, empty, filter_var, implode, in_array, is_array, is_int, is_string, key,
-    max, parse_url, reset, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
+    max, parse_url, php_to_string, reset, rtrim, strtolower, strtoupper, strtr, substr,
+    trigger_error,
 };
 use std::cell::RefCell;
 
@@ -618,7 +619,7 @@ impl Config {
                 } else {
                     val
                 };
-                let processed = self.process(raw_val, flags);
+                let processed = self.process(raw_val, flags)?;
                 let mut val_str = rtrim(processed.as_string().unwrap_or(""), Some("/\\"));
                 val_str = Platform::expand_path(&val_str);
 
@@ -740,7 +741,7 @@ impl Config {
             "home" => {
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                 let expanded = Platform::expand_path(v.as_string().unwrap_or(""));
-                let processed = self.process(PhpMixed::String(expanded), flags);
+                let processed = self.process(PhpMixed::String(expanded), flags)?;
                 Ok(PhpMixed::String(rtrim(
                     processed.as_string().unwrap_or(""),
                     Some("/\\"),
@@ -905,7 +906,7 @@ impl Config {
                     return Ok(PhpMixed::Null);
                 }
 
-                Ok(self.process(v, flags))
+                self.process(v, flags)
             }
 
             "audit" => {
@@ -981,7 +982,7 @@ impl Config {
                 }
 
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                Ok(self.process(v, flags))
+                self.process(v, flags)
             }
         }
     }
@@ -1073,26 +1074,31 @@ impl Config {
     /// @param  int          $flags Options (see class constants)
     ///
     /// @return string|mixed
-    fn process(&self, value: PhpMixed, flags: i64) -> PhpMixed {
+    fn process(&self, value: PhpMixed, flags: i64) -> Result<PhpMixed> {
         if !is_string(&value) {
-            return value;
+            return Ok(value);
         }
 
         let value_str = value.as_string().unwrap_or("").to_string();
-        // TODO(phase-b): Preg::replace_callback with a closure that calls &mut self.get_with_flags
-        let mut result = value_str.clone();
-        let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(r"#\{\$(.+)\}#", &value_str, Some(&mut m)).unwrap_or(false)
-        {
-            let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-            let replacement = self
-                .get_with_flags(&key_match, flags)
-                .ok()
-                .and_then(|v| v.as_string().map(|s| s.to_string()))
-                .unwrap_or_default();
-            result = result.replace(&format!("{{${}}}", key_match), &replacement);
+        let mut error = None;
+        let result = Preg::replace_callback(
+            r"#\{\$(.+)\}#",
+            |m: &IndexMap<CaptureKey, String>| -> String {
+                let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                match self.get_with_flags(&key_match, flags) {
+                    Ok(v) => php_to_string(&v),
+                    Err(e) => {
+                        error = Some(e);
+                        String::new()
+                    }
+                }
+            },
+            &value_str,
+        )?;
+        if let Some(e) = error {
+            return Err(e);
         }
-        PhpMixed::String(result)
+        Ok(PhpMixed::String(result))
     }
 
     /// Turns relative paths in absolute paths without realpath()

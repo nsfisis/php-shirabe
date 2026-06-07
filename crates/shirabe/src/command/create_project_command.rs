@@ -972,8 +972,11 @@ impl CreateProjectCommand {
         im.notify_installs(io.clone());
 
         // collect suggestions
-        // TODO(phase-b): self.suggested_packages_reporter is on the outer scope via &self
-        // self.suggested_packages_reporter.add_suggestions_from_package(&*package);
+        self.suggested_packages_reporter
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .add_suggestions_from_package(package.clone());
 
         let installed_from_vcs = package.get_installation_source().as_deref() == Some("source");
 

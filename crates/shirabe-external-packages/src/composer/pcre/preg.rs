@@ -211,7 +211,7 @@ impl Preg {
         todo!()
     }
 
-    pub fn replace_callback<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
+    pub fn replace_callback<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
         _pattern: &str,
         _replacement: F,
         _subject: &str,
@@ -219,7 +219,7 @@ impl Preg {
         todo!()
     }
 
-    pub fn replace_callback4<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
+    pub fn replace_callback4<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
         _pattern: &str,
         _replacement: F,
         _subject: &str,
@@ -228,7 +228,7 @@ impl Preg {
         todo!()
     }
 
-    pub fn replace_callback5<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
+    pub fn replace_callback5<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
         _pattern: &str,
         _replacement: F,
         _subject: &str,
@@ -238,7 +238,7 @@ impl Preg {
         todo!()
     }
 
-    pub fn replace_callback6<F: Fn(&indexmap::IndexMap<CaptureKey, String>) -> String>(
+    pub fn replace_callback6<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
         _pattern: &str,
         _replacement: F,
         _subject: &str,
