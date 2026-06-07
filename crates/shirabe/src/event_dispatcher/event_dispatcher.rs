@@ -1278,12 +1278,12 @@ impl EventDispatcher {
 
         self.previous_hash = Some(hash_value);
 
-        // TODO(phase-b): build_package_map needs &mut InstallationManager and returns Result;
-        // Composer is &Composer here so we cannot take a mut borrow. Defer until shared ownership.
-        let _ = &generator;
-        let _ = packages;
-        let package_map: Vec<(crate::package::PackageInterfaceHandle, Option<String>)> =
-            todo!("build_package_map requires &mut InstallationManager");
+        let installation_manager = composer.get_installation_manager();
+        let package_map = generator.build_package_map(
+            &mut installation_manager.borrow_mut(),
+            package.clone(),
+            packages,
+        )?;
         // TODO(phase-b): parse_autoloads also expects the filtered dev packages list
         // (PhpMixed in this port).
         let map = generator.parse_autoloads(

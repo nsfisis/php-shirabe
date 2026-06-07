@@ -638,14 +638,13 @@ impl Application {
                                         let generator = composer.get_autoload_generator().clone();
                                         let generator = generator.borrow();
 
-                                        // TODO(phase-b): build_package_map needs &mut InstallationManager
-                                        // but get_composer returns &Composer; skip until shared ownership is settled.
-                                        let package_map: Vec<(
-                                            crate::package::PackageInterfaceHandle,
-                                            Option<String>,
-                                        )> = todo!(
-                                            "build_package_map requires &mut InstallationManager"
-                                        );
+                                        let installation_manager =
+                                            composer.get_installation_manager();
+                                        let package_map = generator.build_package_map(
+                                            &mut installation_manager.borrow_mut(),
+                                            root_package.clone(),
+                                            vec![],
+                                        )?;
                                         let map = generator.parse_autoloads(
                                             package_map,
                                             root_package.clone(),

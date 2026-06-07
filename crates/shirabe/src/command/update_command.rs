@@ -160,17 +160,15 @@ impl UpdateCommand {
         }
 
         let root_package = composer.get_package();
-        // TODO(phase-b): composer.get_package() returns &dyn RootPackageInterface so
-        // set_references/set_stability_flags cannot be called; needs &mut access.
-        let references =
-            RootPackageLoader::extract_references(&reqs, root_package.get_references().clone());
-        let stability_flags = RootPackageLoader::extract_stability_flags(
+        root_package.set_references(RootPackageLoader::extract_references(
+            &reqs,
+            root_package.get_references().clone(),
+        ));
+        root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
             &reqs,
             &root_package.get_minimum_stability(),
             root_package.get_stability_flags().clone(),
-        );
-        let _ = references;
-        let _ = stability_flags;
+        ));
 
         let parser = VersionParser::new();
         let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();

@@ -1000,11 +1000,9 @@ impl VcsDownloader for GitDownloader {
             self.update_to_commit(package.clone(), &path, &r#ref, &pretty_version)?
         {
             if package.get_dist_reference() == package.get_source_reference() {
-                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
-                // package.set_dist_reference(Some(new_ref.clone()));
+                package.set_dist_reference(Some(new_ref.clone()));
             }
-            // package.set_source_reference(Some(new_ref));
-            let _ = new_ref;
+            package.set_source_reference(Some(new_ref));
         }
 
         Ok(None)
@@ -1125,11 +1123,9 @@ impl VcsDownloader for GitDownloader {
             self.update_to_commit(target.clone(), &path, &r#ref, &pretty_version)?
         {
             if target.get_dist_reference() == target.get_source_reference() {
-                // TODO(phase-b): set_dist_reference requires &mut PackageInterface
-                // target.set_dist_reference(Some(new_ref.clone()));
+                target.set_dist_reference(Some(new_ref.clone()));
             }
-            // target.set_source_reference(Some(new_ref));
-            let _ = new_ref;
+            target.set_source_reference(Some(new_ref));
         }
 
         let mut update_origin_url = false;

@@ -289,7 +289,6 @@ impl Factory {
             let file_path_owned = file.get_path().to_string();
             config.merge(&read_data, &file_path_owned);
         }
-        // TODO(phase-b): set_config_source takes Box<dyn ConfigSourceInterface>
         config.set_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(file)),
             false,
@@ -355,7 +354,6 @@ impl Factory {
             let auth_path_owned = auth_file.get_path().to_string();
             config.merge(&wrapped, &auth_path_owned);
         }
-        // TODO(phase-b): set_auth_config_source takes Box<dyn ConfigSourceInterface>
         config.set_auth_config_source(Box::new(JsonConfigSource::new(
             std::rc::Rc::new(std::cell::RefCell::new(auth_file)),
             true,

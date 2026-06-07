@@ -413,9 +413,7 @@ impl RequireCommand {
                         .to_string(),
                     true,
                 ) {
-                    // TODO(phase-b): set_option needs &mut dyn InputInterface, but execute holds
-                    // input as &dyn. Commented out until input is threaded as &mut.
-                    // input.set_option("dev", PhpMixed::Bool(true));
+                    input.borrow_mut().set_option("dev", PhpMixed::Bool(true))?;
                 }
             }
 
@@ -511,9 +509,7 @@ impl RequireCommand {
                         return Ok(0);
                     }
 
-                    // TODO(phase-b): set_option needs &mut dyn InputInterface, but execute holds
-                    // input as &dyn. Commented out until input is threaded as &mut.
-                    // input.set_option("dev", PhpMixed::Bool(true));
+                    input.borrow_mut().set_option("dev", PhpMixed::Bool(true))?;
                     let swap = require_key;
                     require_key = remove_key;
                     remove_key = swap;
@@ -782,21 +778,21 @@ impl RequireCommand {
                     section.shift_remove(package);
                 }
             }
-            // TODO(phase-b): root_package mutation requires &mut RootPackageInterface but
-            // Composer::get_package() exposes only & dyn; needs accessor returning &mut for
-            // the dry-run case to update requires/dev-requires/stability flags/references.
-            let _ = &links;
-            let _ = root_package.get_references().clone();
-            let _ = RootPackageLoader::extract_references(
+            root_package.set_requires(links["require"].clone());
+            root_package.set_dev_requires(links["require-dev"].clone());
+
+            // extract stability flags & references as they weren't present when loading the unmodified composer.json
+            let references = RootPackageLoader::extract_references(
                 requirements,
                 root_package.get_references().clone(),
             );
-            let _ = RootPackageLoader::extract_stability_flags(
+            root_package.set_references(references);
+            let stability_flags = RootPackageLoader::extract_stability_flags(
                 requirements,
                 &root_package.get_minimum_stability(),
                 root_package.get_stability_flags().clone(),
             );
-            // unset($stabilityFlags, $references);
+            root_package.set_stability_flags(stability_flags);
         }
 
         let update_dev_mode = !input

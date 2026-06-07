@@ -634,10 +634,11 @@ impl ShowCommand {
                 self.get_io().write_no_newline(&package.get_name());
                 let path = {
                     let composer_ref = composer.as_ref().unwrap();
-                    // TODO(phase-b): get_installation_manager wants &mut Composer; PHP shares
-                    // by reference. Skipping the install path lookup keeps compile clean.
-                    let _ = composer_ref;
-                    None::<String>
+                    composer_ref
+                        .borrow_partial()
+                        .get_installation_manager()
+                        .borrow_mut()
+                        .get_install_path(package.clone().into())
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();

@@ -426,11 +426,19 @@ impl InitCommand {
 
         if !input.borrow().is_interactive() {
             if input.borrow().get_option("name").is_null() {
-                // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
+                let name = self.get_default_package_name();
+                input
+                    .borrow_mut()
+                    .set_option("name", PhpMixed::from(name))
+                    .expect("name option is defined");
             }
 
             if input.borrow().get_option("author").is_null() {
-                // TODO(phase-b): input.set_option requires &mut; signature passes &dyn here
+                let author = self.get_default_author();
+                input
+                    .borrow_mut()
+                    .set_option("author", PhpMixed::from(author))
+                    .expect("author option is defined");
             }
         }
     }

@@ -144,10 +144,7 @@ impl RunScriptCommand {
             false,
         );
 
-        if let Some(selected) = script.as_string() {
-            // TODO(phase-b): input is std::rc::Rc<std::cell::RefCell<dyn InputInterface>> but set_argument needs &mut.
-            let _ = selected;
-        }
+        input.borrow_mut().set_argument("script", script)?;
 
         Ok(())
     }

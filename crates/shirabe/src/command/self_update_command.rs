@@ -275,7 +275,7 @@ impl SelfUpdateCommand {
         if input.borrow().get_argument("command").as_string() == Some("self")
             && input.borrow().get_argument("version").as_string() == Some("update")
         {
-            // TODO(phase-b): set_argument requires &mut InputInterface; input is &dyn here
+            input.borrow_mut().set_argument("version", PhpMixed::Null)?;
         }
 
         let latest = versions_util.get_latest(None)??;
