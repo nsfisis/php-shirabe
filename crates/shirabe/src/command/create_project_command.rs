@@ -557,18 +557,14 @@ impl CreateProjectCommand {
                 )?)),
                 false,
             );
-            for (r#type, meta) in SUPPORTED_LINK_TYPES.iter() {
-                // PHP: $package->{'get'.$meta['method']}() — dynamic getter dispatch
-                // TODO(phase-b): dynamic getter dispatch by name
-                let _method = format!("get{}", meta.method);
-                let links: Vec<crate::package::Link> = vec![];
-                for link in links {
+            for (r#type, _meta) in SUPPORTED_LINK_TYPES.iter() {
+                for link in package.get_links_for_type(r#type).values() {
                     if link.get_pretty_constraint() == "self.version" {
                         config_source.add_link(
                             r#type,
                             link.get_target(),
                             &package.get_pretty_version(),
-                        );
+                        )?;
                     }
                 }
             }

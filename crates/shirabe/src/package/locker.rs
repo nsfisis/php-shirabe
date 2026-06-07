@@ -951,9 +951,12 @@ impl Locker {
             let installed_repo = InstalledRepository::new(vec![/* set.repo, root_repo */]);
 
             // PHP: call_user_func([$package, $set['method']])
-            // TODO(phase-b): dynamic method dispatch by name
-            let links: Vec<Link> = vec![];
-            for link in links {
+            let links = match set.method.as_str() {
+                "getRequires" => package.get_requires(),
+                "getDevRequires" => package.get_dev_requires(),
+                _ => unreachable!(),
+            };
+            for link in links.values() {
                 if PlatformRepository::is_platform_package(&link.get_target()) {
                     continue;
                 }
@@ -984,10 +987,12 @@ impl Locker {
                             ]
                             .iter()
                             {
-                                // TODO(phase-b): dynamic method dispatch
-                                let provider_links: Vec<Link> = vec![];
-                                let _ = method;
-                                for provider_link in provider_links {
+                                let provider_links = match *method {
+                                    "getReplaces" => provider.get_replaces(),
+                                    "getProvides" => provider.get_provides(),
+                                    _ => unreachable!(),
+                                };
+                                for provider_link in provider_links.values() {
                                     if provider_link.get_target() == link.get_target() {
                                         description = sprintf(
                                             text,

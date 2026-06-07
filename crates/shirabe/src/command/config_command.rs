@@ -9,9 +9,9 @@ use shirabe_external_packages::symfony::component::console::input::InputInterfac
 use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
-    array_filter_use_key, array_is_list, array_map, array_merge, array_unique, call_user_func,
-    count, escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array,
-    is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
+    array_filter_use_key, array_is_list, array_map, array_merge, array_unique, count,
+    escapeshellcmd, exec, explode, file_exists, file_get_contents, implode, in_array, is_array,
+    is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
     str_replace, str_starts_with, strpos, strtolower, system, touch, var_export,
 };
 
@@ -1206,12 +1206,12 @@ impl ConfigCommand {
             }
         }
 
-        // TODO(phase-b): port PHP `call_user_func([$this->configSource, $method], $key, $normalizedValue)`
-        let _ = (method, key, normalized_value);
-        let _: PhpMixed = call_user_func(
-            method,
-            &[/* PhpMixed::String(key.to_string()), normalized_value */],
-        );
+        let config_source = self.config_source.as_mut().unwrap();
+        match method {
+            "addConfigSetting" => config_source.add_config_setting(key, normalized_value)?,
+            "addProperty" => config_source.add_property(key, normalized_value)?,
+            _ => unreachable!(),
+        }
         Ok(())
     }
 
@@ -1246,12 +1246,14 @@ impl ConfigCommand {
             .into());
         }
 
-        // TODO(phase-b): port PHP `call_user_func([$this->configSource, $method], $key, $normalizer($valuesMixed))`
-        let _ = (method, key, normalizer(&values_mixed));
-        let _: PhpMixed = call_user_func(
-            method,
-            &[/* PhpMixed::String(key.to_string()), normalizer(&values_mixed) */],
-        );
+        let config_source = self.config_source.as_mut().unwrap();
+        match method {
+            "addConfigSetting" => {
+                config_source.add_config_setting(key, normalizer(&values_mixed))?
+            }
+            "addProperty" => config_source.add_property(key, normalizer(&values_mixed))?,
+            _ => unreachable!(),
+        }
         Ok(())
     }
 
