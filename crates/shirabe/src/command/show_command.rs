@@ -38,6 +38,7 @@ use crate::repository::FilterRepository;
 use crate::repository::InstalledArrayRepository;
 use crate::repository::InstalledRepository;
 use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
@@ -56,7 +57,7 @@ pub struct ShowCommand {
 
     pub(crate) version_parser: VersionParser,
     pub(crate) colors: Vec<String>,
-    repository_set: Option<RepositorySet>,
+    repository_set: Option<std::rc::Rc<std::cell::RefCell<RepositorySet>>>,
 }
 
 impl ShowCommand {
@@ -201,13 +202,8 @@ impl ShowCommand {
                 platform_overrides = p.into_iter().map(|(k, v)| (k, *v)).collect();
             }
         }
-        // TODO(phase-b): PHP shares a single $platformRepo instance by reference.
-        // We clone the overrides and re-construct as needed because PlatformRepository
-        // is not Clone (PHP class semantics; Phase D will introduce Rc sharing).
-        let mut platform_repo = PlatformRepository::new(vec![], platform_overrides.clone())?;
-        let make_platform_repo = || -> anyhow::Result<PlatformRepository> {
-            PlatformRepository::new(vec![], platform_overrides.clone())
-        };
+        let platform_repo =
+            PlatformRepositoryHandle::new(PlatformRepository::new(vec![], platform_overrides)?);
         let mut locked_repo: Option<RepositoryInterfaceHandle> = None;
 
         // The single-package $package binding from PHP gets surfaced here.
@@ -245,15 +241,13 @@ impl ShowCommand {
             single_package = Some(package.clone().into());
         } else if input.borrow().get_option("platform").as_bool() == Some(true) {
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                RepositoryInterfaceHandle::new(make_platform_repo()?),
+                platform_repo.clone().into(),
             ]));
             repos = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                RepositoryInterfaceHandle::new(make_platform_repo()?),
+                platform_repo.clone().into(),
             ]));
         } else if input.borrow().get_option("available").as_bool() == Some(true) {
-            let mut ir = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(
-                make_platform_repo()?,
-            )]);
+            let mut ir = InstalledRepository::new(vec![platform_repo.clone().into()]);
             if let Some(ref composer) = composer {
                 let composer = crate::command::composer_full(composer);
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
@@ -299,13 +293,13 @@ impl ShowCommand {
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     lr_handle.clone(),
                     local_repo,
-                    RepositoryInterfaceHandle::new(make_platform_repo()?),
+                    platform_repo.clone().into(),
                 ]));
                 locked_repo = Some(lr_handle);
             } else {
                 installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
                     local_repo,
-                    RepositoryInterfaceHandle::new(make_platform_repo()?),
+                    platform_repo.clone().into(),
                 ]));
             }
             let mut composite_input: Vec<RepositoryInterfaceHandle> =
@@ -334,7 +328,7 @@ impl ShowCommand {
                 names.join(", ")
             ));
             installed_repo = RepositoryInterfaceHandle::new(InstalledRepository::new(vec![
-                RepositoryInterfaceHandle::new(make_platform_repo()?),
+                platform_repo.clone().into(),
             ]));
             let mut composite_input: Vec<RepositoryInterfaceHandle> = vec![installed_repo.clone()];
             for (_k, v) in default_repos.into_iter() {
@@ -600,7 +594,7 @@ impl ShowCommand {
                 latest_package = self.find_latest_package(
                     package.clone().into(),
                     composer.as_ref().unwrap(),
-                    &mut platform_repo,
+                    &platform_repo,
                     input
                         .borrow()
                         .get_option("major-only")
@@ -752,10 +746,10 @@ impl ShowCommand {
         for repo in RepositoryUtils::flatten_repositories(repos.clone(), false) {
             // TODO(phase-b): InstalledRepository needs as_repository_interface / get_repositories
             // wired through; placeholder classification until then.
-            let r#type = if Self::same_repository(&*repo.borrow(), &platform_repo) {
+            let r#type = if Self::same_repository(&repo, &platform_repo) {
                 "platform"
             } else if let Some(ref lr) = locked_repo {
-                if Self::same_repository_dyn(&*repo.borrow(), &*lr.borrow()) {
+                if Self::same_repository(&repo, lr) {
                     "locked"
                 } else {
                     "available"
@@ -810,8 +804,8 @@ impl ShowCommand {
                         }
                     }
                 }
-                if Self::same_repository(&*repo.borrow(), &platform_repo) {
-                    for (name, p) in platform_repo.get_disabled_packages() {
+                if Self::same_repository(&repo, &platform_repo) {
+                    for (name, p) in platform_repo.borrow().get_disabled_packages() {
                         packages
                             .entry(type_owned.clone())
                             .or_insert_with(IndexMap::new)
@@ -872,7 +866,7 @@ impl ShowCommand {
                                 let latest = self.find_latest_package(
                                     package.clone(),
                                     composer.as_ref().unwrap(),
-                                    &mut platform_repo,
+                                    &platform_repo,
                                     show_major_only,
                                     show_minor_only,
                                     show_patch_only,
@@ -2600,7 +2594,7 @@ impl ShowCommand {
         &mut self,
         package: PackageInterfaceHandle,
         composer: &PartialComposerHandle,
-        platform_repo: &mut PlatformRepository,
+        platform_repo: &PlatformRepositoryHandle,
         major_only: bool,
         minor_only: bool,
         patch_only: bool,
@@ -2608,19 +2602,10 @@ impl ShowCommand {
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         // find the latest version allowed in this repo set
         let name = package.get_name();
-        // TODO(phase-b): VersionSelector::new wants RepositorySet by value, but get_repository_set
-        // returns &mut RepositorySet. Constructing a placeholder set keeps compile clean.
-        let _ = self.get_repository_set(composer)?;
+        let repo_set = self.get_repository_set(composer)?;
         let composer_ref = crate::command::composer_full(composer);
-        let placeholder_rs = RepositorySet::new(
-            &composer_ref.get_package().get_minimum_stability(),
-            composer_ref.get_package().get_stability_flags().clone(),
-            Vec::new(),
-            IndexMap::new(),
-            IndexMap::new(),
-            IndexMap::new(),
-        );
-        let mut version_selector = VersionSelector::new(placeholder_rs, Some(platform_repo))?;
+        let mut version_selector =
+            VersionSelector::new(repo_set, Some(&mut *platform_repo.borrow_mut()))?;
         let mut stability = composer_ref
             .get_package()
             .get_minimum_stability()
@@ -2738,7 +2723,7 @@ impl ShowCommand {
     fn get_repository_set(
         &mut self,
         composer: &PartialComposerHandle,
-    ) -> anyhow::Result<&mut RepositorySet> {
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
         let composer = crate::command::composer_full(composer);
         if self.repository_set.is_none() {
             // TODO(phase-b): RepositorySet::with_stability_and_flags — using new() placeholder.
@@ -2759,10 +2744,10 @@ impl ShowCommand {
                     .map(|r| r.clone())
                     .collect(),
             )))?;
-            self.repository_set = Some(rs);
+            self.repository_set = Some(std::rc::Rc::new(std::cell::RefCell::new(rs)));
         }
 
-        Ok(self.repository_set.as_mut().unwrap())
+        Ok(self.repository_set.as_ref().unwrap().clone())
     }
 
     fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> String {
@@ -2794,13 +2779,21 @@ impl ShowCommand {
         format!("{} year{} ago", years, if years > 1 { "s" } else { "" })
     }
 
-    fn same_repository(_a: &dyn RepositoryInterface, _b: &PlatformRepository) -> bool {
-        // PHP uses object identity (===); approximation here uses pointer equality.
-        false
+    fn same_repository<T, U>(a: &T, b: &U) -> bool
+    where
+        T: Into<RepositoryInterfaceHandle> + Clone,
+        U: Into<RepositoryInterfaceHandle> + Clone,
+    {
+        let a = a.clone().into();
+        let b = b.clone().into();
+        Self::same_repository_handle(&a, &b)
     }
 
-    fn same_repository_dyn(_a: &dyn RepositoryInterface, _b: &dyn RepositoryInterface) -> bool {
-        false
+    fn same_repository_handle(
+        a: &RepositoryInterfaceHandle,
+        b: &RepositoryInterfaceHandle,
+    ) -> bool {
+        a.ptr_eq(b)
     }
 }
 

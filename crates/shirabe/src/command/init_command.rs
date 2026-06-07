@@ -44,13 +44,14 @@ pub struct InitCommand {
 }
 
 impl PackageDiscoveryTrait for InitCommand {
-    fn get_repos_mut(&mut self) -> &mut Option<CompositeRepository> {
+    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
         todo!()
     }
 
     fn get_repository_sets_mut(
         &mut self,
-    ) -> &mut IndexMap<String, crate::repository::RepositorySet> {
+    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<crate::repository::RepositorySet>>>
+    {
         todo!()
     }
 
@@ -512,7 +513,9 @@ impl InitCommand {
                 )?);
             }
 
-            *self.get_repos_mut() = Some(CompositeRepository::new(repos));
+            *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
+                CompositeRepository::new(repos),
+            ));
             // unset($repos, $config, $repositories);
         }
 
@@ -746,7 +749,7 @@ impl InitCommand {
         io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
         // prepare to resolve dependencies
-        let repos = self.get_repos();
+        let _repos = self.get_repos();
         let preferred_stability =
             if let Some(s) = minimum_stability_default.clone().filter(|s| !s.is_empty()) {
                 s

@@ -319,7 +319,8 @@ impl ArchiveCommand {
         let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0)?;
 
         let package = if packages.len() > 1 {
-            let mut version_selector = VersionSelector::new(repo_set, None)?;
+            let mut version_selector =
+                VersionSelector::new(std::rc::Rc::new(std::cell::RefCell::new(repo_set)), None)?;
             let best = version_selector.find_best_candidate(
                 &package_name.to_lowercase(),
                 version.as_deref(),

@@ -732,7 +732,10 @@ impl UpdateCommand {
         ))?;
         let _ = array_filter::<i64, fn(&i64) -> bool>;
 
-        VersionSelector::new(repository_set, None)
+        VersionSelector::new(
+            std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
+            None,
+        )
     }
 }
 

@@ -28,14 +28,14 @@ use crate::repository::RepositorySet;
 
 #[derive(Debug)]
 pub struct VersionSelector {
-    repository_set: RepositorySet,
+    repository_set: std::rc::Rc<std::cell::RefCell<RepositorySet>>,
     platform_constraints: IndexMap<String, Vec<AnyConstraint>>,
     parser: Option<VersionParser>,
 }
 
 impl VersionSelector {
     pub fn new(
-        repository_set: RepositorySet,
+        repository_set: std::rc::Rc<std::cell::RefCell<RepositorySet>>,
         platform_repo: Option<&mut crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
         let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
@@ -90,7 +90,7 @@ impl VersionSelector {
             Some(v) => Some(self.get_parser().parse_constraints(v)?),
             None => None,
         };
-        let mut candidates = self.repository_set.find_packages(
+        let mut candidates = self.repository_set.borrow().find_packages(
             &strtolower(package_name),
             constraint.as_ref().map(|c| c.clone()),
             repo_set_flags,

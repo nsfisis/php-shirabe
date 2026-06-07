@@ -61,11 +61,13 @@ pub struct RequireCommand {
 }
 
 impl PackageDiscoveryTrait for RequireCommand {
-    fn get_repos_mut(&mut self) -> &mut Option<CompositeRepository> {
+    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle> {
         todo!()
     }
 
-    fn get_repository_sets_mut(&mut self) -> &mut IndexMap<String, RepositorySet> {
+    fn get_repository_sets_mut(
+        &mut self,
+    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
         todo!()
     }
 
@@ -280,7 +282,9 @@ impl RequireCommand {
         for repo in repos {
             combined.push(repo.clone());
         }
-        *self.get_repos_mut() = Some(CompositeRepository::new(combined));
+        *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
+            CompositeRepository::new(combined),
+        ));
 
         let preferred_stability = if composer.get_package().get_prefer_stable() {
             "stable".to_string()
@@ -1033,14 +1037,14 @@ impl RequireCommand {
         let locker_is_locked = composer.get_locker().borrow_mut().is_locked();
         let mut requirements: IndexMap<String, String> = IndexMap::new();
         let mut version_selector = VersionSelector::new(
-            RepositorySet::new(
+            std::rc::Rc::new(std::cell::RefCell::new(RepositorySet::new(
                 "stable",
                 IndexMap::new(),
                 vec![],
                 IndexMap::new(),
                 IndexMap::new(),
                 IndexMap::new(),
-            ),
+            ))),
             None,
         )?;
         let repo: crate::repository::RepositoryInterfaceHandle = if locker_is_locked {

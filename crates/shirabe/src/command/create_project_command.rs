@@ -848,7 +848,10 @@ impl CreateProjectCommand {
         )?;
 
         // find the latest version if there are multiple
-        let mut version_selector = VersionSelector::new(repository_set, Some(&mut platform_repo))?;
+        let mut version_selector = VersionSelector::new(
+            std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
+            Some(&mut platform_repo),
+        )?;
         // TODO(phase-b): platform_requirement_filter is &dyn here but VersionSelector expects
         // Option<Box<dyn ...>>; pass None as placeholder.
         let _ = platform_requirement_filter;

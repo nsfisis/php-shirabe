@@ -36,8 +36,10 @@ use crate::util::Filesystem;
 pub trait PackageDiscoveryTrait {
     // PHP: private $repos; private $repositorySets;
     // TODO(phase-b): trait fields require an associated state struct in Rust; expose via accessors
-    fn get_repos_mut(&mut self) -> &mut Option<CompositeRepository>;
-    fn get_repository_sets_mut(&mut self) -> &mut IndexMap<String, RepositorySet>;
+    fn get_repos_mut(&mut self) -> &mut Option<crate::repository::RepositoryInterfaceHandle>;
+    fn get_repository_sets_mut(
+        &mut self,
+    ) -> &mut IndexMap<String, std::rc::Rc<std::cell::RefCell<RepositorySet>>>;
 
     // PHP: trait dependencies (provided by BaseCommand)
     fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>>;
@@ -56,15 +58,14 @@ pub trait PackageDiscoveryTrait {
 
     fn normalize_requirements(&self, requires: Vec<String>) -> Vec<IndexMap<String, String>>;
 
-    fn get_repos(&mut self) -> &mut CompositeRepository {
+    fn get_repos(&mut self) -> crate::repository::RepositoryInterfaceHandle {
         if self.get_repos_mut().is_none() {
             // PHP: array_merge([new PlatformRepository], RepositoryFactory::defaultReposWithDefaultManager($this->getIO()))
-            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> = vec![
-                // TODO(phase-b): PlatformRepository::new() signature
-                crate::repository::RepositoryInterfaceHandle::new::<PlatformRepository>(todo!(
-                    "PlatformRepository::new()"
-                )),
-            ];
+            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
+                vec![crate::repository::RepositoryInterfaceHandle::new(
+                    PlatformRepository::new(vec![], IndexMap::new())
+                        .expect("PlatformRepository::new should not fail"),
+                )];
             let io_owned: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
             for (_, repo) in RepositoryFactory::default_repos_with_default_manager(io_owned)
                 .unwrap()
@@ -72,10 +73,12 @@ pub trait PackageDiscoveryTrait {
             {
                 repos.push(repo);
             }
-            *self.get_repos_mut() = Some(CompositeRepository::new(repos));
+            *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
+                CompositeRepository::new(repos),
+            ));
         }
 
-        self.get_repos_mut().as_mut().unwrap()
+        self.get_repos_mut().as_ref().unwrap().clone()
     }
 
     /// @param key-of<BasePackage::STABILITIES>|null $minimumStability
@@ -83,7 +86,7 @@ pub trait PackageDiscoveryTrait {
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         minimum_stability: Option<&str>,
-    ) -> &RepositorySet {
+    ) -> std::rc::Rc<std::cell::RefCell<RepositorySet>> {
         let key = minimum_stability.unwrap_or("default").to_string();
 
         if !self.get_repository_sets_mut().contains_key(&key) {
@@ -98,14 +101,15 @@ pub trait PackageDiscoveryTrait {
                 IndexMap::new(),
                 IndexMap::new(),
             );
-            // TODO(phase-b): self.get_repos() returns reference; add_repository takes ownership
-            let repos = todo!("self.get_repos() owned/cloned for add_repository");
+            let repos = self.get_repos();
             let _ = repository_set.add_repository(repos);
-            self.get_repository_sets_mut()
-                .insert(key.clone(), repository_set);
+            self.get_repository_sets_mut().insert(
+                key.clone(),
+                std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
+            );
         }
 
-        self.get_repository_sets_mut().get(&key).unwrap()
+        self.get_repository_sets_mut().get(&key).unwrap().clone()
     }
 
     /// @return key-of<BasePackage::STABILITIES>
@@ -515,9 +519,12 @@ pub trait PackageDiscoveryTrait {
 
         // find the latest version allowed in this repo set
         let repo_set = self.get_repository_set(input.clone(), None);
-        // TODO(phase-b): VersionSelector::new takes owned RepositorySet; we have a shared reference
-        let mut version_selector: VersionSelector =
-            todo!("VersionSelector::new with owned repo_set");
+        let mut version_selector = match platform_repo {
+            Some(handle) => {
+                VersionSelector::new(repo_set.clone(), Some(&mut *handle.borrow_mut()))?
+            }
+            None => VersionSelector::new(repo_set.clone(), None)?,
+        };
         let effective_minimum_stability = self.get_minimum_stability(input.clone());
 
         let package = version_selector.find_best_candidate(
@@ -539,7 +546,7 @@ pub trait PackageDiscoveryTrait {
             }
 
             // Check if it is a virtual package provided by others
-            let providers = repo_set.get_providers(name)?;
+            let providers = repo_set.borrow().get_providers(name)?;
             if count(&PhpMixed::List(
                 providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
             )) > 0
@@ -823,7 +830,7 @@ pub trait PackageDiscoveryTrait {
                 .into());
             }
             self.get_repos_mut()
-                .as_mut()
+                .as_ref()
                 .unwrap()
                 .search(package.to_string(), 0, None)
         })() {

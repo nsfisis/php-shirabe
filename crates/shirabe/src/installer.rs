@@ -93,6 +93,7 @@ use crate::repository::InstalledArrayRepository;
 use crate::repository::InstalledRepository;
 use crate::repository::InstalledRepositoryInterface;
 use crate::repository::PlatformRepository;
+use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryManager;
 use crate::repository::RepositorySet;
@@ -349,7 +350,7 @@ impl Installer {
                 .into();
             let mut installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
-                crate::repository::RepositoryInterfaceHandle::new(self.create_platform_repo(false)),
+                self.create_platform_repo(false).into(),
                 crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
                     RootPackageInterfaceHandle::dup(&self.package),
                 )),
@@ -563,7 +564,7 @@ impl Installer {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
     ) -> anyhow::Result<i64> {
-        let mut platform_repo = self.create_platform_repo(true);
+        let platform_repo = self.create_platform_repo(true);
         let aliases = self.get_root_aliases(true);
 
         let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
@@ -634,7 +635,7 @@ impl Installer {
         let fixed_root_package = self.fixed_root_package.clone();
         let mut request = self.create_request(
             fixed_root_package,
-            &mut platform_repo,
+            &platform_repo,
             locked_repository.as_ref(),
         )?;
         self.require_packages_for_update(&mut request, locked_repository.as_ref(), true)?;
@@ -711,7 +712,7 @@ impl Installer {
 
         let exit_code = self.extract_dev_packages(
             &mut lock_transaction,
-            &mut platform_repo,
+            &platform_repo,
             &aliases,
             &*policy,
             locked_repository.as_ref(),
@@ -916,7 +917,7 @@ impl Installer {
     pub(crate) fn extract_dev_packages(
         &mut self,
         lock_transaction: &mut LockTransaction,
-        platform_repo: &mut PlatformRepository,
+        platform_repo: &PlatformRepositoryHandle,
         aliases: &Vec<IndexMap<String, String>>,
         policy: &dyn PolicyInterface,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
@@ -1010,7 +1011,7 @@ impl Installer {
                 "<info>Verifying lock file contents can be installed on current platform.</info>",
             );
 
-            let mut platform_repo = self.create_platform_repo(false);
+            let platform_repo = self.create_platform_repo(false);
             // creating repository set
             let policy = self.create_policy(false, None)?;
             // use aliases from lock file only, so empty root aliases here
@@ -1026,11 +1027,8 @@ impl Installer {
 
             // creating requirements request
             let fixed_root_package = self.fixed_root_package.clone();
-            let mut request = self.create_request(
-                fixed_root_package,
-                &mut platform_repo,
-                Some(&locked_repository),
-            )?;
+            let mut request =
+                self.create_request(fixed_root_package, &platform_repo, Some(&locked_repository))?;
 
             if !self.locker.borrow_mut().is_fresh()? {
                 self.io.write_error3(
@@ -1249,7 +1247,7 @@ impl Installer {
         Ok(0)
     }
 
-    pub(crate) fn create_platform_repo(&mut self, for_update: bool) -> PlatformRepository {
+    pub(crate) fn create_platform_repo(&mut self, for_update: bool) -> PlatformRepositoryHandle {
         let platform_overrides: IndexMap<String, PhpMixed> = if for_update {
             self.config
                 .borrow_mut()
@@ -1271,14 +1269,16 @@ impl Installer {
         };
 
         // TODO(phase-b): PlatformRepository::new returns Result, propagate
-        PlatformRepository::new(vec![], platform_overrides)
-            .expect("PlatformRepository::new should not fail")
+        PlatformRepositoryHandle::new(
+            PlatformRepository::new(vec![], platform_overrides)
+                .expect("PlatformRepository::new should not fail"),
+        )
     }
 
     fn create_repository_set(
         &mut self,
         for_update: bool,
-        platform_repo: &PlatformRepository,
+        platform_repo: &PlatformRepositoryHandle,
         root_aliases: &Vec<IndexMap<String, String>>,
         locked_repository: Option<&mut dyn RepositoryInterface>,
     ) -> anyhow::Result<RepositorySet> {
@@ -1376,13 +1376,10 @@ impl Installer {
             root_requires,
             temporary_constraints,
         );
-        // TODO(phase-b): RootPackageRepository::new takes owned root package
-        // repository_set.add_repository(Box::new(RootPackageRepository::new(clone(
-        //     &self.fixed_root_package,
-        // ))));
-        let _ = platform_repo;
-        // TODO(phase-b): PlatformRepository has no Clone impl (PHP class)
-        // repository_set.add_repository(Box::new(platform_repo.clone()));
+        repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
+            RootPackageRepository::new(RootPackageInterfaceHandle::dup(&self.fixed_root_package)),
+        ))?;
+        repository_set.add_repository(platform_repo.clone().into())?;
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             // allow using installed repos if needed to avoid warnings about installed repositories being used in the RepositorySet
             // see https://github.com/composer/composer/pull/9574
@@ -1459,7 +1456,7 @@ impl Installer {
     fn create_request(
         &self,
         root_package: RootPackageInterfaceHandle,
-        platform_repo: &mut PlatformRepository,
+        platform_repo: &PlatformRepositoryHandle,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<Request> {
         let mut request = Request::new(locked_repository.cloned());
@@ -1470,7 +1467,7 @@ impl Installer {
             request.fix_package(alias.get_alias_of().into());
         }
 
-        let mut fixed_packages = platform_repo.get_packages()?;
+        let mut fixed_packages = platform_repo.borrow_mut().get_packages()?;
         if let Some(ref additional_fixed_repository) = self.additional_fixed_repository {
             fixed_packages.extend(additional_fixed_repository.get_packages()?);
         }
