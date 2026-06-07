@@ -56,6 +56,29 @@ pub struct GitLabDriver {
 impl GitLabDriver {
     pub const URL_REGEX: &'static str = r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##;
 
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            scheme: String::new(),
+            namespace: String::new(),
+            repository: String::new(),
+            project: None,
+            commits: IndexMap::new(),
+            tags: None,
+            branches: None,
+            git_driver: None,
+            protocol: String::new(),
+            is_private: true,
+            has_nonstandard_origin: false,
+        }
+    }
+
     /// Extracts information from the repository url.
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.

@@ -423,6 +423,16 @@ impl InstalledVersions {
         *INSTALLED_IS_LOCAL_DIR.lock().unwrap() = false;
     }
 
+    /// PHP mutates the private static `$selfDir` via Reflection. Rust exposes a mutating function.
+    pub fn set_self_dir(dir: String) {
+        *SELF_DIR.lock().unwrap() = Some(dir);
+    }
+
+    /// PHP mutates the private static `$installedIsLocalDir` via Reflection. Rust exposes a mutating function.
+    pub fn set_installed_is_local_dir(value: bool) {
+        *INSTALLED_IS_LOCAL_DIR.lock().unwrap() = value;
+    }
+
     /// @return string
     fn get_self_dir() -> String {
         let mut self_dir = SELF_DIR.lock().unwrap();

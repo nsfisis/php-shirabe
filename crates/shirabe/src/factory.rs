@@ -15,7 +15,7 @@ use shirabe_php_shim::{
 
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;
-use crate::composer::{ComposerWeakHandle, PartialOrFullComposer};
+use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialOrFullComposer};
 use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};
 use crate::config::Config;
 use crate::config::JsonConfigSource;
@@ -1262,7 +1262,7 @@ impl Factory {
         config: Option<LocalConfigInput>,
         disable_plugins: DisablePlugins,
         disable_scripts: bool,
-    ) -> anyhow::Result<PartialComposerHandle> {
+    ) -> anyhow::Result<ComposerHandle> {
         let factory = Self;
 
         // for BC reasons, if a config is passed in either as array or a path that is not the default composer.json path
@@ -1285,14 +1285,13 @@ impl Factory {
 
         let composer =
             factory.create_composer(io, config, disable_plugins, None, true, disable_scripts)?;
-        if !composer.is_full() {
-            // TODO(phase-b): unreachable when fullLoad=true; downcasting needs design.
-            return Err(anyhow::anyhow!(RuntimeException {
+        // fullLoad=true guarantees a full Composer; narrow PartialComposer -> Composer (PHP `: Composer`).
+        composer.as_full().ok_or_else(|| {
+            anyhow::anyhow!(RuntimeException {
                 message: "Composer expected with fullLoad=true".to_string(),
                 code: 0,
-            }));
-        }
-        Ok(composer)
+            })
+        })
     }
 
     /// If you are calling this in a plugin, you probably should instead use `$composer->getLoop()->getHttpDownloader()`

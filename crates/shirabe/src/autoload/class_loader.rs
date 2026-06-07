@@ -530,8 +530,106 @@ impl ClassLoader {
         // Rust has no `include` operator; this is a no-op placeholder.
     }
 
+    /// PHP `(array) $loader`. Every property is private, so keys are mangled as
+    /// `"\0Composer\Autoload\ClassLoader\0<propertyName>"` using the original camelCase names, in
+    /// declaration order.
     pub fn as_array_iter(&self) -> Vec<(String, PhpMixed)> {
-        // TODO(phase-b): iterate over loader properties as PHP (array) cast would
-        todo!()
+        let key = |name: &str| format!("\0Composer\\Autoload\\ClassLoader\0{}", name);
+        let str_list = |v: &Vec<String>| {
+            PhpMixed::List(
+                v.iter()
+                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .collect(),
+            )
+        };
+
+        vec![
+            (
+                key("vendorDir"),
+                match &self.vendor_dir {
+                    Some(s) => PhpMixed::String(s.clone()),
+                    None => PhpMixed::Null,
+                },
+            ),
+            (
+                key("prefixLengthsPsr4"),
+                PhpMixed::Array(
+                    self.prefix_lengths_psr4
+                        .iter()
+                        .map(|(k, inner)| {
+                            (
+                                k.clone(),
+                                Box::new(PhpMixed::Array(
+                                    inner
+                                        .iter()
+                                        .map(|(k2, n)| (k2.clone(), Box::new(PhpMixed::Int(*n))))
+                                        .collect(),
+                                )),
+                            )
+                        })
+                        .collect(),
+                ),
+            ),
+            (
+                key("prefixDirsPsr4"),
+                PhpMixed::Array(
+                    self.prefix_dirs_psr4
+                        .iter()
+                        .map(|(k, v)| (k.clone(), Box::new(str_list(v))))
+                        .collect(),
+                ),
+            ),
+            (key("fallbackDirsPsr4"), str_list(&self.fallback_dirs_psr4)),
+            (
+                key("prefixesPsr0"),
+                PhpMixed::Array(
+                    self.prefixes_psr0
+                        .iter()
+                        .map(|(k, inner)| {
+                            (
+                                k.clone(),
+                                Box::new(PhpMixed::Array(
+                                    inner
+                                        .iter()
+                                        .map(|(k2, v)| (k2.clone(), Box::new(str_list(v))))
+                                        .collect(),
+                                )),
+                            )
+                        })
+                        .collect(),
+                ),
+            ),
+            (key("fallbackDirsPsr0"), str_list(&self.fallback_dirs_psr0)),
+            (key("useIncludePath"), PhpMixed::Bool(self.use_include_path)),
+            (
+                key("classMap"),
+                PhpMixed::Array(
+                    self.class_map
+                        .iter()
+                        .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
+                        .collect(),
+                ),
+            ),
+            (
+                key("classMapAuthoritative"),
+                PhpMixed::Bool(self.class_map_authoritative),
+            ),
+            (
+                key("missingClasses"),
+                PhpMixed::Array(
+                    self.missing_classes
+                        .iter()
+                        .map(|(k, b)| (k.clone(), Box::new(PhpMixed::Bool(*b))))
+                        .collect(),
+                ),
+            ),
+            (
+                key("apcuPrefix"),
+                match &self.apcu_prefix {
+                    Some(s) => PhpMixed::String(s.clone()),
+                    None => PhpMixed::Null,
+                },
+            ),
+        ]
     }
 }

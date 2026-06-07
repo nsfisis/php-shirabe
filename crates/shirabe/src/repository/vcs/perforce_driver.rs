@@ -21,6 +21,21 @@ pub struct PerforceDriver {
 }
 
 impl PerforceDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            depot: String::new(),
+            branch: String::new(),
+            perforce: None,
+        }
+    }
+
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         self.depot = self
             .inner

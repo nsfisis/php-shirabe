@@ -279,6 +279,10 @@ pub trait HasBaseCommandData {
     fn io_mut(&mut self) -> &mut Option<Rc<RefCell<dyn IOInterface>>> {
         &mut self.base_command_data_mut().io
     }
+
+    fn is_self_update_command(&self) -> bool {
+        false
+    }
 }
 
 impl<C: HasBaseCommandData> BaseCommand for C {
@@ -352,7 +356,11 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             .has_parameter_option(&["--no-scripts"], false);
 
         // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
-        // TODO(phase-b): `$this instanceof SelfUpdateCommand` not representable
+
+        if self.is_self_update_command() {
+            disable_plugins = true;
+            disable_scripts = true;
+        }
 
         let composer = self.try_composer(Some(disable_plugins), Some(disable_scripts));
         let io = self.get_io();
@@ -503,7 +511,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         };
         // TODO(phase-b): Option<IndexMap<String, PhpMixed>> -> Option<LocalConfigInput> conversion
         let _ = config;
-        Factory::create(io, None, disable_plugins_kind, disable_scripts)
+        Factory::create(io, None, disable_plugins_kind, disable_scripts).map(|c| c.upcast())
     }
 
     fn get_preferred_install_options(

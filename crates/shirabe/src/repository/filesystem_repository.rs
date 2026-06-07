@@ -341,14 +341,8 @@ impl FilesystemRepository {
                 // make sure the selfDir matches the expected data at runtime if the class was loaded from the vendor dir, as it may have been
                 // loaded from the Composer sources, causing packages to appear twice in that case if the installed.php is loaded in addition to the
                 // in memory loaded data from above
-                // TODO(phase-b): Reflection API on static properties — confirm porting approach with user
-                let _attempt: Result<()> = (|| -> Result<()> {
-                    todo!(
-                        "ReflectionProperty(Composer\\InstalledVersions::class, 'selfDir')->setValue(null, strtr($repoDir, '\\\\', '/'))"
-                    );
-                    // (the second reflection block sets installedIsLocalDir = true)
-                })();
-                // PHP: catches \ReflectionException and rethrows if not "Property does not exist"
+                InstalledVersions::set_self_dir(repo_dir.replace('\\', "/"));
+                InstalledVersions::set_installed_is_local_dir(true);
             }
         }
 

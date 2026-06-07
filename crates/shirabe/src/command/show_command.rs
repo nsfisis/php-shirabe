@@ -33,6 +33,7 @@ use crate::package::version::VersionParser;
 use crate::package::version::VersionSelector;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
+use crate::repository::ComposerRepository;
 use crate::repository::CompositeRepository;
 use crate::repository::FilterRepository;
 use crate::repository::InstalledArrayRepository;
@@ -745,23 +746,37 @@ impl ShowCommand {
         }
 
         for repo in RepositoryUtils::flatten_repositories(repos.clone(), false) {
-            // TODO(phase-b): InstalledRepository needs as_repository_interface / get_repositories
-            // wired through; placeholder classification until then.
             let r#type = if Self::same_repository(&repo, &platform_repo) {
                 "platform"
-            } else if let Some(ref lr) = locked_repo {
-                if Self::same_repository(&repo, lr) {
-                    "locked"
-                } else {
-                    "available"
-                }
+            } else if locked_repo
+                .as_ref()
+                .map_or(false, |lr| Self::same_repository(&repo, lr))
+            {
+                "locked"
+            } else if Self::same_repository(&repo, &installed_repo)
+                || installed_repo
+                    .borrow()
+                    .as_any()
+                    .downcast_ref::<InstalledRepository>()
+                    .map_or(false, |ir| {
+                        ir.get_repositories().iter().any(|r| r.ptr_eq(&repo))
+                    })
+            {
+                "installed"
             } else {
                 "available"
             };
             let type_owned = r#type.to_string();
-            // TODO(phase-b): RepositoryInterface needs as_composer_repository_mut downcast helper
-            if false {
-                let _ = package_filter.as_deref();
+            if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
+                let names = cr_rc
+                    .borrow_mut()
+                    .get_package_names(package_filter.as_deref())?;
+                for name in names {
+                    packages
+                        .entry(type_owned.clone())
+                        .or_insert_with(IndexMap::new)
+                        .insert(name.clone(), PackageOrName::Name(name));
+                }
             } else {
                 for package in repo.get_packages()? {
                     let existing = packages

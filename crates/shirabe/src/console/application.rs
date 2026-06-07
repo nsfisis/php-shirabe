@@ -103,10 +103,7 @@ impl Application {
 
     pub fn new(name: String, mut version: String) -> Self {
         let mut inner = BaseApplication::new(&name, &version);
-        // TODO(phase-b): method_exists check requires reflection-style API on BaseApplication
-        if true {
-            inner.set_catch_errors(true);
-        }
+        inner.set_catch_errors(true);
 
         // PHP: static $shutdownRegistered = false; — register only once globally
         static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
@@ -436,8 +433,9 @@ impl Application {
                 for command in self.get_plugin_commands()? {
                     let cmd_name = command.get_name().unwrap_or_default();
                     if self.inner.has(&cmd_name) {
-                        // TODO(phase-b): get_class needs a Command-aware overload; default
-                        // to a placeholder while the trait downcast story is settled.
+                        // TODO(plugin): PHP uses get_class($command) for the skipped-command class
+                        // name. Plugin command discovery (get_plugin_commands) is unimplemented, so
+                        // this loop never runs; wire the concrete class name with the plugin API.
                         let cls = String::new();
                         plugin_warnings.push(format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
@@ -1003,7 +1001,7 @@ impl Application {
                 crate::factory::DisablePlugins::None
             };
             match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
-                Ok(c) => self.composer = Some(c),
+                Ok(c) => self.composer = Some(c.upcast()),
                 Err(e) => {
                     if e.downcast_ref::<JsonValidationException>().is_some()
                         || e.downcast_ref::<RuntimeException>().is_some()

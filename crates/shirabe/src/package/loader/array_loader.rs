@@ -148,6 +148,10 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
 }
 
 impl LoaderInterface for ArrayLoader {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn load(
         &self,
         mut config: IndexMap<String, PhpMixed>,

@@ -50,6 +50,28 @@ pub struct SvnDriver {
 }
 
 impl SvnDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            base_url: String::new(),
+            tags: None,
+            branches: None,
+            root_identifier: None,
+            trunk_path: Some("trunk".to_string()),
+            branches_path: "branches".to_string(),
+            tags_path: "tags".to_string(),
+            package_path: String::new(),
+            cache_credentials: true,
+            util: None,
+        }
+    }
+
     pub fn initialize(&mut self) -> Result<()> {
         let normalized = Self::normalize_url(&self.inner.url);
         self.inner.url = normalized.trim_end_matches('/').to_string();

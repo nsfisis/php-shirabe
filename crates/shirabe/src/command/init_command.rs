@@ -757,17 +757,27 @@ impl InitCommand {
         io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
         // prepare to resolve dependencies
-        let _repos = self.get_repos();
+        let repos = self.get_repos();
         let preferred_stability =
             if let Some(s) = minimum_stability_default.clone().filter(|s| !s.is_empty()) {
                 s
             } else {
                 "stable".to_string()
             };
-        // TODO(phase-b): repos instanceof CompositeRepository downcast
-        let _platform_repo: Option<&PlatformRepositoryHandle> = None;
-
-        // (omitted: iterate repos to find PlatformRepository instance)
+        let platform_repo: Option<PlatformRepositoryHandle> = if repos.is::<CompositeRepository>() {
+            let borrowed = repos.borrow();
+            let composite = borrowed
+                .as_any()
+                .downcast_ref::<CompositeRepository>()
+                .expect("is::<CompositeRepository>() checked above");
+            composite
+                .get_repositories()
+                .iter()
+                .find(|candidate| candidate.is::<PlatformRepository>())
+                .and_then(|candidate| candidate.as_platform_repository())
+        } else {
+            None
+        };
 
         let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
         let require: Vec<String> = input
@@ -785,7 +795,7 @@ impl InitCommand {
                 input,
                 _output,
                 require,
-                _platform_repo,
+                platform_repo.as_ref(),
                 &preferred_stability,
                 false,
                 false,
@@ -820,7 +830,7 @@ impl InitCommand {
                     input,
                     _output,
                     require_dev,
-                    _platform_repo,
+                    platform_repo.as_ref(),
                     &preferred_stability,
                     false,
                     false,

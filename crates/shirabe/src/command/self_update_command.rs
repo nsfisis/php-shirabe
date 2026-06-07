@@ -15,8 +15,8 @@ use shirabe_php_shim::{
     function_exists, hash_file, in_array, ini_get, is_array, is_file, is_numeric, is_writable,
     iterator_to_array, json_decode, openssl_free_key, openssl_get_md_methods,
     openssl_pkey_get_public, openssl_verify, posix_geteuid, posix_getpwuid, random_int, rename,
-    server_argv, sprintf, str_contains, str_replace, strpos, strtolower, strtr, tempnam, unlink,
-    usleep, version_compare,
+    server_argv, sprintf, str_replace, strpos, strtolower, strtr, tempnam, unlink, usleep,
+    version_compare,
 };
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
@@ -78,42 +78,6 @@ impl SelfUpdateCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
-        // TODO(phase-b): __FILE__ / __DIR__ have no direct Rust equivalent
-        let file_path: &str = "";
-        let dir_path: &str = "";
-
-        if strpos(file_path, "phar:") != Some(0) {
-            if str_contains(&strtr(dir_path, "\\", "/"), "vendor/composer/composer") {
-                let proj_dir = shirabe_php_shim::dirname_levels(dir_path, 6);
-                output.borrow().writeln(
-                    "<error>This instance of Composer does not have the self-update command.</error>",
-                    io_interface::NORMAL,
-                );
-                output.borrow().writeln(
-                    &format!(
-                        "<comment>You are running Composer installed as a package in your current project (\"{}\").</comment>",
-                        proj_dir
-                    ),
-                    io_interface::NORMAL,
-                );
-                output.borrow().writeln(
-                    "<comment>To update Composer, download a composer.phar from https://getcomposer.org and then run `composer.phar update composer/composer` in your project.</comment>",
-                    io_interface::NORMAL,
-                );
-            } else {
-                output.borrow().writeln(
-                    "<error>This instance of Composer does not have the self-update command.</error>",
-                    io_interface::NORMAL,
-                );
-                output.borrow().writeln(
-                    "<comment>This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.</comment>",
-                    io_interface::NORMAL,
-                );
-            }
-
-            return Ok(1);
-        }
-
         if server_argv().get(0).map(|s| s.as_str()) == Some("Standard input code") {
             return Ok(1);
         }
@@ -1206,5 +1170,9 @@ impl HasBaseCommandData for SelfUpdateCommand {
 
     fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
         &mut self.base_command_data
+    }
+
+    fn is_self_update_command(&self) -> bool {
+        true
     }
 }

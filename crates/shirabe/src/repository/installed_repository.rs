@@ -48,6 +48,10 @@ impl InstalledRepository {
         this
     }
 
+    pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
+        self.inner.get_repositories()
+    }
+
     pub fn find_packages_with_replacers_and_providers(
         &self,
         name: &str,

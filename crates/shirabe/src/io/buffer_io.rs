@@ -100,14 +100,17 @@ impl BufferIO {
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {
-        // TODO(phase-b): downcast Box<dyn InputInterface> to StreamableInputInterface.
-        // as_any/set_stream are not yet exposed on the InputInterface trait object.
+        // PHP: `if (!$this->input instanceof StreamableInputInterface) { throw ... }`
+        //      `$this->input->setStream($this->createStream($inputs)); $this->input->setInteractive(true);`
+        //
+        // TODO(phase-b): blocked on the symfony console crate-path duplication (see `new`/`get_output`):
+        // `StreamableInputInterface` lives under `symfony::console::input`, but ConsoleIO's input is
+        // a `symfony::component::console::input::InputInterface` from a separate, unrelated trait
+        // tree, so the `instanceof` downcast cannot be expressed until those trees are unified.
         let _ = inputs;
-        let _ = |i: &Box<dyn InputInterface>| -> bool {
-            let _ = i;
-            false
-        };
-        todo!("port BufferIO::set_user_inputs once StreamableInputInterface downcast is available")
+        todo!(
+            "BufferIO::set_user_inputs: blocked on unifying symfony::console / symfony::component::console input trait trees"
+        )
     }
 
     fn create_stream(&self, inputs: Vec<String>) -> Result<PhpMixed> {

@@ -586,7 +586,7 @@ impl Auditor {
                 io.write_error(&sprintf(
                     "%s is abandoned. %s.",
                     &[
-                        PhpMixed::String(self.get_package_name_with_link_for_complete(pkg.clone())),
+                        PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
                         PhpMixed::String(replacement),
                     ],
                 ));
@@ -625,7 +625,7 @@ impl Auditor {
             table.add_row(ConsoleIO::sanitize(
                 PhpMixed::List(vec![
                     Box::new(PhpMixed::String(
-                        self.get_package_name_with_link_for_complete(pkg.clone()),
+                        self.get_package_name_with_link(pkg.clone().into()),
                     )),
                     Box::new(PhpMixed::String(replacement)),
                 ]),
@@ -650,15 +650,6 @@ impl Auditor {
         } else {
             package.get_pretty_name()
         }
-    }
-
-    // TODO(phase-b): merge with get_package_name_with_link once CompletePackageInterface can be
-    // upcast to PackageInterface (e.g. via an as_package_interface() trait method)
-    fn get_package_name_with_link_for_complete(
-        &self,
-        package: CompletePackageInterfaceHandle,
-    ) -> String {
-        self.get_package_name_with_link(package.into())
     }
 
     fn get_severity(&self, advisory: &SecurityAdvisory) -> String {

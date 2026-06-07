@@ -10,4 +10,6 @@ pub trait LoaderInterface: std::fmt::Debug {
         config: IndexMap<String, PhpMixed>,
         class: Option<String>,
     ) -> anyhow::Result<PackageInterfaceHandle>;
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }

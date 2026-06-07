@@ -58,6 +58,32 @@ pub struct GitBitbucketDriver {
 }
 
 impl GitBitbucketDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            owner: String::new(),
+            repository: String::new(),
+            has_issues: false,
+            root_identifier: None,
+            tags: None,
+            branches: None,
+            branches_url: String::new(),
+            tags_url: String::new(),
+            home_url: String::new(),
+            website: String::new(),
+            clone_https_url: String::new(),
+            repo_data: IndexMap::new(),
+            fallback_driver: None,
+            vcs_type: None,
+        }
+    }
+
     /// @inheritDoc
     pub fn initialize(&mut self) -> Result<()> {
         let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();

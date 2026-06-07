@@ -66,6 +66,24 @@ impl RepositoryInterfaceHandle {
         self.0.borrow().as_any().is::<T>()
     }
 
+    /// Downcasts the shared handle to a concrete repository type, preserving shared ownership.
+    pub fn downcast_rc<T: RepositoryInterface + 'static>(&self) -> Option<Rc<RefCell<T>>> {
+        if self.0.borrow().as_any().is::<T>() {
+            let rc = self.0.clone();
+            let ptr = Rc::into_raw(rc) as *const RefCell<T>;
+            // SAFETY: is::<T>() proved the value is `T`, and handles are always allocated as
+            // `Rc::new(RefCell::new(concrete))`, so the layout matches `RcBox<RefCell<T>>`.
+            Some(unsafe { Rc::from_raw(ptr) })
+        } else {
+            None
+        }
+    }
+
+    pub fn as_platform_repository(&self) -> Option<PlatformRepositoryHandle> {
+        self.downcast_rc::<PlatformRepository>()
+            .map(PlatformRepositoryHandle::from_rc)
+    }
+
     pub fn count(&self) -> i64 {
         self.0.borrow().count()
     }

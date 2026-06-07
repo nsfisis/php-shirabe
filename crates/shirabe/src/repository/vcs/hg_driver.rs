@@ -25,6 +25,22 @@ pub struct HgDriver {
 }
 
 impl HgDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            tags: None,
+            branches: None,
+            root_identifier: None,
+            repo_dir: String::new(),
+        }
+    }
+
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         if Filesystem::is_local_path(&self.inner.url) {
             self.repo_dir = self.inner.url.clone();

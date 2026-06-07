@@ -4,10 +4,7 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_search_mixed, count, get_class, in_array,
-    str_replace, strpos,
-};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, in_array, str_replace, strpos};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -26,12 +23,14 @@ use crate::repository::ConfigurableRepositoryInterface;
 use crate::repository::InvalidRepositoryException;
 use crate::repository::RepositoryInterface;
 use crate::repository::vcs::VcsDriverInterface;
+use crate::repository::vcs::VcsDriverKind;
 use crate::repository::{VersionCacheInterface, VersionCacheResult};
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 
+// TODO(phase-c): the driver registration should be refactored later.
 #[derive(Debug)]
 pub struct VcsRepository {
     pub(crate) inner: ArrayRepository,
@@ -62,9 +61,12 @@ pub struct VcsRepository {
     /// @var bool
     pub(crate) branch_error_occurred: bool,
     /// @var array<string, class-string<VcsDriverInterface>>
-    drivers: IndexMap<String, String>,
+    drivers: IndexMap<String, VcsDriverKind>,
     /// @var ?VcsDriverInterface
     driver: Option<Box<dyn VcsDriverInterface>>,
+    /// Kind of the resolved `driver`, used by `get_repo_name` to recover the driver type
+    /// (PHP `array_search(get_class($driver), $this->drivers)`).
+    driver_kind: Option<VcsDriverKind>,
     /// @var ?VersionCacheInterface
     version_cache: Option<Box<dyn VersionCacheInterface>>,
     /// @var list<string>
@@ -91,53 +93,23 @@ impl VcsRepository {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
-        drivers: Option<IndexMap<String, String>>,
+        drivers: Option<IndexMap<String, VcsDriverKind>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,
     ) -> Result<Self> {
         let inner = ArrayRepository::new(vec![])?;
         let drivers = drivers.unwrap_or_else(|| {
-            let mut m: IndexMap<String, String> = IndexMap::new();
-            m.insert(
-                "github".to_string(),
-                "Composer\\Repository\\Vcs\\GitHubDriver".to_string(),
-            );
-            m.insert(
-                "gitlab".to_string(),
-                "Composer\\Repository\\Vcs\\GitLabDriver".to_string(),
-            );
-            m.insert(
-                "bitbucket".to_string(),
-                "Composer\\Repository\\Vcs\\GitBitbucketDriver".to_string(),
-            );
-            m.insert(
-                "git-bitbucket".to_string(),
-                "Composer\\Repository\\Vcs\\GitBitbucketDriver".to_string(),
-            );
-            m.insert(
-                "forgejo".to_string(),
-                "Composer\\Repository\\Vcs\\ForgejoDriver".to_string(),
-            );
-            m.insert(
-                "git".to_string(),
-                "Composer\\Repository\\Vcs\\GitDriver".to_string(),
-            );
-            m.insert(
-                "hg".to_string(),
-                "Composer\\Repository\\Vcs\\HgDriver".to_string(),
-            );
-            m.insert(
-                "perforce".to_string(),
-                "Composer\\Repository\\Vcs\\PerforceDriver".to_string(),
-            );
-            m.insert(
-                "fossil".to_string(),
-                "Composer\\Repository\\Vcs\\FossilDriver".to_string(),
-            );
+            let mut m: IndexMap<String, VcsDriverKind> = IndexMap::new();
+            m.insert("github".to_string(), VcsDriverKind::GitHub);
+            m.insert("gitlab".to_string(), VcsDriverKind::GitLab);
+            m.insert("bitbucket".to_string(), VcsDriverKind::GitBitbucket);
+            m.insert("git-bitbucket".to_string(), VcsDriverKind::GitBitbucket);
+            m.insert("forgejo".to_string(), VcsDriverKind::Forgejo);
+            m.insert("git".to_string(), VcsDriverKind::Git);
+            m.insert("hg".to_string(), VcsDriverKind::Hg);
+            m.insert("perforce".to_string(), VcsDriverKind::Perforce);
+            m.insert("fossil".to_string(), VcsDriverKind::Fossil);
             // svn must be last because identifying a subversion server for sure is practically impossible
-            m.insert(
-                "svn".to_string(),
-                "Composer\\Repository\\Vcs\\SvnDriver".to_string(),
-            );
+            m.insert("svn".to_string(), VcsDriverKind::Svn);
             m
         });
 
@@ -178,6 +150,7 @@ impl VcsRepository {
             branch_error_occurred: false,
             drivers,
             driver: None,
+            driver_kind: None,
             version_cache,
             empty_references: vec![],
             version_transport_exceptions: IndexMap::new(),
@@ -186,22 +159,18 @@ impl VcsRepository {
     }
 
     pub fn get_repo_name(&mut self) -> String {
-        // Ensure the driver is initialized; we do not need a handle here.
+        // Ensure the driver is resolved so `driver_kind` is populated.
         let _ = self.get_driver().expect("driver should be available");
-        let driver_class = get_class(&PhpMixed::Null); // TODO(phase-b): obtain runtime class name of $driver
-        let drivers_snapshot: IndexMap<String, Box<PhpMixed>> = self
-            .drivers
-            .iter()
-            .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
-            .collect();
-        let driver_type = array_search_mixed(
-            &PhpMixed::String(driver_class.clone()),
-            &PhpMixed::Array(drivers_snapshot),
-            false,
-        )
-        .map(|v| v.as_string().unwrap_or("").to_string())
-        .filter(|s| !s.is_empty())
-        .unwrap_or(driver_class);
+        // PHP: array_search(get_class($driver), $this->drivers), falling back to the class name.
+        let driver_type = match self.driver_kind {
+            Some(kind) => self
+                .drivers
+                .iter()
+                .find(|(_, v)| **v == kind)
+                .map(|(name, _)| name.clone())
+                .unwrap_or_else(|| kind.php_class_name().to_string()),
+            None => String::new(),
+        };
 
         format!(
             "vcs repo ({} {})",
@@ -223,39 +192,56 @@ impl VcsRepository {
             return self.driver.as_mut();
         }
 
-        if let Some(_class) = self.drivers.get(&self.r#type).cloned() {
-            // TODO(phase-b): dynamic class-string instantiation `new $class(...)`
-            let driver: Option<Box<dyn VcsDriverInterface>> = None;
-            if let Some(mut d) = driver {
-                let _ = d.initialize();
-                self.driver = Some(d);
-            }
+        if let Some(kind) = self.drivers.get(&self.r#type).copied() {
+            let mut driver = kind.instantiate(
+                self.repo_config.clone(),
+                self.io.clone(),
+                self.config.clone(),
+                self.http_downloader.clone(),
+                self.process_executor.clone(),
+            );
+            let _ = driver.initialize();
+            self.driver = Some(driver);
+            self.driver_kind = Some(kind);
             return self.driver.as_mut();
         }
 
-        for (_, _driver_class) in self.drivers.iter() {
-            // TODO(phase-b): static-method dispatch on class-string: `$driver::supports(...)`
-            let supports = false;
-            if supports {
-                // TODO(phase-b): dynamic class-string instantiation `new $driver(...)`
-                let d: Option<Box<dyn VcsDriverInterface>> = None;
-                if let Some(mut d) = d {
-                    let _ = d.initialize();
-                    self.driver = Some(d);
-                }
+        let kinds: Vec<VcsDriverKind> = self.drivers.values().copied().collect();
+
+        for kind in &kinds {
+            if kind
+                .supports(self.io.clone(), self.config.clone(), &self.url, false)
+                .unwrap_or(false)
+            {
+                let mut driver = kind.instantiate(
+                    self.repo_config.clone(),
+                    self.io.clone(),
+                    self.config.clone(),
+                    self.http_downloader.clone(),
+                    self.process_executor.clone(),
+                );
+                let _ = driver.initialize();
+                self.driver = Some(driver);
+                self.driver_kind = Some(*kind);
                 return self.driver.as_mut();
             }
         }
 
-        for (_, _driver_class) in self.drivers.iter() {
-            // TODO(phase-b): static-method dispatch on class-string: `$driver::supports(..., true)`
-            let supports = false;
-            if supports {
-                let d: Option<Box<dyn VcsDriverInterface>> = None;
-                if let Some(mut d) = d {
-                    let _ = d.initialize();
-                    self.driver = Some(d);
-                }
+        for kind in &kinds {
+            if kind
+                .supports(self.io.clone(), self.config.clone(), &self.url, true)
+                .unwrap_or(false)
+            {
+                let mut driver = kind.instantiate(
+                    self.repo_config.clone(),
+                    self.io.clone(),
+                    self.config.clone(),
+                    self.http_downloader.clone(),
+                    self.process_executor.clone(),
+                );
+                let _ = driver.initialize();
+                self.driver = Some(driver);
+                self.driver_kind = Some(*kind);
                 return self.driver.as_mut();
             }
         }
@@ -706,14 +692,24 @@ impl VcsRepository {
                     .as_ref()
                     .unwrap()
                     .load(package_data.clone(), None)?;
-                // TODO(phase-b): `$this->loader instanceof ValidatingArrayLoader` downcast
-                let loader_as_validating: Option<&ValidatingArrayLoader> = None;
+                // PHP: `$this->loader instanceof ValidatingArrayLoader`.
+                // TODO(phase-c): ValidatingArrayLoader does not implement LoaderInterface yet (its
+                // `load` needs `&mut self`, requiring a LoaderInterface redesign), so it can never be
+                // stored in `self.loader` and this downcast is always None. Production never calls
+                // setLoader so the default ArrayLoader matches upstream, but the InvalidPackageException
+                // path stays dead until the trait is reworked.
+                let loader_as_validating = self
+                    .loader
+                    .as_ref()
+                    .and_then(|l| l.as_any().downcast_ref::<ValidatingArrayLoader>());
                 if let Some(validating) = loader_as_validating {
-                    if count(&PhpMixed::Null) > 0 {
-                        let _ = validating;
-                        return Err(
-                            InvalidPackageException::new(vec![], vec![], package_data).into()
-                        );
+                    if !validating.get_warnings().is_empty() {
+                        return Err(InvalidPackageException::new(
+                            validating.get_errors().to_vec(),
+                            validating.get_warnings().to_vec(),
+                            package_data,
+                        )
+                        .into());
                     }
                 }
                 self.inner.add_package(package)?;

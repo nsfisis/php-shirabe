@@ -47,6 +47,30 @@ pub struct GitHubDriver {
 }
 
 impl GitHubDriver {
+    pub fn new(
+        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        config: std::rc::Rc<std::cell::RefCell<Config>>,
+        http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+        process: std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    ) -> Self {
+        Self {
+            inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
+            owner: String::new(),
+            repository: String::new(),
+            tags: None,
+            branches: None,
+            root_identifier: String::new(),
+            repo_data: None,
+            has_issues: false,
+            is_private: false,
+            is_archived: false,
+            funding_info: None,
+            allow_git_fallback: true,
+            git_driver: None,
+        }
+    }
+
     pub fn initialize(&mut self) -> Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
         if !Preg::is_match_strict_groups3(
