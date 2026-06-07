@@ -17,7 +17,9 @@ static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<String, ClassLoader>>> =
 /// ClassLoader implements a PSR-0, PSR-4 and classmap class loader.
 #[derive(Debug, Clone)]
 pub struct ClassLoader {
-    // PHP: private static $includeFile — TODO(phase-b): stash include closure as a static
+    // PHP holds a `private static $includeFile` closure purely to run `include $file` in an
+    // isolated scope. The `include_file` shim is a free function with no `self`/`Self` access, so
+    // that scope isolation is inherent and there is no static state to keep on the Rust side.
     /// @var string|null
     vendor_dir: Option<String>,
 
@@ -491,8 +493,9 @@ impl ClassLoader {
     }
 
     fn initialize_include_closure() {
-        // TODO(phase-b): preserve PHP `\Closure::bind(static fn($file) => include $file, null, null)`
-        // Rust has no `include` operator; this is a no-op placeholder.
+        // PHP lazily binds `self::$includeFile` to a scope-isolated `include $file` closure. The
+        // Rust `include_file` shim already provides that isolation as a free function, so there is
+        // no closure to bind and this is intentionally a no-op.
     }
 
     /// PHP `(array) $loader`. Every property is private, so keys are mangled as

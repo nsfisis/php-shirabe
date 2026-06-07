@@ -270,7 +270,6 @@ impl Platform {
 
     /// @return int    return a guaranteed binary length of the string, regardless of silly mbstring configs
     pub fn strlen(str: &str) -> i64 {
-        // TODO(phase-b): function-local static; collapse to a Mutex<Option<bool>> in Phase B
         static USE_MB_STRING: Mutex<Option<bool>> = Mutex::new(None);
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
         if use_mb_string.is_none() {

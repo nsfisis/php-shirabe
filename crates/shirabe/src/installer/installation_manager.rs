@@ -64,7 +64,6 @@ impl InstallationManager {
 
     pub fn reset(&mut self) {
         self.notifiable_packages = IndexMap::new();
-        // TODO(phase-b): FileDownloader::$downloadMetadata is a static property
         FileDownloader::reset_download_metadata();
     }
 

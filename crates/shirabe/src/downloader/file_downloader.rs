@@ -82,14 +82,12 @@ pub struct FileDownloader {
 }
 
 impl FileDownloader {
-    /// TODO(phase-b): `$downloadMetadata` is a static property in PHP; not yet mapped to Rust.
     pub fn reset_download_metadata() {
-        todo!("FileDownloader::reset_download_metadata")
+        DOWNLOAD_METADATA.lock().unwrap().clear();
     }
 
-    /// TODO(phase-b): `$downloadMetadata` is a static property in PHP; not yet mapped to Rust.
-    pub fn download_metadata() -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
-        todo!("FileDownloader::download_metadata")
+    pub fn download_metadata() -> IndexMap<String, PhpMixed> {
+        DOWNLOAD_METADATA.lock().unwrap().clone()
     }
 
     /// Constructor.
