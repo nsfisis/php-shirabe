@@ -4,8 +4,8 @@ use crate::util::Silencer;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, RuntimeException, array_unshift, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable, sprintf,
+    PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents, file_put_contents,
+    implode, is_writable, sprintf,
 };
 
 use crate::config::ConfigSourceInterface;
@@ -17,26 +17,19 @@ use crate::util::Filesystem;
 /// JSON Configuration Source
 #[derive(Debug)]
 pub struct JsonConfigSource {
-    /// @var JsonFile
     file: std::rc::Rc<std::cell::RefCell<JsonFile>>,
-
-    /// @var bool
     auth_config: bool,
 }
 
 impl JsonConfigSource {
-    /// Constructor
     pub fn new(file: std::rc::Rc<std::cell::RefCell<JsonFile>>, auth_config: bool) -> Self {
         Self { file, auth_config }
     }
 
-    /// @param mixed ...$args
     fn manipulate_json(
         &mut self,
         clean: impl FnOnce(&mut JsonManipulator) -> Result<bool>,
-        // TODO(phase-b): callback signature uses &mut $config (PHP reference) and variadic args
-        fallback: impl FnOnce(&mut PhpMixed, &mut Vec<PhpMixed>),
-        mut args: Vec<PhpMixed>,
+        fallback: impl FnOnce(&mut PhpMixed) -> Result<()>,
     ) -> Result<()> {
         let contents;
         if self.file.borrow().exists() {
@@ -83,8 +76,7 @@ impl JsonConfigSource {
         } else {
             // on failed clean update, call the fallback and rewrite the whole file
             let mut config = self.file.borrow_mut().read()?;
-            self.array_unshift_ref(&mut args, &mut config);
-            fallback(&mut config, &mut args);
+            fallback(&mut config)?;
             // avoid ending up with arrays for keys that should be objects
             for prop in [
                 "require",
@@ -213,18 +205,119 @@ impl JsonConfigSource {
         Ok(())
     }
 
-    /// Prepend a reference to an element to the beginning of an array.
-    ///
-    /// @param  mixed[] $array
-    /// @param  mixed $value
-    fn array_unshift_ref(&self, array: &mut Vec<PhpMixed>, value: &mut PhpMixed) -> i64 {
-        let return_val = array_unshift(array, PhpMixed::String(String::new()));
-        // PHP: $array[0] = &$value; (PHP reference)
-        // TODO(phase-b): retain reference semantics so later mutations of $value propagate
-        array[0] = value.clone();
+    /// PHP:
+    /// ```
+    /// if (!array_is_list($config['repositories'] ?? [])) { convert the keyed map to a list }
+    /// ```
+    fn normalize_repositories_to_list(root: &mut IndexMap<String, Box<PhpMixed>>) {
+        let map = match root.get("repositories").map(|b| b.as_ref()) {
+            Some(PhpMixed::Array(m)) if !m.is_empty() => m.clone(),
+            _ => return,
+        };
+        let mut list: Vec<Box<PhpMixed>> = Vec::new();
+        for (repository_index, repository) in map {
+            match repository.as_ref() {
+                PhpMixed::Array(repo_map) => {
+                    let mut entry = repo_map.clone();
+                    if !entry.contains_key("name") {
+                        let mut with_name = IndexMap::new();
+                        with_name.insert(
+                            "name".to_string(),
+                            Box::new(PhpMixed::String(repository_index.clone())),
+                        );
+                        for (k, v) in entry {
+                            with_name.insert(k, v);
+                        }
+                        entry = with_name;
+                    }
+                    list.push(Box::new(PhpMixed::Array(entry)));
+                }
+                _ => {
+                    let mut single = IndexMap::new();
+                    single.insert(repository_index.clone(), repository.clone());
+                    list.push(Box::new(PhpMixed::Array(single)));
+                }
+            }
+        }
+        root.insert("repositories".to_string(), Box::new(PhpMixed::List(list)));
+    }
 
-        let _ = return_val;
-        array.len() as i64
+    /// PHP:
+    /// ```
+    /// $config['repositories'] = array_values(
+    ///     array_filter(
+    ///         $config['repositories'] ?? [],
+    ///         fn($val) => !isset($val['name']) || $val['name'] !== $name || $val !== [$name => false],
+    ///     ),
+    /// );
+    /// ```
+    fn dedupe_repositories_by_name(root: &mut IndexMap<String, Box<PhpMixed>>, name: &str) {
+        let items: Vec<Box<PhpMixed>> = match root.get("repositories").map(|b| b.as_ref()) {
+            Some(PhpMixed::List(items)) => items.clone(),
+            Some(PhpMixed::Array(map)) => map.values().cloned().collect(),
+            _ => return,
+        };
+        let filtered: Vec<Box<PhpMixed>> = items
+            .into_iter()
+            .filter(|val| {
+                let name_set = val.as_ref().get("name").is_some();
+                let name_eq = val.as_ref().get("name").and_then(|v| v.as_string()) == Some(name);
+                let is_repo_false = matches!(val.as_ref(), PhpMixed::Array(m)
+                    if m.len() == 1 && matches!(m.get(name).map(|b| b.as_ref()), Some(PhpMixed::Bool(false))));
+                !name_set || !name_eq || !is_repo_false
+            })
+            .collect();
+        root.insert(
+            "repositories".to_string(),
+            Box::new(PhpMixed::List(filtered)),
+        );
+    }
+
+    /// Set a value at a nested key path, creating intermediate maps as needed.
+    fn set_nested(root: &mut IndexMap<String, Box<PhpMixed>>, path: &[&str], value: PhpMixed) {
+        let (last, heads) = path.split_last().unwrap();
+        let mut cursor = root;
+        for seg in heads {
+            let entry = cursor
+                .entry(seg.to_string())
+                .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
+            if !matches!(entry.as_ref(), PhpMixed::Array(_)) {
+                *entry = Box::new(PhpMixed::Array(IndexMap::new()));
+            }
+            cursor = match entry.as_mut() {
+                PhpMixed::Array(m) => m,
+                _ => unreachable!(),
+            };
+        }
+        cursor.insert(last.to_string(), Box::new(value));
+    }
+
+    /// Unset a value at a nested key path; a no-op if the path is absent.
+    fn unset_nested(root: &mut IndexMap<String, Box<PhpMixed>>, path: &[&str]) {
+        let (last, heads) = path.split_last().unwrap();
+        let mut cursor = root;
+        for seg in heads {
+            cursor = match cursor.get_mut(*seg).map(|b| b.as_mut()) {
+                Some(PhpMixed::Array(m)) => m,
+                _ => return,
+            };
+        }
+        cursor.shift_remove(*last);
+    }
+
+    fn is_auth_config_key(key: &str) -> bool {
+        const PREFIXES: &[&str] = &[
+            "bitbucket-oauth.",
+            "github-oauth.",
+            "gitlab-oauth.",
+            "gitlab-token.",
+            "bearer.",
+            "http-basic.",
+            "custom-headers.",
+            "forgejo-token.",
+            "platform.",
+        ];
+        PREFIXES.iter().any(|p| key.starts_with(p))
     }
 }
 
@@ -234,17 +327,91 @@ impl ConfigSourceInterface for JsonConfigSource {
     }
 
     fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> Result<()> {
-        let name_owned = name.to_string();
-        let clean_name = name_owned.clone();
-        let clean_config = config.clone();
+        let config_cloned = config.clone();
         self.manipulate_json(
-            move |m| m.add_repository(&clean_name, clean_config, append),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // TODO(phase-b): port the closure body — args are [$cfg, $repo, $repoConfig, $append]
-                let _ = (cfg, args);
-                todo!("addRepository fallback closure body");
+            move |m| m.add_repository(name, config_cloned, append),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                Self::normalize_repositories_to_list(root);
+
+                if matches!(config, PhpMixed::Bool(false)) {
+                    if let Some(PhpMixed::List(list)) =
+                        root.get_mut("repositories").map(|b| b.as_mut())
+                    {
+                        for repository in list.iter_mut() {
+                            if repository.as_ref().get("name").and_then(|v| v.as_string())
+                                == Some(name)
+                            {
+                                let mut replaced = IndexMap::new();
+                                replaced.insert(name.to_string(), Box::new(PhpMixed::Bool(false)));
+                                *repository = Box::new(PhpMixed::Array(replaced));
+                                return Ok(());
+                            }
+                            if let PhpMixed::Array(m) = repository.as_ref() {
+                                if m.len() == 1
+                                    && matches!(
+                                        m.get(name).map(|b| b.as_ref()),
+                                        Some(PhpMixed::Bool(false))
+                                    )
+                                {
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    } else {
+                        root.insert(
+                            "repositories".to_string(),
+                            Box::new(PhpMixed::List(Vec::new())),
+                        );
+                    }
+                    let mut entry = IndexMap::new();
+                    entry.insert(name.to_string(), Box::new(PhpMixed::Bool(false)));
+                    if let Some(PhpMixed::List(list)) =
+                        root.get_mut("repositories").map(|b| b.as_mut())
+                    {
+                        list.push(Box::new(PhpMixed::Array(entry)));
+                    }
+                    return Ok(());
+                }
+
+                let mut repo_config = config;
+                if let PhpMixed::Array(rc) = &repo_config {
+                    if !name.is_empty() && !rc.contains_key("name") {
+                        let mut with_name = IndexMap::new();
+                        with_name.insert(
+                            "name".to_string(),
+                            Box::new(PhpMixed::String(name.to_string())),
+                        );
+                        for (k, v) in rc.clone() {
+                            with_name.insert(k, v);
+                        }
+                        repo_config = PhpMixed::Array(with_name);
+                    }
+                }
+
+                Self::dedupe_repositories_by_name(root, name);
+
+                if !matches!(
+                    root.get("repositories").map(|b| b.as_ref()),
+                    Some(PhpMixed::List(_))
+                ) {
+                    root.insert(
+                        "repositories".to_string(),
+                        Box::new(PhpMixed::List(Vec::new())),
+                    );
+                }
+                if let Some(PhpMixed::List(list)) = root.get_mut("repositories").map(|b| b.as_mut())
+                {
+                    if append {
+                        list.push(Box::new(repo_config));
+                    } else {
+                        list.insert(0, Box::new(repo_config));
+                    }
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name_owned), config, PhpMixed::Bool(append)],
         )
     }
 
@@ -255,176 +422,359 @@ impl ConfigSourceInterface for JsonConfigSource {
         reference_name: &str,
         offset: i64,
     ) -> Result<()> {
-        let name_owned = name.to_string();
-        let reference_name_owned = reference_name.to_string();
-        let clean_name = name_owned.clone();
-        let clean_reference_name = reference_name_owned.clone();
-        let clean_config = config.clone();
+        let config_cloned = config.clone();
         self.manipulate_json(
-            move |m| m.insert_repository(&clean_name, clean_config, &clean_reference_name, offset),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // TODO(phase-b): port the closure body
-                let _ = (cfg, args);
-                todo!("insertRepository fallback closure body");
+            move |m| m.insert_repository(name, config_cloned, reference_name, offset),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                Self::normalize_repositories_to_list(root);
+                Self::dedupe_repositories_by_name(root, name);
+
+                let mut index_to_insert: Option<usize> = None;
+                if let Some(PhpMixed::List(list)) = root.get("repositories").map(|b| b.as_ref()) {
+                    for (i, repository) in list.iter().enumerate() {
+                        if repository.as_ref().get("name").and_then(|v| v.as_string())
+                            == Some(reference_name)
+                        {
+                            index_to_insert = Some(i);
+                            break;
+                        }
+                        if let PhpMixed::Array(m) = repository.as_ref() {
+                            if m.len() == 1
+                                && matches!(
+                                    m.get(reference_name).map(|b| b.as_ref()),
+                                    Some(PhpMixed::Bool(false))
+                                )
+                            {
+                                index_to_insert = Some(i);
+                                break;
+                            }
+                        }
+                    }
+                }
+                let Some(index_to_insert) = index_to_insert else {
+                    return Err(RuntimeException {
+                        message: sprintf(
+                            "The referenced repository \"%s\" does not exist.",
+                            &[PhpMixed::String(reference_name.to_string())],
+                        ),
+                        code: 0,
+                    }
+                    .into());
+                };
+
+                let mut repo_config = config;
+                if let PhpMixed::Array(rc) = &repo_config {
+                    if !name.is_empty() && !rc.contains_key("name") {
+                        let mut with_name = IndexMap::new();
+                        with_name.insert(
+                            "name".to_string(),
+                            Box::new(PhpMixed::String(name.to_string())),
+                        );
+                        for (k, v) in rc.clone() {
+                            with_name.insert(k, v);
+                        }
+                        repo_config = PhpMixed::Array(with_name);
+                    }
+                }
+
+                if let Some(PhpMixed::List(list)) = root.get_mut("repositories").map(|b| b.as_mut())
+                {
+                    let raw = index_to_insert as i64 + offset;
+                    let pos = if raw < 0 {
+                        (list.len() as i64 + raw).max(0)
+                    } else {
+                        raw.min(list.len() as i64)
+                    } as usize;
+                    list.insert(pos, Box::new(repo_config));
+                }
+                Ok(())
             },
-            vec![
-                PhpMixed::String(name_owned),
-                config,
-                PhpMixed::String(reference_name_owned),
-                PhpMixed::Int(offset),
-            ],
         )
     }
 
     fn set_repository_url(&mut self, name: &str, url: &str) -> Result<()> {
-        let clean_name = name.to_string();
-        let clean_url = url.to_string();
         self.manipulate_json(
-            move |m| m.set_repository_url(&clean_name, &clean_url),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // PHP: foreach ($config['repositories'] ?? [] as $index => $repository) { ... }
-                let _ = (cfg, args);
-                todo!("setRepositoryUrl fallback closure body");
+            move |m| m.set_repository_url(name, url),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                match root.get_mut("repositories").map(|b| b.as_mut()) {
+                    Some(PhpMixed::List(list)) => {
+                        for repository in list.iter_mut() {
+                            if repository.as_ref().get("name").and_then(|v| v.as_string())
+                                == Some(name)
+                            {
+                                if let PhpMixed::Array(m) = repository.as_mut() {
+                                    m.insert(
+                                        "url".to_string(),
+                                        Box::new(PhpMixed::String(url.to_string())),
+                                    );
+                                }
+                                return Ok(());
+                            }
+                        }
+                    }
+                    Some(PhpMixed::Array(map)) => {
+                        let mut target: Option<String> = None;
+                        for (index, repository) in map.iter() {
+                            if index == name
+                                || repository.as_ref().get("name").and_then(|v| v.as_string())
+                                    == Some(name)
+                            {
+                                target = Some(index.clone());
+                                break;
+                            }
+                        }
+                        if let Some(k) = target {
+                            if let Some(PhpMixed::Array(m)) = map.get_mut(&k).map(|b| b.as_mut()) {
+                                m.insert(
+                                    "url".to_string(),
+                                    Box::new(PhpMixed::String(url.to_string())),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(())
             },
-            vec![
-                PhpMixed::String(name.to_string()),
-                PhpMixed::String(url.to_string()),
-            ],
         )
     }
 
     fn remove_repository(&mut self, name: &str) -> Result<()> {
-        let clean_name = name.to_string();
         self.manipulate_json(
-            move |m| m.remove_repository(&clean_name),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                let _ = (cfg, args);
-                todo!("removeRepository fallback closure body");
+            move |m| m.remove_repository(name),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                let had_key = matches!(
+                    root.get("repositories").map(|b| b.as_ref()),
+                    Some(PhpMixed::Array(m)) if m.contains_key(name)
+                );
+                if had_key {
+                    if let Some(PhpMixed::Array(m)) =
+                        root.get_mut("repositories").map(|b| b.as_mut())
+                    {
+                        m.shift_remove(name);
+                    }
+                } else {
+                    Self::dedupe_repositories_by_name(root, name);
+                }
+                let is_empty = match root.get("repositories").map(|b| b.as_ref()) {
+                    Some(PhpMixed::List(l)) => l.is_empty(),
+                    Some(PhpMixed::Array(m)) => m.is_empty(),
+                    _ => false,
+                };
+                if is_empty {
+                    root.shift_remove("repositories");
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name.to_string())],
         )
     }
 
     fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> Result<()> {
         let auth_config = self.auth_config;
-        let clean_name = name.to_string();
-        let clean_value = value.clone();
+        let value_cloned = value.clone();
         self.manipulate_json(
             // override manipulator method for auth config files
             move |m| {
                 if auth_config {
-                    let parts = explode(".", &clean_name);
+                    let parts = explode(".", name);
                     m.add_sub_node(
                         parts.get(0).map(String::as_str).unwrap_or(""),
                         parts.get(1).map(String::as_str).unwrap_or(""),
-                        clean_value,
+                        value_cloned,
                         false,
                     )
                 } else {
-                    m.add_config_setting(&clean_name, clean_value)
+                    m.add_config_setting(name, value_cloned)
                 }
             },
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // PHP: [$key, $host] = explode('.', $key, 2);
-                let _ = (cfg, args, auth_config);
-                todo!("addConfigSetting fallback closure body");
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                if Self::is_auth_config_key(name) {
+                    let mut it = name.splitn(2, '.');
+                    let key = it.next().unwrap_or("");
+                    let host = it.next().unwrap_or("");
+                    if auth_config {
+                        Self::set_nested(root, &[key, host], value);
+                    } else {
+                        Self::set_nested(root, &["config", key, host], value);
+                    }
+                } else {
+                    Self::set_nested(root, &["config", name], value);
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name.to_string()), value],
         )
     }
 
     fn remove_config_setting(&mut self, name: &str) -> Result<()> {
         let auth_config = self.auth_config;
-        let clean_name = name.to_string();
         self.manipulate_json(
             // override manipulator method for auth config files
             move |m| {
                 if auth_config {
-                    let parts = explode(".", &clean_name);
+                    let parts = explode(".", name);
                     m.remove_sub_node(
                         parts.get(0).map(String::as_str).unwrap_or(""),
                         parts.get(1).map(String::as_str).unwrap_or(""),
                     )
                 } else {
-                    m.remove_config_setting(&clean_name)
+                    m.remove_config_setting(name)
                 }
             },
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                let _ = (cfg, args, auth_config);
-                todo!("removeConfigSetting fallback closure body");
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                if Self::is_auth_config_key(name) {
+                    let mut it = name.splitn(2, '.');
+                    let key = it.next().unwrap_or("");
+                    let host = it.next().unwrap_or("");
+                    if auth_config {
+                        Self::unset_nested(root, &[key, host]);
+                    } else {
+                        Self::unset_nested(root, &["config", key, host]);
+                    }
+                } else {
+                    Self::unset_nested(root, &["config", name]);
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name.to_string())],
         )
     }
 
     fn add_property(&mut self, name: &str, value: PhpMixed) -> Result<()> {
-        let clean_name = name.to_string();
-        let clean_value = value.clone();
+        let value_cloned = value.clone();
         self.manipulate_json(
-            move |m| m.add_property(&clean_name, clean_value),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                let _ = (cfg, args);
-                todo!("addProperty fallback closure body");
+            move |m| m.add_property(name, value_cloned),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                if name.starts_with("extra.") || name.starts_with("scripts.") {
+                    let mut bits: Vec<&str> = name.split('.').collect();
+                    let last = bits.pop().unwrap();
+                    let first = bits[0];
+                    let entry = root
+                        .entry(first.to_string())
+                        .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
+                    if !matches!(entry.as_ref(), PhpMixed::Array(_)) {
+                        *entry = Box::new(PhpMixed::Array(IndexMap::new()));
+                    }
+                    let mut cursor = match entry.as_mut() {
+                        PhpMixed::Array(m) => m,
+                        _ => unreachable!(),
+                    };
+                    for bit in &bits {
+                        let e = cursor
+                            .entry(bit.to_string())
+                            .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())));
+                        if !matches!(e.as_ref(), PhpMixed::Array(_)) {
+                            *e = Box::new(PhpMixed::Array(IndexMap::new()));
+                        }
+                        cursor = match e.as_mut() {
+                            PhpMixed::Array(m) => m,
+                            _ => unreachable!(),
+                        };
+                    }
+                    cursor.insert(last.to_string(), Box::new(value));
+                } else {
+                    root.insert(name.to_string(), Box::new(value));
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name.to_string()), value],
         )
     }
 
     fn remove_property(&mut self, name: &str) -> Result<()> {
-        let clean_name = name.to_string();
         self.manipulate_json(
-            move |m| m.remove_property(&clean_name),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                let _ = (cfg, args);
-                todo!("removeProperty fallback closure body");
+            move |m| m.remove_property(name),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                let lower = name.to_ascii_lowercase();
+                if name.starts_with("extra.")
+                    || name.starts_with("scripts.")
+                    || lower.starts_with("autoload.")
+                    || lower.starts_with("autoload-dev.")
+                {
+                    let mut bits: Vec<&str> = name.split('.').collect();
+                    let last = bits.pop().unwrap();
+                    let first = bits[0];
+                    let Some(entry) = root.get_mut(first) else {
+                        return Ok(());
+                    };
+                    let mut cursor: &mut PhpMixed = entry.as_mut();
+                    for bit in &bits {
+                        cursor = match cursor {
+                            PhpMixed::Array(m) if m.contains_key(*bit) => {
+                                m.get_mut(*bit).unwrap().as_mut()
+                            }
+                            _ => return Ok(()),
+                        };
+                    }
+                    if let PhpMixed::Array(m) = cursor {
+                        m.shift_remove(last);
+                    }
+                } else {
+                    root.shift_remove(name);
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(name.to_string())],
         )
     }
 
     fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> Result<()> {
-        let clean_type = r#type.to_string();
-        let clean_name = name.to_string();
-        let clean_value = value.to_string();
         self.manipulate_json(
-            move |m| m.add_link(&clean_type, &clean_name, &clean_value, false),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // PHP: $config[$type][$name] = $value;
-                let _ = (cfg, args);
-                todo!("addLink fallback closure body");
+            move |m| m.add_link(r#type, name, value, false),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                Self::set_nested(root, &[r#type, name], PhpMixed::String(value.to_string()));
+                Ok(())
             },
-            vec![
-                PhpMixed::String(r#type.to_string()),
-                PhpMixed::String(name.to_string()),
-                PhpMixed::String(value.to_string()),
-            ],
         )
     }
 
     fn remove_link(&mut self, r#type: &str, name: &str) -> Result<()> {
-        let clean_type = r#type.to_string();
-        let clean_name = name.to_string();
         self.manipulate_json(
-            move |m| m.remove_sub_node(&clean_type, &clean_name),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // PHP: unset($config[$type][$name]);
-                let _ = (cfg, args);
-                todo!("removeLink fallback (unset subnode) closure body");
+            move |m| m.remove_sub_node(r#type, name),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                Self::unset_nested(root, &[r#type, name]);
+                Ok(())
             },
-            vec![
-                PhpMixed::String(r#type.to_string()),
-                PhpMixed::String(name.to_string()),
-            ],
         )?;
-        let clean_type = r#type.to_string();
         self.manipulate_json(
-            move |m| m.remove_main_key_if_empty(&clean_type),
-            move |cfg: &mut PhpMixed, args: &mut Vec<PhpMixed>| {
-                // PHP: if (0 === count($config[$type])) { unset($config[$type]); }
-                let _ = (cfg, args);
-                todo!("removeLink fallback (unset main key if empty) closure body");
+            move |m| m.remove_main_key_if_empty(r#type),
+            move |cfg| {
+                let Some(root) = cfg.as_array_mut() else {
+                    return Ok(());
+                };
+                let empty = match root.get(r#type).map(|b| b.as_ref()) {
+                    Some(PhpMixed::Array(m)) => m.is_empty(),
+                    Some(PhpMixed::List(l)) => l.is_empty(),
+                    _ => false,
+                };
+                if empty {
+                    root.shift_remove(r#type);
+                }
+                Ok(())
             },
-            vec![PhpMixed::String(r#type.to_string())],
         )
     }
 }
