@@ -102,8 +102,14 @@ impl AuthHelper {
         if store.is_some() {
             config_source.add_config_setting(
                 &format!("http-basic.{}", origin),
-                // TODO(phase-b): convert IOInterface auth IndexMap into PhpMixed
-                todo!("IOInterface.get_authentication(origin) as PhpMixed"),
+                PhpMixed::Array(
+                    self.io
+                        .borrow()
+                        .get_authentication(origin)
+                        .into_iter()
+                        .map(|(k, v)| (k, Box::new(v.map_or(PhpMixed::Null, PhpMixed::String))))
+                        .collect(),
+                ),
             )?;
         }
         Ok(())
@@ -440,7 +446,6 @@ impl AuthHelper {
                 password,
             );
             // PHP: $this->config->get('store-auths') returns 'prompt'|bool
-            // TODO(phase-b): decode the PhpMixed result into StoreAuth
             store_auth = match self.config.borrow_mut().get("store-auths") {
                 PhpMixed::Bool(b) => StoreAuth::Bool(b),
                 PhpMixed::String(ref s) if s == "prompt" => StoreAuth::Prompt,
@@ -467,7 +472,6 @@ impl AuthHelper {
             options.insert("http".to_string(), PhpMixed::Array(IndexMap::new()));
         }
         // PHP: if (!isset($options['http']['header']))
-        // TODO(phase-b): mutate nested PhpMixed in place rather than copying
         {
             let http_has_header = if let Some(PhpMixed::Array(http)) = options.get("http") {
                 http.contains_key("header")

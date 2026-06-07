@@ -54,13 +54,14 @@ impl SuggestsCommand {
             ))];
 
         if composer.get_locker().borrow_mut().is_locked() {
-            // TODO(phase-b): get_platform_overrides returns IndexMap<String, String>; PlatformRepository::new expects IndexMap<String, PhpMixed>
-            let _platform_overrides = composer
+            let platform_overrides = composer
                 .get_locker()
                 .borrow_mut()
                 .get_platform_overrides()?;
-            let platform_overrides: IndexMap<String, PhpMixed> =
-                todo!("convert IndexMap<String, String> to IndexMap<String, PhpMixed>");
+            let platform_overrides: IndexMap<String, PhpMixed> = platform_overrides
+                .into_iter()
+                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .collect();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,

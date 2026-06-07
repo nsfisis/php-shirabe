@@ -85,7 +85,6 @@ impl InstalledVersions {
             ),
         );
         let flipped = array_flip(&merged);
-        // TODO(phase-b): convert flipped (PhpMixed::Array) to IndexMap<String, V>
         array_keys(
             &flipped
                 .as_array()

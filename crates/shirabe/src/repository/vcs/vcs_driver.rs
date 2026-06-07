@@ -74,7 +74,6 @@ impl VcsDriverBase {
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        // TODO(phase-b): convert PhpMixed::Array options into IndexMap<String, PhpMixed> properly.
         let options: IndexMap<String, PhpMixed> = match options_mixed {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
@@ -216,7 +215,6 @@ pub trait VcsDriver: VcsDriverInterface {
             if self.should_cache(identifier) {
                 if let Some(res) = self.cache_mut().and_then(|c| c.read(identifier)) {
                     let parsed = JsonFile::parse_json(Some(&res), None)?;
-                    // TODO(phase-b): unwrap PhpMixed::Array into IndexMap<String, PhpMixed>.
                     let parsed_map: Option<IndexMap<String, PhpMixed>> = match parsed {
                         PhpMixed::Array(a) => Some(a.into_iter().map(|(k, v)| (k, *v)).collect()),
                         _ => None,
@@ -273,7 +271,6 @@ pub trait VcsDriver: VcsDriverInterface {
             Some(&format!("{}:composer.json", identifier)),
         )?;
 
-        // TODO(phase-b): unwrap PhpMixed::Array into IndexMap<String, PhpMixed>.
         let mut composer: IndexMap<String, PhpMixed> = match composer {
             PhpMixed::Array(a) if !a.is_empty() => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => return Ok(None),
@@ -315,7 +312,6 @@ pub trait VcsDriver: VcsDriverInterface {
             .get("options")
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()));
-        // TODO(phase-b): convert PhpMixed::Array options into IndexMap<String, PhpMixed> properly.
         let options: IndexMap<String, PhpMixed> = match options_mixed {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),

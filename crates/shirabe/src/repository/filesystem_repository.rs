@@ -284,8 +284,10 @@ impl FilesystemRepository {
         }
 
         // PHP: sort($data['dev-package-names']);
-        if let Some(PhpMixed::List(_list)) = data.get_mut("dev-package-names") {
-            // TODO(phase-b): sort PhpMixed::List in-place using string comparison; PhpMixed: !Ord.
+        if let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names") {
+            usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+                shirabe_php_shim::strcmp(a.as_string().unwrap_or(""), b.as_string().unwrap_or(""))
+            });
         }
         // PHP: usort($data['packages'], static function ($a, $b): int { return strcmp($a['name'], $b['name']); });
         if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
@@ -611,9 +613,14 @@ impl FilesystemRepository {
                 if let PhpMixed::Array(version_map) = version.as_mut() {
                     for key in ["aliases", "replaced", "provided"] {
                         if let Some(boxed) = version_map.get_mut(key) {
-                            if let PhpMixed::List(_list) = boxed.as_mut() {
+                            if let PhpMixed::List(list) = boxed.as_mut() {
                                 // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
-                                // TODO(phase-b): PhpMixed lacks Ord; needs custom comparator.
+                                usort(list, |a: &Box<PhpMixed>, b: &Box<PhpMixed>| -> i64 {
+                                    shirabe_php_shim::strnatcmp(
+                                        a.as_string().unwrap_or(""),
+                                        b.as_string().unwrap_or(""),
+                                    )
+                                });
                             }
                         }
                     }
