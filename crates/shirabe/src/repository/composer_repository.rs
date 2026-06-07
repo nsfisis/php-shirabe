@@ -1794,8 +1794,7 @@ impl ComposerRepository {
                 .and_then(|v| v.as_string())
                 .map_or(false, |s| s == "composer/2.0");
             if minified {
-                // TODO(phase-b): MetadataMinifier::expand expects/returns IndexMap but versions is Vec
-                versions = todo!("MetadataMinifier::expand signature mismatch with Vec<IndexMap>");
+                versions = MetadataMinifier::expand(versions);
             }
 
             names_found.insert(real_name.clone(), true);

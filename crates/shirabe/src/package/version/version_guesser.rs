@@ -539,7 +539,6 @@ impl VersionGuesser {
                     let branch_clone = branch.clone();
                     let cmd_line: Vec<String> = array_map(
                         move |component: &String| -> String {
-                            // TODO(phase-b): str_replace with array arguments — emulating
                             let r1 = str_replace("%candidate%", &candidate_clone, component);
                             str_replace("%branch%", &branch_clone, &r1)
                         },
