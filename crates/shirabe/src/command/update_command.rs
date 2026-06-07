@@ -5,9 +5,9 @@ use crate::package::base_package;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::helper::Table;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::helper::Table;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge, array_search, count, empty, in_array, sprintf, strtolower,

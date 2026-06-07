@@ -4,9 +4,9 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
-use shirabe_external_packages::symfony::component::process::ExecutableFinder;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_php_shim::{
     CURL_HTTP_VERSION_2_0, CURL_VERSION_HTTP2, CURL_VERSION_HTTP3, CURL_VERSION_ZSTD,
     FILTER_VALIDATE_BOOLEAN, INFO_GENERAL, InvalidArgumentException, OPENSSL_VERSION_NUMBER,

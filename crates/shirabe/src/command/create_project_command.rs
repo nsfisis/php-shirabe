@@ -4,9 +4,9 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
-use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, PhpMixed, RuntimeException,
     UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,

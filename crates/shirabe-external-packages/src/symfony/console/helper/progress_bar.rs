@@ -1,4 +1,4 @@
-use crate::symfony::component::console::output::OutputInterface;
+use crate::symfony::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ProgressBar;

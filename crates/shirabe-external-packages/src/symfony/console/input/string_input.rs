@@ -1,3 +1,4 @@
+use crate::symfony::console::input::InputDefinition;
 use crate::symfony::console::input::InputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -24,6 +25,9 @@ impl InputInterface for StringInput {
         _default: PhpMixed,
         _only_params: bool,
     ) -> PhpMixed {
+        todo!()
+    }
+    fn bind(&mut self, _definition: &InputDefinition) -> anyhow::Result<()> {
         todo!()
     }
     fn validate(&self) -> anyhow::Result<()> {

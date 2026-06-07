@@ -4,8 +4,8 @@ use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};

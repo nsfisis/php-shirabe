@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};

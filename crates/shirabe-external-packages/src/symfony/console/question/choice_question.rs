@@ -1,4 +1,4 @@
-use crate::symfony::component::console::question::Question;
+use crate::symfony::console::question::Question;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

@@ -3,7 +3,7 @@
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::helper::ProgressBar;
+use shirabe_external_packages::symfony::console::helper::ProgressBar;
 
 #[derive(Debug)]
 pub struct Loop {

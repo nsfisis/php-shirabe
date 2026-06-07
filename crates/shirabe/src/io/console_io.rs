@@ -5,16 +5,16 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::helper::HelperSet;
-use shirabe_external_packages::symfony::component::console::helper::ProgressBar;
-use shirabe_external_packages::symfony::component::console::helper::Table;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::{
+use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::ProgressBar;
+use shirabe_external_packages::symfony::console::helper::Table;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::{
     self as output_interface, OutputInterface,
 };
-use shirabe_external_packages::symfony::component::console::question::ChoiceQuestion;
-use shirabe_external_packages::symfony::component::console::question::Question;
+use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
+use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_keys, array_search, count, function_exists, implode, in_array,
     is_array, is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat,

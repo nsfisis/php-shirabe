@@ -1,5 +1,5 @@
-use crate::symfony::component::console::input::InputInterface;
-use crate::symfony::component::console::output::OutputInterface;
+use crate::symfony::console::input::InputInterface;
+use crate::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

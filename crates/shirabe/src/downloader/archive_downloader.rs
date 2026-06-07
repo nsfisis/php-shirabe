@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::finder::{Finder, SplFileInfo};
+use shirabe_external_packages::symfony::finder::{Finder, SplFileInfo};
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PhpMixed, RuntimeException, basename, bin2hex, file_exists, is_dir,
     random_bytes, realpath,

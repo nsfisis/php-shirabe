@@ -3,12 +3,12 @@
 use crate::io::ConsoleIO;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::helper::HelperSet;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
+use shirabe_external_packages::symfony::console::helper::HelperSet;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::input::StringInput;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, fopen, fseek, fwrite, rewind, stream_get_contents,
@@ -39,16 +39,14 @@ impl BufferIO {
         }
 
         let decorated = formatter.as_ref().map_or(false, |f| f.is_decorated());
-        // TODO(phase-b): StreamOutput lives under `symfony::console` (not `symfony::component::console`)
-        // and so does not implement the `component::console::output::OutputInterface` ConsoleIO expects.
-        // Real fix requires unifying the two crate paths.
+        // TODO(phase-c): wire StreamOutput as the output. The console tree merge made StreamOutput
+        // implement the unified OutputInterface; StreamOutput::new is still a stub.
         let _ = formatter;
         let _ = StreamOutput::new(stream, verbosity, Some(decorated));
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
-            todo!("StreamOutput as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>");
+            todo!("wire StreamOutput as the ConsoleIO output");
 
-        // TODO(phase-b): symfony console helper modules live under both `symfony::console`
-        // and `symfony::component::console`; QuestionHelper::new is not yet provided.
+        // TODO(phase-c): construct the QuestionHelper and register it in the HelperSet.
         let helpers: Vec<PhpMixed> = vec![/* PhpMixed::Object(QuestionHelper::new()) */];
         let _ = std::marker::PhantomData::<QuestionHelper>;
         let inner = ConsoleIO::new(
@@ -103,14 +101,11 @@ impl BufferIO {
         // PHP: `if (!$this->input instanceof StreamableInputInterface) { throw ... }`
         //      `$this->input->setStream($this->createStream($inputs)); $this->input->setInteractive(true);`
         //
-        // TODO(phase-b): blocked on the symfony console crate-path duplication (see `new`/`get_output`):
-        // `StreamableInputInterface` lives under `symfony::console::input`, but ConsoleIO's input is
-        // a `symfony::component::console::input::InputInterface` from a separate, unrelated trait
-        // tree, so the `instanceof` downcast cannot be expressed until those trees are unified.
+        // TODO(phase-c): unblocked by the console tree merge (StreamableInputInterface and
+        // InputInterface now share one tree). Wiring the downcast still needs an as_streamable
+        // accessor on InputInterface to reach ConsoleIO's input.
         let _ = inputs;
-        todo!(
-            "BufferIO::set_user_inputs: blocked on unifying symfony::console / symfony::component::console input trait trees"
-        )
+        todo!("BufferIO::set_user_inputs: needs an as_streamable accessor on InputInterface")
     }
 
     fn create_stream(&self, inputs: Vec<String>) -> Result<PhpMixed> {

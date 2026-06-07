@@ -3,11 +3,11 @@
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::Application;
-use shirabe_external_packages::symfony::component::console::input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::ConsoleOutput;
-use shirabe_external_packages::symfony::component::process::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::PhpExecutableFinder;
+use shirabe_external_packages::symfony::console::Application;
+use shirabe_external_packages::symfony::console::input::StringInput;
+use shirabe_external_packages::symfony::console::output::ConsoleOutput;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PATH_SEPARATOR, PHP_VERSION_ID, PhpMixed,
     RuntimeException, array_pop, array_push, array_search_in_vec, array_splice, class_exists,

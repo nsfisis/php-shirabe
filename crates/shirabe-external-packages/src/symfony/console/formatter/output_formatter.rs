@@ -1,12 +1,13 @@
-use indexmap::IndexMap;
-
 #[derive(Debug)]
 pub struct OutputFormatter;
 
 impl OutputFormatter {
     pub fn new(
         _decorated: bool,
-        _styles: IndexMap<String, crate::symfony::console::formatter::OutputFormatterStyle>,
+        _styles: indexmap::IndexMap<
+            String,
+            crate::symfony::console::formatter::OutputFormatterStyle,
+        >,
     ) -> Self {
         todo!()
     }
@@ -24,6 +25,10 @@ impl OutputFormatter {
     }
 
     pub fn escape(_text: &str) -> String {
+        todo!()
+    }
+
+    pub fn escape_trailing_backslash(_text: &str) -> String {
         todo!()
     }
 

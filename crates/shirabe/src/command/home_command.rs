@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{FILTER_VALIDATE_URL, PhpMixed, filter_var};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};

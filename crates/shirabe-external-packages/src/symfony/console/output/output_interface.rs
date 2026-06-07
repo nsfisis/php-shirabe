@@ -1,22 +1,31 @@
 use crate::symfony::console::formatter::OutputFormatter;
+use crate::symfony::console::output::ConsoleOutputInterface;
 
-pub trait OutputInterface {
-    fn write(&mut self, messages: &str, newline: bool, r#type: i64);
-    fn writeln(&mut self, messages: &str, r#type: i64);
-    fn set_verbosity(&mut self, level: i64);
+pub trait OutputInterface: std::fmt::Debug {
+    // PHP class semantics: OutputInterface methods take &self with interior mutability,
+    // because output objects are shared by reference across the PHP code.
+    fn write(&self, messages: &str, newline: bool, r#type: i64);
+    fn writeln(&self, messages: &str, r#type: i64);
+    fn set_verbosity(&self, level: i64);
     fn get_verbosity(&self) -> i64;
     fn is_quiet(&self) -> bool;
     fn is_verbose(&self) -> bool;
     fn is_very_verbose(&self) -> bool;
     fn is_debug(&self) -> bool;
-    fn set_decorated(&mut self, decorated: bool);
+    fn set_decorated(&self, decorated: bool);
     fn is_decorated(&self) -> bool;
-    fn set_formatter(&mut self, formatter: OutputFormatter);
-    fn get_formatter(&mut self) -> &mut OutputFormatter;
+    fn set_formatter(&self, formatter: OutputFormatter);
+    fn get_formatter(&self) -> &OutputFormatter;
 
     /// PHP: `$output instanceof ConsoleOutputInterface`. Default false; ConsoleOutput overrides.
     fn is_console_output_interface(&self) -> bool {
         false
+    }
+
+    /// PHP: `$output instanceof ConsoleOutputInterface`. Returns the output as a
+    /// ConsoleOutputInterface trait object when it is one. Default None; ConsoleOutput overrides.
+    fn as_console_output_interface(&self) -> Option<&dyn ConsoleOutputInterface> {
+        None
     }
 
     /// PHP: only StreamOutput exposes `getStream()`. Default panics for outputs without one.

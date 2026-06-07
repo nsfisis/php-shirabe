@@ -4,9 +4,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::StringInput;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::input::StringInput;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{LogicException, RuntimeException, chdir};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};

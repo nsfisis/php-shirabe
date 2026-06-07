@@ -6,9 +6,9 @@ use crate::console::input::InputOption;
 use crate::io::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -178,7 +178,7 @@ impl OutdatedCommand {
         args.insert("--format".to_string(), input.borrow().get_option("format"));
         args.insert("--ignore".to_string(), input.borrow().get_option("ignore"));
 
-        let input = ArrayInput::new(args);
+        let input = ArrayInput::new(args, None);
 
         // TODO(phase-b): convert ArrayInput/output references to dyn trait objects expected by Application::run
         let _ = input;

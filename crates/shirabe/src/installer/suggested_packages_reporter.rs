@@ -7,7 +7,7 @@ use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {

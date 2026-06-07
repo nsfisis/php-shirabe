@@ -4,7 +4,7 @@ use crate::package::archiver::ComposerExcludeFilter;
 use crate::package::archiver::GitExcludeFilter;
 use crate::util::Filesystem;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{RuntimeException, preg_quote, realpath};
 use std::path::{Path, PathBuf};
 

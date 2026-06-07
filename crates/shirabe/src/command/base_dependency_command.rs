@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php
 
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;

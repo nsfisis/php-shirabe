@@ -15,15 +15,19 @@ impl Question {
         todo!()
     }
 
-    pub fn set_normalizer(&mut self, _normalizer: Box<dyn Fn(&PhpMixed) -> PhpMixed>) {
-        todo!()
-    }
-
     pub fn set_max_attempts(&mut self, _attempts: Option<i64>) {
         todo!()
     }
 
+    pub fn set_normalizer(&mut self, _normalizer: Box<dyn Fn(&PhpMixed) -> PhpMixed>) {
+        todo!()
+    }
+
     pub fn set_hidden(&mut self, _hidden: bool) {
+        todo!()
+    }
+
+    pub fn set_hidden_fallback(&mut self, _fallback: bool) {
         todo!()
     }
 
@@ -36,6 +40,14 @@ impl Question {
     }
 
     pub fn is_hidden(&self) -> bool {
+        todo!()
+    }
+
+    pub fn get_validator(&self) -> Option<&dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>> {
+        todo!()
+    }
+
+    pub fn get_max_attempts(&self) -> Option<i64> {
         todo!()
     }
 }

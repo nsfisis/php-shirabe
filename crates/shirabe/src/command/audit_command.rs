@@ -13,8 +13,8 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use anyhow::Result;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
     implode, in_array,

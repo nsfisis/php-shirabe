@@ -5,21 +5,21 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::seld::json_lint::ParsingException;
-use shirabe_external_packages::symfony::component::console::Application as BaseApplication;
-use shirabe_external_packages::symfony::component::console::SingleCommandApplication;
-use shirabe_external_packages::symfony::component::console::command::Command;
-use shirabe_external_packages::symfony::component::console::exception::CommandNotFoundException;
-use shirabe_external_packages::symfony::component::console::exception::ExceptionInterface;
-use shirabe_external_packages::symfony::component::console::helper::HelperSet;
-use shirabe_external_packages::symfony::component::console::helper::QuestionHelper;
-use shirabe_external_packages::symfony::component::console::input::InputDefinition;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::input::InputOption;
-use shirabe_external_packages::symfony::component::console::output::ConsoleOutputInterface;
-use shirabe_external_packages::symfony::component::console::output::output_interface::{
+use shirabe_external_packages::symfony::console::Application as BaseApplication;
+use shirabe_external_packages::symfony::console::SingleCommandApplication;
+use shirabe_external_packages::symfony::console::command::Command;
+use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
+use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
+use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
+use shirabe_external_packages::symfony::console::input::InputDefinition;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::input::InputOption;
+use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
+use shirabe_external_packages::symfony::console::output::output_interface::{
     self as output_interface, OutputInterface,
 };
-use shirabe_external_packages::symfony::component::process::exception::ProcessTimedOutException;
+use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
     RuntimeException, UnexpectedValueException, array_merge, bin2hex, chdir, clone, count,

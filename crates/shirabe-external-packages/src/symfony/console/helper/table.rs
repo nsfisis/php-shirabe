@@ -1,4 +1,4 @@
-use crate::symfony::component::console::output::OutputInterface;
+use crate::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -6,10 +6,6 @@ pub struct Table;
 
 impl Table {
     pub fn new(_output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) -> Self {
-        todo!()
-    }
-
-    pub fn set_style(&mut self, _style: &str) -> &mut Self {
         todo!()
     }
 
@@ -26,6 +22,26 @@ impl Table {
     }
 
     pub fn render(&mut self) {
+        todo!()
+    }
+
+    pub fn set_style(&mut self, _style: &str) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_column_width(&mut self, _column_index: usize, _width: i64) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_column_widths(&mut self, _widths: Vec<i64>) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_column_max_width(&mut self, _column_index: usize, _width: i64) -> &mut Self {
+        todo!()
+    }
+
+    pub fn set_horizontal(&mut self, _horizontal: bool) -> &mut Self {
         todo!()
     }
 }

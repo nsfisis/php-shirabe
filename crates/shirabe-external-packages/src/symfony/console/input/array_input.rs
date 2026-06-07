@@ -1,3 +1,4 @@
+use crate::symfony::console::input::InputDefinition;
 use crate::symfony::console::input::InputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -6,7 +7,10 @@ use shirabe_php_shim::PhpMixed;
 pub struct ArrayInput;
 
 impl ArrayInput {
-    pub fn new(_parameters: IndexMap<String, PhpMixed>) -> Self {
+    pub fn new(
+        _parameters: IndexMap<String, PhpMixed>,
+        _definition: Option<InputDefinition>,
+    ) -> Self {
         todo!()
     }
 }
@@ -24,6 +28,9 @@ impl InputInterface for ArrayInput {
         _default: PhpMixed,
         _only_params: bool,
     ) -> PhpMixed {
+        todo!()
+    }
+    fn bind(&mut self, _definition: &InputDefinition) -> anyhow::Result<()> {
         todo!()
     }
     fn validate(&self) -> anyhow::Result<()> {

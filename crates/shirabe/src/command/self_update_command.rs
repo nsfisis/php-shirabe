@@ -4,9 +4,9 @@ use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
-use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     InvalidArgumentException, OPENSSL_ALGO_SHA384, PHP_EOL, PHP_VERSION_ID, Phar, PharException,
     PhpMixed, RuntimeException, UnexpectedValueException, array_map, base64_decode,

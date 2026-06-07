@@ -5,8 +5,8 @@ use shirabe_external_packages::composer::ca_bundle::CaBundle;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::seld::phar_utils::Linter;
 use shirabe_external_packages::seld::phar_utils::Timestamps;
-use shirabe_external_packages::symfony::component::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::SplFileInfo;
+use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_external_packages::symfony::finder::SplFileInfo;
 use shirabe_php_shim::{
     Phar, PhpMixed, RuntimeException, T_COMMENT, T_DOC_COMMENT, T_WHITESPACE,
     UnexpectedValueException, array_search, file_exists, file_get_contents, strcmp, strtr,

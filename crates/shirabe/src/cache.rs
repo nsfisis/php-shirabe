@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use anyhow::Result;
 use chrono::Utc;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     abs, bin2hex, dirname, file_exists, file_get_contents, file_put_contents, filemtime, hash_file,
     is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,

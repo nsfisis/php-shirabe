@@ -12,8 +12,8 @@ use crate::util::Platform;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::process::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::Process;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists,

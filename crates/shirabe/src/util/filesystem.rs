@@ -1,8 +1,8 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
-use shirabe_external_packages::symfony::component::finder::Finder;
+use shirabe_external_packages::symfony::filesystem::exception::IOException;
+use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, ErrorException, InvalidArgumentException, LogicException, PhpMixed,
     RuntimeException, UnexpectedValueException, array_pop, basename, chdir, clearstatcache,

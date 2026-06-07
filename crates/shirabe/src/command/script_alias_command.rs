@@ -7,8 +7,8 @@ use crate::io::IOInterface;
 use crate::util::Platform;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
 
 #[derive(Debug)]

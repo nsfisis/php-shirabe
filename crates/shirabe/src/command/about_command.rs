@@ -7,8 +7,8 @@ use crate::composer;
 use crate::composer::ComposerHandle;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct AboutCommand {

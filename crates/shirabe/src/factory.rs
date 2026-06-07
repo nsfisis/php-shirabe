@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 
-use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::component::console::formatter::OutputFormatterStyle;
-use shirabe_external_packages::symfony::component::console::output::ConsoleOutput;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, Phar, PhpMixed, RuntimeException,
     UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive, class_exists,

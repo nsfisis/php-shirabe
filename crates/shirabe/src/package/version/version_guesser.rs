@@ -3,7 +3,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::process::Process;
+use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     PHP_INT_MAX, PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty,
     function_exists, implode, is_string, json_encode, preg_quote, str_replace, strlen,

@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 
 use crate::console::input::InputOption;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     ArrayObject, InvalidArgumentException, JsonObject, PhpMixed, RuntimeException, array_filter,
     array_filter_use_key, array_is_list, array_map, array_merge, array_unique, count,

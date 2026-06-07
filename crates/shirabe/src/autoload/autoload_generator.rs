@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_keys, array_map,
     array_merge, array_merge_map, array_merge_recursive, array_reverse, array_shift, array_slice,

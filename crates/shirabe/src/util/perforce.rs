@@ -3,8 +3,8 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_external_packages::symfony::component::process::ExecutableFinder;
-use shirabe_external_packages::symfony::component::process::Process;
+use shirabe_external_packages::symfony::process::ExecutableFinder;
+use shirabe_external_packages::symfony::process::Process;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, chdir, count, date, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode, str_replace_array, strcmp, strlen,

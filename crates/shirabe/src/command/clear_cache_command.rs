@@ -5,8 +5,8 @@ use crate::composer;
 use crate::composer::ComposerHandle;
 use crate::factory::Factory;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 
 #[derive(Debug)]
 pub struct ClearCacheCommand {

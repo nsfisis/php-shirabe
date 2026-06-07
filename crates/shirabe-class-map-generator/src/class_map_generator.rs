@@ -5,8 +5,8 @@ use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
 use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::component::finder::Finder;
-use shirabe_external_packages::symfony::component::finder::SplFileInfo;
+use shirabe_external_packages::symfony::finder::Finder;
+use shirabe_external_packages::symfony::finder::SplFileInfo;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, InvalidArgumentException, LogicException, PATHINFO_EXTENSION, PHP_INT_MAX,
     PhpMixed, RuntimeException, explode, getcwd, implode, in_array, is_dir, is_file, is_string,

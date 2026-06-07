@@ -5,8 +5,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::seld::signal::SignalHandler;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, array_fill_keys, array_intersect,
     array_keys, array_map, array_merge, array_merge_recursive, array_unique, count, empty,

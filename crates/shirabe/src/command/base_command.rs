@@ -3,12 +3,12 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::console::Terminal;
-use shirabe_external_packages::symfony::component::console::helper::Table;
-use shirabe_external_packages::symfony::component::console::helper::TableSeparator;
-use shirabe_external_packages::symfony::component::console::input::InputDefinition;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::Terminal;
+use shirabe_external_packages::symfony::console::helper::Table;
+use shirabe_external_packages::symfony::console::helper::TableSeparator;
+use shirabe_external_packages::symfony::console::input::InputDefinition;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
     count, explode, in_array, is_string, max,

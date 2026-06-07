@@ -5,10 +5,10 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
-use shirabe_external_packages::symfony::component::console::helper::FormatterHelper;
-use shirabe_external_packages::symfony::component::console::input::ArrayInput;
-use shirabe_external_packages::symfony::component::console::input::InputInterface;
-use shirabe_external_packages::symfony::component::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::helper::FormatterHelper;
+use shirabe_external_packages::symfony::console::input::ArrayInput;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, FILTER_VALIDATE_EMAIL, InvalidArgumentException, PHP_EOL, PhpMixed,
     array_filter, array_flip, array_flip_strings, array_intersect_key, array_keys, array_map,

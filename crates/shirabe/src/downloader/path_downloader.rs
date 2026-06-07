@@ -3,8 +3,8 @@
 use crate::io::io_interface;
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_external_packages::symfony::component::filesystem::Filesystem as SymfonyFilesystem;
-use shirabe_external_packages::symfony::component::filesystem::exception::IOException;
+use shirabe_external_packages::symfony::filesystem::Filesystem as SymfonyFilesystem;
+use shirabe_external_packages::symfony::filesystem::exception::IOException;
 use shirabe_php_shim::{
     DIRECTORY_SEPARATOR, PHP_WINDOWS_VERSION_MAJOR, PHP_WINDOWS_VERSION_MINOR, PhpMixed,
     RuntimeException, file_exists, function_exists, is_dir, realpath,
