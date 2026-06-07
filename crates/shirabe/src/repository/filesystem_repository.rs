@@ -151,7 +151,6 @@ impl FilesystemRepository {
         let mut loader = ArrayLoader::new(None, true);
         if let Some(packages_list) = packages.as_list() {
             for package_data in packages_list.iter() {
-                // TODO(phase-b): expected IndexMap<String, PhpMixed> but package_data is PhpMixed.
                 let cfg = (**package_data)
                     .as_array()
                     .cloned()
@@ -167,7 +166,6 @@ impl FilesystemRepository {
             }
         } else if let Some(packages_array) = packages.as_array() {
             for (_, package_data) in packages_array.iter() {
-                // TODO(phase-b): expected IndexMap<String, PhpMixed> but package_data is PhpMixed.
                 let cfg = (**package_data)
                     .as_array()
                     .cloned()

@@ -347,9 +347,10 @@ impl ForgejoDriver {
         if !self.inner.info_cache.contains_key(identifier) {
             let composer = if self.inner.should_cache(identifier) {
                 if let Some(res) = self.inner.cache.as_mut().and_then(|c| c.read(identifier)) {
-                    // TODO(phase-b): JsonFile::parse_json returns PhpMixed; convert into Option<IndexMap>
-                    let _ = JsonFile::parse_json(Some(res.as_str()), None)?;
-                    None
+                    let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
+                    parsed
+                        .as_array()
+                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
                 } else {
                     let file_content = self.get_file_content("composer.json", identifier)?;
                     let c = VcsDriverBase::finish_base_composer_information(

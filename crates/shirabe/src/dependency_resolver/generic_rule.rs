@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{Rule, RuleBase};
 use anyhow::Result;
-use shirabe_php_shim::{PHP_VERSION_ID, PhpMixed, RuntimeException, hash_raw, unpack};
+use shirabe_php_shim::{PHP_VERSION_ID, RuntimeException, hash_raw, unpack};
 
 use super::rule::ReasonData;
 
@@ -13,8 +13,8 @@ pub struct GenericRule {
 }
 
 impl GenericRule {
-    pub fn new(mut literals: Vec<i64>, reason: PhpMixed, reason_data: PhpMixed) -> Self {
-        let inner = RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data));
+    pub fn new(mut literals: Vec<i64>, reason: i64, reason_data: ReasonData) -> Self {
+        let inner = RuleBase::new(reason, reason_data);
         literals.sort();
         Self { inner, literals }
     }

@@ -79,37 +79,16 @@ impl ClassLoader {
     pub fn get_prefixes(&self) -> IndexMap<String, Vec<String>> {
         if !self.prefixes_psr0.is_empty() {
             // PHP: call_user_func_array('array_merge', array_values($this->prefixesPsr0))
-            let prefixes_as_mixed: IndexMap<String, PhpMixed> = self
-                .prefixes_psr0
-                .iter()
-                .map(|(k, v)| {
-                    (
-                        k.clone(),
-                        PhpMixed::Array(
-                            v.iter()
-                                .map(|(k2, v2)| {
-                                    (
-                                        k2.clone(),
-                                        Box::new(PhpMixed::List(
-                                            v2.iter()
-                                                .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                                .collect(),
-                                        )),
-                                    )
-                                })
-                                .collect(),
-                        ),
-                    )
-                })
-                .collect();
-            let arrays = array_values(&prefixes_as_mixed);
-            let result = call_user_func_array(
-                "array_merge",
-                &PhpMixed::List(arrays.into_iter().map(Box::new).collect()),
-            );
-            // TODO(phase-b): cast result back to IndexMap<String, Vec<String>>
-            let _ = result;
-            return IndexMap::new();
+            // The per-first-char maps are flattened into one prefix => dirs map. array_merge with
+            // string keys keeps the first position and lets the later value win, which is exactly
+            // IndexMap::insert.
+            let mut result: IndexMap<String, Vec<String>> = IndexMap::new();
+            for inner in self.prefixes_psr0.values() {
+                for (prefix, dirs) in inner {
+                    result.insert(prefix.clone(), dirs.clone());
+                }
+            }
+            return result;
         }
 
         IndexMap::new()
@@ -139,22 +118,8 @@ impl ClassLoader {
     pub fn add_class_map(&mut self, class_map: IndexMap<String, String>) {
         if !self.class_map.is_empty() {
             // PHP: $this->classMap = array_merge($this->classMap, $classMap);
-            let merged = array_merge(
-                PhpMixed::Array(
-                    self.class_map
-                        .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
-                        .collect(),
-                ),
-                PhpMixed::Array(
-                    class_map
-                        .iter()
-                        .map(|(k, v)| (k.clone(), Box::new(PhpMixed::String(v.clone()))))
-                        .collect(),
-                ),
-            );
-            // TODO(phase-b): cast merged back to IndexMap<String, String>
-            let _ = merged;
+            // array_merge keeps existing string keys in place and lets $classMap overwrite their
+            // values while appending new ones, which is exactly IndexMap::extend.
             self.class_map.extend(class_map);
         } else {
             self.class_map = class_map;

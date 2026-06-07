@@ -186,10 +186,13 @@ impl SvnDriver {
                     }
 
                     let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                    // TODO(phase-b): info_cache expects Option<IndexMap<String, PhpMixed>>;
-                    // PhpMixed → IndexMap conversion is non-trivial here. Skip insert/return.
-                    let _ = parsed;
-                    return Ok(None);
+                    let composer: Option<IndexMap<String, PhpMixed>> = parsed
+                        .as_array()
+                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
+                    self.inner
+                        .info_cache
+                        .insert(identifier.to_string(), composer.clone());
+                    return Ok(composer);
                 }
             }
 
@@ -253,15 +256,6 @@ impl SvnDriver {
             .info_cache
             .get(identifier)
             .and_then(|v| v.clone());
-        if cached.is_none()
-            || !is_array(
-                // TODO(phase-b): wrap IndexMap to PhpMixed for is_array check
-                &cached.clone().map(PhpMixed::from).unwrap_or(PhpMixed::Null),
-            )
-        {
-            return Ok(None);
-        }
-
         Ok(cached)
     }
 

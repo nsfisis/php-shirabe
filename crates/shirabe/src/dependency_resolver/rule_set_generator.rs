@@ -67,8 +67,8 @@ impl RuleSetGenerator {
 
         Some(GenericRule::new(
             literals,
-            PhpMixed::Int(reason),
-            reason_data,
+            reason,
+            rule::ReasonData::from(reason_data),
         ))
     }
 
@@ -83,7 +83,7 @@ impl RuleSetGenerator {
         reason_data: PhpMixed,
     ) -> GenericRule {
         let literals: Vec<i64> = packages.iter().map(|p| p.get_id()).collect();
-        GenericRule::new(literals, PhpMixed::Int(reason), reason_data)
+        GenericRule::new(literals, reason, rule::ReasonData::from(reason_data))
     }
 
     /// Creates a rule for two conflicting packages.
@@ -368,19 +368,14 @@ impl RuleSetGenerator {
                     self.add_rules_for_package(package.clone(), platform_requirement_filter);
                 }
 
-                let mut reason_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                reason_data.insert(
-                    "packageName".to_string(),
-                    Box::new(PhpMixed::String(package_name.clone())),
-                );
-                reason_data.insert(
-                    "constraint".to_string(),
-                    Box::new(PhpMixed::Null), // reasonData: $constraint (ConstraintInterface)
-                );
-                let rule = self.create_install_one_of_rule(
-                    &packages,
+                let literals: Vec<i64> = packages.iter().map(|p| p.get_id()).collect();
+                let rule = GenericRule::new(
+                    literals,
                     rule::RULE_ROOT_REQUIRE,
-                    PhpMixed::Array(reason_data),
+                    rule::ReasonData::RootRequire {
+                        package_name: package_name.clone(),
+                        constraint: constraint.clone(),
+                    },
                 );
                 self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
             }

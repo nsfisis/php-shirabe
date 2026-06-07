@@ -211,23 +211,13 @@ impl Solver {
                 .is_empty()
             {
                 let mut problem = Problem::new();
-                let mut reason_data: IndexMap<String, PhpMixed> = IndexMap::new();
-                reason_data.insert(
-                    "packageName".to_string(),
-                    PhpMixed::String(package_name.clone()),
-                );
-                // TODO(phase-b): store the constraint inside reason_data; PhpMixed needs to
-                // accept a `dyn ConstraintInterface` wrapper.
-                reason_data.insert("constraint".to_string(), PhpMixed::Null);
                 problem.add_rule(Rc::new(RefCell::new(Rule::Generic(GenericRule::new(
                     Vec::new(),
-                    PhpMixed::Int(rule::RULE_ROOT_REQUIRE),
-                    PhpMixed::Array(
-                        reason_data
-                            .into_iter()
-                            .map(|(k, v)| (k, Box::new(v)))
-                            .collect(),
-                    ),
+                    rule::RULE_ROOT_REQUIRE,
+                    rule::ReasonData::RootRequire {
+                        package_name: package_name.clone(),
+                        constraint: active_constraint.clone(),
+                    },
                 )))));
                 self.problems.push(problem);
             }
@@ -620,8 +610,8 @@ impl Solver {
         array_unshift::<i64>(&mut other_learned_literals, learned_literal);
         let new_rule = GenericRule::new(
             other_learned_literals,
-            PhpMixed::Int(rule::RULE_LEARNED),
-            PhpMixed::Int(why),
+            rule::RULE_LEARNED,
+            rule::ReasonData::Int(why),
         );
 
         Ok((learned_literal, rule_level, new_rule, why))

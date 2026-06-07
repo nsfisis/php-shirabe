@@ -3,7 +3,8 @@ use crate::advisory::PartialSecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use shirabe_semver::constraint::AnyConstraint;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(untagged)]
 pub enum AnySecurityAdvisory {
     Partial(PartialSecurityAdvisory),
     Full(SecurityAdvisory),

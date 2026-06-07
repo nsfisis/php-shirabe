@@ -854,18 +854,27 @@ impl ComposerRepository {
             return Ok(results);
         }
 
-        // TODO(phase-b): inner.search returns Vec<SearchResult>; convert to PHP-shaped map
         let inner_results = self.inner.search(query, mode, None)?;
         let converted: Vec<IndexMap<String, PhpMixed>> = inner_results
             .into_iter()
             .map(|sr| {
                 let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
                 m.insert("name".to_string(), PhpMixed::String(sr.name));
-                if let Some(d) = sr.description {
-                    m.insert("description".to_string(), PhpMixed::String(d));
-                }
-                if let Some(u) = sr.url {
-                    m.insert("url".to_string(), PhpMixed::String(u));
+                m.insert(
+                    "description".to_string(),
+                    match sr.description {
+                        Some(d) => PhpMixed::String(d),
+                        None => PhpMixed::Null,
+                    },
+                );
+                if let Some(ab) = sr.abandoned {
+                    m.insert(
+                        "abandoned".to_string(),
+                        match ab {
+                            crate::repository::AbandonedInfo::Replacement(r) => PhpMixed::String(r),
+                            crate::repository::AbandonedInfo::Abandoned => PhpMixed::Bool(true),
+                        },
+                    );
                 }
                 m
             })
@@ -1205,12 +1214,15 @@ impl ComposerRepository {
 
         if Countable::count(&self.inner) > 0 {
             for (k, v) in self.inner.get_providers(package_name.to_string())? {
-                // TODO(phase-b): ProviderInfo -> IndexMap<String, PhpMixed> conversion needed
                 let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(v.name));
-                if let Some(d) = v.description {
-                    entry.insert("description".to_string(), PhpMixed::String(d));
-                }
+                entry.insert(
+                    "description".to_string(),
+                    match v.description {
+                        Some(d) => PhpMixed::String(d),
+                        None => PhpMixed::Null,
+                    },
+                );
                 entry.insert("type".to_string(), PhpMixed::String(v.r#type));
                 result.insert(k, entry);
             }

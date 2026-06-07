@@ -199,7 +199,10 @@ impl SearchCommand {
                 }
             }
         } else if format == "json" {
-            // TODO(phase-b): JsonFile::encode takes &PhpMixed; convert Vec<SearchResult> into PhpMixed
+            // TODO(phase-c): faithful JSON output requires SearchResult to retain the raw result
+            // array. PHP's fulltext search passes through arbitrary API fields (downloads, favers,
+            // repository, ...) which the typed SearchResult (name/description/abandoned/url) drops,
+            // so encoding it here would diverge from Composer's output.
             let _ = &results;
             io.write(&JsonFile::encode(&PhpMixed::Null));
         }

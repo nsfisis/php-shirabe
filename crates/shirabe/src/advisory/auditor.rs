@@ -22,6 +22,20 @@ use crate::package::base_package::BasePackage;
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
 
+/// Shape of the `--format=json` audit output.
+#[derive(serde::Serialize)]
+struct AuditJsonReport<'a> {
+    advisories: &'a IndexMap<String, Vec<AnySecurityAdvisory>>,
+    #[serde(rename = "ignored-advisories", skip_serializing_if = "Option::is_none")]
+    ignored_advisories: Option<&'a IndexMap<String, Vec<AnySecurityAdvisory>>>,
+    #[serde(
+        rename = "unreachable-repositories",
+        skip_serializing_if = "Option::is_none"
+    )]
+    unreachable_repositories: Option<&'a Vec<String>>,
+    abandoned: IndexMap<String, Option<String>>,
+}
+
 /// @internal
 #[derive(Debug)]
 pub struct Auditor;
@@ -122,24 +136,7 @@ impl Auditor {
             self.calculate_bitmask(0 < affected_packages_count, 0 < abandoned_count);
 
         if Self::FORMAT_JSON == format {
-            let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
-            // TODO(phase-b): serialize advisories / ignored_advisories into PhpMixed
-            json.insert("advisories".to_string(), PhpMixed::Null);
-            if !ignored_advisories.is_empty() {
-                json.insert("ignored-advisories".to_string(), PhpMixed::Null);
-            }
-            if !unreachable_repos.is_empty() {
-                json.insert(
-                    "unreachable-repositories".to_string(),
-                    PhpMixed::List(
-                        unreachable_repos
-                            .iter()
-                            .map(|r| Box::new(PhpMixed::String(r.clone())))
-                            .collect(),
-                    ),
-                );
-            }
-            let abandoned_map = array_reduce(
+            let abandoned = array_reduce(
                 &abandoned_packages,
                 |mut carry: IndexMap<String, Option<String>>,
                  package: &CompletePackageInterfaceHandle| {
@@ -148,27 +145,22 @@ impl Auditor {
                 },
                 IndexMap::new(),
             );
-            json.insert(
-                "abandoned".to_string(),
-                PhpMixed::Array(
-                    abandoned_map
-                        .into_iter()
-                        .map(|(k, v)| {
-                            (
-                                k,
-                                Box::new(match v {
-                                    Some(s) => PhpMixed::String(s),
-                                    None => PhpMixed::Null,
-                                }),
-                            )
-                        })
-                        .collect(),
-                ),
-            );
+            let report = AuditJsonReport {
+                advisories: &advisories,
+                ignored_advisories: if ignored_advisories.is_empty() {
+                    None
+                } else {
+                    Some(&ignored_advisories)
+                },
+                unreachable_repositories: if unreachable_repos.is_empty() {
+                    None
+                } else {
+                    Some(&unreachable_repos)
+                },
+                abandoned,
+            };
 
-            io.write(&JsonFile::encode(&PhpMixed::Array(
-                json.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
-            )));
+            io.write(&JsonFile::encode(&report));
 
             return Ok(audit_bitmask);
         }

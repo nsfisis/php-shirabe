@@ -44,6 +44,39 @@ impl serde::Serialize for PhpMixed {
     }
 }
 
+/// PHP `===` semantics: type-strict and, for arrays, order-sensitive.
+impl PartialEq for PhpMixed {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (PhpMixed::Null, PhpMixed::Null) => true,
+            (PhpMixed::Bool(a), PhpMixed::Bool(b)) => a == b,
+            (PhpMixed::Int(a), PhpMixed::Int(b)) => a == b,
+            (PhpMixed::Float(a), PhpMixed::Float(b)) => a == b,
+            (PhpMixed::String(a), PhpMixed::String(b)) => a == b,
+            (PhpMixed::List(a), PhpMixed::List(b)) => a == b,
+            (PhpMixed::Array(a), PhpMixed::Array(b)) => {
+                a.len() == b.len()
+                    && a.iter()
+                        .zip(b.iter())
+                        .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
+            }
+            (PhpMixed::Object(a), PhpMixed::Object(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for ArrayObject {
+    fn eq(&self, other: &Self) -> bool {
+        self.data.len() == other.data.len()
+            && self
+                .data
+                .iter()
+                .zip(other.data.iter())
+                .all(|((ka, va), (kb, vb))| ka == kb && va == vb)
+    }
+}
+
 impl serde::Serialize for ArrayObject {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -175,26 +208,26 @@ impl PhpMixed {
 }
 
 impl From<bool> for PhpMixed {
-    fn from(_value: bool) -> Self {
-        todo!()
+    fn from(value: bool) -> Self {
+        PhpMixed::Bool(value)
     }
 }
 
 impl From<i64> for PhpMixed {
-    fn from(_value: i64) -> Self {
-        todo!()
+    fn from(value: i64) -> Self {
+        PhpMixed::Int(value)
     }
 }
 
 impl From<f64> for PhpMixed {
-    fn from(_value: f64) -> Self {
-        todo!()
+    fn from(value: f64) -> Self {
+        PhpMixed::Float(value)
     }
 }
 
 impl From<String> for PhpMixed {
-    fn from(_value: String) -> Self {
-        todo!()
+    fn from(value: String) -> Self {
+        PhpMixed::String(value)
     }
 }
 

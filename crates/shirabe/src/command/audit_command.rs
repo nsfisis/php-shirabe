@@ -113,10 +113,19 @@ impl AuditCommand {
 
         let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
 
-        let ignore_severities = array_merge(
-            array_fill_keys(input.borrow().get_option("ignore-severity"), PhpMixed::Null),
-            PhpMixed::from(audit_config.ignore_severity_for_audit.clone()),
-        );
+        let mut ignore_severities: indexmap::IndexMap<String, Option<String>> =
+            indexmap::IndexMap::new();
+        let cli_severities = input.borrow().get_option("ignore-severity");
+        if let Some(list) = cli_severities.as_list() {
+            for sev in list {
+                if let Some(s) = sev.as_string() {
+                    ignore_severities.insert(s.to_string(), None);
+                }
+            }
+        }
+        for (k, v) in audit_config.ignore_severity_for_audit.clone() {
+            ignore_severities.insert(k, v);
+        }
         let ignore_unreachable = input
             .borrow()
             .get_option("ignore-unreachable")
@@ -125,8 +134,6 @@ impl AuditCommand {
             || audit_config.ignore_unreachable;
 
         let audit_format = self.get_audit_format(input, "format")?;
-        // TODO(phase-b): ignore_severities is PhpMixed; need conversion to IndexMap<String, Option<String>>
-        let _ = ignore_severities;
         Ok(auditor
             .audit(
                 &mut *self.get_io().borrow_mut(),
@@ -136,7 +143,7 @@ impl AuditCommand {
                 false,
                 audit_config.ignore_list_for_audit.clone(),
                 &abandoned,
-                indexmap::IndexMap::new(),
+                ignore_severities,
                 ignore_unreachable,
                 audit_config.ignore_abandoned_for_audit.clone(),
             )?

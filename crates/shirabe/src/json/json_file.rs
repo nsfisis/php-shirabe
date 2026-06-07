@@ -349,7 +349,7 @@ impl JsonFile {
         }
 
         // PHP: $schemaData = (object) ['$ref' => $schemaFile, '$schema' => "https://json-schema.org/draft-04/schema#"];
-        // TODO(phase-b): represent (object) cast as PhpMixed::Array or a dedicated stdClass shim
+        // A string-keyed `PhpMixed::Array` serializes as a JSON object, matching the (object) cast.
         let mut schema_data: PhpMixed = {
             let mut m = indexmap::IndexMap::new();
             m.insert(
@@ -367,7 +367,6 @@ impl JsonFile {
 
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
             schema_data = json_decode(&file_get_contents(&schema_file).unwrap_or_default(), false)?;
-            // TODO(phase-b): mutate object properties; using PhpMixed::Array we set keys
             if let PhpMixed::Array(map) = &mut schema_data {
                 map.insert(
                     "additionalProperties".to_string(),

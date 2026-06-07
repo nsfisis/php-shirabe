@@ -990,7 +990,6 @@ impl ValidatingArrayLoader {
                             .and_then(|v| v.as_array())
                             .cloned()
                             .unwrap_or_default();
-                        // TODO(phase-b): convert Box<PhpMixed> maps for the shim signature.
                         let replace_map_flat: IndexMap<String, PhpMixed> = replace_map
                             .iter()
                             .map(|(k, v)| (k.clone(), (**v).clone()))

@@ -655,9 +655,6 @@ impl UpdateCommand {
             .into());
         }
 
-        // TODO(phase-b): IOInterface::select returns PhpMixed and takes
-        // Vec<String> choices; convert IndexMap<String, String> autocompleter values
-        // to choices and downcast PhpMixed back to Vec<String>.
         let select_result = io.select(
             "Select packages: (Select more than one value separated by comma) ".to_string(),
             autocompleter_values

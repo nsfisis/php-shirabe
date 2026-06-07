@@ -379,8 +379,6 @@ pub trait BaseDependencyCommand: BaseCommand {
             new_table.extend(table);
             table = new_table;
         }
-        // TODO(phase-b): render_table expects Vec<PhpMixed>; build PhpMixed cells once a
-        // converter exists for Vec<String> rows.
         let table_as_mixed: Vec<PhpMixed> = table
             .into_iter()
             .map(|row| {

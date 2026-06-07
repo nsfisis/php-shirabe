@@ -239,7 +239,6 @@ impl GitBitbucketDriver {
             .and_then(|v| v.as_string())
             .map(String::from);
 
-        // TODO(phase-b): unwrap PhpMixed::Array into the typed IndexMap stored on self
         self.repo_data = match repo_data {
             PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
@@ -262,18 +261,9 @@ impl GitBitbucketDriver {
             if self.inner.should_cache(identifier) && {
                 let res = self.inner.cache.as_mut().and_then(|c| c.read(identifier));
                 if let Some(res) = res {
-                    // TODO(phase-b): wrap parsed PhpMixed::Array into the IndexMap-shaped composer slot
-                    composer = Some(
-                        JsonFile::parse_json(Some(&res), None)?
-                            .as_array()
-                            .cloned()
-                            .map(|m| {
-                                m.into_iter()
-                                    .map(|(k, v)| (k, *v))
-                                    .collect::<IndexMap<String, PhpMixed>>()
-                            })
-                            .unwrap_or_default(),
-                    );
+                    composer = JsonFile::parse_json(Some(&res), None)?
+                        .as_array()
+                        .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect());
                     true
                 } else {
                     false

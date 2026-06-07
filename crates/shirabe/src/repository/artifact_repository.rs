@@ -203,7 +203,6 @@ impl ArtifactRepository {
             arr.insert("dist".to_string(), Box::new(PhpMixed::Array(dist)));
         }
 
-        // TODO(phase-b): load wants IndexMap<String, PhpMixed>; convert from PhpMixed::Array.
         let cfg: IndexMap<String, PhpMixed> = package
             .as_array()
             .cloned()

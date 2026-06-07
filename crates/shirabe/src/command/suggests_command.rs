@@ -75,10 +75,11 @@ impl SuggestsCommand {
             )?;
             installed_repos.push(locked_repo.into());
         } else {
-            // TODO(phase-b): Config::get returns PhpMixed; need to coerce to IndexMap<String, PhpMixed>
-            let _platform_cfg = composer.get_config().borrow().get("platform");
-            let platform_overrides: IndexMap<String, PhpMixed> =
-                todo!("extract IndexMap<String, PhpMixed> from PhpMixed config value");
+            let platform_cfg = composer.get_config().borrow().get("platform");
+            let platform_overrides: IndexMap<String, PhpMixed> = platform_cfg
+                .as_array()
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
+                .unwrap_or_default();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
                 platform_overrides,

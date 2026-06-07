@@ -89,7 +89,6 @@ impl Locker {
     /// Returns the md5 hash of the sorted content of the composer file.
     pub fn get_content_hash(composer_file_contents: &str) -> Result<String> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
-        // TODO(phase-b): parse_json returns PhpMixed; downstream expects map-like access
         let content_map: IndexMap<String, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
             _ => IndexMap::new(),
@@ -620,10 +619,9 @@ impl Locker {
         } else {
             None
         };
-        // TODO(phase-b): PhpMixed lacks PartialEq; PHP compares lock array with current data
         let differs = current_data
             .as_ref()
-            .map(|c| !std::ptr::eq(c as *const _, &lock as *const _))
+            .map(|c| !c.iter().eq(lock.iter()))
             .unwrap_or(true);
         if !is_locked || differs {
             if write {
@@ -725,8 +723,6 @@ impl Locker {
                 })
                 .unwrap_or(false);
             if should_replace {
-                // PHP: $lockData[$key] = new \stdClass();
-                // TODO(phase-b): represent empty stdClass distinctly from empty array
                 lock_data.insert(key.to_string(), PhpMixed::Array(IndexMap::new()));
             }
         }

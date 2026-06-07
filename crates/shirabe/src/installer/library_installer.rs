@@ -55,7 +55,6 @@ impl LibraryInstaller {
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let vendor_dir = rtrim(
-            // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
             &composer_ref
                 .get_config()
                 .borrow_mut()
@@ -74,7 +73,6 @@ impl LibraryInstaller {
                         .unwrap_or_default(),
                     Some("/"),
                 ),
-                // TODO(phase-b): Config::get returns PhpMixed; coerce to String via get_str.
                 composer_ref
                     .get_config()
                     .borrow_mut()

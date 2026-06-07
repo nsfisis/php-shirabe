@@ -134,7 +134,6 @@ impl InitCommand {
             "license".to_string(),
             "autoload".to_string(),
         ];
-        // TODO(phase-b): adapt PhpMixed<->Box<PhpMixed> for array_filter_map
         let filtered_input: IndexMap<String, Box<PhpMixed>> = array_intersect_key(
             &input.borrow().get_options(),
             &array_flip_strings(&allowlist),

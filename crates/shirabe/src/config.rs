@@ -583,7 +583,7 @@ impl Config {
         self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
     }
 
-    // TODO(phase-b): typed convenience; PHP's Config::get() returns mixed.
+    /// Typed convenience accessor for keys whose `get()` value is always a string.
     pub fn get_str(&self, key: &str) -> Result<String> {
         Ok(self
             .get_with_flags(key, 0)?

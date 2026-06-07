@@ -279,7 +279,6 @@ impl GitHubDriver {
                     .as_mut()
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
-                // TODO(phase-b): cached payload is JSON string; parse to PhpMixed -> Option<IndexMap>
                 let parsed = JsonFile::parse_json(Some(&res), None)?;
                 parsed
                     .as_array()

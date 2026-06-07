@@ -275,18 +275,9 @@ impl GitLabDriver {
                     .as_mut()
                     .and_then(|c| c.read(identifier))
                     .unwrap_or_default();
-                // TODO(phase-b): cached payload is wrapped to satisfy outer Option type
-                Some(
-                    JsonFile::parse_json(Some(&res), None)?
-                        .as_array()
-                        .cloned()
-                        .map(|m| {
-                            m.into_iter()
-                                .map(|(k, v)| (k, *v))
-                                .collect::<IndexMap<String, PhpMixed>>()
-                        })
-                        .unwrap_or_default(),
-                )
+                JsonFile::parse_json(Some(&res), None)?
+                    .as_array()
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect())
             } else {
                 let file_content = self.get_file_content("composer.json", identifier)?;
                 let composer = VcsDriverBase::finish_base_composer_information(
