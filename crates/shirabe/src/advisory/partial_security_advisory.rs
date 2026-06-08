@@ -4,10 +4,10 @@ use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::package::version::VersionParser;
 use anyhow::Result;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -57,12 +57,9 @@ impl PartialSecurityAdvisory {
             && data.contains_key("reportedAt");
 
         if has_full_data {
-            let reported_at: DateTime<Utc> = Utc
-                .datetime_from_str(
-                    data["reportedAt"].as_string().unwrap_or(""),
-                    "%Y-%m-%dT%H:%M:%S+00:00",
-                )
-                .unwrap_or_default();
+            let reported_at: DateTime<Utc> =
+                shirabe_php_shim::date_create(data["reportedAt"].as_string().unwrap_or(""))
+                    .unwrap_or_default();
             let sources: Vec<IndexMap<String, String>> = data["sources"]
                 .as_list()
                 .map(|list| {

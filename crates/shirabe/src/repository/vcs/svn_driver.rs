@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Repository/Vcs/SvnDriver.php
 
 use anyhow::Result;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -296,7 +296,7 @@ impl SvnDriver {
         Ok(Some(output))
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Ok(Some(m)) =
@@ -329,10 +329,9 @@ impl SvnDriver {
                 .unwrap_or(false)
                 {
                     let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    // PHP: new \DateTimeImmutable($match[1], new \DateTimeZone('UTC'))
-                    return Ok(Utc
-                        .datetime_from_str(date_str.trim(), "%Y-%m-%d %H:%M:%S %z")
-                        .ok());
+                    return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
+                        .ok()
+                        .map(|d| d.fixed_offset()));
                 }
             }
         }
@@ -638,7 +637,10 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
         SvnDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         SvnDriver::get_change_date(self, identifier)
     }
 

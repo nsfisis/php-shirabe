@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Repository/Vcs/FossilDriver.php
 
 use crate::io::io_interface;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable};
+use shirabe_php_shim::{
+    DATE_RFC3339, PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable,
+};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -256,7 +258,10 @@ impl FossilDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(&self, _identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(
+        &self,
+        _identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let mut output = String::new();
         self.inner.process.borrow_mut().execute_args(
             &["fossil", "finfo", "-b", "-n", "1", "composer.json"]
@@ -268,8 +273,8 @@ impl FossilDriver {
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
         let date = parts.get(1).copied().unwrap_or("");
 
-        let date = DateTime::parse_from_rfc3339(date).map(|d| d.with_timezone(&Utc))?;
-        Ok(Some(date))
+        let date: DateTime<Utc> = shirabe_php_shim::date_create(date)?;
+        Ok(Some(date.fixed_offset()))
     }
 
     pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
@@ -383,7 +388,10 @@ impl crate::repository::vcs::VcsDriverInterface for FossilDriver {
         FossilDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         FossilDriver::get_change_date(self, identifier)
     }
 

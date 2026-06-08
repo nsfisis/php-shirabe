@@ -2,7 +2,7 @@
 
 use crate::io::io_interface;
 use chrono::TimeZone;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
@@ -281,7 +281,10 @@ impl GitDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with('-') {
             return Err(RuntimeException {
                 message: format!(
@@ -310,7 +313,9 @@ impl GitDriver {
 
         let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process);
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
-        Ok(Some(Utc.timestamp_opt(timestamp, 0).unwrap()))
+        Ok(Some(
+            Utc.timestamp_opt(timestamp, 0).unwrap().fixed_offset(),
+        ))
     }
 
     pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
@@ -514,7 +519,10 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
         GitDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitDriver::get_change_date(self, identifier)
     }
 

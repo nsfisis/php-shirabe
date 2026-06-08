@@ -2,13 +2,13 @@
 
 use crate::io::io_interface;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
-    array_search_mixed, extension_loaded, http_build_query_mixed, implode, in_array, is_array,
-    sprintf, strpos,
+    DATE_RFC3339, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
+    array_key_exists, array_search_mixed, extension_loaded, http_build_query_mixed, implode,
+    in_array, is_array, sprintf, strpos,
 };
 
 use crate::cache::Cache;
@@ -461,7 +461,7 @@ impl GitBitbucketDriver {
     }
 
     /// @inheritDoc
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_change_date(identifier);
         }
@@ -486,11 +486,8 @@ impl GitBitbucketDriver {
             .fetch_with_oauth_credentials(&resource, false)?
             .decode_json()?;
 
-        // TODO(phase-b): port PHP `new \DateTimeImmutable($commit['date'])`
         let date_str = commit.get("date").and_then(|v| v.as_string()).unwrap_or("");
-        let date: DateTime<Utc> = chrono::DateTime::parse_from_rfc3339(date_str)
-            .map_err(|e| anyhow::anyhow!(e))?
-            .with_timezone(&Utc);
+        let date: DateTime<FixedOffset> = shirabe_php_shim::date_create(date_str)?;
         Ok(Some(date))
     }
 
@@ -920,7 +917,10 @@ impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
         GitBitbucketDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitBitbucketDriver::get_change_date(self, identifier)
     }
 

@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
@@ -18,7 +18,10 @@ pub trait VcsDriverInterface: std::fmt::Debug {
 
     fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>>;
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>>;
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>>;
 
     fn get_root_identifier(&mut self) -> anyhow::Result<String>;
 

@@ -2,17 +2,17 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
+use shirabe_php_shim::DATE_RFC3339;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::advisory::IgnoredSecurityAdvisory;
 use crate::advisory::PartialSecurityAdvisory;
 
-/// Matches PHP's `format(DATE_RFC3339)`, e.g. "2020-01-01T00:00:00+00:00".
 fn serialize_date_rfc3339<S: serde::Serializer>(
     dt: &DateTime<Utc>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&dt.format("%Y-%m-%dT%H:%M:%S%:z").to_string())
+    serializer.serialize_str(&dt.format(DATE_RFC3339).to_string())
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

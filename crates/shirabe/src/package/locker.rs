@@ -876,7 +876,6 @@ impl Locker {
                             None,
                         );
                         if Preg::is_match(r"{^\s*\d+\s*$}", &output_str).unwrap_or(false) {
-                            // TODO(phase-b): new \DateTime('@'.trim($output), new \DateTimeZone('UTC'))
                             let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }

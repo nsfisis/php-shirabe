@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists, array_keys,
-    array_reduce, get_class, sprintf, str_starts_with,
+    DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
+    array_keys, array_reduce, get_class, sprintf, str_starts_with,
 };
 
 use crate::advisory::AnySecurityAdvisory;
@@ -464,11 +464,7 @@ impl Auditor {
                     sa.title.clone(),
                     self.get_url(sa),
                     sa.affected_versions().get_pretty_string(),
-                    // TODO(phase-b): PHP uses `$advisory->reportedAt->format(DATE_ATOM)`, but
-                    // shim DATE_ATOM ("Y-m-d\TH:i:sP") is a PHP format string incompatible with
-                    // chrono. Using the chrono equivalent directly; revisit once a PHP-style date
-                    // formatter exists (see also locker.rs DATE_RFC3339).
-                    sa.reported_at.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+                    sa.reported_at.format(DATE_ATOM).to_string(),
                 ];
                 if let Some(ignored) = advisory.as_ignored() {
                     headers.push("Ignore reason".to_string());
@@ -523,14 +519,7 @@ impl Auditor {
                     "Affected versions: {}",
                     OutputFormatter::escape(&sa.affected_versions().get_pretty_string())
                 ));
-                error.push(format!(
-                    "Reported at: {}",
-                    // TODO(phase-b): PHP uses `$advisory->reportedAt->format(DATE_ATOM)`, but
-                    // shim DATE_ATOM ("Y-m-d\TH:i:sP") is a PHP format string incompatible with
-                    // chrono. Using the chrono equivalent directly; revisit once a PHP-style date
-                    // formatter exists (see also locker.rs DATE_RFC3339).
-                    sa.reported_at.format("%Y-%m-%dT%H:%M:%S%:z")
-                ));
+                error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
                 if let Some(ignored) = advisory.as_ignored() {
                     error.push(format!(
                         "Ignore reason: {}",

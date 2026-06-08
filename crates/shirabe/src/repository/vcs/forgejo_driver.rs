@@ -5,7 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
+    DATE_RFC3339, PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, urlencode,
 };
 
 use crate::cache::Cache;
@@ -185,7 +185,7 @@ impl ForgejoDriver {
     pub fn get_change_date(
         &mut self,
         identifier: &str,
-    ) -> Result<Option<chrono::DateTime<chrono::Utc>>> {
+    ) -> Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -218,8 +218,7 @@ impl ForgejoDriver {
             code: 0,
         })?;
 
-        let date = chrono::DateTime::parse_from_rfc3339(&date_str)
-            .map(|d| d.with_timezone(&chrono::Utc))?;
+        let date: chrono::DateTime<chrono::FixedOffset> = shirabe_php_shim::date_create(&date_str)?;
         Ok(Some(date))
     }
 
@@ -725,7 +724,7 @@ impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
     fn get_change_date(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         ForgejoDriver::get_change_date(self, identifier)
     }
 

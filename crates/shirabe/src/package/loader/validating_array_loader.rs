@@ -6,10 +6,10 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, Exception, FILTER_VALIDATE_EMAIL, PHP_EOL, PhpMixed, array_intersect_key,
-    array_values, filter_var, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
-    is_string, json_encode, parse_url_all, php_to_string, sprintf, str_replace, strcasecmp,
-    strtolower, strtotime, substr, trigger_error, trim, var_export,
+    E_USER_DEPRECATED, FILTER_VALIDATE_EMAIL, PHP_EOL, PhpMixed, array_intersect_key, array_values,
+    filter_var, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
+    json_encode, parse_url_all, php_to_string, sprintf, str_replace, strcasecmp, strtolower,
+    strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchNoneConstraint;
@@ -166,7 +166,7 @@ impl ValidatingArrayLoader {
         self.validate_string("time", false);
         if self.config.contains_key("time") {
             let time_str = self.config["time"].as_string().unwrap_or("").to_string();
-            match Self::parse_datetime_utc(&time_str) {
+            match shirabe_php_shim::date_create::<chrono::Utc>(&time_str) {
                 Ok(dt) => {
                     release_date = Some(dt);
                 }
@@ -1590,23 +1590,5 @@ impl ValidatingArrayLoader {
             },
             None => true,
         }
-    }
-
-    fn parse_datetime_utc(s: &str) -> anyhow::Result<chrono::DateTime<chrono::Utc>> {
-        // TODO(phase-b): PHP's `new \DateTime($s, new \DateTimeZone('UTC'))` accepts
-        // many free-form formats; approximate with chrono for now.
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-            return Ok(dt.with_timezone(&chrono::Utc));
-        }
-        if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
-            return Ok(chrono::Utc.from_utc_datetime(&dt));
-        }
-        if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-            return Ok(chrono::Utc.from_utc_datetime(&d.and_hms_opt(0, 0, 0).unwrap()));
-        }
-        Err(anyhow::anyhow!(Exception {
-            message: format!("Failed to parse date: {}", s),
-            code: 0,
-        }))
     }
 }

@@ -1740,8 +1740,6 @@ pub fn abs(_value: i64) -> i64 {
     todo!()
 }
 
-pub const DATE_ATOM: &str = "Y-m-d\\TH:i:sP";
-
 pub fn ucfirst(_s: &str) -> String {
     todo!()
 }
@@ -2409,7 +2407,6 @@ pub const OPENSSL_VERSION_NUMBER: i64 = 0;
 pub const OPENSSL_VERSION_TEXT: &str = "";
 pub const PHP_BINARY: &str = "";
 pub const PHP_WINDOWS_VERSION_BUILD: i64 = 0;
-pub const DATE_RFC3339: &str = "Y-m-d\\TH:i:sP";
 pub const PREG_BACKTRACK_LIMIT_ERROR: i64 = 2;
 
 #[derive(Debug, Clone)]
@@ -2459,3 +2456,24 @@ pub fn zlib_decode(_data: &str) -> Option<String> {
 pub const STREAM_NOTIFY_FAILURE: i64 = 9;
 pub const STREAM_NOTIFY_FILE_SIZE_IS: i64 = 5;
 pub const STREAM_NOTIFY_PROGRESS: i64 = 7;
+
+pub fn date_create<Tz: chrono::TimeZone>(s: &str) -> chrono::ParseResult<chrono::DateTime<Tz>> {
+    todo!()
+}
+
+/// PHP: \DATE_RFC3339 ("Y-m-d\TH:i:sP").
+pub const DATE_RFC3339: &str = "%Y-%m-%dT%H:%M:%S%:z";
+
+/// PHP: \DATE_ATOM (equivalent to \DATE_RFC3339).
+pub const DATE_ATOM: &str = DATE_RFC3339;
+
+/// Convert PHP-compatible date time format to strftime-compatible format.
+/// Only the patterns Composer actually passes are supported; anything else panics.
+pub fn date_format_to_strftime(format: &str) -> &'static str {
+    match format {
+        "Y-m-d H:i:s" => "%Y-%m-%d %H:%M:%S",
+        "Y-m-d" => "%Y-%m-%d",
+        "Ymd" => "%Y%m%d",
+        other => panic!("Unsupported PHP date format: {other:?}"),
+    }
+}

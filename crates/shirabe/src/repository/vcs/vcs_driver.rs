@@ -1,9 +1,9 @@
 //! ref: composer/src/Composer/Repository/Vcs/VcsDriver.php
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{PhpMixed, extension_loaded};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded};
 
 use crate::cache::Cache;
 use crate::config::Config;
@@ -94,7 +94,7 @@ impl VcsDriverBase {
     pub fn finish_base_composer_information(
         identifier: &str,
         composer_file_content: Option<String>,
-        change_date: impl FnOnce() -> anyhow::Result<Option<DateTime<Utc>>>,
+        change_date: impl FnOnce() -> anyhow::Result<Option<DateTime<FixedOffset>>>,
     ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
         let content = match composer_file_content {
             None => return Ok(None),
@@ -123,7 +123,10 @@ impl VcsDriverBase {
                 .map_or(true, |v| v.as_string().map_or(true, |s| s.is_empty()))
         {
             if let Some(d) = change_date()? {
-                composer.insert("time".to_string(), PhpMixed::String(d.to_rfc3339()));
+                composer.insert(
+                    "time".to_string(),
+                    PhpMixed::String(d.format(DATE_RFC3339).to_string()),
+                );
             }
         }
 
@@ -284,7 +287,7 @@ pub trait VcsDriver: VcsDriverInterface {
             if let Some(change_date) = self.get_change_date(identifier)? {
                 composer.insert(
                     "time".to_string(),
-                    PhpMixed::String(change_date.to_rfc3339()),
+                    PhpMixed::String(change_date.format(DATE_RFC3339).to_string()),
                 );
             }
         }

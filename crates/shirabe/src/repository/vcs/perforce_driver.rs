@@ -113,7 +113,7 @@ impl PerforceDriver {
     pub fn get_change_date(
         &self,
         _identifier: &str,
-    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         Ok(None)
     }
 
@@ -248,7 +248,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_change_date(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<chrono::DateTime<chrono::Utc>>> {
+    ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         PerforceDriver::get_change_date(self, identifier)
     }
 

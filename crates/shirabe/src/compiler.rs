@@ -9,8 +9,8 @@ use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_external_packages::symfony::finder::SplFileInfo;
 use shirabe_php_shim::{
     Phar, PhpMixed, RuntimeException, T_COMMENT, T_DOC_COMMENT, T_WHITESPACE,
-    UnexpectedValueException, array_search, file_exists, file_get_contents, strcmp, strtr,
-    strtr_array, token_get_all,
+    UnexpectedValueException, array_search, date_format_to_strftime, file_exists,
+    file_get_contents, strcmp, strtr, strtr_array, token_get_all,
 };
 
 use crate::json::JsonFile;
@@ -95,8 +95,7 @@ impl Compiler {
         let version_date_str = Git::parse_rev_list_output(&output, &process);
         self.version_date =
             chrono::DateTime::parse_from_str(version_date_str.trim(), "%Y-%m-%d %H:%M:%S %z")
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .unwrap_or_else(|_| chrono::Utc::now());
+                .map(|dt| dt.with_timezone(&chrono::Utc))?;
 
         let mut git_describe_output = String::new();
         if process.borrow_mut().execute_args(
@@ -298,7 +297,12 @@ impl Compiler {
 
         // re-sign the phar with reproducible timestamp / signature
         let mut util = Timestamps::new(phar_file);
-        util.update_timestamps(&self.version_date.format("%Y-%m-%d %H:%M:%S").to_string())?;
+        util.update_timestamps(
+            &self
+                .version_date
+                .format(date_format_to_strftime("Y-m-d H:i:s"))
+                .to_string(),
+        )?;
         util.save(phar_file, Phar::SHA512)?;
 
         Linter::lint(
@@ -355,7 +359,9 @@ impl Compiler {
             );
             replacements.insert(
                 "@release_date@".to_string(),
-                self.version_date.format("%Y-%m-%d %H:%M:%S").to_string(),
+                self.version_date
+                    .format(date_format_to_strftime("Y-m-d H:i:s"))
+                    .to_string(),
             );
             content = strtr_array(&content, &replacements);
             content = Preg::replace(

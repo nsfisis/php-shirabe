@@ -9,8 +9,9 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException, array_search,
-    date, extension_loaded, in_array, realpath, strtolower, version_compare,
+    DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
+    array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
+    version_compare,
 };
 
 use shirabe_semver::constraint::AnyConstraint;
@@ -1026,7 +1027,7 @@ impl ShowCommand {
                                     .insert("release-age".to_string(), PhpMixed::String(age));
                                 package_view_data.insert(
                                     "release-date".to_string(),
-                                    PhpMixed::String(release_date.to_rfc3339()),
+                                    PhpMixed::String(release_date.format(DATE_ATOM).to_string()),
                                 );
                             } else {
                                 package_view_data.insert(
@@ -1062,7 +1063,7 @@ impl ShowCommand {
                             if let Some(rd) = latest.get_release_date() {
                                 package_view_data.insert(
                                     "latest-release-date".to_string(),
-                                    PhpMixed::String(rd.to_rfc3339()),
+                                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
                                 );
                             } else {
                                 package_view_data.insert(
@@ -1666,7 +1667,7 @@ impl ShowCommand {
                 let rel = self.get_relative_time(&rd);
                 self.get_io().write(&format!(
                     "<info>released</info> : {}, {}",
-                    rd.format("%Y-%m-%d"),
+                    rd.format(date_format_to_strftime("Y-m-d")),
                     rel
                 ));
             }
@@ -1677,7 +1678,11 @@ impl ShowCommand {
                 None => String::new(),
                 Some(rd) => {
                     let rel = self.get_relative_time(&rd);
-                    format!(" released {}, {}", rd.format("%Y-%m-%d"), rel)
+                    format!(
+                        " released {}, {}",
+                        rd.format(date_format_to_strftime("Y-m-d")),
+                        rel
+                    )
                 }
             };
             self.get_io().write(&format!(
@@ -2017,7 +2022,10 @@ impl ShowCommand {
             }
 
             if let Some(rd) = package.get_release_date() {
-                json.insert("released".to_string(), PhpMixed::String(rd.to_rfc3339()));
+                json.insert(
+                    "released".to_string(),
+                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
+                );
             }
         }
 
@@ -2786,12 +2794,15 @@ impl ShowCommand {
     }
 
     fn get_relative_time(&self, release_date: &chrono::DateTime<chrono::Utc>) -> String {
-        if release_date.format("%Y%m%d").to_string() == date("Ymd", None) {
+        if release_date
+            .format(date_format_to_strftime("Ymd"))
+            .to_string()
+            == date("Ymd", None)
+        {
             return "today".to_string();
         }
 
-        let now: chrono::DateTime<chrono::Utc> = chrono::Utc::now();
-        let diff = now.signed_duration_since(*release_date);
+        let diff = chrono::Utc::now().signed_duration_since(*release_date);
         let days = diff.num_days();
         if days < 7 {
             return "this week".to_string();

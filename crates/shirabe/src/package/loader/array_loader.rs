@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Package/Loader/ArrayLoader.php
 
 use anyhow::Result;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, Exception, PhpMixed, UnexpectedValueException, is_scalar, is_string,
-    json_encode, ltrim, sprintf, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string, json_encode,
+    ltrim, sprintf, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 use crate::package::CompleteAliasPackageHandle;
@@ -527,14 +527,7 @@ impl ArrayLoader {
                     time_str.to_string()
                 };
 
-                let result: std::result::Result<DateTime<Utc>, Exception> =
-                    // TODO(phase-b): port PHP `new \DateTime($time, new \DateTimeZone('UTC'))`
-                    Utc.datetime_from_str(&time, "%Y-%m-%dT%H:%M:%S%z")
-                        .map_err(|e| Exception {
-                            message: e.to_string(),
-                            code: 0,
-                        });
-                if let Ok(date) = result {
+                if let Ok(date) = shirabe_php_shim::date_create::<Utc>(&time) {
                     package.package_mut().set_release_date(Some(date));
                 }
             }

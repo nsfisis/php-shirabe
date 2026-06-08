@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
 
 use crate::package::Mirror;
 use crate::package::PackageInterfaceHandle;
@@ -156,7 +156,7 @@ impl ArrayDumper {
         if let Some(release_date) = package.get_release_date() {
             data.insert(
                 "time".to_string(),
-                PhpMixed::String(release_date.to_rfc3339()),
+                PhpMixed::String(release_date.format(DATE_RFC3339).to_string()),
             );
         }
 

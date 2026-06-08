@@ -2,13 +2,14 @@
 
 use crate::io::io_interface;
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
-    array_search_mixed, base64_decode, basename, count, empty, explode, extension_loaded, in_array,
-    parse_url_all, sprintf, strpos, strtolower, substr, trim, urlencode,
+    DATE_RFC3339, InvalidArgumentException, PhpMixed, RuntimeException, array_diff,
+    array_key_exists, array_map, array_search_mixed, base64_decode, basename, count, empty,
+    explode, extension_loaded, in_array, parse_url_all, sprintf, strpos, strtolower, substr, trim,
+    urlencode,
 };
 
 use crate::cache::Cache;
@@ -821,7 +822,7 @@ impl GitHubDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_change_date(identifier);
         }
@@ -851,11 +852,8 @@ impl GitHubDriver {
             _ => String::new(),
         };
 
-        Ok(Some(
-            DateTime::parse_from_rfc3339(&date_str)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|_| Utc::now()),
-        ))
+        let date: DateTime<FixedOffset> = shirabe_php_shim::date_create(&date_str)?;
+        Ok(Some(date))
     }
 
     pub fn get_tags(&mut self) -> Result<IndexMap<String, String>> {
@@ -1364,7 +1362,10 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
         GitHubDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitHubDriver::get_change_date(self, identifier)
     }
 

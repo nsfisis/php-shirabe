@@ -10,10 +10,10 @@ use crate::repository::vcs::VcsDriverBase;
 use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::Url;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, RuntimeException, dirname, is_dir, is_writable};
 
 #[derive(Debug)]
 pub struct HgDriver {
@@ -197,7 +197,10 @@ impl HgDriver {
         Ok(Some(content))
     }
 
-    pub fn get_change_date(&self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    pub fn get_change_date(
+        &self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if identifier.starts_with('-') {
             return Err(RuntimeException {
                 message: format!(
@@ -225,8 +228,8 @@ impl HgDriver {
             Some(self.repo_dir.clone()),
         );
 
-        let date = DateTime::parse_from_rfc3339(output.trim()).map(|d| d.with_timezone(&Utc))?;
-        Ok(Some(date))
+        let date: DateTime<Utc> = shirabe_php_shim::date_create(output.trim())?;
+        Ok(Some(date.fixed_offset()))
     }
 
     pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
@@ -410,7 +413,10 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
         HgDriver::get_file_content(self, file, identifier)
     }
 
-    fn get_change_date(&mut self, identifier: &str) -> anyhow::Result<Option<DateTime<Utc>>> {
+    fn get_change_date(
+        &mut self,
+        identifier: &str,
+    ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         HgDriver::get_change_date(self, identifier)
     }
 

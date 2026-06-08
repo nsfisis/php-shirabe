@@ -7,8 +7,9 @@ use chrono::Utc;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    abs, bin2hex, dirname, file_exists, file_get_contents, file_put_contents, filemtime, hash_file,
-    is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
+    abs, bin2hex, date_format_to_strftime, dirname, file_exists, file_get_contents,
+    file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir, random_bytes, random_int,
+    rename, time, unlink,
 };
 
 use crate::io::IOInterface;
@@ -278,12 +279,13 @@ impl Cache {
 
     pub fn gc(&mut self, ttl: i64, max_size: i64) -> bool {
         if self.is_enabled() && !self.read_only {
-            let mut expire = Utc::now();
-            // PHP: $expire->modify('-'.$ttl.' seconds');
-            expire -= chrono::Duration::seconds(ttl);
+            let expire = Utc::now() - chrono::Duration::seconds(ttl);
 
             let mut finder = self.get_finder();
-            finder.date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
+            finder.date(&format!(
+                "until {}",
+                expire.format(date_format_to_strftime("Y-m-d H:i:s"))
+            ));
             for file in &mut finder {
                 let _ = self.filesystem.borrow_mut().unlink(&file.get_pathname());
             }
@@ -309,15 +311,17 @@ impl Cache {
 
     pub fn gc_vcs_cache(&mut self, ttl: i64) -> bool {
         if self.is_enabled() {
-            let mut expire = Utc::now();
-            expire -= chrono::Duration::seconds(ttl);
+            let expire = Utc::now() - chrono::Duration::seconds(ttl);
 
             let mut finder = Finder::create();
             finder
                 .r#in(&self.root)
                 .directories()
                 .depth(0)
-                .date(&format!("until {}", expire.format("%Y-%m-%d %H:%M:%S")));
+                .date(&format!(
+                    "until {}",
+                    expire.format(date_format_to_strftime("Y-m-d H:i:s"))
+                ));
             for file in &mut finder {
                 let _ = self
                     .filesystem
