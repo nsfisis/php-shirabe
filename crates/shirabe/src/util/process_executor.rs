@@ -14,8 +14,8 @@ use shirabe_external_packages::symfony::process::exception::RuntimeException as 
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, array_intersect, array_map, call_user_func,
     defined, escapeshellarg, explode, implode, in_array, is_array, is_callable, is_dir, is_numeric,
-    is_string, max, min, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower, strtr,
-    substr_replace, trim, usleep,
+    is_string, max, min, rtrim, sprintf, str_replace, strcspn, strlen, strpbrk, strtolower,
+    strtr_array, substr_replace, trim, usleep,
 };
 
 use crate::io::IOInterface;
@@ -754,12 +754,7 @@ impl ProcessExecutor {
         translation.insert("\u{2044}".to_string(), "/".to_string());
         translation.insert("\u{2215}".to_string(), "/".to_string());
         translation.insert("\u{00b4}".to_string(), "/".to_string());
-        // PHP: strtr($argument, $translation) — variadic translation map
-        // TODO(phase-b): implement multi-target strtr; for now we apply replacements iteratively
-        for (from, to) in &translation {
-            argument = str_replace(from, to, &argument);
-        }
-        let _ = strtr;
+        argument = strtr_array(&argument, &translation);
 
         // In addition to whitespace, commas need quoting to preserve paths
         let mut quote = strpbrk(&argument, " \t,").is_some();

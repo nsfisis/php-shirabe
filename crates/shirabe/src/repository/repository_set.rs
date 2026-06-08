@@ -5,8 +5,7 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_merge, array_merge_recursive, ksort,
-    strtolower,
+    LogicException, PhpMixed, RuntimeException, array_merge, ksort, strtolower,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -411,13 +410,12 @@ impl RepositorySet {
             }
         }
 
-        let mut advisories = if !repo_advisories.is_empty() {
-            // PHP: array_merge_recursive([], ...$repoAdvisories)
-            // TODO(phase-b): array_merge_recursive signature expects PhpMixed arguments
-            todo!("array_merge_recursive across repo_advisories")
-        } else {
-            IndexMap::new()
-        };
+        let mut advisories: IndexMap<String, Vec<AnySecurityAdvisory>> = IndexMap::new();
+        for repo in repo_advisories {
+            for (name, list) in repo {
+                advisories.entry(name).or_default().extend(list);
+            }
+        }
         ksort(&mut advisories);
 
         Ok(advisories)

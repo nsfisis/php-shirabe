@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use indexmap::IndexSet;
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
+    uasort_map,
 };
 
 use crate::dependency_resolver::operation::InstallOperation;
@@ -70,9 +71,7 @@ impl Transaction {
 
     /// @param PackageInterface[] $resultPackages
     fn set_result_package_maps(&mut self, result_packages: Vec<PackageInterfaceHandle>) {
-        // PHP: static function (PackageInterface $a, PackageInterface $b): int { ... };
-        // TODO(phase-b): bridge the closure to uasort's argument type
-        let _package_sort = |a: &PackageInterfaceHandle, b: &PackageInterfaceHandle| -> i64 {
+        let package_sort = |a: &PackageInterfaceHandle, b: &PackageInterfaceHandle| -> i64 {
             // sort alias packages by the same name behind their non alias version
             if a.get_name() == b.get_name() {
                 let a_is_alias = a.as_alias().is_some();
@@ -100,17 +99,12 @@ impl Transaction {
                 .insert(package.ptr_id().to_string(), package);
         }
 
-        // TODO(phase-b): uasort signature mismatch — needs to operate on the IndexMap with a PackageInterface comparator
-        uasort(
-            todo!("&mut self.result_package_map"),
-            |_a: &str, _b: &str| -> i64 { todo!("package_sort") },
-        );
+        uasort_map(&mut self.result_package_map, package_sort);
         let names: Vec<String> = self.result_packages_by_name.keys().cloned().collect();
-        for _name in &names {
-            uasort(
-                todo!("&mut self.result_packages_by_name[name]"),
-                |_a: &str, _b: &str| -> i64 { todo!("package_sort") },
-            );
+        for name in &names {
+            if let Some(packages) = self.result_packages_by_name.get_mut(name) {
+                uasort(packages, package_sort);
+            }
         }
     }
 
@@ -297,8 +291,6 @@ impl Transaction {
         let mut plugins_with_deps: Vec<std::rc::Rc<dyn OperationInterface>> = vec![];
         let mut plugin_requires: Vec<String> = vec![];
 
-        // PHP: foreach (array_reverse($operations, true) as $idx => $op)
-        // TODO(phase-b): array_reverse preserves keys (true); iterate indices in reverse to mimic
         let mut to_remove: Vec<usize> = vec![];
         for idx in (0..operations.len()).rev() {
             let op = &operations[idx];

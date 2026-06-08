@@ -1628,11 +1628,27 @@ impl AutoloadGenerator {
             };
 
             let mut autoload = package.get_autoload();
-            // PHP comparison: $package === $rootPackage (object identity). We compare by name as best-effort.
-            let is_root = package.get_name() == root_package.get_name();
+            let is_root = package.ptr_eq(&root_package.clone().into());
             if self.dev_mode.unwrap_or(false) && is_root {
-                // TODO(phase-b): array_merge_recursive semantics (nested merge) not preserved
-                autoload.extend(root_package.get_dev_autoload());
+                let merged = array_merge_recursive(vec![
+                    PhpMixed::Array(
+                        autoload
+                            .into_iter()
+                            .map(|(k, v)| (k, Box::new(v)))
+                            .collect(),
+                    ),
+                    PhpMixed::Array(
+                        root_package
+                            .get_dev_autoload()
+                            .into_iter()
+                            .map(|(k, v)| (k, Box::new(v)))
+                            .collect(),
+                    ),
+                ]);
+                autoload = match merged {
+                    PhpMixed::Array(m) => m.into_iter().map(|(k, v)| (k, *v)).collect(),
+                    _ => IndexMap::new(),
+                };
             }
 
             // skip misconfigured packages
@@ -1914,7 +1930,9 @@ impl AutoloadGenerator {
 }
 
 pub fn composer_require(_file_identifier: &str, _file: &str) {
-    // TODO(phase-b): PHP GLOBALS nested array access not supported
+    // TODO(phase-c): unportable — depends on the $GLOBALS superglobal
+    // ($GLOBALS['__composer_autoload_files']) and PHP's `require $file` include
+    // mechanism (see also ClassLoader's include closure), neither of which is modeled.
     todo!()
 }
 

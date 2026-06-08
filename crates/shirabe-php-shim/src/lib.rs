@@ -1614,9 +1614,16 @@ pub fn php_uname(_mode: &str) -> String {
     todo!()
 }
 
-pub fn uasort<F>(_array: &mut Vec<String>, _compare: F)
+pub fn uasort<T, F>(_array: &mut Vec<T>, _compare: F)
 where
-    F: Fn(&str, &str) -> i64,
+    F: FnMut(&T, &T) -> i64,
+{
+    todo!()
+}
+
+pub fn uasort_map<K, V, F>(_array: &mut IndexMap<K, V>, _compare: F)
+where
+    F: FnMut(&V, &V) -> i64,
 {
     todo!()
 }

@@ -304,7 +304,6 @@ impl AuthHelper {
             if let Some(prev_auth) = auth {
                 if self.io.has_authentication(origin) {
                     let current_auth = self.io.get_authentication(origin);
-                    // TODO(phase-b): IndexMap equality compares all entries by value
                     if prev_auth == current_auth {
                         return Err(TransportException::new(
                             format!("Invalid credentials for '{}', aborting.", url),

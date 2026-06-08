@@ -79,9 +79,11 @@ impl InstallationManager {
     ///
     /// @param InstallerInterface $installer installer instance
     pub fn remove_installer(&mut self, installer: &dyn InstallerInterface) {
-        // TODO(phase-b): array_search for trait object identity needs concrete type info
-        let _ = installer;
-        let key: Option<usize> = None;
+        let target = installer as *const dyn InstallerInterface as *const ();
+        let key = self
+            .installers
+            .iter()
+            .position(|inst| inst.as_ref() as *const dyn InstallerInterface as *const () == target);
         if let Some(k) = key {
             array_splice(&mut self.installers, k as i64, Some(1), vec![]);
             self.cache = IndexMap::new();

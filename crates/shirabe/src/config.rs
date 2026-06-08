@@ -512,8 +512,7 @@ impl Config {
                 }
 
                 // store repo
-                // TODO(phase-b): is_int($name) where $name is an IndexMap key (PHP string-or-int)
-                let is_numeric_name = name.parse::<i64>().is_ok();
+                let is_numeric_name = is_php_integer_key(name);
                 if is_numeric_name {
                     if !self.repositories.contains_key(name) {
                         self.repositories.insert(name.clone(), repository.clone());
@@ -1277,4 +1276,23 @@ impl Config {
         // Override global timeout set earlier by environment or config
         ProcessExecutor::set_timeout(0);
     }
+}
+
+/// Whether a string array key would have been coerced to an integer key by PHP.
+///
+/// PHP stores a string array key as an integer when it is a canonical decimal
+/// representation: "0", or an optionally negative sequence of digits with no
+/// leading zero and no leading plus sign, that fits in a platform integer.
+pub(crate) fn is_php_integer_key(key: &str) -> bool {
+    if key == "0" {
+        return true;
+    }
+    let digits = key.strip_prefix('-').unwrap_or(key);
+    if digits.is_empty() || digits.as_bytes()[0] == b'0' {
+        return false;
+    }
+    if !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    key.parse::<i64>().is_ok()
 }

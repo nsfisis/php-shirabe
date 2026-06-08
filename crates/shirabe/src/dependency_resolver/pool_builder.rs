@@ -7,9 +7,8 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::composer::semver::CompilingMatcher;
 use shirabe_external_packages::composer::semver::Intervals;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, array_chunk, array_flip, array_flip_strings, array_map, array_merge,
-    array_search, array_search_mixed, count, in_array, microtime, number_format, round, sprintf,
-    strpos,
+    LogicException, PhpMixed, array_flip, array_flip_strings, array_map, array_merge, array_search,
+    array_search_mixed, count, in_array, microtime, number_format, round, sprintf, strpos,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -474,7 +473,6 @@ impl PoolBuilder {
         }
 
         // Load packages in chunks of 50 to prevent memory usage build-up due to caches of all sorts
-        // TODO(phase-b): array_chunk shim signature expects &[T]; build IndexMap chunks manually.
         let mut package_batches: Vec<IndexMap<String, AnyConstraint>> = {
             let mut chunks: Vec<IndexMap<String, AnyConstraint>> = Vec::new();
             let mut current: IndexMap<String, AnyConstraint> = IndexMap::new();

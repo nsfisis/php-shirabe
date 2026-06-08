@@ -9,10 +9,11 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PhpMixed, SORT_NATURAL,
     UnexpectedValueException, array_flip, dirname, r#eval, file_get_contents, get_class,
-    get_class_err, get_debug_type, in_array, is_array, is_int, is_null, is_string, ksort, php_dir,
+    get_class_err, get_debug_type, in_array, is_array, is_null, is_string, ksort, php_dir,
     realpath, sort, sort_with_flags, str_repeat, strtr, trim, usort, var_export,
 };
 
+use crate::config::is_php_integer_key;
 use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManager;
 use crate::json::JsonFile;
@@ -394,8 +395,7 @@ impl FilesystemRepository {
 
         for (key, value) in array {
             lines.push_str(&str_repeat("    ", level as usize));
-            lines.push_str(&if is_int(&PhpMixed::String(key.clone())) {
-                // TODO(phase-b): PHP integer-keyed array entries — IndexMap keys are strings
+            lines.push_str(&if is_php_integer_key(key) {
                 format!("{} => ", key)
             } else {
                 format!("{} => ", var_export(&PhpMixed::String(key.clone()), true))
@@ -548,54 +548,56 @@ impl FilesystemRepository {
                 if PlatformRepository::is_platform_package(replace.get_target()) {
                     continue;
                 }
-                // PHP: dev_requirement handling
-                // TODO(phase-b): mutate nested versions['versions'][$replace->getTarget()]['dev_requirement']
-                todo!("mutate nested versions['versions'][target]['dev_requirement']");
-                #[allow(unreachable_code)]
-                {
-                    let mut replaced = replace.get_pretty_constraint().to_string();
-                    if replaced == "self.version" {
-                        replaced = package.get_pretty_version().to_string();
-                    }
-                    // TODO(phase-b): mutate nested versions['versions'][$replace->getTarget()]['replaced']
-                    todo!("append replaced to versions['versions'][target]['replaced']");
+                let mut replaced = replace.get_pretty_constraint().to_string();
+                if replaced == "self.version" {
+                    replaced = package.get_pretty_version().to_string();
                 }
+                record_replace_or_provide(
+                    &mut versions,
+                    replace.get_target(),
+                    "replaced",
+                    replaced,
+                    is_dev_package,
+                );
             }
             for (_, provide) in package.get_provides() {
                 // exclude platform provides as when they are really there we can not check for their presence
                 if PlatformRepository::is_platform_package(provide.get_target()) {
                     continue;
                 }
-                // TODO(phase-b): mutate nested versions['versions'][$provide->getTarget()]['dev_requirement']
-                todo!("mutate nested versions['versions'][target]['dev_requirement']");
-                #[allow(unreachable_code)]
-                {
-                    let mut provided = provide.get_pretty_constraint().to_string();
-                    if provided == "self.version" {
-                        provided = package.get_pretty_version().to_string();
-                    }
-                    // TODO(phase-b): mutate nested versions['versions'][$provide->getTarget()]['provided']
-                    todo!("append provided to versions['versions'][target]['provided']");
+                let mut provided = provide.get_pretty_constraint().to_string();
+                if provided == "self.version" {
+                    provided = package.get_pretty_version().to_string();
                 }
+                record_replace_or_provide(
+                    &mut versions,
+                    provide.get_target(),
+                    "provided",
+                    provided,
+                    is_dev_package,
+                );
             }
         }
 
         // add aliases
         for package in &packages {
-            let Some(_alias) = package.as_alias() else {
+            if package.as_alias().is_none() {
                 continue;
-            };
-            // TODO(phase-b): mutate nested versions['versions'][name]['aliases']
-            todo!("append alias->getPrettyVersion() to versions['versions'][name]['aliases']");
-            #[allow(unreachable_code)]
+            }
+            let pretty = package.get_pretty_version().to_string();
+            push_to_list(
+                versions_entry(&mut versions, &package.get_name()),
+                "aliases",
+                pretty.clone(),
+            );
             if package.as_root().is_some() {
-                // TODO(phase-b): same mutation on versions['root']['aliases']
-                todo!("append alias->getPrettyVersion() to versions['root']['aliases']");
+                if let Some(PhpMixed::Array(root_map)) = versions.get_mut("root") {
+                    push_to_list(root_map, "aliases", pretty);
+                }
             }
         }
 
         if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
-            // TODO(phase-b): ksort signature mismatch on nested IndexMap; cast appropriately
             ksort(versions_map);
         }
         ksort(&mut versions);
@@ -765,5 +767,64 @@ impl FilesystemRepository {
         result.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
 
         result
+    }
+}
+
+fn versions_entry<'a>(
+    versions: &'a mut IndexMap<String, PhpMixed>,
+    target: &str,
+) -> &'a mut IndexMap<String, Box<PhpMixed>> {
+    let versions_map = match versions.get_mut("versions") {
+        Some(PhpMixed::Array(m)) => m,
+        _ => unreachable!("versions['versions'] is always an array"),
+    };
+    match versions_map
+        .entry(target.to_string())
+        .or_insert_with(|| Box::new(PhpMixed::Array(IndexMap::new())))
+        .as_mut()
+    {
+        PhpMixed::Array(m) => m,
+        _ => unreachable!("versions['versions'][target] is always an array"),
+    }
+}
+
+fn push_to_list(entry: &mut IndexMap<String, Box<PhpMixed>>, key: &str, value: String) {
+    if let PhpMixed::List(list) = entry
+        .entry(key.to_string())
+        .or_insert_with(|| Box::new(PhpMixed::List(vec![])))
+        .as_mut()
+    {
+        list.push(Box::new(PhpMixed::String(value)));
+    }
+}
+
+fn record_replace_or_provide(
+    versions: &mut IndexMap<String, PhpMixed>,
+    target: &str,
+    key: &str,
+    value: String,
+    is_dev_package: bool,
+) {
+    let entry = versions_entry(versions, target);
+    if !entry.contains_key("dev_requirement") {
+        entry.insert(
+            "dev_requirement".to_string(),
+            Box::new(PhpMixed::Bool(is_dev_package)),
+        );
+    } else if !is_dev_package {
+        entry.insert(
+            "dev_requirement".to_string(),
+            Box::new(PhpMixed::Bool(false)),
+        );
+    }
+    let already_present = match entry.get(key) {
+        Some(b) => matches!(
+            b.as_ref(),
+            PhpMixed::List(list) if list.iter().any(|v| v.as_string() == Some(value.as_str()))
+        ),
+        None => false,
+    };
+    if !already_present {
+        push_to_list(entry, key, value);
     }
 }

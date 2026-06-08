@@ -10,7 +10,7 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge, array_search, count, empty, in_array, sprintf, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, count, empty, in_array, sprintf, strtolower,
 };
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
@@ -145,16 +145,9 @@ impl UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name = Preg::replace(r"{^([^ =:]+)[ =:].*$}", "$1", package);
-                let index = array_search(
-                    package,
-                    // TODO(phase-b): array_search expects IndexMap<String, String>; supply a wrapper
-                    todo!("packages as IndexMap<String, String>"),
-                );
-                if let Some(idx) = index {
-                    // TODO(phase-b): mutate packages[idx] — PHP integer-keyed array
-                    let _ = idx;
-                    let _ = package_name;
+                let package_name = Preg::replace(r"{^([^ =:]+)[ =:].*$}", "$1", package)?;
+                if let Some(idx) = array_search_in_vec(package, &packages) {
+                    packages[idx] = package_name;
                 }
             }
         }
@@ -172,25 +165,20 @@ impl UpdateCommand {
 
         let parser = VersionParser::new();
         let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();
-        let root_requirements = array_merge(
-            // TODO(phase-b): array_merge for IndexMap<String, Link>
-            todo!("root_package.get_requires() as PhpMixed"),
-            todo!("root_package.get_dev_requires() as PhpMixed"),
-        );
+        let root_requirements =
+            array_merge_map(root_package.get_requires(), root_package.get_dev_requires());
         for (package, constraint) in &reqs {
             let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
-            temporary_constraints.insert(package.clone(), parsed_constraint);
-            // TODO(phase-b): access root_requirements[package].getConstraint()
-            let intersected: bool = todo!("Intervals::haveIntersections check");
-            if let Some(_root_req) = todo!("root_requirements.get(&package)") as Option<PhpMixed> {
-                if !intersected {
+            temporary_constraints.insert(package.clone(), parsed_constraint.clone());
+            if let Some(root_req) = root_requirements.get(&package) {
+                if !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())? {
                     io.write_error3(
                         &format!(
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
                             constraint,
                             package,
-                            todo!("root_requirements[package].get_pretty_constraint()"),
+                            root_req.get_pretty_constraint(),
                         ),
                         true,
                         io_interface::NORMAL,
@@ -263,8 +251,8 @@ impl UpdateCommand {
         {
             packages = self.get_packages_interactively(
                 io.clone(),
-                input,
-                output,
+                input.clone(),
+                output.clone(),
                 &composer_handle,
                 packages,
             )?;
@@ -283,18 +271,7 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false)
             {
-                requires = array_merge(
-                    // TODO(phase-b): array_merge for Vec<String>
-                    todo!("requires as PhpMixed"),
-                    todo!("array_keys(&root_package.get_dev_requires()) as PhpMixed"),
-                )
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default();
+                requires.extend(array_keys(&root_package.get_dev_requires()));
             }
 
             if !packages.is_empty() {
@@ -327,7 +304,8 @@ impl UpdateCommand {
             return Ok(-1);
         }
 
-        let mut command_event = CommandEvent::new(PluginEvents::COMMAND, "update", input, output);
+        let mut command_event =
+            CommandEvent::new(PluginEvents::COMMAND, "update", input.clone(), output);
         // TODO(phase-b): dispatch should accept the CommandEvent itself; passing the
         // event by name only for now to keep types aligned with EventDispatcher::dispatch.
         composer
@@ -350,7 +328,7 @@ impl UpdateCommand {
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =
-            self.get_preferred_install_options(&*config.borrow(), input, false)?;
+            self.get_preferred_install_options(&*config.borrow(), input.clone(), false)?;
 
         let optimize = input
             .borrow()
@@ -464,7 +442,7 @@ impl UpdateCommand {
             .set_update_mirrors(update_mirrors)
             .set_update_allow_list(packages.clone())
             .set_update_allow_transitive_dependencies(update_allow_transitive_dependencies)?
-            .set_platform_requirement_filter(self.get_platform_requirement_filter(input)?)
+            .set_platform_requirement_filter(self.get_platform_requirement_filter(input.clone())?)
             .set_prefer_stable(
                 input
                     .borrow()
@@ -487,7 +465,7 @@ impl UpdateCommand {
                 IndexMap::new()
             })
             .set_audit_config(
-                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input)?,
+                self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
             )
             .set_minimal_update(minimal_changes);
 
@@ -565,10 +543,9 @@ impl UpdateCommand {
         let composer_ref = crate::command::composer_full(composer);
         let platform_req_filter = self.get_platform_requirement_filter(input);
         let stability_flags = composer_ref.get_package().get_stability_flags();
-        let requires = array_merge(
-            // TODO(phase-b): array_merge for IndexMap<String, Link>
-            todo!("composer.get_package().get_requires() as PhpMixed"),
-            todo!("composer.get_package().get_dev_requires() as PhpMixed"),
+        let requires = array_merge_map(
+            composer_ref.get_package().get_requires(),
+            composer_ref.get_package().get_dev_requires(),
         );
 
         let filter: Option<String> = if packages.len() > 0 {
@@ -606,21 +583,27 @@ impl UpdateCommand {
                 }
             }
             let current_version = package.get_pretty_version();
-            // TODO(phase-b): pull from requires[package.get_name()].get_pretty_constraint()
-            let constraint: Option<&str> = None;
-            // TODO(phase-b): derive from stabilityFlags / minimum_stability
-            let stability: &str = "stable";
+            let constraint = requires
+                .get(&package.get_name())
+                .map(|link| link.get_pretty_constraint());
+            let stability = match stability_flags.get(&package.get_name()) {
+                Some(flag) => base_package::STABILITIES
+                    .iter()
+                    .find(|&(_, v)| v == flag)
+                    .map(|(k, _)| k.to_string())
+                    .unwrap_or_default(),
+                None => composer_ref.get_package().get_minimum_stability(),
+            };
             let latest_version = version_selector.find_best_candidate(
                 &package.get_name(),
                 constraint,
-                stability,
+                &stability,
                 None,
                 0,
                 None,
                 PhpMixed::Bool(true),
             )?;
             let _ = &platform_req_filter;
-            let _ = &stability_flags;
             if let Some(latest) = latest_version {
                 if package.get_version() != latest.get_version() || latest.is_dev() {
                     autocompleter_values.insert(
@@ -635,11 +618,7 @@ impl UpdateCommand {
             }
         }
         if 0 == installed_packages.len() {
-            // TODO(phase-b): iterate composer.get_package().get_requires() merged with
-            // get_dev_requires(); requires is currently a PhpMixed placeholder.
-            let _ = &requires;
-            let _empty: IndexMap<String, ()> = IndexMap::new();
-            for (req, _constraint) in &_empty {
+            for (req, _constraint) in &requires {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }

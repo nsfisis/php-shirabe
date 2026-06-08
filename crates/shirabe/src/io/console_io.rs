@@ -589,8 +589,6 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         if !is_array(&result) {
-            // PHP: (string) array_search($result, $choices, true)
-            // TODO(phase-b): array_search signature requires IndexMap<String, String>
             let result_str = result.as_string().unwrap_or("").to_string();
             let haystack: IndexMap<String, String> = match &choices {
                 PhpMixed::List(l) => l

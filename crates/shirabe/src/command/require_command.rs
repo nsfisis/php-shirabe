@@ -9,9 +9,8 @@ use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, array_fill_keys, array_intersect,
-    array_keys, array_map, array_merge, array_merge_recursive, array_unique, count, empty,
-    file_exists, file_get_contents, file_put_contents, filesize, implode, is_writable, sprintf,
-    strtolower, unlink,
+    array_keys, array_map, array_merge, array_unique, count, empty, file_exists, file_get_contents,
+    file_put_contents, filesize, implode, is_writable, sprintf, strtolower, unlink,
 };
 
 use crate::advisory::Auditor;
@@ -396,8 +395,6 @@ impl RequireCommand {
                 } else {
                     "it is"
                 };
-                // TODO(phase-b): PHP's array_merge_recursive + array_unique on a list of
-                // string lists; collapsed here to a flat unique Vec<String>.
                 let merged: Vec<String> = dev_packages.iter().flatten().cloned().collect();
                 let pkg_dev_tags: Vec<String> = array_unique(&merged);
                 let warn_msg = format!(
