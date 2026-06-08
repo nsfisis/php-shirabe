@@ -1,8 +1,12 @@
 //! ref: composer/src/Composer/Installer/InstallerEvent.php
 
+use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
+
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
 
 #[derive(Debug)]
@@ -53,5 +57,27 @@ impl InstallerEvent {
 
     pub fn get_transaction(&self) -> Option<&Transaction> {
         Some(&self.transaction)
+    }
+}
+
+impl EventInterface for InstallerEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

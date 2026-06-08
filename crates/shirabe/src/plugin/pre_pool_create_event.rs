@@ -2,8 +2,11 @@
 
 use indexmap::IndexMap;
 
+use shirabe_php_shim::PhpMixed;
+
 use crate::dependency_resolver::Request;
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterface;
 
@@ -90,5 +93,27 @@ impl PrePoolCreateEvent {
 
     pub fn set_unacceptable_fixed_packages(&mut self, packages: Vec<BasePackageHandle>) {
         self.unacceptable_fixed_packages = packages;
+    }
+}
+
+impl EventInterface for PrePoolCreateEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

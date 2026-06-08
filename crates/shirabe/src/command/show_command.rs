@@ -452,7 +452,7 @@ impl ShowCommand {
 
         if let Some(ref composer) = composer {
             let composer = crate::command::composer_full(composer);
-            let command_event = CommandEvent::new6(
+            let mut command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "show",
                 input.clone(),
@@ -460,13 +460,11 @@ impl ShowCommand {
                 vec![],
                 IndexMap::new(),
             );
-            // TODO(phase-b): EventDispatcher::dispatch wants Option<Event>, but PHP passes
-            // the CommandEvent subclass directly. Phase D will introduce trait-based dispatch.
-            let _event_name = command_event.get_name().to_string();
+            let command_event_name = command_event.get_name().to_string();
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(&_event_name), None)?;
+                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
         }
 
         if input.borrow().get_option("latest").as_bool() == Some(true) && composer.is_none() {

@@ -21,6 +21,10 @@ impl Event {
         }
     }
 
+    pub fn from_name(name: String) -> Self {
+        Event::new(name, Vec::new(), IndexMap::new())
+    }
+
     pub fn get_name(&self) -> &str {
         &self.name
     }
@@ -38,6 +42,36 @@ impl Event {
     }
 
     pub fn stop_propagation(&mut self) {
+        self.propagation_stopped = true;
+    }
+}
+
+pub trait EventInterface: std::fmt::Debug {
+    fn get_name(&self) -> &str;
+    fn get_arguments(&self) -> &Vec<String>;
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed>;
+    fn is_propagation_stopped(&self) -> bool;
+    fn stop_propagation(&mut self);
+}
+
+impl EventInterface for Event {
+    fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        &self.args
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        &self.flags
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.propagation_stopped
+    }
+
+    fn stop_propagation(&mut self) {
         self.propagation_stopped = true;
     }
 }

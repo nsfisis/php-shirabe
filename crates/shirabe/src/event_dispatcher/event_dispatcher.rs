@@ -24,6 +24,7 @@ use crate::composer::PartialComposerWeakHandle;
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 use crate::event_dispatcher::EventSubscriberInterface;
 use crate::event_dispatcher::ScriptExecutionException;
 use crate::installer::BinaryInstaller;
@@ -118,9 +119,9 @@ impl EventDispatcher {
     pub fn dispatch(
         &mut self,
         event_name: Option<&str>,
-        event: Option<Event>,
+        event: Option<&mut dyn EventInterface>,
     ) -> anyhow::Result<i64> {
-        let event = match event {
+        match event {
             None => {
                 let name = event_name.ok_or_else(|| {
                     anyhow::anyhow!(InvalidArgumentException {
@@ -130,12 +131,11 @@ impl EventDispatcher {
                         code: 0,
                     })
                 })?;
-                Event::new(name.to_string(), Vec::new(), IndexMap::new())
+                let mut event = Event::new(name.to_string(), Vec::new(), IndexMap::new());
+                self.do_dispatch(&mut event)
             }
-            Some(e) => e,
-        };
-
-        self.do_dispatch(event)
+            Some(event) => self.do_dispatch(event),
+        }
     }
 
     /// Dispatch a script event.
@@ -216,7 +216,7 @@ impl EventDispatcher {
     }
 
     /// Triggers the listeners of an event.
-    fn do_dispatch(&mut self, event: Event) -> anyhow::Result<i64> {
+    fn do_dispatch(&mut self, event: &mut dyn EventInterface) -> anyhow::Result<i64> {
         if Platform::get_env("COMPOSER_DEBUG_EVENTS").is_some() {
             // TODO(plugin): PackageEvent / CommandEvent / PreCommandRunEvent specialization
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
@@ -235,13 +235,13 @@ impl EventDispatcher {
             );
         }
 
-        let listeners = self.get_listeners(&event);
+        let listeners = self.get_listeners(&*event);
 
-        self.push_event(&event)?;
+        self.push_event(&*event)?;
 
         let autoloaders_before = spl_autoload_functions();
 
-        let result = self.do_dispatch_body(&event, listeners);
+        let result = self.do_dispatch_body(&*event, listeners);
 
         // finally block
         self.pop_event();
@@ -279,7 +279,11 @@ impl EventDispatcher {
         result
     }
 
-    fn do_dispatch_body(&mut self, event: &Event, listeners: Vec<Callable>) -> anyhow::Result<i64> {
+    fn do_dispatch_body(
+        &mut self,
+        event: &dyn EventInterface,
+        listeners: Vec<Callable>,
+    ) -> anyhow::Result<i64> {
         let mut return_max = 0_i64;
         for callable in listeners {
             let mut r#return: i64 = 0;
@@ -471,14 +475,7 @@ impl EventDispatcher {
                                 flags,
                             );
                             // TODO(plugin): script_event.set_originating_event(event.clone())
-                            match self.dispatch(
-                                Some(&script_name),
-                                Some(Event::new(
-                                    script_name.clone(),
-                                    script_event.inner_args_for_dispatch(),
-                                    script_event.inner_flags_for_dispatch(),
-                                )),
-                            ) {
+                            match self.dispatch(Some(&script_name), Some(&mut script_event)) {
                                 Ok(v) => r#return = v,
                                 Err(e) => {
                                     if e.downcast_ref::<ScriptExecutionException>().is_some() {
@@ -857,30 +854,16 @@ impl EventDispatcher {
         Ok(return_max)
     }
 
-    fn do_dispatch_script(&mut self, event: ScriptEvent) -> anyhow::Result<i64> {
-        // TODO(plugin): proper polymorphic dispatch — currently delegate to base Event path.
-        let base = Event::new(
-            event.get_inner().get_name().to_string(),
-            event.get_inner().get_arguments().clone(),
-            event.get_inner().get_flags().clone(),
-        );
-        self.do_dispatch(base)
+    fn do_dispatch_script(&mut self, mut event: ScriptEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(&mut event)
     }
 
-    fn do_dispatch_package(&mut self, event: PackageEvent) -> anyhow::Result<i64> {
-        // TODO(plugin): preserve PackageEvent identity for `instanceof` checks above.
-        let base = Event::new(event.get_name().to_string(), Vec::new(), IndexMap::new());
-        self.do_dispatch(base)
+    fn do_dispatch_package(&mut self, mut event: PackageEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(&mut event)
     }
 
-    fn do_dispatch_installer(&mut self, event: InstallerEvent) -> anyhow::Result<i64> {
-        // TODO(plugin): preserve InstallerEvent identity for `instanceof` checks above.
-        let base = Event::new(
-            event.get_inner_name().to_string(),
-            Vec::new(),
-            IndexMap::new(),
-        );
-        self.do_dispatch(base)
+    fn do_dispatch_installer(&mut self, mut event: InstallerEvent) -> anyhow::Result<i64> {
+        self.do_dispatch(&mut event)
     }
 
     fn execute_tty(&self, exec: &str) -> anyhow::Result<i64> {
@@ -936,7 +919,7 @@ impl EventDispatcher {
         &self,
         class_name: &str,
         method_name: &str,
-        event: &Event,
+        event: &dyn EventInterface,
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
@@ -969,7 +952,7 @@ impl EventDispatcher {
         todo!("dynamic static method invocation requires plugin runtime")
     }
 
-    fn event_needs_to_output(&self, event: &Event) -> bool {
+    fn event_needs_to_output(&self, event: &dyn EventInterface) -> bool {
         // do not output the command being run when using `composer exec` as it is fairly obvious the user is running it
         if event.get_name() == "__exec_command" {
             return false;
@@ -1031,7 +1014,7 @@ impl EventDispatcher {
     }
 
     /// Retrieves all listeners for a given event
-    fn get_listeners(&mut self, event: &Event) -> Vec<Callable> {
+    fn get_listeners(&mut self, event: &dyn EventInterface) -> Vec<Callable> {
         let script_listeners: Vec<Callable> = if self.run_scripts {
             self.get_script_listeners(event)
         } else {
@@ -1071,14 +1054,14 @@ impl EventDispatcher {
     }
 
     /// Checks if an event has listeners registered
-    pub fn has_event_listeners(&mut self, event: &Event) -> bool {
+    pub fn has_event_listeners(&mut self, event: &dyn EventInterface) -> bool {
         let listeners = self.get_listeners(event);
 
         listeners.len() > 0
     }
 
     /// Finds all listeners defined as scripts in the package
-    fn get_script_listeners(&self, event: &Event) -> Vec<Callable> {
+    fn get_script_listeners(&self, event: &dyn EventInterface) -> Vec<Callable> {
         let composer = self.composer();
         let composer = composer.borrow_partial();
         let package = composer.get_package();
@@ -1128,7 +1111,7 @@ impl EventDispatcher {
     }
 
     /// Push an event to the stack of active event
-    fn push_event(&mut self, event: &Event) -> anyhow::Result<i64> {
+    fn push_event(&mut self, event: &dyn EventInterface) -> anyhow::Result<i64> {
         let event_name = event.get_name().to_string();
         if self.event_stack.iter().any(|n| n == &event_name) {
             return Err(anyhow::anyhow!(RuntimeException {
@@ -1227,7 +1210,11 @@ impl EventDispatcher {
         "unsupported".to_string()
     }
 
-    fn make_autoloader(&mut self, event: &Event, callable: &Callable) -> anyhow::Result<()> {
+    fn make_autoloader(
+        &mut self,
+        event: &dyn EventInterface,
+        callable: &Callable,
+    ) -> anyhow::Result<()> {
         let composer = self.composer();
         // TODO(plugin): full autoloader rebuild on plugin-supplied callables — currently a stub.
         let Some(composer) = composer.as_full() else {
@@ -1332,36 +1319,5 @@ impl EventDispatcher {
             PhpMixed::List(l) => l.is_empty(),
             _ => false,
         }
-    }
-}
-
-// TODO(plugin): re-export the `Event::name`-only constructor `Event::new` PHP variant so callers
-// can build an `Event` from just a name, mirroring `new Event($eventName)`.
-impl Event {
-    pub fn from_name(name: String) -> Self {
-        Event::new(name, Vec::new(), IndexMap::new())
-    }
-}
-
-// Convenience accessors that ScriptEvent doesn't currently expose for the base Event fields.
-// TODO(plugin): replace with proper getters once ScriptEvent grows them.
-impl ScriptEvent {
-    fn get_inner(&self) -> &Event {
-        unimplemented!("ScriptEvent::get_inner — Phase B")
-    }
-
-    fn inner_args_for_dispatch(&self) -> Vec<String> {
-        Vec::new()
-    }
-
-    fn inner_flags_for_dispatch(&self) -> IndexMap<String, PhpMixed> {
-        IndexMap::new()
-    }
-}
-
-// Convenience accessor for InstallerEvent's underlying name.
-impl InstallerEvent {
-    fn get_inner_name(&self) -> &str {
-        unimplemented!("InstallerEvent::get_inner_name — Phase B")
     }
 }

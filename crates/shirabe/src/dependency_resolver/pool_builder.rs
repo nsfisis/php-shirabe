@@ -299,8 +299,10 @@ impl PoolBuilder {
         }
 
         if self.event_dispatcher.is_some() {
-            // TODO(phase-b): PrePoolCreateEvent::new takes Request and Vec<Box<dyn RepositoryInterface>>
-            // by value but neither can be cloned (PHP class shared semantics). Needs Rc-based migration.
+            // TODO(plugin): PrePoolCreateEvent::new takes Request and Vec<Box<dyn RepositoryInterface>>
+            // by value but neither can be cloned (PHP class shared semantics). This event is purely
+            // plugin-facing and nothing in the no-plugin path reads it back, so it stays deferred
+            // until the plugin API drives an Rc-based migration of Request/repositories.
             let mut pre_pool_create_event = PrePoolCreateEvent::new(
                 PluginEvents::PRE_POOL_CREATE.to_string(),
                 todo!("share repositories with PrePoolCreateEvent without moving"),
@@ -315,12 +317,15 @@ impl PoolBuilder {
                     .cloned()
                     .collect(),
             );
-            // TODO(phase-b): EventDispatcher::dispatch expects an owned Event, not &mut PrePoolCreateEvent
+            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
             self.event_dispatcher
                 .as_ref()
                 .unwrap()
                 .borrow_mut()
-                .dispatch(Some(pre_pool_create_event.get_name()), None)?;
+                .dispatch(
+                    Some(&pre_pool_create_event_name),
+                    Some(&mut pre_pool_create_event),
+                )?;
             // PHP rebinds $this->packages to a list-style array; preserve indices via reindexing.
             // TODO(plugin)/TODO(phase-c): rebind self.packages from the (handle-based) event packages
             // once EventDispatcher::dispatch returns the mutated event.

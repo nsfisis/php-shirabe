@@ -378,15 +378,17 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         if let Some(composer) = composer.as_ref() {
             // TODO(phase-b): requires inner Symfony Command get_name access
             let command_name: String = todo!();
-            let pre_command_run_event = PreCommandRunEvent::new(
+            let mut pre_command_run_event = PreCommandRunEvent::new(
                 PluginEvents::PRE_COMMAND_RUN.to_string(),
                 input,
                 command_name,
             );
-            // TODO(phase-b): event_dispatcher.dispatch expects Option<Event>; need wrapper from
-            // PreCommandRunEvent.
-            let _ = composer.borrow_partial().get_event_dispatcher();
-            let _ = pre_command_run_event.get_name();
+            let pre_command_run_event_name = pre_command_run_event.get_name().to_string();
+            let dispatcher = composer.borrow_partial().get_event_dispatcher();
+            dispatcher.borrow_mut().dispatch(
+                Some(&pre_command_run_event_name),
+                Some(&mut pre_command_run_event),
+            )?;
         }
 
         if input.borrow().has_parameter_option(&["--no-ansi"], false)

@@ -2,7 +2,10 @@
 
 // TODO(plugin): this event is part of the plugin API and is dispatched before a command runs
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
+use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PreCommandRunEvent {
@@ -35,5 +38,27 @@ impl PreCommandRunEvent {
 
     pub fn get_command(&self) -> &str {
         &self.command
+    }
+}
+
+impl EventInterface for PreCommandRunEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

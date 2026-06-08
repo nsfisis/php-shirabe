@@ -3,9 +3,11 @@
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PackageEvent {
@@ -65,5 +67,27 @@ impl PackageEvent {
 
     pub fn get_operation(&self) -> &dyn OperationInterface {
         self.operation.as_ref()
+    }
+}
+
+impl EventInterface for PackageEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

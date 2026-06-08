@@ -306,12 +306,11 @@ impl UpdateCommand {
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "update", input.clone(), output);
-        // TODO(phase-b): dispatch should accept the CommandEvent itself; passing the
-        // event by name only for now to keep types aligned with EventDispatcher::dispatch.
+        let command_event_name = command_event.get_name().to_string();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(command_event.get_name()), None)?;
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         composer
             .get_installation_manager()

@@ -2,6 +2,7 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::event_dispatcher::Event as BaseEvent;
+use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -61,5 +62,27 @@ impl Event {
         //
         // return $event;
         todo!()
+    }
+}
+
+impl EventInterface for Event {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

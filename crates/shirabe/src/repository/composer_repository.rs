@@ -2757,10 +2757,12 @@ impl ComposerRepository {
                             .map(|(k, v)| (k, Box::new(v)))
                             .collect(),
                     );
-                    // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types;
-                    // need a way to pass PreFileDownloadEvent through EventDispatcher's API.
-                    let _ = &mut pre_file_download_event;
-                    dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+                    let pre_file_download_event_name =
+                        pre_file_download_event.get_name().to_string();
+                    dispatcher.dispatch(
+                        Some(&pre_file_download_event_name),
+                        Some(&mut pre_file_download_event),
+                    )?;
                     filename = pre_file_download_event.get_processed_url().to_string();
                     options = pre_file_download_event
                         .get_transport_options()
@@ -2815,9 +2817,12 @@ impl ComposerRepository {
                             m.into()
                         },
                     );
-                    // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
-                    let _ = &mut post_file_download_event;
-                    dispatcher.dispatch(Some(post_file_download_event.get_name()), None)?;
+                    let post_file_download_event_name =
+                        post_file_download_event.get_name().to_string();
+                    dispatcher.dispatch(
+                        Some(&post_file_download_event_name),
+                        Some(&mut post_file_download_event),
+                    )?;
                 }
 
                 let decoded = response.decode_json()?;
@@ -2954,9 +2959,11 @@ impl ComposerRepository {
                         .map(|(k, v)| (k, Box::new(v)))
                         .collect(),
                 );
-                // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
-                let _ = &mut pre_file_download_event;
-                dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+                let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+                dispatcher.dispatch(
+                    Some(&pre_file_download_event_name),
+                    Some(&mut pre_file_download_event),
+                )?;
                 filename = pre_file_download_event.get_processed_url().to_string();
                 options = pre_file_download_event
                     .get_transport_options()
@@ -3015,9 +3022,11 @@ impl ComposerRepository {
                         m.into()
                     },
                 );
-                // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
-                let _ = &mut post_file_download_event;
-                dispatcher.dispatch(Some(post_file_download_event.get_name()), None)?;
+                let post_file_download_event_name = post_file_download_event.get_name().to_string();
+                dispatcher.dispatch(
+                    Some(&post_file_download_event_name),
+                    Some(&mut post_file_download_event),
+                )?;
             }
 
             let decoded = response.decode_json()?;
@@ -3120,9 +3129,11 @@ impl ComposerRepository {
                     .map(|(k, v)| (k, Box::new(v)))
                     .collect(),
             );
-            // TODO(phase-b): dispatcher.dispatch expects Option<Event>, not concrete event types
-            let _ = &mut pre_file_download_event;
-            dispatcher.dispatch(Some(pre_file_download_event.get_name()), None)?;
+            let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+            dispatcher.dispatch(
+                Some(&pre_file_download_event_name),
+                Some(&mut pre_file_download_event),
+            )?;
             filename = pre_file_download_event.get_processed_url().to_string();
             options = pre_file_download_event
                 .get_transport_options()

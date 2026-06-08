@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 use crate::util::HttpDownloader;
 
 #[derive(Debug)]
@@ -74,5 +75,27 @@ impl PreFileDownloadEvent {
 
     pub fn set_transport_options(&mut self, options: IndexMap<String, Box<PhpMixed>>) {
         self.transport_options = options;
+    }
+}
+
+impl EventInterface for PreFileDownloadEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }

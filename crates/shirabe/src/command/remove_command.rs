@@ -485,18 +485,17 @@ impl RemoveCommand {
             root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default());
         }
 
-        // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, 'remove', input, output)
-        let command_event = crate::plugin::CommandEvent::new(
+        let mut command_event = crate::plugin::CommandEvent::new(
             crate::plugin::PluginEvents::COMMAND,
             "remove",
             input.clone(),
             output,
         );
+        let command_event_name = command_event.get_name().to_string();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            // TODO(phase-b): dispatch expects Option<Event>; CommandEvent is a different type
-            .dispatch(Some(command_event.get_name()), None);
+            .dispatch(Some(&command_event_name), Some(&mut command_event));
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
         let removed_plugins: Vec<String> =

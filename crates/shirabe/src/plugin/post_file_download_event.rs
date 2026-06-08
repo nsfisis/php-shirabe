@@ -1,8 +1,10 @@
 //! ref: composer/src/Composer/Plugin/PostFileDownloadEvent.php
 
+use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 use crate::event_dispatcher::Event;
+use crate::event_dispatcher::EventInterface;
 
 #[derive(Debug)]
 pub struct PostFileDownloadEvent {
@@ -55,5 +57,27 @@ impl PostFileDownloadEvent {
 
     pub fn get_type(&self) -> &str {
         &self.r#type
+    }
+}
+
+impl EventInterface for PostFileDownloadEvent {
+    fn get_name(&self) -> &str {
+        self.inner.get_name()
+    }
+
+    fn get_arguments(&self) -> &Vec<String> {
+        self.inner.get_arguments()
+    }
+
+    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+        self.inner.get_flags()
+    }
+
+    fn is_propagation_stopped(&self) -> bool {
+        self.inner.is_propagation_stopped()
+    }
+
+    fn stop_propagation(&mut self) {
+        self.inner.stop_propagation();
     }
 }
