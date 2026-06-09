@@ -28,13 +28,15 @@ impl Request {
     pub const UPDATE_LISTED_WITH_TRANSITIVE_DEPS: i64 = UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
 }
 
-/// Represents the value of updateAllowTransitiveDependencies, which is false|UPDATE_* in PHP.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateAllowTransitiveDeps {
-    /// Corresponds to PHP false (initial value)
+    /// Corresponds to PHP false.
     False,
+    /// \Composer\DependencyResolver\Request::UPDATE_ONLY_LISTED
     UpdateOnlyListed,
+    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE
     UpdateListedWithTransitiveDepsNoRootRequire,
+    /// \Composer\DependencyResolver\Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS
     UpdateListedWithTransitiveDeps,
 }
 

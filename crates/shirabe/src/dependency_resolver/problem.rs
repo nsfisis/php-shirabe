@@ -92,7 +92,6 @@ impl Problem {
             }
 
             let reason_data = rule_ref.get_reason_data();
-            // TODO(phase-b): reason_data for RULE_ROOT_REQUIRE; extract via ReasonData::RootRequire variant.
             let (package_name, constraint): (String, Option<&AnyConstraint>) = match reason_data {
                 rule::ReasonData::RootRequire {
                     package_name,
@@ -144,27 +143,23 @@ impl Problem {
                 rule::ReasonData::RootRequire { package_name, .. } => package_name.clone(),
                 _ => String::new(),
             },
-            rule::RULE_FIXED => {
-                // TODO(phase-b): reason_data for RULE_FIXED is `array{package: BasePackage}`.
-                // PHP: (string) $rule->getReasonData()['package']
-                match rule.get_reason_data() {
-                    rule::ReasonData::Fixed { package } => package.get_pretty_string(),
-                    _ => String::new(),
-                }
-            }
+            rule::RULE_FIXED => match rule.get_reason_data() {
+                rule::ReasonData::Fixed { package } => package.get_unique_name(),
+                _ => String::new(),
+            },
             rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => {
-                // TODO(phase-b): reason_data is a Link.
                 let source = rule.get_source_package(pool).unwrap();
                 let link_pretty = match rule.get_reason_data() {
                     rule::ReasonData::Link(link) => link.get_pretty_string(source.clone()),
                     _ => String::new(),
                 };
-                format!("{}//{}", source.get_pretty_string(), link_pretty)
+                format!("{}//{}", source.get_unique_name(), link_pretty)
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
             | rule::RULE_PACKAGE_INVERSE_ALIAS => {
-                // TODO(phase-b): convert ReasonData to PhpMixed for php_to_string
+                // TODO(phase-c): PHP returns (string) $rule->getReasonData(), but the alias rules'
+                // reason_data is still a placeholder pending the RuleSetGenerator reason_data wiring.
                 format!("{:?}", rule.get_reason_data())
             }
             rule::RULE_LEARNED => implode(
@@ -807,7 +802,7 @@ impl Problem {
             }
 
             if pool.is_security_removed_package_version(package_name, constraint) {
-                // TODO(phase-b): get_matching_security_advisories needs Vec<PackageInterfaceHandle>
+                // TODO(phase-c): get_matching_security_advisories needs Vec<PackageInterfaceHandle>
                 // and SecurityAdvisory.inner.advisory_id is on the private inner field.
                 // Convert packages to PackageInterfaceHandle and adjust SecurityAdvisory accessor first.
                 let _ = repository_set;

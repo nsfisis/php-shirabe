@@ -551,12 +551,7 @@ impl DownloaderInterface for FileDownloader {
         for bin in package.get_binaries() {
             let bin_path = format!("{}/{}", path, bin);
             if file_exists(&bin_path) && !is_executable(&bin_path) {
-                // TODO(phase-b): Silencer::call_named for native PHP function
-                let _ = Silencer::call(|| {
-                    let _ = bin_path;
-                    let _ = umask();
-                    Ok(())
-                });
+                let _ = Silencer::call(|| Ok(shirabe_php_shim::chmod(&bin_path, 0o777 & !umask())));
             }
         }
 

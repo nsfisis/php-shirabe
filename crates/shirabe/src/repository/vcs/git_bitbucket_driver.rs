@@ -494,7 +494,9 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            // TODO(phase-b): trait returns Result; flatten for the inherent signature here
+            // TODO(phase-c): PHP getSource is infallible (: array), but the Rust trait made it
+            // Result, so the fallback's Result is flattened here. The faithful fix is making the
+            // VcsDriverInterface get_source/get_dist infallible across all implementations.
             return fallback.get_source(identifier).unwrap_or_default();
         }
 
@@ -511,7 +513,7 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
-            // TODO(phase-b): trait returns Result; flatten for the inherent signature here
+            // TODO(phase-c): see get_source above — the trait's over-fallibility is flattened here.
             return fallback.get_dist(identifier).ok().flatten();
         }
 
@@ -886,14 +888,14 @@ impl GitBitbucketDriver {
         }
 
         if !extension_loaded("openssl") {
-            io.write_error(
+            io.write_error3(
                 &format!(
                     "Skipping Bitbucket git driver for {} because the OpenSSL PHP extension is missing.",
                     url
                 ),
+                true,
+                io_interface::VERBOSE,
             );
-            // PHP: writeError(..., true, io_interface::VERBOSE)
-            // TODO(phase-b): io_interface::VERBOSE verbosity argument
 
             return Ok(false);
         }

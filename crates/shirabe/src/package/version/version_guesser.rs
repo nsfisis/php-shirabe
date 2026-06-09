@@ -436,8 +436,6 @@ impl VersionGuesser {
                 ],
                 path,
             )?;
-            // PHP: $result['commit'] = '';
-            // TODO(phase-b): VersionData::commit modeled as Option<String>; using Some(String::new())
             let commit = Some(String::new());
             let feature_version = Some(version.clone());
             let feature_pretty_version = Some(version);

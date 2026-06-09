@@ -1240,7 +1240,6 @@ impl VcsDownloader for GitDownloader {
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        // TODO(phase-b): PHP passes the list directly to writeError; joined here so write_error3 takes &str
         self.inner
             .io
             .write_error3(&changes[..slice_end].join("\n"), true, io_interface::NORMAL);
@@ -1291,7 +1290,6 @@ impl VcsDownloader for GitDownloader {
                     .into());
                 }
                 Some("v") => {
-                    // TODO(phase-b): PHP passes list directly; joined here for &str arg
                     self.inner
                         .io
                         .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
@@ -1307,7 +1305,6 @@ impl VcsDownloader for GitDownloader {
 
             if do_help {
                 // help:
-                // TODO(phase-b): PHP passes list directly; joined here for &str arg
                 self.inner.io.write_error3(
                     &[
                         format!(

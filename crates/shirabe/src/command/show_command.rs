@@ -610,7 +610,7 @@ impl ShowCommand {
                         .get_option("patch-only")
                         .as_bool()
                         .unwrap_or(false),
-                    &*platform_req_filter,
+                    platform_req_filter.clone(),
                 )?;
             }
             if input.borrow().get_option("outdated").as_bool() == Some(true)
@@ -885,7 +885,7 @@ impl ShowCommand {
                                     show_major_only,
                                     show_minor_only,
                                     show_patch_only,
-                                    &*platform_req_filter,
+                                    platform_req_filter.clone(),
                                 )?;
                                 if latest.is_none() {
                                     continue;
@@ -2639,7 +2639,7 @@ impl ShowCommand {
         major_only: bool,
         minor_only: bool,
         patch_only: bool,
-        platform_req_filter: &dyn PlatformRequirementFilterInterface,
+        platform_req_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         // find the latest version allowed in this repo set
         let name = package.get_name();
@@ -2738,14 +2738,14 @@ impl ShowCommand {
                 version_compare(&candidate.get_version(), &package_version, "<=")
             });
         }
-        // TODO(phase-b): platform_req_filter needs to be Option<Box<dyn ...>>; current code holds &dyn.
-        let _ = platform_req_filter;
+        // TODO(phase-c): PHP passes $showWarnings (true or a closure) as the last argument, but the
+        // closure form requires modeling a callable inside PhpMixed; hardcoding true until then.
         let _ = show_warnings_box;
         let mut candidate = version_selector.find_best_candidate(
             &name,
             target_version.as_deref(),
             &best_stability,
-            None,
+            Some(platform_req_filter),
             0,
             Some(self.get_io().clone()),
             PhpMixed::Bool(true),

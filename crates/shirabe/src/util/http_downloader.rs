@@ -779,7 +779,8 @@ impl HttpDownloader {
             );
             http_map.insert("ignore_errors".to_string(), Box::new(PhpMixed::Bool(true)));
             ctx_options.insert("http".to_string(), PhpMixed::Array(http_map));
-            // TODO(phase-b): file_get_contents only takes a path; stream context arg dropped.
+            // TODO(phase-c): file_get_contents only takes a path; the stream context arg is dropped
+            // until the PHP stream-context layer is modeled.
             let _ = stream_context_create(&ctx_options, None);
             let test_connectivity = file_get_contents("https://8.8.8.8");
             Silencer::restore();

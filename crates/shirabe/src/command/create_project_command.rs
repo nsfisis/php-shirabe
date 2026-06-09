@@ -293,7 +293,7 @@ impl CreateProjectCommand {
                 io.clone(),
                 &config,
                 package_name,
-                &*platform_requirement_filter,
+                platform_requirement_filter.clone(),
                 directory.clone(),
                 package_version,
                 stability,
@@ -334,17 +334,10 @@ impl CreateProjectCommand {
                             .get_config()
                             .borrow()
                             .get_repositories();
-                    // TODO(phase-b): generate_repository_name expects existing repos as
-                    // IndexMap<String, Box<dyn RepositoryInterface>>; pass empty placeholder.
-                    let _ = &composer_json_repositories_config;
-                    let placeholder_existing: IndexMap<
-                        String,
-                        crate::repository::RepositoryInterfaceHandle,
-                    > = IndexMap::new();
                     let name = RepositoryFactory::generate_repository_name(
                         &PhpMixed::Int(index as i64),
                         &repo_config,
-                        &placeholder_existing,
+                        &composer_json_repositories_config,
                     );
                     let mut config_source = JsonConfigSource::new(
                         std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
@@ -595,7 +588,7 @@ impl CreateProjectCommand {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         package_name: &str,
-        platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
+        platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
         directory: Option<String>,
         mut package_version: Option<String>,
         mut stability: Option<String>,
@@ -850,14 +843,11 @@ impl CreateProjectCommand {
             std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
             Some(&mut platform_repo),
         )?;
-        // TODO(phase-b): platform_requirement_filter is &dyn here but VersionSelector expects
-        // Option<Box<dyn ...>>; pass None as placeholder.
-        let _ = platform_requirement_filter;
         let package = version_selector.find_best_candidate(
             &name,
             package_version.as_deref(),
             &stability,
-            None,
+            Some(platform_requirement_filter.clone()),
             0,
             Some(io.clone()),
             PhpMixed::Bool(true),

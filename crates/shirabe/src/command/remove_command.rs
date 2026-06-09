@@ -14,6 +14,7 @@ use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Request;
+use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::io::IOInterface;
@@ -597,7 +598,7 @@ impl RemoveCommand {
                 .unwrap_or(false);
 
         let mut update_allow_transitive_dependencies =
-            Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
+            UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
         let mut flags = String::new();
         if input
             .borrow()
@@ -610,7 +611,8 @@ impl RemoveCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
+            update_allow_transitive_dependencies =
+                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
             flags += " --with-all-dependencies";
         } else if input
             .borrow()
@@ -618,7 +620,7 @@ impl RemoveCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            update_allow_transitive_dependencies = Request::UPDATE_ONLY_LISTED;
+            update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
             flags += " --with-dependencies";
         }
 

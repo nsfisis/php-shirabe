@@ -852,7 +852,6 @@ pub trait PackageDiscoveryTrait {
         let installed_repo = repository_manager.get_local_repository();
 
         for result in &results {
-            // TODO(phase-b): installed_repo.find_package signature mismatch with FindPackageConstraint
             if installed_repo
                 .find_package(
                     &result.name,
@@ -929,11 +928,14 @@ pub trait PackageDiscoveryTrait {
                 let has_config_platform = platform_extra.contains_key("config.platform");
                 let is_complete = platform_pkg.as_complete().is_some();
                 if has_config_platform && is_complete {
-                    // TODO(phase-b): platform_pkg.get_description() via CompletePackageInterface
                     platform_pkg_version = format!(
                         "{} ({})",
                         platform_pkg_version,
-                        todo!("platform_pkg.get_description()")
+                        platform_pkg
+                            .as_complete()
+                            .unwrap()
+                            .get_description()
+                            .unwrap_or_default()
                     );
                 }
                 details.push(format!(

@@ -720,7 +720,8 @@ impl RemoteFilesystem {
         }
 
         let mut caught_e: Option<anyhow::Error> = None;
-        // TODO(phase-b): wrap PHP's `file_get_contents` with stream context and error capture.
+        // TODO(phase-c): wrap PHP's `file_get_contents` with stream context and error capture;
+        // depends on the unmodeled PHP stream-context layer.
         let outer: Result<Option<String>, anyhow::Error> = Ok(None);
         match outer {
             Ok(v) => result = v,
@@ -743,7 +744,8 @@ impl RemoteFilesystem {
             *response_headers = http_get_last_response_headers().unwrap_or_default();
             http_clear_last_response_headers();
         } else {
-            // TODO(phase-b): read the magic `$http_response_header` PHP variable.
+            // TODO(phase-c): read the magic `$http_response_header` PHP variable; depends on the
+            // unmodeled PHP stream layer that populates it.
             *response_headers = Vec::new();
         }
 

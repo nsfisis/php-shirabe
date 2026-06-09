@@ -103,7 +103,7 @@ impl ScriptAliasCommand {
 
         let args = input.borrow().get_arguments();
 
-        // TODO(phase-b): InputInterface has_to_string/get_class_name not modeled in Rust
+        // TODO(phase-c): InputInterface has_to_string/get_class_name not modeled in Rust
         // TODO remove for Symfony 6+ as it is then in the interface
         if false {
             return Err(LogicException {
@@ -122,7 +122,7 @@ impl ScriptAliasCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        // TODO(phase-b): InputInterface lacks to_string; use a placeholder
+        // TODO(phase-c): InputInterface lacks to_string; use a placeholder until it is modeled.
         let input_as_string = String::new();
         let _ = input;
         let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input_as_string, 1)?;

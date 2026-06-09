@@ -438,8 +438,11 @@ impl AutoloadGenerator {
         }
 
         let mut class_map = class_map_generator.take_class_map();
-        // TODO(phase-b): strict_ambiguous should filter vendor path for non-strict mode
-        let ambiguous_classes = class_map.get_ambiguous_classes(None)?;
+        let ambiguous_classes = if strict_ambiguous {
+            class_map.get_ambiguous_classes(None)?
+        } else {
+            class_map.get_ambiguous_classes(Some(r"{/(test|fixture|example|stub)s?/}i"))?
+        };
         for (class_name, ambiguous_paths) in &ambiguous_classes {
             if ambiguous_paths.len() > 1 {
                 self.io.write_error(&format!(
@@ -804,14 +807,17 @@ impl AutoloadGenerator {
         };
         let mut sorted_package_map = self.sort_package_map(package_map);
         sorted_package_map.push(root_package_map);
+        let reverse_sorted_map: Vec<(PackageInterfaceHandle, Option<String>)> =
+            sorted_package_map.iter().rev().cloned().collect();
 
-        // TODO(phase-b): psr-0/4/classmap should use reverse_sorted_map (root first) for correct precedence
+        // reverse-sorted means root first, then dependents, then their dependents, etc.
+        // which makes sense to allow root to override classmap or psr-0/4 entries with higher precedence rules
         let mut psr0 =
-            self.parse_autoloads_type(&sorted_package_map, "psr-0", root_package.clone());
+            self.parse_autoloads_type(&reverse_sorted_map, "psr-0", root_package.clone());
         let mut psr4 =
-            self.parse_autoloads_type(&sorted_package_map, "psr-4", root_package.clone());
+            self.parse_autoloads_type(&reverse_sorted_map, "psr-4", root_package.clone());
         let classmap =
-            self.parse_autoloads_type(&sorted_package_map, "classmap", root_package.clone());
+            self.parse_autoloads_type(&reverse_sorted_map, "classmap", root_package.clone());
 
         // sorted (i.e. dependents first) for files to ensure that dependencies are loaded/available once a file is included
         let files = self.parse_autoloads_type(&sorted_package_map, "files", root_package.clone());

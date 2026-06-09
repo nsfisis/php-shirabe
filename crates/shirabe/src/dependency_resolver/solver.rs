@@ -239,10 +239,8 @@ impl Solver {
         self.io
             .write_error3("Generating rules", true, crate::io::DEBUG);
         let mut rule_set_generator = RuleSetGenerator::new(self.policy.clone(), self.pool.clone());
-        // TODO(phase-b): get_rules_for takes Option<Rc<dyn PlatformRequirementFilterInterface>>;
-        // PHP passes the filter directly. Forwarding `None` here keeps the call typecheckable.
-        let _ = platform_requirement_filter.as_ref();
-        self.rules = rule_set_generator.get_rules_for(request, None)?;
+        self.rules =
+            rule_set_generator.get_rules_for(request, Some(platform_requirement_filter.clone()))?;
         drop(rule_set_generator);
         self.check_for_root_require_problems(request, platform_requirement_filter.as_ref())?;
         self.decisions = Decisions::new(self.pool.clone());
@@ -667,21 +665,11 @@ impl Solver {
             seen.insert(literal.abs(), true);
         }
 
-        // TODO(phase-b): Decisions does not expose an `iter()` matching PHP's foreach.
-        // Walk the decision queue directly through offsets to avoid borrowing issues
-        // (we still need to call back into `&self` while iterating).
-        let mut offset = 0_usize;
-        while offset < self.decisions.count() {
-            let decision_literal = self.decisions.at_offset(offset).0;
-
-            offset += 1;
-
+        for (decision_literal, why) in self.decisions.iter() {
             // skip literals that are not in this rule
             if !seen.contains_key(&decision_literal.abs()) {
                 continue;
             }
-
-            let why = self.decisions.at_offset(offset - 1).1.clone();
 
             problem.add_rule(why.clone());
             self.analyze_unsolvable_rule(&mut problem, why.clone(), &mut rule_seen);

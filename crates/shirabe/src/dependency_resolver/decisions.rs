@@ -11,7 +11,6 @@ pub struct Decisions {
     pub(crate) pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     pub(crate) decision_map: IndexMap<i64, i64>,
     pub(crate) decision_queue: Vec<(i64, std::rc::Rc<std::cell::RefCell<Rule>>)>,
-    iterator_cursor: Option<usize>,
 }
 
 impl std::fmt::Debug for Decisions {
@@ -32,7 +31,6 @@ impl Decisions {
             pool,
             decision_map: IndexMap::new(),
             decision_queue: Vec::new(),
-            iterator_cursor: None,
         }
     }
 
@@ -154,33 +152,6 @@ impl Decisions {
         self.decision_queue.len()
     }
 
-    pub fn rewind(&mut self) {
-        if self.decision_queue.is_empty() {
-            self.iterator_cursor = None;
-        } else {
-            self.iterator_cursor = Some(self.decision_queue.len() - 1);
-        }
-    }
-
-    pub fn current(&self) -> Option<&(i64, std::rc::Rc<std::cell::RefCell<Rule>>)> {
-        self.iterator_cursor
-            .and_then(|cursor| self.decision_queue.get(cursor))
-    }
-
-    pub fn key(&self) -> Option<usize> {
-        self.iterator_cursor
-    }
-
-    pub fn next(&mut self) {
-        self.iterator_cursor = self
-            .iterator_cursor
-            .and_then(|cursor| if cursor > 0 { Some(cursor - 1) } else { None });
-    }
-
-    pub fn valid(&self) -> bool {
-        self.iterator_cursor.is_some() && self.current().is_some()
-    }
-
     pub fn is_empty(&self) -> bool {
         self.decision_queue.is_empty()
     }
@@ -226,6 +197,11 @@ impl Decisions {
         str.push(']');
 
         str
+    }
+
+    // Reverse iteration: newest-first.
+    pub fn iter(&self) -> impl Iterator<Item = &(i64, std::rc::Rc<std::cell::RefCell<Rule>>)> {
+        self.decision_queue.iter().rev()
     }
 }
 

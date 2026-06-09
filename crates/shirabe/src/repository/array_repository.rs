@@ -144,6 +144,11 @@ impl ArrayRepository {
     pub(crate) fn initialize(&self) {
         *self.packages.borrow_mut() = Some(vec![]);
     }
+
+    /// Resets the packages cache so the next access re-runs `initialize`.
+    pub(crate) fn reset_packages(&self) {
+        *self.packages.borrow_mut() = None;
+    }
 }
 
 impl RepositoryInterface for ArrayRepository {

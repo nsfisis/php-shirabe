@@ -48,6 +48,10 @@ impl WritableArrayRepository {
         self.dev_mode = None;
     }
 
+    pub fn reset_packages(&self) {
+        self.inner.reset_packages();
+    }
+
     pub fn add_package(&mut self, package: crate::package::PackageInterfaceHandle) -> Result<()> {
         self.inner.add_package(package)
     }

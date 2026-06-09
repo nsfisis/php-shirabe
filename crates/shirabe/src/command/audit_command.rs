@@ -181,7 +181,7 @@ impl AuditCommand {
         }
 
         let _root_pkg = composer.get_package();
-        // TODO(phase-b): InstalledRepository::new expects Vec<Box<dyn RepositoryInterface>>, but
+        // TODO(phase-c): InstalledRepository::new expects Vec<Box<dyn RepositoryInterface>>, but
         // get_local_repository returns &dyn InstalledRepositoryInterface. Conversion requires
         // either cloning into a Box or restructuring InstalledRepository constructor.
         let _ = RepositoryUtils::filter_required_packages;

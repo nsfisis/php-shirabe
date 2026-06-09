@@ -59,8 +59,8 @@ impl BufferIO {
     }
 
     pub fn get_output(&self) -> String {
-        // TODO(phase-b): OutputInterface::get_stream returns PhpResource, while
-        // fseek/stream_get_contents take PhpMixed. Conversion is not yet defined.
+        // TODO(phase-c): OutputInterface::get_stream returns PhpResource, while
+        // fseek/stream_get_contents take PhpMixed. The PhpResource stream model is not yet defined.
         let stream: PhpMixed =
             todo!("PhpResource -> PhpMixed conversion for OutputInterface::get_stream");
         fseek(stream.clone(), 0);
@@ -93,7 +93,8 @@ impl BufferIO {
             &output,
         );
 
-        // TODO(phase-b): Preg::replace_callback returns Result<String>, unwrap for now
+        // TODO(phase-c): Preg::replace_callback returns Result<String>; PHP getOutput returns the
+        // string directly, so this is gated on the get_stream PhpResource model above.
         output.unwrap_or_default()
     }
 

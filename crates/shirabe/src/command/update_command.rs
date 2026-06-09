@@ -49,7 +49,8 @@ impl UpdateCommand {
             .set_name("update")
             .set_aliases(&["u".to_string(), "upgrade".to_string()])
             .set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file")
-            // TODO(phase-b): set_definition with InputArgument/InputOption (see PHP UpdateCommand)
+            // TODO(phase-c): populate with InputArgument/InputOption entries (see PHP UpdateCommand);
+            // blocked on the symfony InputDefinition entry modeling.
             .set_definition(&[])
             .set_help(
                 "The <info>update</info> command reads the composer.json file from the\n\
@@ -227,15 +228,10 @@ impl UpdateCommand {
                     "~{}",
                     matches.get(1).cloned().unwrap_or_default()
                 ))?;
-                if temporary_constraints.contains_key(&package.get_name()) {
-                    let existing = temporary_constraints
-                        .get(&package.get_name())
-                        .map(|c| c.clone())
-                        .unwrap();
+                if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),
-                        // TODO(phase-b): MultiConstraint::create signature
-                        todo!("MultiConstraint::create([existing, constraint], true)"),
+                        MultiConstraint::create(vec![existing.clone(), constraint], true, None)?,
                     );
                 } else {
                     temporary_constraints.insert(package.get_name(), constraint);
@@ -376,14 +372,15 @@ impl UpdateCommand {
                 .as_bool()
                 .unwrap_or(false);
 
-        let mut update_allow_transitive_dependencies: i64 = Request::UPDATE_ONLY_LISTED;
+        let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if input
             .borrow()
             .get_option("with-all-dependencies")
             .as_bool()
             .unwrap_or(false)
         {
-            update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
+            update_allow_transitive_dependencies =
+                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
         } else if input
             .borrow()
             .get_option("with-dependencies")
@@ -391,10 +388,8 @@ impl UpdateCommand {
             .unwrap_or(false)
         {
             update_allow_transitive_dependencies =
-                Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
+                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
         }
-        // Keep `UpdateAllowTransitiveDeps` import alive while still using i64 for the setter.
-        let _ = UpdateAllowTransitiveDeps::UpdateOnlyListed;
 
         install
             .set_dry_run(
@@ -456,13 +451,7 @@ impl UpdateCommand {
                     .as_bool()
                     .unwrap_or(false),
             )
-            // TODO(phase-b): VersionParser::parse_constraints returns Arc<dyn ...> but
-            // Installer::set_temporary_constraints expects IndexMap<String, Box<dyn ...>>;
-            // bridge the constraint storage types later.
-            .set_temporary_constraints({
-                let _ = &temporary_constraints;
-                IndexMap::new()
-            })
+            .set_temporary_constraints(temporary_constraints)
             .set_audit_config(
                 self.create_audit_config(&mut *composer.get_config().borrow_mut(), input.clone())?,
             )
@@ -548,7 +537,6 @@ impl UpdateCommand {
         );
 
         let filter: Option<String> = if packages.len() > 0 {
-            // TODO(phase-b): base_package::package_names_to_regexp signature
             Some(base_package::package_names_to_regexp(&packages, "%s"))
         } else {
             None
@@ -682,11 +670,21 @@ impl UpdateCommand {
 
     fn create_version_selector(&self, composer: &PartialComposerHandle) -> Result<VersionSelector> {
         let composer = crate::command::composer_full(composer);
+        let root_aliases: Vec<crate::repository::RootAliasInput> = composer
+            .get_package()
+            .get_aliases()
+            .into_iter()
+            .map(|alias| crate::repository::RootAliasInput {
+                package: alias.get("package").cloned().unwrap_or_default(),
+                version: alias.get("version").cloned().unwrap_or_default(),
+                alias: alias.get("alias").cloned().unwrap_or_default(),
+                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+            })
+            .collect();
         let mut repository_set = RepositorySet::new(
             &composer.get_package().get_minimum_stability(),
             composer.get_package().get_stability_flags().clone(),
-            // TODO(phase-b): collect root aliases from composer.get_package().get_aliases()
-            Vec::new(),
+            root_aliases,
             composer.get_package().get_references().clone(),
             IndexMap::new(),
             IndexMap::new(),

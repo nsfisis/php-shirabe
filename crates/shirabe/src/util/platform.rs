@@ -186,7 +186,6 @@ impl Platform {
                 return false;
             }
 
-            // TODO(phase-b): Silencer::call returns Result; PHP returns the value or false on error
             let file_contents = Silencer::call(|| Ok(file_get_contents("/proc/version")))
                 .ok()
                 .flatten()
@@ -294,7 +293,8 @@ impl Platform {
             Some(f) => f,
             None => {
                 if defined("STDOUT") {
-                    // TODO(phase-b): map STDOUT to the runtime stdout resource
+                    // TODO(phase-c): map the STDOUT constant to a runtime stdout resource; depends
+                    // on the unmodeled PHP stream/resource layer.
                     todo!("STDOUT constant")
                 } else {
                     let fd = fopen("php://stdout", "w");
@@ -330,7 +330,6 @@ impl Platform {
             return true;
         }
 
-        // TODO(phase-b): Silencer::call wraps the fstat call (`@fstat($fd)`)
         let stat = Silencer::call(|| Ok(fstat(fd)));
         let stat = match stat {
             Ok(s) => s,
@@ -427,25 +426,8 @@ impl Platform {
         "/dev/null".to_string()
     }
 
-    /// PHP: PHP_OS — returns the OS PHP was built on.
-    pub fn php_os() -> &'static str {
-        // TODO(phase-b): map to actual OS name (e.g. "Darwin", "Linux", "WINNT").
-        todo!()
-    }
-
     /// PHP: rename($from, $to) — wrap the std rename so callers can use Platform::rename.
     pub fn rename(from: &str, to: &str) -> bool {
         std::fs::rename(from, to).is_ok()
-    }
-
-    /// PHP: mkdir($pathname, $mode, $recursive)
-    pub fn mkdir(pathname: &str, _mode: u32, recursive: bool) -> bool {
-        // TODO(phase-b): honor mode bits on Unix
-        let result = if recursive {
-            std::fs::create_dir_all(pathname)
-        } else {
-            std::fs::create_dir(pathname)
-        };
-        result.is_ok()
     }
 }

@@ -2477,3 +2477,16 @@ pub fn date_format_to_strftime(format: &str) -> &'static str {
         other => panic!("Unsupported PHP date format: {other:?}"),
     }
 }
+
+// NOTE: &str matching in const expression does not compile for now.
+pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
+    b"linux" => "Linux",
+    b"macos" => "Darwin",
+    b"windows" => "WINNT",
+    b"freebsd" => "FreeBSD",
+    b"openbsd" => "OpenBSD",
+    b"netbsd" => "NetBSD",
+    b"dragonfly" => "DragonFly",
+    b"solaris" | b"illumos" => "SunOS",
+    _ => std::env::consts::OS,
+};

@@ -486,7 +486,7 @@ impl InstallationManager {
             };
 
             if run_scripts && self.event_dispatcher.is_some() {
-                // TODO(phase-b): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
+                // TODO(phase-c): dispatch_package_event takes Box<dyn RepositoryInterface>/Vec<Box<...>>
                 // but we hold &mut dyn here. Needs structural rework (likely shared Rc on repo and ops).
                 let _ = (
                     event_name,

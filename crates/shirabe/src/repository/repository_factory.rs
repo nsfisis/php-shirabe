@@ -321,10 +321,10 @@ impl RepositoryFactory {
         Ok(repo_map)
     }
 
-    pub fn generate_repository_name(
+    pub fn generate_repository_name<T>(
         index: &PhpMixed,
         repo: &IndexMap<String, PhpMixed>,
-        existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
+        existing_repos: &IndexMap<String, T>,
     ) -> String {
         let mut name = match index {
             PhpMixed::Int(_) => {

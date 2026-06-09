@@ -1067,8 +1067,6 @@ impl EventDispatcher {
         let package = composer.get_package();
         let scripts = package.get_scripts();
 
-        // TODO(phase-b): RootPackage::get_scripts() returns Vec<String> per event;
-        // mirror PHP's is_empty_value semantics on the Vec form.
         let event_scripts: Vec<String> = match scripts.get(event.get_name()) {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return Vec::new(),
@@ -1271,12 +1269,10 @@ impl EventDispatcher {
             package.clone(),
             packages,
         )?;
-        // TODO(phase-b): parse_autoloads also expects the filtered dev packages list
-        // (PhpMixed in this port).
         let map = generator.parse_autoloads(
             package_map,
             package.clone(),
-            shirabe_php_shim::PhpMixed::Null,
+            shirabe_php_shim::PhpMixed::Bool(false),
         );
 
         if self.loader.is_some() {

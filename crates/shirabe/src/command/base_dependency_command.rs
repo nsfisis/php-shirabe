@@ -106,17 +106,18 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             repos.push(local_repo);
 
-            let platform_overrides = composer
+            let platform_overrides: IndexMap<String, PhpMixed> = composer
                 .get_config()
                 .borrow()
                 .get("platform")
                 .as_array()
                 .cloned()
-                .unwrap_or_default();
-            // TODO(phase-b): platform_overrides type adjustment; using empty for now
-            let _ = platform_overrides;
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(k, v)| (k, *v))
+                .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
-                PlatformRepository::new(vec![], IndexMap::new())?,
+                PlatformRepository::new(vec![], platform_overrides)?,
             ));
         }
 

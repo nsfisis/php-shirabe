@@ -229,7 +229,9 @@ impl Rule {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     return false;
                 }
-                // TODO(phase-b): Request::get_locked_repository() signature
+                // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
+                // returns Result while is_caused_by_lock returns bool; resolving needs the bool
+                // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
                 let locked_repo: Option<()> = todo!("request.get_locked_repository()");
                 if let Some(_locked_repo) = locked_repo {
                     let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");
@@ -269,7 +271,9 @@ impl Rule {
                 if PlatformRepository::is_platform_package(package_name) {
                     return false;
                 }
-                // TODO(phase-b): Request::get_locked_repository() signature
+                // TODO(phase-c): request.get_locked_repository() exists, but its get_packages()
+                // returns Result while is_caused_by_lock returns bool; resolving needs the bool
+                // chain (also via Problem/SolverProblemsException, itself phase-c) to carry Result.
                 let locked_repo: Option<()> = todo!("request.get_locked_repository()");
                 if let Some(_locked_repo) = locked_repo {
                     let packages: Vec<BasePackageHandle> = todo!("locked_repo.get_packages()");

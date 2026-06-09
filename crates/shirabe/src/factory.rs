@@ -6,11 +6,11 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, Phar, PhpMixed, RuntimeException,
-    UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive, class_exists,
-    dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode,
-    in_array, is_array, is_dir, is_file, is_string, json_decode, pathinfo, realpath, str_replace,
-    strpos, strtr, substr, trim,
+    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, Phar, PhpMixed,
+    RuntimeException, UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive,
+    class_exists, dirname, extension_loaded, file_exists, file_get_contents, file_put_contents,
+    implode, in_array, is_array, is_dir, is_file, is_string, json_decode, mkdir, pathinfo,
+    realpath, str_replace, strpos, strtr, substr, trim,
 };
 
 use crate::autoload::AutoloadGenerator;
@@ -175,7 +175,7 @@ impl Factory {
         }
 
         let user_dir = Self::get_user_dir()?;
-        if Platform::php_os() == "Darwin" {
+        if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
             if is_dir(&format!("{}/cache", home))
                 && !is_dir(&format!("{}/Library/Caches/composer", user_dir))
@@ -309,7 +309,7 @@ impl Factory {
                     if !is_dir(dir) {
                         let dir_owned = dir.clone();
                         let _ = Silencer::call(|| {
-                            Ok::<bool, anyhow::Error>(Platform::mkdir(&dir_owned, 0o777, true))
+                            Ok::<bool, anyhow::Error>(mkdir(&dir_owned, 0o777, true))
                         });
                     }
                     let path = format!("{}/.htaccess", dir);

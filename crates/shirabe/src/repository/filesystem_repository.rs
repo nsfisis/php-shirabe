@@ -186,8 +186,7 @@ impl FilesystemRepository {
     }
 
     pub fn reload(&mut self) -> Result<()> {
-        // TODO(phase-b): clear inner packages cache (PHP: $this->packages = null)
-        self.inner.reload();
+        self.inner.reset_packages();
         self.initialize()
     }
 

@@ -511,9 +511,8 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         } else {
             crate::factory::DisablePlugins::None
         };
-        // TODO(phase-b): Option<IndexMap<String, PhpMixed>> -> Option<LocalConfigInput> conversion
-        let _ = config;
-        Factory::create(io, None, disable_plugins_kind, disable_scripts).map(|c| c.upcast())
+        let config = config.map(crate::factory::LocalConfigInput::Data);
+        Factory::create(io, config, disable_plugins_kind, disable_scripts).map(|c| c.upcast())
     }
 
     fn get_preferred_install_options(

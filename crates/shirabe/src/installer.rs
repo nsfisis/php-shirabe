@@ -58,6 +58,7 @@ use crate::dependency_resolver::Request;
 use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
 use crate::dependency_resolver::Solver;
 use crate::dependency_resolver::SolverProblemsException;
+use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::OperationInterface;
 use crate::dependency_resolver::operation::UninstallOperation;
@@ -143,7 +144,7 @@ pub struct Installer {
     allowed_types: Option<Vec<String>>,
     pub(crate) update_mirrors: bool,
     pub(crate) update_allow_list: Option<Vec<String>>,
-    pub(crate) update_allow_transitive_dependencies: i64,
+    pub(crate) update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     pub(crate) suggested_packages_reporter:
         std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     pub(crate) platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
@@ -217,7 +218,7 @@ impl Installer {
             allowed_types: None,
             update_mirrors: false,
             update_allow_list: None,
-            update_allow_transitive_dependencies: Request::UPDATE_ONLY_LISTED,
+            update_allow_transitive_dependencies: UpdateAllowTransitiveDeps::UpdateOnlyListed,
             suggested_packages_reporter,
             platform_requirement_filter,
             additional_fixed_repository: None,
@@ -653,8 +654,10 @@ impl Installer {
 
         // pass the allow list into the request, so the pool builder can apply it
         if let Some(ref allow_list) = self.update_allow_list {
-            // TODO(phase-b): convert i64 self.update_allow_transitive_dependencies into the enum
-            let _ = allow_list;
+            request.set_update_allow_list(
+                allow_list.clone(),
+                self.update_allow_transitive_dependencies,
+            );
         }
 
         let pool = std::rc::Rc::new(std::cell::RefCell::new(repository_set.create_pool(
@@ -1324,7 +1327,7 @@ impl Installer {
                 .borrow_mut()
                 .get_minimum_stability()
                 .unwrap_or_else(|_| String::new());
-            // TODO(phase-b): locker.get_stability_flags returns IndexMap<String, String>; convert to i64
+            // locker stores stability flags as stringified ints; recover the int form here.
             stability_flags = self
                 .locker
                 .borrow_mut()
@@ -1378,9 +1381,15 @@ impl Installer {
                 [VersionParser::parse_stability(&self.package.get_version()).as_str()],
         );
 
-        // TODO(phase-b): convert root_aliases (Vec<IndexMap<String, String>>) into Vec<RootAliasInput>
-        let root_aliases_input: Vec<crate::repository::RootAliasInput> = vec![];
-        let _ = root_aliases;
+        let root_aliases_input: Vec<crate::repository::RootAliasInput> = root_aliases
+            .into_iter()
+            .map(|alias| crate::repository::RootAliasInput {
+                package: alias.get("package").cloned().unwrap_or_default(),
+                version: alias.get("version").cloned().unwrap_or_default(),
+                alias: alias.get("alias").cloned().unwrap_or_default(),
+                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+            })
+            .collect();
         let temporary_constraints: IndexMap<String, AnyConstraint> = IndexMap::new();
         let mut repository_set = RepositorySet::new(
             &minimum_stability,
@@ -1522,20 +1531,11 @@ impl Installer {
     ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
         if self.update_mirrors {
-            let excluded_packages: IndexMap<String, i64> = if !include_dev_requires {
-                // TODO(phase-b): locker.get_dev_package_names returns Result<Vec<String>>
-                let names = self
-                    .locker
-                    .borrow_mut()
-                    .get_dev_package_names()
-                    .unwrap_or_default();
-                names
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, name)| (name, i as i64))
-                    .collect()
+            let excluded_packages: indexmap::IndexSet<String> = if !include_dev_requires {
+                let names = self.locker.borrow_mut().get_dev_package_names()?;
+                names.into_iter().collect()
             } else {
-                IndexMap::new()
+                indexmap::IndexSet::new()
             };
 
             for locked_package in locked_repository
@@ -1546,7 +1546,7 @@ impl Installer {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias().is_none()
-                    && !excluded_packages.contains_key(&locked_package.get_name())
+                    && !excluded_packages.contains(&locked_package.get_name())
                 {
                     request.require_name(
                         &locked_package.get_name(),
@@ -1893,21 +1893,8 @@ impl Installer {
     /// dependencies which are not root requirement or all transitive dependencies including root requirements
     pub fn set_update_allow_transitive_dependencies(
         &mut self,
-        update_allow_transitive_dependencies: i64,
+        update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     ) -> anyhow::Result<&mut Self> {
-        let valid = [
-            Request::UPDATE_ONLY_LISTED,
-            Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE,
-            Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS,
-        ];
-        if !valid.contains(&update_allow_transitive_dependencies) {
-            return Err(RuntimeException {
-                message: "Invalid value for updateAllowTransitiveDependencies supplied".to_string(),
-                code: 0,
-            }
-            .into());
-        }
-
         self.update_allow_transitive_dependencies = update_allow_transitive_dependencies;
 
         Ok(self)

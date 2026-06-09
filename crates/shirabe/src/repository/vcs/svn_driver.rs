@@ -33,8 +33,6 @@ pub struct SvnDriver {
     /// @var ?string
     pub(crate) root_identifier: Option<String>,
 
-    /// @var string|false
-    // TODO(phase-b): PHP uses 'false' as a sentinel; model as Option<String>
     pub(crate) trunk_path: Option<String>,
     /// @var string
     pub(crate) branches_path: String,
@@ -79,8 +77,10 @@ impl SvnDriver {
 
         SvnUtil::clean_env();
 
-        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("trunk-path").cloned() {
-            self.trunk_path = Some(v);
+        match self.inner.repo_config.get("trunk-path") {
+            Some(PhpMixed::Bool(false)) => self.trunk_path = None,
+            Some(PhpMixed::String(v)) => self.trunk_path = Some(v.clone()),
+            _ => {}
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("branches-path").cloned() {
             self.branches_path = v;
@@ -100,10 +100,11 @@ impl SvnDriver {
             self.package_path = format!("/{}", trim(&v, Some("/")));
         }
 
-        if let Some(trunk_path) = &self.trunk_path {
-            if let Some(pos) = strrpos(&self.inner.url, &format!("/{}", trunk_path)) {
-                self.base_url = substr(&self.inner.url, 0, Some(pos as i64));
-            }
+        if let Some(pos) = strrpos(
+            &self.inner.url,
+            &format!("/{}", self.trunk_path.as_deref().unwrap_or("")),
+        ) {
+            self.base_url = substr(&self.inner.url, 0, Some(pos as i64));
         }
 
         self.inner.cache = Some(Cache::new(

@@ -20,6 +20,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Request;
+use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
 use crate::installer::InstallerEvents;
@@ -848,7 +849,7 @@ impl RequireCommand {
                 .as_bool()
                 .unwrap_or(false);
 
-        let mut update_allow_transitive_dependencies = Request::UPDATE_ONLY_LISTED;
+        let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         let mut flags = String::new();
         if input
             .borrow()
@@ -861,7 +862,8 @@ impl RequireCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            update_allow_transitive_dependencies = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
+            update_allow_transitive_dependencies =
+                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
             flags += " --with-all-dependencies";
         } else if input
             .borrow()
@@ -875,7 +877,7 @@ impl RequireCommand {
                 .unwrap_or(false)
         {
             update_allow_transitive_dependencies =
-                Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS_NO_ROOT_REQUIRE;
+                UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
             flags += " --with-dependencies";
         }
 
@@ -1135,7 +1137,8 @@ impl RequireCommand {
                     IndexMap::new(),
                 );
                 let stability_flags_clone = stability_flags.clone();
-                // TODO(phase-b): get_locker_mut needs update_hash with stability flags rewriter.
+                // TODO(phase-c): Locker::update_hash needs the stability-flags rewriter callback;
+                // depends on modeling the closure passed to updateHash.
                 let _ = &stability_flags_clone;
                 todo!("update locker hash with stability flags rewriter");
             }

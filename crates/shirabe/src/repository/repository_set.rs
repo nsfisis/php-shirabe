@@ -618,7 +618,6 @@ impl RepositorySet {
         }
 
         if !allowed_packages.is_empty() {
-            // TODO(phase-b): Request::restrict_packages signature
             request.restrict_packages(allowed_packages);
         }
 

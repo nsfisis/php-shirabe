@@ -234,7 +234,6 @@ pub trait VcsDriver: VcsDriverInterface {
 
             if self.should_cache(identifier) {
                 if let Some(ref composer_map) = composer {
-                    // TODO(phase-b): use a dedicated encode-with-options helper; reuse encode for now.
                     let composer_mixed = PhpMixed::Array(
                         composer_map
                             .iter()
