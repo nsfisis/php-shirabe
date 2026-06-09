@@ -472,8 +472,7 @@ impl CreateProjectCommand {
                     }
                 }
                 Err(e) => {
-                    // TODO(phase-b): catch only PluginBlockedException
-                    if let Some(_pbe) = e.downcast_ref::<PluginBlockedException>() {
+                    if e.downcast_ref::<PluginBlockedException>().is_some() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
                         io.write_error(&format!(
                             "<error>You can then cd into {}, configure allow-plugins, and finally run a composer install to complete the process.</error>",

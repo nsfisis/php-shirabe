@@ -606,7 +606,6 @@ impl Locker {
         let is_locked = match self.is_locked_result() {
             Ok(b) => b,
             Err(e) => {
-                // TODO(phase-b): catch only ParsingException
                 if e.downcast_ref::<ParsingException>().is_some() {
                     false
                 } else {

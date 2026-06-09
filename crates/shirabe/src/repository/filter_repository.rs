@@ -148,26 +148,20 @@ impl FilterRepository {
     }
 }
 
-impl shirabe_php_shim::Countable for FilterRepository {
-    fn count(&self) -> i64 {
-        if self.repo.count() > 0 {
-            // TODO(phase-b): propagate the error
-            // self.get_packages()?.len() as i64
-            self.repo
-                .get_packages()
-                .map(|pkgs| {
-                    pkgs.iter()
-                        .filter(|p| self.is_allowed(&p.get_name()))
-                        .count() as i64
-                })
-                .unwrap_or(0)
+impl RepositoryInterface for FilterRepository {
+    fn count(&self) -> anyhow::Result<usize> {
+        if self.repo.count()? > 0 {
+            Ok(self
+                .repo
+                .get_packages()?
+                .iter()
+                .filter(|p| self.is_allowed(&p.get_name()))
+                .count())
         } else {
-            0
+            Ok(0)
         }
     }
-}
 
-impl RepositoryInterface for FilterRepository {
     fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.repo.has_package(package)
     }

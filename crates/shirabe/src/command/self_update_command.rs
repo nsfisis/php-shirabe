@@ -26,6 +26,7 @@ use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::downloader::FilesystemException;
+use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -435,15 +436,17 @@ impl SelfUpdateCommand {
         ) {
             Ok(r) => r.get_body().map(|s| s.to_string()),
             Err(e) => {
-                // TODO(phase-b): TransportException::get_status_code mapping from anyhow::Error
-                if false && e.to_string().contains("404") {
+                if e.downcast_ref::<TransportException>()
+                    .and_then(|te| te.get_status_code())
+                    == Some(404)
+                {
                     return Err(InvalidArgumentException {
                         message: format!("Version \"{}\" could not be found.", update_version),
                         code: 0,
                     }
                     .into());
                 }
-                return Err(e.into());
+                return Err(e);
             }
         };
         io.write_error3("   ", false, io_interface::NORMAL);

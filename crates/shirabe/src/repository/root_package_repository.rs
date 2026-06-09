@@ -25,13 +25,11 @@ impl RootPackageRepository {
     }
 }
 
-impl shirabe_php_shim::Countable for RootPackageRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for RootPackageRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         self.inner.count()
     }
-}
 
-impl RepositoryInterface for RootPackageRepository {
     fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }

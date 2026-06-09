@@ -3,7 +3,7 @@
 use std::fmt;
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{Countable, STR_PAD_LEFT, abs, str_pad};
+use shirabe_php_shim::{STR_PAD_LEFT, abs, str_pad};
 use shirabe_semver::compiling_matcher::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -378,13 +378,6 @@ impl Pool {
     /// @return BasePackage[]
     pub fn get_unacceptable_fixed_or_locked_packages(&self) -> &Vec<BasePackageHandle> {
         &self.unacceptable_fixed_or_locked_packages
-    }
-}
-
-impl Countable for Pool {
-    /// Returns how many packages have been loaded into the pool
-    fn count(&self) -> i64 {
-        self.packages.len() as i64
     }
 }
 

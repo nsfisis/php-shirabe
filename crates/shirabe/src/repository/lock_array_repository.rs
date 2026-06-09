@@ -9,7 +9,6 @@ use crate::repository::{
     RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -31,13 +30,11 @@ impl LockArrayRepository {
     }
 }
 
-impl Countable for LockArrayRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for LockArrayRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         self.inner.count()
     }
-}
 
-impl RepositoryInterface for LockArrayRepository {
     fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }

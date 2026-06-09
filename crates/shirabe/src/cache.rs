@@ -4,12 +4,12 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use chrono::Utc;
-use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::finder::Finder;
 use shirabe_php_shim::{
-    abs, bin2hex, date_format_to_strftime, dirname, file_exists, file_get_contents,
-    file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir, random_bytes, random_int,
-    rename, time, unlink,
+    ErrorException, abs, bin2hex, clearstatcache, date_format_to_strftime, dirname,
+    disk_free_space, file_exists, file_get_contents, file_put_contents, filemtime, function_exists,
+    hash_file, is_dir, is_writable, mkdir, random_bytes, random_int, rename, time, unlink,
 };
 
 use crate::io::IOInterface;
@@ -129,18 +129,62 @@ impl Cache {
                 .write_error(&format!("Writing {}{} into cache", self.root, file));
 
             let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)),);
-            // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch (ErrorException)
-            let attempt: Result<bool> = {
-                let put = file_put_contents(&temp_file_name, contents.as_bytes());
-                Ok(put.is_some()
-                    && put != Some(-1)
-                    && rename(&temp_file_name, &format!("{}{}", self.root, file)))
-            };
+            let dest = format!("{}{}", self.root, file);
+            let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                file_put_contents(&temp_file_name, contents.as_bytes()).is_some()
+                    && rename(&temp_file_name, &dest)
+            }));
             return match attempt {
                 Ok(b) => Ok(b),
-                Err(e) => {
-                    // TODO(phase-b): downcast e to ErrorException; handle partial write cleanup
-                    Err(e)
+                Err(payload) => {
+                    let e: ErrorException = match payload.downcast::<ErrorException>() {
+                        Ok(boxed) => *boxed,
+                        Err(payload) => std::panic::resume_unwind(payload),
+                    };
+
+                    // If the write failed despite isEnabled checks passing earlier, rerun the isEnabled checks to
+                    // see if they are still current and recreate the cache dir if needed. Refs https://github.com/composer/composer/issues/11076
+                    if was_enabled {
+                        clearstatcache();
+                        self.enabled = None;
+
+                        return self.write(&file, contents);
+                    }
+
+                    self.io.write_error(&format!(
+                        "<warning>Failed to write into cache: {}</warning>",
+                        e.message,
+                    ));
+                    let mut m = indexmap::IndexMap::new();
+                    if Preg::match3(
+                        r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}",
+                        &e.message,
+                        Some(&mut m),
+                    )? {
+                        // Remove partial file.
+                        unlink(&temp_file_name);
+
+                        let free_space = if function_exists("disk_free_space") {
+                            disk_free_space(&dirname(&temp_file_name))
+                                .map(|space| space.to_string())
+                                .unwrap_or_default()
+                        } else {
+                            "unknown".to_string()
+                        };
+                        let message = format!(
+                            "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
+                            temp_file_name,
+                            m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            free_space,
+                        );
+
+                        self.io.write_error(&message);
+
+                        return Ok(false);
+                    }
+
+                    Err(e.into())
                 }
             };
         }
@@ -185,21 +229,22 @@ impl Cache {
                 .unwrap_or_default();
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                // TODO(phase-b): use anyhow::Result<Result<T, E>> to model PHP try/catch
-                let touch_result: Result<()> = {
-                    shirabe_php_shim::touch(
+                let touch_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    shirabe_php_shim::touch3(
                         &full_path,
-                        // TODO(phase-b): PHP touch signature accepts (filename, mtime, atime)
+                        filemtime(&full_path).unwrap_or(0),
+                        time(),
                     );
-                    Ok(())
-                };
-                if touch_result.is_err() {
-                    // fallback in case the above failed due to incorrect ownership
-                    // see https://github.com/composer/composer/issues/4070
-                    Silencer::call(|| {
-                        shirabe_php_shim::touch(&full_path);
-                        Ok(())
-                    })?;
+                }));
+                if let Err(payload) = touch_result {
+                    match payload.downcast::<ErrorException>() {
+                        Ok(_) => {
+                            // fallback in case the above failed due to incorrect ownership
+                            // see https://github.com/composer/composer/issues/4070
+                            Silencer::call(|| Ok(shirabe_php_shim::touch(&full_path)))?;
+                        }
+                        Err(payload) => std::panic::resume_unwind(payload),
+                    }
                 }
 
                 self.io

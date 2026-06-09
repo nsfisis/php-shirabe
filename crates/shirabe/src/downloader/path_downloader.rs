@@ -371,7 +371,6 @@ impl DownloaderInterface for PathDownloader {
 
         let mut is_fallback = false;
         if Self::STRATEGY_SYMLINK == current_strategy {
-            // TODO(phase-b): PHP catches IOException; shim symfony filesystem returns anyhow::Result.
             let symlink_result: Result<anyhow::Result<()>> =
                 (|| {
                     if Platform::is_windows() {

@@ -62,13 +62,16 @@ impl CompositeRepository {
     }
 }
 
-impl shirabe_php_shim::Countable for CompositeRepository {
-    fn count(&self) -> i64 {
-        self.repositories.iter().map(|r| r.count()).sum()
-    }
-}
-
 impl RepositoryInterface for CompositeRepository {
+    fn count(&self) -> anyhow::Result<usize> {
+        let mut total = 0;
+        for repository in &self.repositories {
+            total += repository.count()?;
+        }
+
+        Ok(total)
+    }
+
     fn get_repo_name(&self) -> String {
         let names: Vec<String> = self
             .repositories

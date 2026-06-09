@@ -5,7 +5,6 @@ use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceWeakHandle;
 use anyhow::Result;
-use shirabe_php_shim::Countable;
 
 #[derive(Debug)]
 pub struct WritableArrayRepository {
@@ -84,7 +83,7 @@ impl WritableArrayRepository {
         self.inner.get_repo_name()
     }
 
-    pub fn count(&self) -> i64 {
-        Countable::count(&self.inner)
+    pub fn count(&self) -> anyhow::Result<usize> {
+        self.inner.count()
     }
 }

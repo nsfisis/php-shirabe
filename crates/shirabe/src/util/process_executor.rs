@@ -305,7 +305,6 @@ impl ProcessExecutor {
         let final_result: Result<()> = match result {
             Ok(()) => Ok(()),
             Err(e) => {
-                // TODO(phase-b): catch ProcessSignaledException
                 if let Some(pse) = e.downcast_ref::<ProcessSignaledException>() {
                     if signal_handler.is_triggered() {
                         // exiting as we were signaled and the child process exited too due to the signal

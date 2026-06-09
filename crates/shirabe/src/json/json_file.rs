@@ -404,9 +404,9 @@ impl JsonFile {
         validator.check(&data_converted, &schema_data)?;
 
         if !validator.is_valid() {
-            // TODO(phase-b): Validator::get_errors currently returns Vec<String>; original PHP
-            // exposes [{property, message}, ...]. Until shim is enriched, surface raw error
-            // strings without prop/message splitting.
+            // TODO(phase-c): Validator::get_errors currently returns Vec<String>; original PHP
+            // exposes [{property, message}, ...]. Until the validator shim is enriched, surface raw
+            // error strings without prop/message splitting.
             let errors: Vec<String> = validator.get_errors();
             return Err(JsonValidationException::new(
                 format!("\"{}\" does not match the expected JSON schema", source),
@@ -431,8 +431,9 @@ impl JsonFile {
         let json = match json {
             Some(j) => j,
             None => {
-                // PHP: self::throwEncodeError(json_last_error());
-                // TODO(phase-b): throw an error; downstream callers expect a String
+                // PHP: self::throwEncodeError(json_last_error()), which throws \RuntimeException.
+                // TODO(phase-c): faithfully propagating this requires encode/encode_with_options to
+                // return Result<String>, a signature change rippling across ~53 call sites.
                 Self::throw_encode_error(json_last_error()).unwrap_or_default();
                 String::new()
             }

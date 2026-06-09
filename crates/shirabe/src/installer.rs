@@ -353,7 +353,7 @@ impl Installer {
                 .into();
             let mut installed_repo = InstalledRepository::new(vec![
                 locked_repository_handle,
-                self.create_platform_repo(false).into(),
+                self.create_platform_repo(false)?.into(),
                 crate::repository::RepositoryInterfaceHandle::new(RootPackageRepository::new(
                     RootPackageInterfaceHandle::dup(&self.package),
                 )),
@@ -575,7 +575,7 @@ impl Installer {
         local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
     ) -> anyhow::Result<i64> {
-        let platform_repo = self.create_platform_repo(true);
+        let platform_repo = self.create_platform_repo(true)?;
         let aliases = self.get_root_aliases(true);
 
         let mut locked_repository: Option<crate::repository::LockArrayRepositoryHandle> = None;
@@ -685,8 +685,9 @@ impl Installer {
                 solver = None;
             }
             Err(e) => {
-                // TODO(phase-b): SolverProblemsException contains dyn Rule which isn't Send+Sync
-                // so anyhow::Error::downcast_ref can't extract it. Skipping detection.
+                // TODO(phase-c): SolverProblemsException contains dyn Rule which isn't Send+Sync
+                // so anyhow::Error::downcast_ref can't extract it. Skipping detection until the
+                // solver error path moves off anyhow (see solver.rs).
                 let _ = (&repository_set, &request, &pool);
                 return Err(e);
             }
@@ -973,7 +974,7 @@ impl Installer {
                 solver = None;
             }
             Err(e) => {
-                // TODO(phase-b): SolverProblemsException can't be downcast (dyn Rule not Send+Sync)
+                // TODO(phase-c): SolverProblemsException can't be downcast (dyn Rule not Send+Sync); see solver.rs
                 let _ = (&repository_set, &request, &pool);
                 return Err(e);
             }
@@ -1020,7 +1021,7 @@ impl Installer {
                 "<info>Verifying lock file contents can be installed on current platform.</info>",
             );
 
-            let platform_repo = self.create_platform_repo(false);
+            let platform_repo = self.create_platform_repo(false)?;
             // creating repository set
             let policy = self.create_policy(false, None)?;
             // use aliases from lock file only, so empty root aliases here
@@ -1127,7 +1128,7 @@ impl Installer {
                     }
                 }
                 Err(e) => {
-                    // TODO(phase-b): SolverProblemsException can't be downcast (dyn Rule not Send+Sync)
+                    // TODO(phase-c): SolverProblemsException can't be downcast (dyn Rule not Send+Sync); see solver.rs
                     let _ = (&repository_set, &request, &pool);
                     return Err(e);
                 }
@@ -1258,7 +1259,10 @@ impl Installer {
         Ok(0)
     }
 
-    pub(crate) fn create_platform_repo(&mut self, for_update: bool) -> PlatformRepositoryHandle {
+    pub(crate) fn create_platform_repo(
+        &mut self,
+        for_update: bool,
+    ) -> anyhow::Result<PlatformRepositoryHandle> {
         let platform_overrides: IndexMap<String, PhpMixed> = if for_update {
             self.config
                 .borrow_mut()
@@ -1279,11 +1283,10 @@ impl Installer {
                 .collect()
         };
 
-        // TODO(phase-b): PlatformRepository::new returns Result, propagate
-        PlatformRepositoryHandle::new(
-            PlatformRepository::new(vec![], platform_overrides)
-                .expect("PlatformRepository::new should not fail"),
-        )
+        Ok(PlatformRepositoryHandle::new(PlatformRepository::new(
+            vec![],
+            platform_overrides,
+        )?))
     }
 
     fn create_repository_set(

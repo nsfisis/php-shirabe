@@ -7,7 +7,7 @@ use std::rc::Weak;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{Countable, LogicException, implode, preg_quote, strtolower};
+use shirabe_php_shim::{implode, preg_quote, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -39,19 +39,10 @@ impl ArrayRepository {
         if self.packages.borrow().is_none() {
             self.initialize();
         }
-
-        if self.packages.borrow().is_none() {
-            // TODO(phase-b): propagate the error.
-            // PHP: throw new \LogicException('initialize failed to initialize the packages array')
-            panic!(
-                "{}",
-                LogicException {
-                    message: "initialize failed to initialize the packages array".to_string(),
-                    code: 0,
-                }
-                .message
-            );
-        }
+        assert!(
+            self.packages.borrow().is_some(),
+            "initialize failed to initialize the packages array"
+        );
 
         self.packages
             .borrow()
@@ -155,25 +146,22 @@ impl ArrayRepository {
     }
 }
 
-impl Countable for ArrayRepository {
+impl RepositoryInterface for ArrayRepository {
     /// Returns the number of packages in this repository
-    ///
-    /// @return 0|positive-int Number of packages
-    fn count(&self) -> i64 {
+    fn count(&self) -> anyhow::Result<usize> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }
 
-        self.packages.borrow().as_ref().unwrap().len() as i64
+        Ok(self.packages.borrow().as_ref().unwrap().len())
     }
-}
 
-impl RepositoryInterface for ArrayRepository {
     fn get_repo_name(&self) -> String {
+        let count = self.count().expect("ArrayRepository::count is infallible");
         format!(
             "array repo (defining {} package{})",
-            self.count(),
-            if self.count() > 1 { "s" } else { "" },
+            count,
+            if count > 1 { "s" } else { "" },
         )
     }
 

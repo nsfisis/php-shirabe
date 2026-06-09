@@ -315,7 +315,6 @@ impl VcsRepository {
                             }
                             Ok(None) => {}
                             Err(e) => {
-                                // TODO(phase-b): unify exception handling below
                                 if let Some(te) = e.downcast_ref::<TransportException>() {
                                     if self.should_rethrow_transport_exception(te) {
                                         return Err(e);

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::metadata_minifier::MetadataMinifier;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    Countable, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
+    InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, RuntimeException,
     UnexpectedValueException, extension_loaded, hash, http_build_query, in_array, json_decode,
     parse_url_all, realpath, strtolower, strtr, urlencode, var_export,
 };
@@ -1212,7 +1212,7 @@ impl ComposerRepository {
             }
         }
 
-        if Countable::count(&self.inner) > 0 {
+        if self.inner.count()? > 0 {
             for (k, v) in self.inner.get_providers(package_name.to_string())? {
                 let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(v.name));
@@ -3401,13 +3401,11 @@ fn clone_root_data(rd: &RootData) -> RootData {
     }
 }
 
-impl shirabe_php_shim::Countable for ComposerRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for ComposerRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         self.inner.count()
     }
-}
 
-impl RepositoryInterface for ComposerRepository {
     fn has_package(&self, package: PackageInterfaceHandle) -> bool {
         self.inner.has_package(package)
     }

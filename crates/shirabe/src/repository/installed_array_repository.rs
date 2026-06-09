@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/InstalledArrayRepository.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackageHandle;
@@ -41,7 +40,10 @@ impl InstalledRepositoryInterface for InstalledArrayRepository {
     }
 
     fn is_fresh(&self) -> bool {
-        self.inner.count() == 0
+        self.inner
+            .count()
+            .expect("WritableArrayRepository::count is infallible")
+            == 0
     }
 }
 
@@ -87,13 +89,11 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
     }
 }
 
-impl Countable for InstalledArrayRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for InstalledArrayRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         todo!()
     }
-}
 
-impl RepositoryInterface for InstalledArrayRepository {
     fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
         todo!()
     }

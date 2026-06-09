@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
-use shirabe_php_shim::{Countable, OutOfBoundsException, rtrim, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, rtrim, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -135,11 +135,5 @@ impl ClassMap {
     /// Get the raw psr violations
     pub fn get_raw_psr_violations(&self) -> &IndexMap<String, Vec<PsrViolationEntry>> {
         &self.psr_violations
-    }
-}
-
-impl Countable for ClassMap {
-    fn count(&self) -> i64 {
-        self.map.len() as i64
     }
 }

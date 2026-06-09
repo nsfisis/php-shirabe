@@ -381,13 +381,11 @@ impl InstalledRepository {
     }
 }
 
-impl shirabe_php_shim::Countable for InstalledRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for InstalledRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         self.inner.count()
     }
-}
 
-impl RepositoryInterface for InstalledRepository {
     fn get_repo_name(&self) -> String {
         let names: Vec<String> = self
             .inner

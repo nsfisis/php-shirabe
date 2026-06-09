@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::json::JsonFile;
@@ -97,13 +96,11 @@ impl WritableRepositoryInterface for InstalledFilesystemRepository {
     }
 }
 
-impl Countable for InstalledFilesystemRepository {
-    fn count(&self) -> i64 {
+impl RepositoryInterface for InstalledFilesystemRepository {
+    fn count(&self) -> anyhow::Result<usize> {
         todo!()
     }
-}
 
-impl RepositoryInterface for InstalledFilesystemRepository {
     fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
         todo!()
     }

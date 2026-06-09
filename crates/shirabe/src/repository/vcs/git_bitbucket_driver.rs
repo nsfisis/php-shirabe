@@ -707,7 +707,6 @@ impl GitBitbucketDriver {
         match self.inner.get_contents(url) {
             Ok(r) => Ok(r),
             Err(e) => {
-                // TODO(phase-b): only handle TransportException
                 let mut bitbucket_util = Bitbucket::new(
                     self.inner.io.clone(),
                     self.inner.config.clone(),
@@ -772,7 +771,9 @@ impl GitBitbucketDriver {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
             Ok(()) => Ok(true),
             Err(e) => {
-                // TODO(phase-b): only catch RuntimeException
+                // TODO(phase-c): PHP catches \RuntimeException (and all its subclasses), letting
+                // other exceptions propagate without this cleanup. Modeling that precisely needs the
+                // PHP exception hierarchy, which is intentionally not reproduced (see CLAUDE.md).
                 self.fallback_driver = None;
 
                 self.inner.io.write_error(&format!(

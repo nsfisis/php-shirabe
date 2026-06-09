@@ -104,7 +104,6 @@ impl Finder {
         std::iter::empty()
     }
 
-    /// PHP: Finder implements Countable.
     pub fn len(&self) -> usize {
         todo!()
     }

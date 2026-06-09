@@ -274,10 +274,10 @@ impl Solver {
         );
 
         if self.problems.len() > 0 {
-            // TODO(phase-b): SolverProblemsException stores `Rc<RefCell<Rule>>` which is not
+            // TODO(phase-c): SolverProblemsException stores `Rc<RefCell<Rule>>` which is not
             // `Send + Sync`, so it cannot satisfy `anyhow::Error`'s bounds. Returning a
-            // placeholder error preserves control flow until the `Send + Sync` requirement
-            // is removed (single-threaded `Rc` model) or the exception type is reworked.
+            // placeholder error preserves control flow until the solver error path is reworked to
+            // a dedicated (non-anyhow) error type or the exception drops its dyn Rule payload.
             let _ = SolverProblemsException::new(
                 std::mem::take(&mut self.problems),
                 std::mem::take(&mut self.learned_pool),

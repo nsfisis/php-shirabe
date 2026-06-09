@@ -4,7 +4,6 @@ use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::AdvisoryProviderInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 pub enum FindPackageConstraint {
@@ -52,7 +51,9 @@ pub const SEARCH_FULLTEXT: i64 = 0;
 pub const SEARCH_NAME: i64 = 1;
 pub const SEARCH_VENDOR: i64 = 2;
 
-pub trait RepositoryInterface: Countable + std::fmt::Debug {
+pub trait RepositoryInterface: std::fmt::Debug {
+    fn count(&self) -> anyhow::Result<usize>;
+
     fn has_package(&self, package: PackageInterfaceHandle) -> bool;
 
     fn find_package(

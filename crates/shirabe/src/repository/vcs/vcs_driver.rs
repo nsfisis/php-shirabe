@@ -78,11 +78,13 @@ impl VcsDriverBase {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
         };
-        // TODO(phase-b): map anyhow::Error from HttpDownloader::get into TransportException.
         self.http_downloader
             .borrow_mut()
             .get(url, options)
-            .map_err(|e| TransportException::new(e.to_string(), 0))
+            .map_err(|e| match e.downcast::<TransportException>() {
+                Ok(te) => te,
+                Err(other) => TransportException::new(other.to_string(), 0),
+            })
     }
 
     // Helper for concrete drivers: produces the same value as the trait default
@@ -319,11 +321,13 @@ pub trait VcsDriver: VcsDriverInterface {
             PhpMixed::Array(a) => a.into_iter().map(|(k, v)| (k, *v)).collect(),
             _ => IndexMap::new(),
         };
-        // TODO(phase-b): map anyhow::Error from HttpDownloader::get into TransportException.
         self.http_downloader()
             .borrow_mut()
             .get(url, options)
-            .map_err(|e| TransportException::new(e.to_string(), 0))
+            .map_err(|e| match e.downcast::<TransportException>() {
+                Ok(te) => te,
+                Err(other) => TransportException::new(other.to_string(), 0),
+            })
     }
 
     fn cleanup(&self) {}

@@ -890,10 +890,6 @@ pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
 }
 
-pub trait Countable {
-    fn count(&self) -> i64;
-}
-
 pub fn in_array(_needle: PhpMixed, _haystack: &PhpMixed, _strict: bool) -> bool {
     todo!()
 }
@@ -956,6 +952,10 @@ pub fn touch(_path: &str) -> bool {
 }
 
 pub fn touch2(_path: &str, _mtime: i64) -> bool {
+    todo!()
+}
+
+pub fn touch3(_path: &str, _mtime: i64, _atime: i64) -> bool {
     todo!()
 }
 

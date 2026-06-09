@@ -4,7 +4,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
 
 use indexmap::IndexMap;
-use shirabe_php_shim::Countable;
 use shirabe_semver::constraint::AnyConstraint;
 
 use crate::package::BasePackageHandle;
@@ -84,7 +83,7 @@ impl RepositoryInterfaceHandle {
             .map(PlatformRepositoryHandle::from_rc)
     }
 
-    pub fn count(&self) -> i64 {
+    pub fn count(&self) -> anyhow::Result<usize> {
         self.0.borrow().count()
     }
 
