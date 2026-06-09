@@ -356,17 +356,18 @@ impl ShowCommand {
             let lr = locker.get_locked_repository(
                 input.borrow().get_option("no-dev").as_bool() != Some(true),
             )?;
-            let lr_handle: RepositoryInterfaceHandle = lr.into();
             if input.borrow().get_option("self").as_bool() == Some(true) {
-                // TODO(phase-b): LockArrayRepository needs add_package via WritableRepositoryInterface;
-                // skipping the insertion here keeps compile clean.
-                let _ = &lr_handle;
+                lr.add_package(
+                    crate::package::RootPackageInterfaceHandle::dup(composer_ref.get_package())
+                        .into(),
+                )?;
             }
-            installed_repo =
-                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle.clone()]));
-            repos =
-                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle.clone()]));
-            locked_repo = Some(lr_handle);
+            let lr_handle: RepositoryInterfaceHandle = lr.into();
+            locked_repo = Some(lr_handle.clone());
+            let new_repo =
+                RepositoryInterfaceHandle::new(InstalledRepository::new(vec![lr_handle]));
+            installed_repo = new_repo.clone();
+            repos = new_repo.clone();
         } else {
             // --installed / default case
             let composer_local_owned;
@@ -1542,10 +1543,7 @@ impl ShowCommand {
             _ => None, // already a ConstraintInterface
         };
 
-        // TODO(phase-b): DefaultPolicy::new() requires (bool, bool, Option<IndexMap>) — using placeholder values.
         let policy = DefaultPolicy::new(false, false, None);
-        let _ = &policy;
-        // TODO(phase-b): RepositorySet::with_stability("dev") — using new() with placeholder args.
         let mut repository_set = RepositorySet::new(
             "dev",
             IndexMap::new(),
@@ -2267,7 +2265,7 @@ impl ShowCommand {
 
         for color in self.colors.iter() {
             let _style = OutputFormatterStyle::new(Some(color.as_str()), None, None);
-            // TODO(phase-b): OutputInterface::get_formatter returns &OutputFormatter, but
+            // TODO(phase-c): OutputInterface::get_formatter returns &OutputFormatter, but
             // set_style requires &mut. Resolution requires interior-mutability refactor of
             // OutputFormatter wiring across symfony shim.
             let _ = (output.borrow().get_formatter(), color);
@@ -2767,7 +2765,6 @@ impl ShowCommand {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<RepositorySet>>> {
         let composer = crate::command::composer_full(composer);
         if self.repository_set.is_none() {
-            // TODO(phase-b): RepositorySet::with_stability_and_flags — using new() placeholder.
             let mut rs = RepositorySet::new(
                 &composer.get_package().get_minimum_stability(),
                 composer.get_package().get_stability_flags().clone(),

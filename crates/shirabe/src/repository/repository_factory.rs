@@ -284,15 +284,18 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let _json_path = repo_arr
+                        let json_path = repo_arr
                             .get("json")
                             .and_then(|v| v.as_string())
                             .unwrap_or("")
                             .to_string();
-                        // TODO(phase-b): FilesystemRepository does not yet implement
-                        // RepositoryInterface; once it does, construct it from JsonFile here.
                         let created: RepositoryInterfaceHandle =
-                            todo!("FilesystemRepository as dyn RepositoryInterface");
+                            RepositoryInterfaceHandle::new(FilesystemRepository::new(
+                                JsonFile::new(json_path, None, None)?,
+                                false,
+                                None,
+                                None,
+                            )?);
                         repo_map.insert(name, created);
                     } else {
                         let created = rm.create_repository(

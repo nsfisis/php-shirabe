@@ -11,7 +11,9 @@ use shirabe_php_shim::{implode, preg_quote, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
+use crate::package::AliasPackageHandle;
 use crate::package::BasePackageHandle;
+use crate::package::CompleteAliasPackageHandle;
 use crate::package::PackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::StabilityFilter;
@@ -35,7 +37,7 @@ pub struct ArrayRepository {
 }
 
 impl ArrayRepository {
-    fn get_packages_internal(&self) -> Vec<BasePackageHandle> {
+    pub(crate) fn get_packages_internal(&self) -> Vec<BasePackageHandle> {
         if self.packages.borrow().is_none() {
             self.initialize();
         }
@@ -111,13 +113,14 @@ impl ArrayRepository {
             package = alias_pkg.get_alias_of().into();
         }
 
-        let _ = (&package, &alias, &pretty_alias);
-        if package.as_complete_package().is_some() {
-            // TODO(phase-b): construct CompleteAliasPackage/AliasPackage and return as a handle
-            return todo!("new CompleteAliasPackage(package, alias, pretty_alias)");
+        if let Some(complete) = package.as_complete_package() {
+            CompleteAliasPackageHandle::new(complete, alias, pretty_alias).into()
+        } else {
+            let real = package
+                .as_package()
+                .expect("non-alias package must be a real Package");
+            AliasPackageHandle::new(real, alias, pretty_alias).into()
         }
-
-        todo!("new AliasPackage(package, alias, pretty_alias)")
     }
 
     /// Removes package from repository.
@@ -148,6 +151,10 @@ impl ArrayRepository {
     /// Resets the packages cache so the next access re-runs `initialize`.
     pub(crate) fn reset_packages(&self) {
         *self.packages.borrow_mut() = None;
+    }
+
+    pub(crate) fn is_initialized(&self) -> bool {
+        self.packages.borrow().is_some()
     }
 }
 

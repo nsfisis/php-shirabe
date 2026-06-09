@@ -17,6 +17,7 @@ use crate::config::is_php_integer_key;
 use crate::installed_versions::InstalledVersions;
 use crate::installer::InstallationManager;
 use crate::json::JsonFile;
+use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
@@ -24,9 +25,12 @@ use crate::package::loader::ArrayLoader;
 use crate::package::loader::LoaderInterface;
 use crate::repository::InvalidRepositoryException;
 use crate::repository::PlatformRepository;
+use crate::repository::RepositoryInterface;
 use crate::repository::WritableArrayRepository;
+use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
 use crate::util::Filesystem;
 use crate::util::Platform;
+use shirabe_semver::constraint::AnyConstraint;
 
 /// Filesystem repository.
 #[derive(Debug)]
@@ -84,7 +88,14 @@ impl FilesystemRepository {
     }
 
     pub fn get_repo_name(&self) -> String {
-        format!("file ({})", self.file.get_path())
+        self.inner.get_repo_name()
+    }
+
+    fn ensure_initialized(&mut self) -> Result<()> {
+        if !self.inner.is_initialized() {
+            self.initialize()?;
+        }
+        Ok(())
     }
 
     /// Initializes repository (reads file, or remote address).
@@ -188,6 +199,27 @@ impl FilesystemRepository {
     pub fn reload(&mut self) -> Result<()> {
         self.inner.reset_packages();
         self.initialize()
+    }
+
+    pub fn add_package(&mut self, package: PackageInterfaceHandle) -> Result<()> {
+        self.inner.add_package(package)
+    }
+
+    pub fn remove_package(&mut self, package: PackageInterfaceHandle) -> Result<()> {
+        self.inner.remove_package(package)
+    }
+
+    pub fn get_canonical_packages(&mut self) -> Result<Vec<PackageInterfaceHandle>> {
+        self.ensure_initialized()?;
+        Ok(self.inner.get_canonical_packages())
+    }
+
+    pub fn set_dev_package_names(&mut self, dev_package_names: Vec<String>) {
+        self.inner.set_dev_package_names(dev_package_names);
+    }
+
+    pub fn get_dev_package_names(&self) -> &Vec<String> {
+        self.inner.get_dev_package_names()
     }
 
     /// Writes writable repository.
@@ -766,6 +798,82 @@ impl FilesystemRepository {
         result.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
 
         result
+    }
+}
+
+impl RepositoryInterface for FilesystemRepository {
+    fn count(&self) -> Result<usize> {
+        self.inner.count()
+    }
+
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        self.inner.has_package(package)
+    }
+
+    fn find_package(
+        &mut self,
+        name: &str,
+        constraint: FindPackageConstraint,
+    ) -> Result<Option<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_package(name, constraint)
+    }
+
+    fn find_packages(
+        &mut self,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
+    ) -> Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.find_packages(name, constraint)
+    }
+
+    fn get_packages(&mut self) -> Result<Vec<BasePackageHandle>> {
+        self.ensure_initialized()?;
+        self.inner.get_packages()
+    }
+
+    fn load_packages(
+        &mut self,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+    ) -> Result<LoadPackagesResult> {
+        self.ensure_initialized()?;
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
+    }
+
+    fn search(
+        &mut self,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
+    ) -> Result<Vec<SearchResult>> {
+        self.ensure_initialized()?;
+        self.inner.search(query, mode, r#type)
+    }
+
+    fn get_providers(&mut self, package_name: String) -> Result<IndexMap<String, ProviderInfo>> {
+        self.ensure_initialized()?;
+        self.inner.get_providers(package_name)
+    }
+
+    fn get_repo_name(&self) -> String {
+        self.inner.get_repo_name()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
+        self.inner.set_self_handle(weak);
     }
 }
 

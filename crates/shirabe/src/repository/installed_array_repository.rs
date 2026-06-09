@@ -51,94 +51,92 @@ impl WritableRepositoryInterface for InstalledArrayRepository {
     fn write(
         &mut self,
         dev_mode: bool,
-        installation_manager: &crate::installer::InstallationManager,
+        installation_manager: &mut crate::installer::InstallationManager,
     ) -> anyhow::Result<()> {
-        todo!()
+        self.inner.write(dev_mode, installation_manager)
     }
 
-    fn add_package(
-        &mut self,
-        package: crate::package::PackageInterfaceHandle,
-    ) -> anyhow::Result<()> {
-        todo!()
+    fn add_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        self.inner.add_package(package)
     }
 
-    fn remove_package(
-        &mut self,
-        package: crate::package::PackageInterfaceHandle,
-    ) -> anyhow::Result<()> {
-        todo!()
+    fn remove_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        self.inner.remove_package(package)
     }
 
-    fn get_canonical_packages(
-        &mut self,
-    ) -> anyhow::Result<Vec<crate::package::PackageInterfaceHandle>> {
-        todo!()
+    fn get_canonical_packages(&mut self) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
+        Ok(self.inner.get_canonical_packages())
     }
 
-    fn reload(&mut self) {
-        todo!()
+    fn reload(&mut self) -> anyhow::Result<()> {
+        self.inner.reload();
+        Ok(())
     }
 
     fn set_dev_package_names(&mut self, dev_package_names: Vec<String>) {
-        todo!()
+        self.inner.set_dev_package_names(dev_package_names);
     }
 
     fn get_dev_package_names(&self) -> &Vec<String> {
-        todo!()
+        self.inner.get_dev_package_names()
     }
 }
 
 impl RepositoryInterface for InstalledArrayRepository {
     fn count(&self) -> anyhow::Result<usize> {
-        todo!()
+        self.inner.count()
     }
 
-    fn has_package(&self, _package: PackageInterfaceHandle) -> bool {
-        todo!()
+    fn has_package(&self, package: PackageInterfaceHandle) -> bool {
+        self.inner.has_package(package)
     }
     fn find_package(
         &mut self,
-        _name: &str,
-        _constraint: FindPackageConstraint,
+        name: &str,
+        constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
-        todo!()
+        self.inner.find_package(name, constraint)
     }
     fn find_packages(
         &mut self,
-        _name: &str,
-        _constraint: Option<FindPackageConstraint>,
+        name: &str,
+        constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        todo!()
+        self.inner.find_packages(name, constraint)
     }
     fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
-        todo!()
+        self.inner.get_packages()
     }
     fn load_packages(
         &mut self,
-        _package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        _acceptable_stabilities: IndexMap<String, i64>,
-        _stability_flags: IndexMap<String, i64>,
-        _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<String, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<String, i64>,
+        stability_flags: IndexMap<String, i64>,
+        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
-        todo!()
+        self.inner.load_packages(
+            package_name_map,
+            acceptable_stabilities,
+            stability_flags,
+            already_loaded,
+        )
     }
     fn search(
         &mut self,
-        _query: String,
-        _mode: i64,
-        _type: Option<String>,
+        query: String,
+        mode: i64,
+        r#type: Option<String>,
     ) -> anyhow::Result<Vec<SearchResult>> {
-        todo!()
+        self.inner.search(query, mode, r#type)
     }
     fn get_providers(
         &mut self,
-        _package_name: String,
+        package_name: String,
     ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
-        todo!()
+        self.inner.get_providers(package_name)
     }
     fn get_repo_name(&self) -> String {
-        todo!()
+        format!("installed {}", self.inner.get_repo_name())
     }
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None
@@ -157,7 +155,7 @@ impl RepositoryInterface for InstalledArrayRepository {
         Some(self)
     }
     fn as_any(&self) -> &dyn std::any::Any {
-        todo!()
+        self
     }
     fn set_self_handle(&self, weak: crate::repository::RepositoryInterfaceWeakHandle) {
         self.inner.set_self_handle(weak);
