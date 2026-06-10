@@ -411,12 +411,24 @@ impl VersionGuesser {
             }
 
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
-            let _io = NullIO::new();
             let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
             repo_config.insert("url".to_string(), PhpMixed::String(path.to_string()));
-            // TODO(phase-b): HgDriver lacks a `new` constructor and HttpDownloader::new signature is unknown
-            let mut driver: HgDriver = todo!(
-                "HgDriver::new(repo_config, Box::new(io), self.config.clone(), HttpDownloader::new(io, config), Rc::clone(&self.process))"
+            let io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+            let http_io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
+                std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
+            let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
+                http_io,
+                self.config.clone(),
+                IndexMap::new(),
+                false,
+            )));
+            let mut driver = HgDriver::new(
+                repo_config,
+                io,
+                self.config.clone(),
+                http_downloader,
+                std::rc::Rc::clone(&self.process),
             );
             let branches: Vec<String> =
                 array_map(|k: &String| k.clone(), &array_keys(&driver.get_branches()?));

@@ -448,8 +448,10 @@ impl InitCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()> {
         let io = self.get_io();
-        // @var FormatterHelper $formatter
-        // TODO(phase-b): get_helper_set returns PhpMixed; the helper set needs proper typing.
+        // @var FormatterHelper $formatter — PHP: $this->getHelperSet()->get('formatter')
+        // TODO(phase-c): get_helper_set returns PhpMixed and HelperSet::get is a todo!() stub (per
+        // the "Symfony stays todo!()" policy), so the typed FormatterHelper cannot be retrieved
+        // until the Helper trait + typed HelperSet are modelled.
         let formatter: FormatterHelper = todo!();
         let _ = &formatter;
         let _ = self.get_helper_set();
@@ -630,7 +632,13 @@ impl InitCommand {
                     String::new()
                 }
             ),
-            // TODO(phase-b): closure cannot call &self.parse_author_string; needs &self capture
+            // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
+            // TODO(phase-c): IOInterface::ask_and_validate takes a `Box<dyn Fn> + 'static`
+            // validator, so it cannot borrow &self to call self.parse_author_string; and
+            // ask_and_validate itself is a deferred QuestionHelper todo!() (see console_io). The
+            // validator body below therefore stays a placeholder. (parse_author_string and
+            // is_valid_email are stateless, so a future fix can make them associated functions and
+            // call them from the closure once the helper interaction is modelled.)
             Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 let value_str = value.as_string().unwrap_or("").to_string();
                 if value_str == "n" || value_str == "no" {
@@ -641,7 +649,10 @@ impl InitCommand {
                 } else {
                     value_str
                 };
-                // TODO(phase-b): would call self.parse_author_string(value_or_default)
+                // PHP: $author = $self->parseAuthorString($value); return $author['email'] === null
+                //   ? $author['name'] : sprintf('%s <%s>', $author['name'], $author['email']);
+                // TODO(phase-c): see the closure note above — cannot reach parse_author_string from
+                // this 'static validator yet.
                 let _ = value_or_default;
                 Ok(PhpMixed::Null)
             }),
@@ -1083,7 +1094,10 @@ impl InitCommand {
         let result = self.get_application().and_then(|mut app| {
             let _update_command = app.find("update")?;
             app.reset_composer();
-            // TODO(phase-b): invoke update_command.run; currently update_command is a PhpMixed.
+            // PHP: $updateCommand->run(new ArrayInput([]), $output);
+            // TODO(phase-c): Application::find returns PhpMixed (the Symfony command registry is a
+            // todo!() stub), so the resolved command's run() cannot be invoked until the typed
+            // command registry is modelled.
             let _ = ArrayInput::new(IndexMap::new(), None);
             let _ = output;
             Ok(())
@@ -1104,7 +1118,9 @@ impl InitCommand {
         let result = self.get_application().and_then(|mut app| {
             let _command = app.find("dump-autoload")?;
             app.reset_composer();
-            // TODO(phase-b): invoke command.run; currently command is a PhpMixed.
+            // PHP: $command->run(new ArrayInput([]), $output);
+            // TODO(phase-c): same blocker as update_dependencies — Application::find returns
+            // PhpMixed (Symfony command registry todo!() stub), so run() cannot be invoked.
             let _ = ArrayInput::new(IndexMap::new(), None);
             let _ = output;
             Ok(())

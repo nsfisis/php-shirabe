@@ -32,6 +32,10 @@ impl StrictConfirmationQuestion {
         this
     }
 
+    pub fn inner(&self) -> &Question {
+        &self.inner
+    }
+
     fn get_default_normalizer(&self) -> Box<dyn Fn(&PhpMixed) -> PhpMixed> {
         let default = self.inner.get_default();
         let true_regex = self.true_answer_regex.clone();

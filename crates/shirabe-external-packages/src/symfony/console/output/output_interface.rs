@@ -1,4 +1,4 @@
-use crate::symfony::console::formatter::OutputFormatter;
+use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
 
 pub trait OutputInterface: std::fmt::Debug {
@@ -14,8 +14,11 @@ pub trait OutputInterface: std::fmt::Debug {
     fn is_debug(&self) -> bool;
     fn set_decorated(&self, decorated: bool);
     fn is_decorated(&self) -> bool;
-    fn set_formatter(&self, formatter: OutputFormatter);
-    fn get_formatter(&self) -> &OutputFormatter;
+    fn set_formatter(
+        &self,
+        formatter: std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>,
+    );
+    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>;
 
     /// PHP: `$output instanceof ConsoleOutputInterface`. Default false; ConsoleOutput overrides.
     fn is_console_output_interface(&self) -> bool {

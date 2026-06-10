@@ -151,6 +151,10 @@ pub trait IOInterfaceMutable {
 // `dyn IOInterface`; its vtable carries both the immutable and mutable methods.
 pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
     fn as_any(&self) -> &dyn std::any::Any;
+
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
+        None
+    }
 }
 
 // Shared-ownership handle for a PHP IO instance (reference semantics). It

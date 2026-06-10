@@ -7,6 +7,7 @@ use indexmap::indexmap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
 use shirabe_external_packages::symfony::console::helper::ProgressBar;
+use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
@@ -30,10 +31,11 @@ use crate::question::StrictConfirmationQuestion;
 use crate::util::Silencer;
 
 /// The Input/Output helper.
+#[derive(Debug)]
 pub struct ConsoleIO {
     authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
 
-    pub(crate) input: Box<dyn InputInterface>,
+    pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     pub(crate) helper_set: HelperSet,
     pub(crate) last_message: RefCell<String>,
@@ -45,21 +47,6 @@ pub struct ConsoleIO {
     verbosity_map: IndexMap<i64, i64>,
 }
 
-// TODO(phase-b): dyn InputInterface / dyn OutputInterface do not implement Debug,
-// so we cannot derive Debug. Provide a manual impl that omits those fields.
-impl std::fmt::Debug for ConsoleIO {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ConsoleIO")
-            .field("authentications", &self.authentications)
-            .field("helper_set", &self.helper_set)
-            .field("last_message", &self.last_message)
-            .field("last_message_err", &self.last_message_err)
-            .field("start_time", &self.start_time)
-            .field("verbosity_map", &self.verbosity_map)
-            .finish()
-    }
-}
-
 impl ConsoleIO {
     /// Constructor.
     ///
@@ -67,7 +54,7 @@ impl ConsoleIO {
     /// @param OutputInterface $output    The output instance
     /// @param HelperSet       $helperSet The helperSet instance
     pub fn new(
-        input: Box<dyn InputInterface>,
+        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         helper_set: HelperSet,
     ) -> Self {
@@ -375,7 +362,7 @@ impl ConsoleIO {
 
 impl IOInterfaceImmutable for ConsoleIO {
     fn is_interactive(&self) -> bool {
-        self.input.is_interactive()
+        self.input.borrow().is_interactive()
     }
 
     fn is_verbose(&self) -> bool {
@@ -447,8 +434,7 @@ impl IOInterfaceImmutable for ConsoleIO {
     }
 
     fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
-        // PHP: $helper = $this->helperSet->get('question');
-        let _helper = self.helper_set.get("question");
+        let helper = self.helper_set.get::<QuestionHelper>("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -458,30 +444,32 @@ impl IOInterfaceImmutable for ConsoleIO {
         } else {
             Some(default)
         };
-        let _question = Question::new(&sanitized_question, sanitized_default);
+        let question = Question::new(&sanitized_question, sanitized_default);
 
-        // TODO(phase-b): HelperSet::get returns PhpMixed; QuestionHelper::ask is
-        // not yet modeled. Returning a placeholder until helper types are wired up.
-        todo!("call QuestionHelper::ask on resolved helper")
+        helper
+            .borrow()
+            .ask(self.input.clone(), self.get_error_output(), &question)
     }
 
     fn ask_confirmation(&self, question: String, default: bool) -> bool {
-        let _helper = self.helper_set.get("question");
-        // TODO(phase-b): Self::sanitize returns PhpMixed but new() expects String;
-        // also true/false regexes need to come through composer/symfony defaults.
+        let helper = self.helper_set.get::<QuestionHelper>("question");
         let sanitized = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
             .to_string();
-        let _question = StrictConfirmationQuestion::new(
+        let question = StrictConfirmationQuestion::new(
             sanitized,
             default,
             "/^y(?:es)?$/i".to_string(),
             "/^no?$/i".to_string(),
         );
 
-        // TODO(phase-b): see ask() above; placeholder until QuestionHelper is modeled.
-        todo!("call QuestionHelper::ask on resolved helper and coerce to bool")
+        let result = helper.borrow().ask(
+            self.input.clone(),
+            self.get_error_output(),
+            question.inner(),
+        );
+        result.as_bool().unwrap_or(false)
     }
 
     fn ask_and_validate(
@@ -491,7 +479,6 @@ impl IOInterfaceImmutable for ConsoleIO {
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        let _helper = self.helper_set.get("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -509,12 +496,13 @@ impl IOInterfaceImmutable for ConsoleIO {
         question.set_validator(Some(adapted));
         question.set_max_attempts(attempts);
 
-        // TODO(phase-b): QuestionHelper::ask not yet modeled.
-        todo!("call QuestionHelper::ask on resolved helper")
+        let helper = self.helper_set.get::<QuestionHelper>("question");
+        Ok(helper
+            .borrow()
+            .ask(self.input.clone(), self.get_error_output(), &question))
     }
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
-        let _helper = self.helper_set.get("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -522,8 +510,11 @@ impl IOInterfaceImmutable for ConsoleIO {
         let mut question = Question::new(&sanitized_question, Some(PhpMixed::Null));
         question.set_hidden(true);
 
-        // TODO(phase-b): QuestionHelper::ask not yet modeled.
-        todo!("call QuestionHelper::ask on resolved helper and coerce to Option<String>")
+        let helper = self.helper_set.get::<QuestionHelper>("question");
+        let result = helper
+            .borrow()
+            .ask(self.input.clone(), self.get_error_output(), &question);
+        result.as_string().map(|s| s.to_string())
     }
 
     fn select(
@@ -542,7 +533,7 @@ impl IOInterfaceImmutable for ConsoleIO {
                 .map(|s| Box::new(PhpMixed::String(s)))
                 .collect(),
         );
-        let _helper = self.helper_set.get("question");
+        let _helper = self.helper_set.get::<QuestionHelper>("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -573,8 +564,13 @@ impl IOInterfaceImmutable for ConsoleIO {
         question.set_error_message(&error_message);
         question.set_multiselect(multiselect);
 
-        // TODO(phase-b): QuestionHelper::ask not yet modeled.
-        let result: PhpMixed = todo!("call QuestionHelper::ask on resolved helper");
+        // TODO(phase-c): QuestionHelper::ask takes a concrete `&Question`, but PHP passes a
+        // ChoiceQuestion whose getValidator/getDefault/autocompleter overrides drive the answer
+        // handling via polymorphism. Passing the inner Question would silently drop that behaviour.
+        // Faithful support needs the Symfony Question hierarchy modelled as a trait (or ask taking a
+        // trait object) so ChoiceQuestion's overrides dispatch — unlike StrictConfirmationQuestion,
+        // whose behaviour lives entirely on its inner Question (see ask_confirmation above).
+        let result: PhpMixed = todo!("call QuestionHelper::ask with a polymorphic ChoiceQuestion");
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
         let choice_keys: Vec<String> = match &choices {
@@ -669,6 +665,10 @@ impl IOInterfaceMutable for ConsoleIO {
 impl IOInterface for ConsoleIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+        Some(self)
     }
 }
 

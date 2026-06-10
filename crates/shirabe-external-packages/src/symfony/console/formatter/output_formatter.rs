@@ -39,4 +39,45 @@ impl OutputFormatter {
     ) {
         todo!()
     }
+
+    pub fn has_style(&self, _name: &str) -> bool {
+        todo!()
+    }
+
+    pub fn get_style(
+        &self,
+        _name: &str,
+    ) -> crate::symfony::console::formatter::OutputFormatterStyle {
+        todo!()
+    }
+}
+
+impl crate::symfony::console::formatter::OutputFormatterInterface for OutputFormatter {
+    fn is_decorated(&self) -> bool {
+        self.is_decorated()
+    }
+
+    fn set_decorated(&mut self, decorated: bool) {
+        self.set_decorated(decorated)
+    }
+
+    fn set_style(
+        &mut self,
+        name: &str,
+        style: crate::symfony::console::formatter::OutputFormatterStyle,
+    ) {
+        self.set_style(name, style)
+    }
+
+    fn has_style(&self, name: &str) -> bool {
+        self.has_style(name)
+    }
+
+    fn get_style(&self, name: &str) -> crate::symfony::console::formatter::OutputFormatterStyle {
+        self.get_style(name)
+    }
+
+    fn format(&self, message: &str) -> String {
+        self.format(message)
+    }
 }

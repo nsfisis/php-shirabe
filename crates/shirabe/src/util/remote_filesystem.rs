@@ -307,7 +307,13 @@ impl RemoteFilesystem {
         let mut error_message = String::new();
         let error_code = 0_i64;
         let mut result: Option<String> = None;
-        // TODO(phase-b): set_error_handler with a closure capturing `error_message` by reference.
+        // TODO(phase-c): faithfully accumulating the file_get_contents warnings into
+        // error_message requires PHP's set_error_handler runtime mechanism — a global handler the
+        // stream layer invokes per warning, appending into error_message by &-reference.
+        // set_error_handler / restore_error_handler are php-shim functions that must stay todo!(),
+        // and get_remote_contents does not surface low-level read warnings through such a side
+        // channel, so error_message stays empty here. Resolving this needs a thread-local
+        // error-handler stack wired into the I/O layer.
         set_error_handler(|_code, _msg, _file, _line| true);
 
         let mut http_response_header: Vec<String> = Vec::new();
@@ -611,7 +617,10 @@ impl RemoteFilesystem {
             }
 
             let put_error_message = String::new();
-            // TODO(phase-b): set_error_handler closure that captures `put_error_message` by reference
+            // TODO(phase-c): capturing the file_put_contents warning into put_error_message
+            // requires PHP's set_error_handler runtime mechanism (see the get() method above);
+            // set_error_handler is a php-shim that must stay todo!() and file_put_contents does not
+            // surface its warning text here, so put_error_message stays empty.
             set_error_handler(|_code, _msg, _file, _line| true);
             let write_result =
                 file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());

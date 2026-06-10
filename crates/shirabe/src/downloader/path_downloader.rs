@@ -472,7 +472,11 @@ impl DownloaderInterface for PathDownloader {
                 );
             }
             let _iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
-            // TODO(phase-b): pass iterator as PhpMixed; ArchivableFilesFinder iterator wrapping not modelled yet.
+            // PHP: $symfonyFilesystem->mirror($realUrl, $path, $iterator);
+            // TODO(phase-c): Symfony Filesystem::mirror takes a Traversable iterator as its third
+            // argument, but the external-package Filesystem stub does not model the iterator type
+            // that ArchivableFilesFinder (an IteratorAggregate) would be wrapped into, so None is
+            // passed and the mirrored file list is not restricted.
             symfony_filesystem.mirror(&real_url, &path, None, &IndexMap::new())?;
         }
 

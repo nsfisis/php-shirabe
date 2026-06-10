@@ -1,3 +1,4 @@
+use crate::symfony::console::helper::HelperInterface;
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::OutputInterface;
 use crate::symfony::console::question::Question;
@@ -12,7 +13,13 @@ impl QuestionHelper {
         _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         _question: &Question,
-    ) -> Option<PhpMixed> {
+    ) -> PhpMixed {
         todo!()
+    }
+}
+
+impl HelperInterface for QuestionHelper {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }

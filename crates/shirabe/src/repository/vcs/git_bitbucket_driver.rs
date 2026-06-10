@@ -790,14 +790,13 @@ impl GitBitbucketDriver {
     fn setup_fallback_driver(&mut self, url: &str) -> Result<()> {
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
         repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
-        // TODO(phase-b): construct VcsDriver from repo_config / io / config / etc.
-        let mut driver = GitDriver {
-            inner: todo!("phase-b: build VcsDriver for fallback GitDriver"),
-            tags: None,
-            branches: None,
-            root_identifier: None,
-            repo_dir: String::new(),
-        };
+        let mut driver = GitDriver::new(
+            repo_config,
+            self.inner.io.clone(),
+            self.inner.config.clone(),
+            self.inner.http_downloader.clone(),
+            self.inner.process.clone(),
+        );
         driver.initialize()?;
         self.fallback_driver = Some(Box::new(driver));
         Ok(())

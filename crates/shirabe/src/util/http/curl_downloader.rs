@@ -645,7 +645,11 @@ impl CurlDownloader {
         );
         // curlHandle, headerHandle, bodyHandle, resolve, reject are PHP resources/callables;
         // stored as opaque PhpMixed::Null placeholders (real values live in Rust-side fields).
-        // TODO(phase-b): wire handle/closure storage properly.
+        // TODO(phase-c): storing the real \CurlHandle and the resolve/reject callables needs the
+        // Job to become a typed struct (an IndexMap<String, PhpMixed> cannot hold a non-Clone
+        // closure and the job is cloned at many sites). That refactor only pays off once the curl
+        // multi-exec loop actually runs — which depends on the curl_multi_* php-shims and the
+        // React\Promise Deferred (external package), both intentionally todo!().
         job.insert("curlHandle".to_string(), PhpMixed::Null);
         job.insert(
             "filename".to_string(),
@@ -659,7 +663,9 @@ impl CurlDownloader {
         job.insert("reject".to_string(), PhpMixed::Null);
         job.insert("primaryIp".to_string(), PhpMixed::String(String::new()));
 
-        let _ = (resolve, reject); // TODO(phase-b): store callables in Job
+        // TODO(phase-c): store the resolve/reject callables in the Job (see curlHandle note
+        // above) — blocked on the typed-Job refactor and the React\Promise model.
+        let _ = (resolve, reject);
 
         self.jobs.insert(curl_handle_id(&curl_handle), job);
 
@@ -719,7 +725,10 @@ impl CurlDownloader {
         {
             let job = self.jobs.get(&id).cloned().unwrap_or_default();
             // job['curlHandle'] is the actual \CurlHandle in PHP; in this port we keep
-            // handles in Rust-owned storage. TODO(phase-b): wire actual handle removal.
+            // handles in Rust-owned storage.
+            // TODO(phase-c): curl_multi_remove_handle($this->multiHandle, $job['curlHandle']) needs
+            // the real \CurlHandle stored in the Job (typed-Job refactor) and the curl_multi_*
+            // php-shims, which stay todo!().
             // curl_multi_remove_handle($this->multiHandle, $job['curlHandle']);
             if PHP_VERSION_ID < 80000 {
                 // curl_close($job['curlHandle']);
@@ -776,7 +785,10 @@ impl CurlDownloader {
                 .map(|b| (**b).clone())
                 .unwrap_or(PhpMixed::Null);
             let result_code: i64 = progress.get("result").and_then(|b| b.as_int()).unwrap_or(0);
-            // TODO(phase-b): correlate handle in `progress['handle']` to its job id.
+            // TODO(phase-c): the job id is `(int) $progress['handle']` — the integer id of the
+            // \CurlHandle reported by curl_multi_info_read. Recovering it needs real curl handle
+            // resources from the curl_multi_* php-shims (todo!()); until then the id cannot be
+            // correlated and this loop body is unreachable in practice.
             let i: i64 = 0;
             if !self.jobs.contains_key(&i) {
                 continue;
@@ -1357,10 +1369,12 @@ impl CurlDownloader {
                 if let Some(PhpMixed::String(filename)) = job.get("filename") {
                     rename(&format!("{}~", filename), filename);
                     // job['resolve']($response);
-                    // TODO(phase-b): invoke stored resolve callable
+                    // TODO(phase-c): invoke the stored resolve callable — blocked on the typed-Job
+                    // refactor that holds the React\Promise resolve closure (see download()).
                 } else {
                     // job['resolve']($response);
-                    // TODO(phase-b): invoke stored resolve callable
+                    // TODO(phase-c): invoke the stored resolve callable — blocked on the typed-Job
+                    // refactor that holds the React\Promise resolve closure (see download()).
                 }
                 Ok(Ok(()))
             })();
@@ -1501,7 +1515,11 @@ impl CurlDownloader {
                             .and_then(|v| v.as_array())
                             .and_then(|a| a.get("prevent_ip_access_callable"))
                             .is_some();
-                        // TODO(phase-b): invoke prevent_ip_access_callable
+                        // PHP: is_callable($cb = $job['options']['prevent_ip_access_callable']) && $cb($primaryIp)
+                        // TODO(phase-c): prevent_ip_access_callable is a caller-supplied callable
+                        // carried inside the options array as PhpMixed; invoking it needs a typed
+                        // callable model (options would have to hold an Rc<dyn Fn>), which the
+                        // PhpMixed-keyed options map cannot express yet.
                         let blocked = prevent_ip_access_callable && false;
                         if blocked {
                             let job = self.jobs.get(&i).cloned().unwrap_or_default();
@@ -1794,8 +1812,9 @@ impl CurlDownloader {
             Some(PhpMixed::Array(a)) => a.iter().map(|(k, v)| (k.clone(), (**v).clone())).collect(),
             _ => IndexMap::new(),
         };
-        // resolve/reject callables are stored Rust-side; pass placeholders for now.
-        // TODO(phase-b): forward stored callables here.
+        // PHP forwards the original job's resolve/reject callables into the restarted download.
+        // TODO(phase-c): those callables are not stored on the Job yet (typed-Job refactor, see
+        // download()), so no-op placeholders are forwarded instead of the real promise callbacks.
         let resolve: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(|_| {});
         let reject: Box<dyn Fn(PhpMixed) + Send + Sync> = Box::new(|_| {});
         self.init_download(
@@ -1897,7 +1916,8 @@ impl CurlDownloader {
             unlink_silent(&format!("{}~", filename));
         }
         // job['reject']($e);
-        // TODO(phase-b): invoke stored reject callable
+        // TODO(phase-c): invoke the stored reject callable — blocked on the typed-Job refactor
+        // that holds the React\Promise reject closure (see download()).
     }
 
     fn check_curl_result(&self, code: i64) -> anyhow::Result<()> {

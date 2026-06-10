@@ -180,9 +180,9 @@ impl OutdatedCommand {
 
         let input = ArrayInput::new(args, None);
 
-        // TODO(phase-b): convert ArrayInput/output references to dyn trait objects expected by Application::run
-        let _ = input;
-        self.get_application()?.run(None, None)
+        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(input));
+        self.get_application()?.run(Some(input), Some(output))
     }
 
     pub fn is_proxy_command(&self) -> bool {

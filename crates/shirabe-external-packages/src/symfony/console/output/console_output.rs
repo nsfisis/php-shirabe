@@ -1,4 +1,4 @@
-use crate::symfony::console::formatter::OutputFormatter;
+use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::ConsoleOutputInterface;
 use crate::symfony::console::output::OutputInterface;
 
@@ -9,7 +9,7 @@ impl ConsoleOutput {
     pub fn new(
         _verbosity: i64,
         _decorated: Option<bool>,
-        _formatter: Option<OutputFormatter>,
+        _formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> Self {
         todo!()
     }
@@ -64,10 +64,13 @@ impl OutputInterface for ConsoleOutput {
     fn is_decorated(&self) -> bool {
         todo!()
     }
-    fn set_formatter(&self, _formatter: OutputFormatter) {
+    fn set_formatter(
+        &self,
+        _formatter: std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>,
+    ) {
         todo!()
     }
-    fn get_formatter(&self) -> &OutputFormatter {
+    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
         todo!()
     }
 }

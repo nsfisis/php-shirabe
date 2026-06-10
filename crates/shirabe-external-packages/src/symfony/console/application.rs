@@ -1,3 +1,4 @@
+use crate::symfony::console::input::InputDefinition;
 use crate::symfony::console::input::InputInterface;
 use crate::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
@@ -103,6 +104,30 @@ impl Application {
     }
 
     pub fn has(&self, _name: &str) -> bool {
+        todo!()
+    }
+
+    pub fn do_run(
+        &mut self,
+        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        todo!()
+    }
+
+    pub fn get_help(&self) -> String {
+        todo!()
+    }
+
+    pub fn are_exceptions_caught(&self) -> bool {
+        todo!()
+    }
+
+    pub fn get_default_input_definition(&self) -> InputDefinition {
+        todo!()
+    }
+
+    pub fn get_default_commands(&self) -> Vec<PhpMixed> {
         todo!()
     }
 }

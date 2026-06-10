@@ -94,9 +94,12 @@ impl InstallerInterface for PluginInstaller {
                 .get("plugin-optional")
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
-            // TODO(plugin): check if plugin is allowed
-            // TODO(phase-b): is_plugin_allowed needs &mut PluginManager but prepare is &self.
-            let _ = plugin_optional;
+            self.get_plugin_manager().borrow_mut().is_plugin_allowed(
+                &package.get_name(),
+                false,
+                plugin_optional,
+                true,
+            )?;
         }
 
         self.inner.prepare(r#type, package, prev_package).await

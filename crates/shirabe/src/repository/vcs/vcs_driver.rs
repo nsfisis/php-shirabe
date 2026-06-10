@@ -187,8 +187,6 @@ impl VcsDriverBase {
     }
 }
 
-// TODO(phase-b): the constructor is `final` in PHP; concrete implementations must replicate the
-// initialization logic (local-path normalization etc.) from the original new() body.
 pub trait VcsDriver: VcsDriverInterface {
     fn url(&self) -> &str;
     fn url_mut(&mut self) -> &mut String;

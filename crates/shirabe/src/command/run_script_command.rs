@@ -190,9 +190,19 @@ impl RunScriptCommand {
                 .get_option("no-dev")
                 .as_bool()
                 .unwrap_or(false);
-        // TODO(phase-b): ScriptEvent::new takes Composer/IOInterface by value; placeholder construction.
-        let _ = (script.clone(), &composer, dev_mode);
-        let has_listeners = false;
+        let io = self.get_io();
+        let event = ScriptEvent::new(
+            script.clone(),
+            composer
+                .as_full()
+                .expect("require_composer returns a full Composer")
+                .downgrade(),
+            io,
+            dev_mode,
+            vec![],
+            IndexMap::new(),
+        );
+        let has_listeners = dispatcher.borrow_mut().has_event_listeners(&event);
         if !has_listeners {
             return Err(InvalidArgumentException {
                 message: format!("Script \"{}\" is not defined in this package", script),
@@ -272,7 +282,11 @@ impl RunScriptCommand {
 
         let mut result: Vec<(String, String)> = vec![];
         for (name, _script) in scripts {
-            // TODO(phase-b): Application::find returns PhpMixed; placeholder description.
+            // PHP: $cmd = $this->getApplication()->find($name); $description = $cmd->getDescription();
+            // TODO(phase-c): Application::find returns PhpMixed (the Symfony command registry is a
+            // todo!() stub) and get_application() is itself deferred, so the resolved command's
+            // getDescription() cannot be read; the description stays empty until the typed command
+            // registry is modelled.
             let _ = self.get_application()?.find(&name);
             let description = String::new();
             result.push((name, description));

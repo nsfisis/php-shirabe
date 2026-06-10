@@ -287,7 +287,14 @@ pub trait HasBaseCommandData {
 
 impl<C: HasBaseCommandData> BaseCommand for C {
     fn get_application(&self) -> Result<Application> {
-        // TODO(phase-b): requires inner Symfony Command access
+        // PHP: parent::getApplication() returns Symfony Command::$application, the back-reference
+        // set by Application::add() -> $command->setApplication($this) when the command is
+        // registered.
+        // TODO(phase-c): the command holds no Application back-reference. Establishing it requires
+        // (1) modelling the Symfony command registry (add/find/run), which is an intentional
+        // todo!() stub, and (2) making Application shared (Rc<RefCell<Application>>) with a Weak
+        // back-edge to break the Application<->command cycle. Until command registration runs,
+        // there is no application to return.
         todo!()
     }
 
@@ -296,12 +303,15 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         _disable_plugins: Option<bool>,
         _disable_scripts: Option<bool>,
     ) -> Result<PartialComposerHandle> {
-        // TODO(phase-b): depends on Application::get_composer, which is still stubbed.
+        // PHP: $this->composer ??= $this->getApplication()->getComposer(true, ...).
+        // TODO(phase-c): blocked on get_application() (see above) — it currently returns an owned
+        // `Application` by value, which a command cannot hold; a shared Application handle is the
+        // prerequisite. Application::getComposer itself is already implemented.
         let _ = RuntimeException {
             message: String::new(),
             code: 0,
         };
-        todo!("require_composer pending Application::get_composer")
+        todo!("require_composer pending get_application() shared-handle support")
     }
 
     fn try_composer(
@@ -309,8 +319,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         _disable_plugins: Option<bool>,
         _disable_scripts: Option<bool>,
     ) -> Option<PartialComposerHandle> {
-        // TODO(phase-b): depends on Application::get_composer, which is still stubbed.
-        todo!("try_composer pending Application::get_composer")
+        // PHP: try { return $this->requireComposer(...); } catch (\RuntimeException $e) { return null; }
+        // TODO(phase-c): blocked on get_application() / require_composer (see above) — needs a
+        // shared Application handle the command can reach.
+        todo!("try_composer pending get_application() shared-handle support")
     }
 
     fn set_composer(&mut self, composer: PartialComposerHandle) {
@@ -329,7 +341,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>> {
         if self.io().is_none() {
-            // TODO(phase-b): requires inner Symfony Application access
+            // PHP: $this->io = $this->getApplication() instanceof Application
+            //          ? $this->getApplication()->getIO() : new NullIO();
+            // TODO(phase-c): the application-IO branch needs get_application() (see above); until
+            // a shared Application handle exists we take the NullIO fallback (PHP's else branch).
             *self.io_mut() = Some(Rc::new(RefCell::new(NullIO::new())));
         }
 
@@ -348,14 +363,16 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<()> {
         // initialize a plugin-enabled Composer instance, either local or global
+        // PHP also ORs in $this->getApplication()->getDisablePluginsByDefault() /
+        // getDisableScriptsByDefault().
+        // TODO(phase-c): the application-default OR-terms need get_application() (see above); a
+        // shared Application handle is the prerequisite, so only the input flags are honoured here.
         let mut disable_plugins = input
             .borrow()
             .has_parameter_option(&["--no-plugins"], false);
         let mut disable_scripts = input
             .borrow()
             .has_parameter_option(&["--no-scripts"], false);
-
-        // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
 
         if self.is_self_update_command() {
             disable_plugins = true;
@@ -376,7 +393,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             composer
         };
         if let Some(composer) = composer.as_ref() {
-            // TODO(phase-b): requires inner Symfony Command get_name access
+            // PHP: $this->getName() — the Symfony Command's configured name.
+            // TODO(phase-c): the command name lives in Symfony Command state (set via configure()
+            // -> setName()), which this port does not yet carry on BaseCommandData; it requires
+            // the Symfony Command base-class model (intentional todo!() stub).
             let command_name: String = todo!();
             let mut pre_command_run_event = PreCommandRunEvent::new(
                 PluginEvents::PRE_COMMAND_RUN.to_string(),
@@ -505,7 +525,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 .borrow()
                 .has_parameter_option(&["--no-scripts"], false);
 
-        // TODO(phase-b): requires inner Symfony Application access for disable_plugins_by_default / disable_scripts_by_default
+        // PHP: if ($app instanceof Application && $app->getDisablePluginsByDefault()) $disablePlugins = true;
+        //      (same for getDisableScriptsByDefault()).
+        // TODO(phase-c): these application-default overrides need get_application() (see above) —
+        // a shared Application handle is the prerequisite, so only the passed/flag values apply.
         let disable_plugins_kind = if disable_plugins {
             crate::factory::DisablePlugins::All
         } else {
@@ -826,6 +849,8 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     }
 }
 
-// TODO(phase-b): bridge BaseCommand to Symfony Command for trait-object container usage.
+// TODO(phase-c): bridge BaseCommand to Symfony Command for trait-object container usage.
 // Cannot blanket-impl a foreign trait for a local generic (orphan rule); each concrete
-// command must impl symfony Command itself, or a wrapper type must be introduced.
+// command must impl symfony Command itself, or a wrapper type must be introduced. This is the
+// same orphan-rule blocker as Application::get_default_commands and is gated on the Symfony
+// command-registry model, which is an intentional external-package todo!() stub.

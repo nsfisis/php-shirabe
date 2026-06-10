@@ -1,3 +1,5 @@
+use crate::symfony::console::input::InputArgument;
+use crate::symfony::console::input::InputOption;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
@@ -8,11 +10,11 @@ impl InputDefinition {
         todo!()
     }
 
-    pub fn add_argument(&mut self, _argument: PhpMixed) {
+    pub fn add_argument(&mut self, _argument: InputArgument) {
         todo!()
     }
 
-    pub fn add_option(&mut self, _option: PhpMixed) {
+    pub fn add_option(&mut self, _option: InputOption) {
         todo!()
     }
 

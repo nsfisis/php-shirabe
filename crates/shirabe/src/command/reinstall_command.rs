@@ -226,8 +226,13 @@ impl ReinstallCommand {
             indexmap::IndexMap::new(),
         );
 
-        // TODO(phase-b): InstallationManager::execute needs `&mut dyn InstalledRepositoryInterface`;
-        // local_repo is borrowed shared from RepositoryManager. Needs Rc<RefCell<dyn ...>> migration.
+        // PHP: $installationManager->execute($localRepo, $uninstallOperations, $devMode);
+        //      $installationManager->execute($localRepo, $installOperations, $devMode);
+        // TODO(phase-c): two blockers. (1) execute() wants `&mut dyn InstalledRepositoryInterface`,
+        // but local_repo is a RepositoryInterfaceHandle that exposes no raw &mut
+        // InstalledRepositoryInterface view (only per-method helpers). (2) InstallationManager::
+        // execute is itself deferred (its operation/promise machinery stays todo!() — see
+        // installation_manager.rs).
         let _ = (
             uninstall_operations,
             install_operations,
@@ -281,7 +286,13 @@ impl ReinstallCommand {
                     .as_bool()
                     .unwrap_or(false);
 
-            // TODO(phase-b): AutoloadGenerator setters/dump need &mut self; conflicts with concurrent borrows of composer subsystems; needs shared-ownership refactor
+            // PHP: $generator = $composer->getAutoloadGenerator(); $generator->setClassMapAuthoritative(...);
+            //      $generator->setApcu(...); $generator->setPlatformRequirementFilter(...);
+            //      $generator->dump($config, $localRepo, $package, $installationManager, 'composer', $optimize);
+            // TODO(phase-c): AutoloadGenerator::dump (and the setters) take &mut self and dump wants
+            // `local_repo: &mut dyn InstalledRepositoryInterface`, which the RepositoryInterfaceHandle
+            // does not expose as a raw &mut view (the same handle blocker as execute above). Wiring
+            // this needs that accessor plus completing the dump call's remaining arguments.
             let _ = (
                 authoritative,
                 apcu,

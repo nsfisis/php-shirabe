@@ -53,7 +53,7 @@ impl RuleSetGenerator {
         package: PackageInterfaceHandle,
         providers: &[PackageInterfaceHandle],
         reason: i64,
-        reason_data: PhpMixed,
+        reason_data: rule::ReasonData,
     ) -> Option<GenericRule> {
         let mut literals = vec![-package.get_id()];
 
@@ -65,11 +65,7 @@ impl RuleSetGenerator {
             literals.push(provider.get_id());
         }
 
-        Some(GenericRule::new(
-            literals,
-            reason,
-            rule::ReasonData::from(reason_data),
-        ))
+        Some(GenericRule::new(literals, reason, reason_data))
     }
 
     /// Creates a rule to install at least one of a set of packages.
@@ -80,10 +76,10 @@ impl RuleSetGenerator {
         &self,
         packages: &[PackageInterfaceHandle],
         reason: i64,
-        reason_data: PhpMixed,
+        reason_data: rule::ReasonData,
     ) -> GenericRule {
         let literals: Vec<i64> = packages.iter().map(|p| p.get_id()).collect();
-        GenericRule::new(literals, reason, rule::ReasonData::from(reason_data))
+        GenericRule::new(literals, reason, reason_data)
     }
 
     /// Creates a rule for two conflicting packages.
@@ -95,7 +91,7 @@ impl RuleSetGenerator {
         issuer: PackageInterfaceHandle,
         provider: PackageInterfaceHandle,
         reason: i64,
-        reason_data: PhpMixed,
+        reason_data: rule::ReasonData,
     ) -> Option<Rule2Literals> {
         // ignore self conflict
         if issuer.ptr_eq(&provider) {
@@ -105,7 +101,7 @@ impl RuleSetGenerator {
         Some(Rule2Literals::new(
             -issuer.get_id(),
             -provider.get_id(),
-            PhpMixed::Int(reason),
+            reason,
             reason_data,
         ))
     }
@@ -114,7 +110,7 @@ impl RuleSetGenerator {
         &self,
         packages: &[PackageInterfaceHandle],
         reason: i64,
-        reason_data: PhpMixed,
+        reason_data: rule::ReasonData,
     ) -> Rule {
         let literals: Vec<i64> = packages.iter().map(|p| -p.get_id()).collect();
 
@@ -122,13 +118,11 @@ impl RuleSetGenerator {
             Rule::TwoLiterals(Rule2Literals::new(
                 literals[0],
                 literals[1],
-                PhpMixed::Int(reason),
+                reason,
                 reason_data,
             ))
         } else {
-            Rule::MultiConflict(
-                MultiConflictRule::new(literals, PhpMixed::Int(reason), reason_data).unwrap(),
-            )
+            Rule::MultiConflict(MultiConflictRule::new(literals, reason, reason_data).unwrap())
         }
     }
 
@@ -175,7 +169,7 @@ impl RuleSetGenerator {
                     package.clone(),
                     &[alias_of.clone()],
                     rule::RULE_PACKAGE_ALIAS,
-                    PhpMixed::Null, // reasonData: $package (BasePackage)
+                    rule::ReasonData::BasePackage(package.clone()),
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::Generic));
 
@@ -184,7 +178,7 @@ impl RuleSetGenerator {
                     alias_of.clone(),
                     &[package.clone()],
                     rule::RULE_PACKAGE_INVERSE_ALIAS,
-                    PhpMixed::Null, // reasonData: $package->getAliasOf() (BasePackage)
+                    rule::ReasonData::BasePackage(alias_of.clone()),
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, inverse_rule.map(Rule::Generic));
 
@@ -221,7 +215,7 @@ impl RuleSetGenerator {
                     package.clone(),
                     &possible_requires,
                     rule::RULE_PACKAGE_REQUIRES,
-                    PhpMixed::Null, // reasonData: $link (Link)
+                    rule::ReasonData::Link(link.clone()),
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::Generic));
 
@@ -277,7 +271,7 @@ impl RuleSetGenerator {
                             package.clone(),
                             conflict.clone(),
                             rule::RULE_PACKAGE_CONFLICT,
-                            PhpMixed::Null, // reasonData: $link (Link)
+                            rule::ReasonData::Link(link.clone()),
                         );
                         self.add_rule(RuleSet::TYPE_PACKAGE, rule.map(Rule::TwoLiterals));
                     }
@@ -294,8 +288,11 @@ impl RuleSetGenerator {
         for (name, packages) in names_packages {
             if packages.len() > 1 {
                 let reason = rule::RULE_PACKAGE_SAME_NAME;
-                let rule =
-                    self.create_multi_conflict_rule(&packages, reason, PhpMixed::String(name));
+                let rule = self.create_multi_conflict_rule(
+                    &packages,
+                    reason,
+                    rule::ReasonData::String(name),
+                );
                 self.add_rule(RuleSet::TYPE_PACKAGE, Some(rule));
             }
         }
@@ -329,15 +326,12 @@ impl RuleSetGenerator {
 
             self.add_rules_for_package(package.clone().into(), platform_requirement_filter);
 
-            let mut reason_data: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-            reason_data.insert(
-                "package".to_string(),
-                Box::new(PhpMixed::Null), // reasonData: $package (BasePackage)
-            );
             let rule = self.create_install_one_of_rule(
                 &[package.clone().into()],
                 rule::RULE_FIXED,
-                PhpMixed::Array(reason_data),
+                rule::ReasonData::Fixed {
+                    package: package.clone().into(),
+                },
             );
             self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
         }

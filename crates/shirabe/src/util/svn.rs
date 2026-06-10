@@ -140,7 +140,13 @@ impl Svn {
         let command = self.get_command(svn_command.clone(), url, path);
 
         let mut output: Option<String> = None;
-        // TODO(phase-b): handler captures &mut output and io by reference; restructure for Rust closures
+        // PHP: $handler = function ($type, $buffer) use (&$output, $io, $verbose) { ... };
+        //      $status = $this->process->execute($command, $handler, $cwd);
+        // TODO(phase-c): ProcessExecutor::execute does not yet accept a streaming output callback
+        // (its Symfony Process backing stays todo!()), so this handler — which filters by stream
+        // type, drops "Redirecting to URL" lines, accumulates into `output`, and echoes when
+        // verbose — cannot be passed through. The plain-buffer execute_args call below loses that
+        // filtering; resolving needs the process callback model (cf. process_executor.rs).
         let _io = &self.io;
         let _handler = |r#type: &str, buffer: &str| -> Option<()> {
             if r#type != "out" {
@@ -156,7 +162,8 @@ impl Svn {
             }
             None
         };
-        // TODO(phase-b): pass handler callback to process.execute
+        // TODO(phase-c): pass the filtering handler above to process.execute once the callback
+        // model lands; for now a plain buffer is used and the output filtering is skipped.
         let mut handler_output = String::new();
         let status = self.process.borrow_mut().execute_args(
             &command,

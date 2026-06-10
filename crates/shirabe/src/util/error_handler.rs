@@ -1,18 +1,21 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php
 
 use crate::io::IOInterface;
+use crate::io::IOInterfaceImmutable;
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException,
     FILTER_VALIDATE_BOOLEAN, PHP_EOL, PhpMixed, STDERR, debug_backtrace, error_reporting,
     filter_var, ini_get, is_resource, set_error_handler,
 };
-use std::sync::{Mutex, OnceLock};
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
-static IO: OnceLock<Mutex<Option<Box<dyn IOInterface + Send>>>> = OnceLock::new();
-static HAS_SHOWN_DEPRECATION_NOTICE: Mutex<i64> = Mutex::new(0);
-
-fn io() -> &'static Mutex<Option<Box<dyn IOInterface + Send>>> {
-    IO.get_or_init(|| Mutex::new(None))
+// PHP keeps `$io` / `$hasShownDeprecationNotice` as process-global statics. Composer runs
+// single-threaded, so thread-locals on the main thread reproduce that faithfully while letting
+// us hold the same shared (`Rc<RefCell<dyn IOInterface>>`) IO instance the application uses.
+thread_local! {
+    static IO: RefCell<Option<Rc<RefCell<dyn IOInterface>>>> = const { RefCell::new(None) };
+    static HAS_SHOWN_DEPRECATION_NOTICE: Cell<i64> = const { Cell::new(0) };
 }
 
 pub struct ErrorHandler;
@@ -65,18 +68,17 @@ impl ErrorHandler {
             });
         }
 
-        let mut io_guard = io().lock().unwrap();
-        if io_guard.is_some() {
-            let has_shown = *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap();
-            if has_shown > 0 && !io_guard.as_ref().unwrap().is_verbose() {
+        let io = IO.with(|cell| cell.borrow().clone());
+        if let Some(io) = io {
+            let has_shown = HAS_SHOWN_DEPRECATION_NOTICE.with(|c| c.get());
+            if has_shown > 0 && !io.is_verbose() {
                 if has_shown == 1 {
-                    io_guard.as_mut().unwrap().write_error("<warning>More deprecation notices were hidden, run again with `-v` to show them.</warning>");
-                    *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap() = 2;
+                    io.write_error("<warning>More deprecation notices were hidden, run again with `-v` to show them.</warning>");
+                    HAS_SHOWN_DEPRECATION_NOTICE.with(|c| c.set(2));
                 }
                 return Ok(true);
             }
-            *HAS_SHOWN_DEPRECATION_NOTICE.lock().unwrap() = 1;
-            drop(io_guard);
+            HAS_SHOWN_DEPRECATION_NOTICE.with(|c| c.set(1));
             Self::output_warning(
                 &format!("Deprecation Notice: {} in {}:{}", message, file, line),
                 false,
@@ -86,17 +88,17 @@ impl ErrorHandler {
         Ok(true)
     }
 
-    pub fn register(io: Option<Box<dyn IOInterface + Send>>) {
+    pub fn register(io: Option<Rc<RefCell<dyn IOInterface>>>) {
         set_error_handler(|level, message, file, line| {
             Self::handle(level, message.to_string(), file.to_string(), line).unwrap_or(true)
         });
         error_reporting(Some(E_ALL));
-        *self::io().lock().unwrap() = io;
+        IO.with(|cell| *cell.borrow_mut() = io);
     }
 
     fn output_warning(message: &str, output_even_without_io: bool) {
-        let mut io_guard = io().lock().unwrap();
-        if let Some(io) = io_guard.as_mut() {
+        let io = IO.with(|cell| cell.borrow().clone());
+        if let Some(io) = io {
             io.write_error(&format!("<warning>{}</warning>", message));
             if io.is_verbose() {
                 io.write_error("<warning>Stack trace:</warning>");
@@ -122,7 +124,6 @@ impl ErrorHandler {
             }
             return;
         }
-        drop(io_guard);
 
         if output_even_without_io {
             if is_resource(&PhpMixed::Int(STDERR)) {

@@ -40,9 +40,6 @@ pub trait BaseDependencyCommand: BaseCommand {
     fn colors(&self) -> &[String];
     fn colors_mut(&mut self) -> &mut Vec<String>;
 
-    // TODO(phase-b): these wrappers existed to forward BaseCommand setters, but they
-    // shadowed the BaseCommand methods and caused ambiguity. Use BaseCommand directly.
-
     fn do_execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -153,12 +150,12 @@ pub trait BaseDependencyCommand: BaseCommand {
             FindPackageConstraint::String(text_constraint.clone()),
         )?;
         if matched_package.is_none() {
+            let rm = composer.get_repository_manager();
             let mut default_repos = CompositeRepository::new(
                 RepositoryFactory::default_repos(
                     Some(self.get_io()),
                     Some(composer.get_config()),
-                    // TODO(phase-b): get_repository_manager returns &; default_repos needs &mut
-                    Some(todo!("share repository_manager as &mut")),
+                    Some(&mut rm.borrow_mut()),
                 )?
                 .into_values()
                 .collect(),
@@ -402,10 +399,12 @@ pub trait BaseDependencyCommand: BaseCommand {
             "blue".to_string(),
         ];
         for color in self.colors() {
-            // TODO(phase-b): output.get_formatter() returns &OutputFormatter; set_style needs
-            // &mut. Need interior mutability or `get_formatter_mut`.
-            let _ = OutputFormatterStyle::new(Some(color), None, None);
-            let _ = output.borrow().get_formatter();
+            let style = OutputFormatterStyle::new(Some(color), None, None);
+            output
+                .borrow()
+                .get_formatter()
+                .borrow_mut()
+                .set_style(color, style);
         }
     }
 

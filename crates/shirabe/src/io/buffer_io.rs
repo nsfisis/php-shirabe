@@ -4,6 +4,7 @@ use crate::io::ConsoleIO;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
+use shirabe_external_packages::symfony::console::helper::HelperInterface;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -46,11 +47,11 @@ impl BufferIO {
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
             todo!("wire StreamOutput as the ConsoleIO output");
 
-        // TODO(phase-c): construct the QuestionHelper and register it in the HelperSet.
-        let helpers: Vec<PhpMixed> = vec![/* PhpMixed::Object(QuestionHelper::new()) */];
-        let _ = std::marker::PhantomData::<QuestionHelper>;
+        let helpers: Vec<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> =
+            vec![std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper))];
         let inner = ConsoleIO::new(
-            Box::new(input_obj) as Box<dyn InputInterface>,
+            std::rc::Rc::new(std::cell::RefCell::new(input_obj))
+                as std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
             output,
             HelperSet::new(helpers),
         );
@@ -129,8 +130,6 @@ impl BufferIO {
     }
 }
 
-// TODO(phase-b): PHP `class BufferIO extends ConsoleIO` — delegate all
-// IOInterface and BaseIO methods to `self.inner` (ConsoleIO).
 impl crate::io::IOInterfaceImmutable for BufferIO {
     fn is_interactive(&self) -> bool {
         self.inner.is_interactive()
@@ -248,6 +247,10 @@ impl crate::io::IOInterfaceMutable for BufferIO {
 impl crate::io::IOInterface for BufferIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn crate::io::BaseIO> {
+        Some(self)
     }
 }
 

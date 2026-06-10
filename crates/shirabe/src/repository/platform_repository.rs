@@ -283,9 +283,12 @@ impl PlatformRepository {
         // The AF_INET6 constant is only defined if ext-sockets is available but
         // IPv6 support might still be available.
         let has_inet6 = self.runtime.has_constant("AF_INET6", None);
+        // PHP: Silencer::call([$this->runtime, 'invoke'], 'inet_pton', ['::'])
+        // TODO(phase-c): Composer's Platform\Runtime class is entirely a todo!() stub (invoke,
+        // has_constant, ...), so the inet_pton invocation cannot run. The placeholder callable
+        // returns false; resolving this requires implementing the Runtime wrapper (separate Phase C
+        // work) and a closure that forwards to the inet_pton shim.
         let inet_pton_check = Silencer::call(|| {
-            // TODO(phase-b): Runtime::invoke takes a Box<dyn Fn(Vec<PhpMixed>) -> PhpMixed>;
-            // mirror PHP's `Silencer::call([$this->runtime, 'invoke'], 'inet_pton', ['::'])`.
             Ok::<PhpMixed, anyhow::Error>(self.runtime.invoke(
                 Box::new(|_args| PhpMixed::Bool(false)),
                 vec![

@@ -267,10 +267,11 @@ impl EventDispatcher {
             }
 
             // other newly appeared prepended autoloaders should be appended instead to ensure Composer loads its classes first
+            // PHP: spl_autoload_unregister($cb); spl_autoload_register($cb, true, $prepend);
             // TODO(plugin): ClassLoader detection via instanceof — currently treat all callbacks uniformly
-            // TODO(phase-b): `cb` is a PhpMixed; spl_autoload_*/register expect a typed
-            // Box<dyn Fn(&str) -> PhpMixed + Send + Sync> callback. Bridging requires
-            // exposing the underlying callable from PhpMixed.
+            // TODO(phase-c): `cb` is a PhpMixed holding a callable; spl_autoload_register/unregister
+            // (php-shims that stay todo!()) need a typed Box<dyn Fn(&str) -> PhpMixed> callback.
+            // Bridging requires the callable model to expose the underlying closure from PhpMixed.
             let _ = &cb;
             let _ = spl_autoload_unregister;
             let _ = spl_autoload_register;

@@ -261,14 +261,19 @@ impl ProcessExecutor {
             }
         }
 
+        // PHP: $callback = is_callable($output) ? $output : fn($type, $buffer) => $this->outputHandler($type, $buffer);
         let output_is_callable = output.as_deref().map(|o| is_callable(o)).unwrap_or(false);
         let _callback: Box<dyn Fn(&str, &str)> = if output_is_callable {
-            // TODO(phase-b): adapt output PhpMixed callable to closure
+            // TODO(phase-c): the user-supplied $output is a PhpMixed callable that cannot be
+            // invoked without a typed callable model (Rc<dyn Fn>); deferred with the callable model.
             Box::new(|_t: &str, _b: &str| {})
         } else {
-            Box::new(|_t: &str, _b: &str| {
-                // TODO(phase-b): self.output_handler(t, b) — self is borrowed mutably elsewhere
-            })
+            // TODO(phase-c): the fallback must call self.output_handler(type, buffer) (which is
+            // &mut self and writes to io / updates last_message), but this is a 'static
+            // `Box<dyn Fn>` that cannot borrow &mut self. Wiring it needs the handler state shared
+            // (Rc<RefCell<...>>). The callback is also not yet passed to process.run, whose Symfony
+            // Process backing stays todo!().
+            Box::new(|_t: &str, _b: &str| {})
         };
 
         let io_for_signal = self.io.clone();

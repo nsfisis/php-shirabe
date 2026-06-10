@@ -920,15 +920,20 @@ impl PluginManager {
                                         "allow-plugins",
                                         PhpMixed::Array(allow_plugins.clone()),
                                     )?;
-                                // TODO(phase-b): get_config() returns &Config, but merge needs &mut Config; ownership needs refactoring
                                 let mut inner: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
                                 inner.insert(
                                     "allow-plugins".to_string(),
                                     Box::new(PhpMixed::Array(allow_plugins)),
                                 );
-                                let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
-                                wrap.insert("config".to_string(), PhpMixed::Array(inner));
-                                todo!("see TODO(phase-b) above");
+                                let mut config_section: IndexMap<String, Box<PhpMixed>> =
+                                    IndexMap::new();
+                                config_section
+                                    .insert("config".to_string(), Box::new(PhpMixed::Array(inner)));
+                                let wrap: IndexMap<String, PhpMixed> =
+                                    config_section.into_iter().map(|(k, v)| (k, *v)).collect();
+                                config
+                                    .borrow_mut()
+                                    .merge(&wrap, crate::config::Config::SOURCE_UNKNOWN);
                             }
                         }
 

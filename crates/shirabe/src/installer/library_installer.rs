@@ -189,8 +189,7 @@ impl LibraryInstaller {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.vendor_dir);
-        // TODO(phase-b): realpath returns Option<String>; PHP assigns to vendorDir even when false
-        self.vendor_dir = realpath(&self.vendor_dir).unwrap();
+        self.vendor_dir = realpath(&self.vendor_dir).unwrap_or_default();
     }
 
     pub(crate) fn get_download_manager(&self) -> &std::rc::Rc<std::cell::RefCell<DownloadManager>> {

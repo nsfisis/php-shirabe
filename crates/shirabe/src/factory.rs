@@ -419,10 +419,13 @@ impl Factory {
     }
 
     pub fn create_output() -> ConsoleOutput {
-        let _styles = Self::create_additional_styles();
-        // TODO(phase-b): OutputFormatter::new signature and ConsoleOutput::new_with_formatter missing
-        todo!(
-            "create_output: wire OutputFormatter into ConsoleOutput once the symfony console stubs are completed"
+        let styles = Self::create_additional_styles();
+        let formatter = OutputFormatter::new(false, styles);
+
+        ConsoleOutput::new(
+            shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL,
+            None,
+            Some(std::rc::Rc::new(std::cell::RefCell::new(formatter))),
         )
     }
 
@@ -678,9 +681,13 @@ impl Factory {
                         "Composer\\Package\\RootPackage",
                         Some(&cwd),
                     )?;
-                    // TODO(phase-b): set_package expects RootPackageInterface; loader returns BasePackage
-                    // composer.set_package(package);
-                    let _ = package;
+                    // load() builds a RootPackage of the requested class, so as_root() is always
+                    // Some; setPackage takes a RootPackageInterface in PHP.
+                    composer.set_package(
+                        package
+                            .as_root()
+                            .expect("RootPackageLoader::load returns a RootPackage"),
+                    );
 
                     // load local repository
                     self.add_local_repository(
@@ -853,7 +860,13 @@ impl Factory {
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
-            // TODO(phase-b): rm and im are owned by composer at this point; need to access via composer
+            // PHP: $this->purgePackages($rm->getLocalRepository(), $im);
+            // TODO(phase-c): the rm/im locals are still in scope (Rc-shared with composer), but
+            // purge_packages wants `&mut dyn InstalledRepositoryInterface` and
+            // RepositoryManager::get_local_repository yields a RepositoryInterfaceHandle that
+            // exposes no raw &mut InstalledRepositoryInterface view (only per-method helpers that
+            // borrow internally). Wiring this needs such an accessor plus completing
+            // purge_packages' removal body (repo.removePackage), which is itself still a stub.
             // self.purge_packages(rm.get_local_repository(), &mut im)?;
         }
 
@@ -1219,8 +1232,19 @@ impl Factory {
                 .unwrap_or_default(),
             Some("/"),
         );
-        // TODO(phase-b): BinaryInstaller is a PHP class so it can't be cloned. Sharing requires
-        // Rc<RefCell<BinaryInstaller>>; for now construct one per installer.
+        // PHP: $binaryInstaller = new BinaryInstaller(...);
+        //      $im->addInstaller(new LibraryInstaller($io, $composer, null, $fs, $binaryInstaller));
+        //      $im->addInstaller(new PluginInstaller($io, $composer, $fs, $binaryInstaller));
+        //      $im->addInstaller(new MetapackageInstaller($io));
+        // The same BinaryInstaller object is shared by the Library and Plugin installers.
+        // TODO(phase-c): two coupled blockers. (1) Sharing one BinaryInstaller requires
+        // Rc<RefCell<BinaryInstaller>>; LibraryInstaller/PluginInstaller currently own a
+        // `BinaryInstaller` by value. (2) Both installers' constructors take a
+        // PartialComposerWeakHandle, but create_default_installers runs (line 737) before the
+        // composer is wrapped in its shared Rc, so no weak handle is obtainable here yet —
+        // installer registration must move after the composer Rc is established. Both are part of
+        // the composer construction-ordering / shared-ownership rework, so no installers are
+        // registered for now.
         let _binary_installer = BinaryInstaller::new(
             io.clone(),
             bin_dir.clone(),

@@ -2264,11 +2264,12 @@ impl ShowCommand {
         ];
 
         for color in self.colors.iter() {
-            let _style = OutputFormatterStyle::new(Some(color.as_str()), None, None);
-            // TODO(phase-c): OutputInterface::get_formatter returns &OutputFormatter, but
-            // set_style requires &mut. Resolution requires interior-mutability refactor of
-            // OutputFormatter wiring across symfony shim.
-            let _ = (output.borrow().get_formatter(), color);
+            let style = OutputFormatterStyle::new(Some(color.as_str()), None, None);
+            output
+                .borrow()
+                .get_formatter()
+                .borrow_mut()
+                .set_style(color, style);
         }
     }
 

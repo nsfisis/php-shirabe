@@ -768,14 +768,16 @@ impl CreateProjectCommand {
             indexmap::IndexMap::new(),
         );
         if repositories.is_none() {
-            // TODO(phase-b): default_repos needs &mut RepositoryManager but we hold &RepositoryManager.
-            let _ = rm;
             repository_set.add_repository(crate::repository::RepositoryInterfaceHandle::new(
                 CompositeRepository::new(
-                    RepositoryFactory::default_repos(Some(io.clone()), Some(config.clone()), None)?
-                        .into_iter()
-                        .map(|(_, v)| v)
-                        .collect(),
+                    RepositoryFactory::default_repos(
+                        Some(io.clone()),
+                        Some(config.clone()),
+                        Some(&mut rm.borrow_mut()),
+                    )?
+                    .into_iter()
+                    .map(|(_, v)| v)
+                    .collect(),
                 ),
             ))?;
         } else {
@@ -903,6 +905,7 @@ impl CreateProjectCommand {
         let mut signal_handler: Option<SignalHandler> = None;
         if let Some(real_dir) = realpath(&directory) {
             let real_dir_clone = real_dir.clone();
+            let io_for_signal = io.clone();
             signal_handler = Some(SignalHandler::create(
                 vec![
                     SignalHandler::SIGINT.to_string(),
@@ -910,8 +913,11 @@ impl CreateProjectCommand {
                     SignalHandler::SIGHUP.to_string(),
                 ],
                 Box::new(move |signal: String, handler: &SignalHandler| {
-                    // TODO(phase-b): self.get_io().write_error(...) inside the closure
-                    let _ = &signal;
+                    io_for_signal.write_error3(
+                        &format!("Received {}, aborting", signal),
+                        true,
+                        crate::io::DEBUG,
+                    );
                     let mut fs = Filesystem::new(None);
                     fs.remove_directory(&real_dir_clone).ok();
                     handler.exit_with_last_signal();

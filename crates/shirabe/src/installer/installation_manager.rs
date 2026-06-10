@@ -117,7 +117,14 @@ impl InstallationManager {
 
         for installer in &self.installers {
             if installer.supports(&r#type) {
-                // TODO(phase-b): cache by cloning Box<dyn InstallerInterface> is non-trivial
+                // PHP: return $this->cache[$type] = $installer; — the cache holds the SAME
+                // installer instance as $this->installers.
+                // TODO(phase-c): faithfully sharing the instance requires storing installers as
+                // Rc<RefCell<dyn InstallerInterface>> (so the cache clones the Rc, not the value).
+                // That refactor is blocked because get_installer's result is used across `.await`
+                // points in download/install/update/uninstall, where a RefCell borrow cannot be
+                // held; it is coupled to the async/React-Promise execution rework this file's
+                // execute() path depends on. clone_box (itself a todo!()) is the placeholder.
                 self.cache.insert(r#type.clone(), installer.clone_box());
                 return Ok(self.cache.get_mut(&r#type).unwrap().as_mut());
             }
@@ -326,7 +333,14 @@ impl InstallationManager {
             }
             let installer = self.get_installer(&package.get_type())?;
 
-            // TODO(phase-b): closure captures installer + package; needs Rc-shared installer/package
+            // PHP: $cleanupPromises[$index] = function () use ($index, $installer, $type, $package) {
+            //   if (null === $package->getInstallationSource()) { return \React\Promise\resolve(null); }
+            //   return $installer->cleanup($type, $package); };
+            // TODO(phase-c): the cleanup callable must capture the installer and package and invoke
+            // installer.cleanup(...) returning a React promise. It is a 'static closure stored in
+            // cleanup_promises, so installer/package must be Rc-shared (the installer registry is
+            // not Rc yet, see get_installer) and the promise type must be modelled. Both depend on
+            // the async/React-Promise rework, so a no-op future is stored instead.
             let _ = installer;
             let op_type_clone = op_type.clone();
             let cleanup: Box<
@@ -507,7 +521,12 @@ impl InstallationManager {
                 .prepare(&op_type, package, initial_package)
                 .await?;
 
-            // TODO(phase-b): chain the install/update/uninstall step with cleanup_promises[index], repo.write, etc.
+            // PHP: $promise = $promise->then(fn() => $this->{$type}(...))->then($cleanupPromises[$index])
+            //      ->then(fn() => $repo->write($devMode, $this->io)); the chained steps run install/
+            //      update/uninstall, then cleanup, then persist the repository.
+            // TODO(phase-c): this promise chain (install step -> cleanup_promises[index] ->
+            // repo.write) needs the React\Promise model and the cleanup callables wired (see above);
+            // both stay todo!(), so only prepare() is awaited here.
             let _ = cleanup_promises.get(&index);
 
             let event_name_post = match op_type.as_str() {
@@ -518,7 +537,11 @@ impl InstallationManager {
             };
 
             if run_scripts && self.event_dispatcher.is_some() {
-                // TODO(phase-b): post-exec callback captures &mut dispatcher and operation
+                // PHP appends a post-exec step to the promise chain that dispatches the
+                // POST_PACKAGE_* event via the event dispatcher with repo/all_operations/operation.
+                // TODO(phase-c): the callback captures the event dispatcher (&mut) and the operation
+                // and must outlive the loop body; that requires the dispatcher behind Rc<RefCell>
+                // and the deferred event dispatch to be wired into the promise chain (todo!()).
                 let _ = event_name_post;
                 post_exec_callbacks.push(Box::new(|| {
                     // dispatcher.dispatch_package_event(event_name_post, dev_mode, repo, all_operations, operation);

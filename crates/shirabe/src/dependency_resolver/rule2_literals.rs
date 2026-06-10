@@ -1,7 +1,5 @@
 //! ref: composer/src/Composer/DependencyResolver/Rule2Literals.php
 
-use shirabe_php_shim::PhpMixed;
-
 use crate::dependency_resolver::{ReasonData, Rule, RuleBase};
 
 #[derive(Debug)]
@@ -12,7 +10,7 @@ pub struct Rule2Literals {
 }
 
 impl Rule2Literals {
-    pub fn new(literal1: i64, literal2: i64, reason: PhpMixed, reason_data: PhpMixed) -> Self {
+    pub fn new(literal1: i64, literal2: i64, reason: i64, reason_data: ReasonData) -> Self {
         let (literal1, literal2) = if literal1 < literal2 {
             (literal1, literal2)
         } else {
@@ -20,7 +18,7 @@ impl Rule2Literals {
         };
 
         Self {
-            inner: RuleBase::new(reason.as_int().unwrap_or(0), ReasonData::from(reason_data)),
+            inner: RuleBase::new(reason, reason_data),
             literal1,
             literal2,
         }

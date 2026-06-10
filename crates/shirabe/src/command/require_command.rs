@@ -202,8 +202,14 @@ impl RequireCommand {
             None
         };
 
-        // TODO(phase-b): closure captures `self` which requires complex borrow handling; the closure needs
-        // to call self.get_io().write_error(...), self.revert_composer_file(), and handler.exit_with_last_signal()
+        // PHP: function ($signal, $handler) use ($io, $self) {
+        //   $io->writeError('Received '.$signal.', aborting', true, IOInterface::DEBUG);
+        //   $self->revertComposerFile(); $handler->exitWithLastSignal(); }
+        // TODO(phase-c): SignalHandler::create takes a `Box<dyn Fn> + 'static` handler that cannot
+        // borrow &self, but the body must call self.revert_composer_file() (which mutates the
+        // command's composer.json backup state) and self.get_io(). Faithfully wiring this needs the
+        // revert state + io shared into the closure (Rc<RefCell<...>>), i.e. the shared-ownership
+        // rework of the command — the same pattern as InstallationManager::execute's signal handler.
         let signal_handler = SignalHandler::create(
             vec![
                 SignalHandler::SIGINT.to_string(),
@@ -211,8 +217,6 @@ impl RequireCommand {
                 SignalHandler::SIGHUP.to_string(),
             ],
             Box::new(move |signal: String, handler: &SignalHandler| {
-                // TODO(phase-b): self.get_io().write_error('Received '.$signal.', aborting', true, io_interface::DEBUG);
-                // TODO(phase-b): self.revert_composer_file();
                 let _ = signal;
                 handler.exit_with_last_signal();
             }),
@@ -733,8 +737,13 @@ impl RequireCommand {
         let mut composer = crate::command::composer_full_mut(&composer_handle);
 
         self.dependency_resolution_completed = false;
-        // TODO(phase-b): add_listener expects a Callable enum; PHP closure should set
-        // self.dependency_resolution_completed = true when invoked.
+        // PHP: $composer->getEventDispatcher()->addListener(InstallerEvents::PRE_OPERATIONS_EXEC,
+        //   function () use (&$dependencyResolutionCompleted) { $dependencyResolutionCompleted = true; }, 10000);
+        // TODO(phase-c): the event dispatcher's Callable::Closure is a placeholder variant that
+        // stores no actual closure, so the listener that flips dependency_resolution_completed
+        // cannot be registered. Resolving needs the closure model (Callable holding an Rc<dyn Fn>)
+        // plus dependency_resolution_completed shared (Rc<RefCell<bool>>) into both the listener
+        // and this command.
         composer.get_event_dispatcher().borrow_mut().add_listener(
             InstallerEvents::PRE_OPERATIONS_EXEC,
             crate::event_dispatcher::Callable::Closure,

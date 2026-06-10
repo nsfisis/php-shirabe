@@ -76,13 +76,11 @@ impl GlobalCommand {
             return self.run(input, output);
         }
 
-        // TODO(phase-b): sub_input/output need to be &mut for Application::run; placeholder marks.
-        let mut sub_input = self.prepare_subcommand_input(input, false)?;
+        let sub_input = self.prepare_subcommand_input(input, false)?;
         let mut app = self.get_application()?;
-        let _ = output;
         Ok(app.run(
             Some(std::rc::Rc::new(std::cell::RefCell::new(sub_input))),
-            None,
+            Some(output),
         )?)
     }
 

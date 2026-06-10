@@ -142,6 +142,10 @@ impl IOInterface for NullIO {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn as_base_io_mut(&mut self) -> Option<&mut dyn BaseIO> {
+        Some(self)
+    }
 }
 
 impl BaseIO for NullIO {

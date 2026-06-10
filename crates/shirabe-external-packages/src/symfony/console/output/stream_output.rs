@@ -1,4 +1,4 @@
-use crate::symfony::console::formatter::OutputFormatter;
+use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 
@@ -42,10 +42,13 @@ impl OutputInterface for StreamOutput {
     fn is_decorated(&self) -> bool {
         todo!()
     }
-    fn set_formatter(&self, _formatter: OutputFormatter) {
+    fn set_formatter(
+        &self,
+        _formatter: std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>,
+    ) {
         todo!()
     }
-    fn get_formatter(&self) -> &OutputFormatter {
+    fn get_formatter(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>> {
         todo!()
     }
     fn get_stream(&self) -> shirabe_php_shim::PhpResource {

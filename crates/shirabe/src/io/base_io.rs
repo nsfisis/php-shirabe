@@ -13,9 +13,6 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_merge, in_array, json_encode_ex,
 };
 
-// TODO(phase-b): default implementations in a subtrait cannot override supertrait methods in Rust;
-// write/write_error etc. from IOInterface are called through the supertrait and must be provided
-// by concrete types implementing both BaseIO and IOInterface.
 pub trait BaseIO: IOInterface {
     fn authentications(&self) -> &IndexMap<String, IndexMap<String, Option<String>>>;
     fn authentications_mut(&mut self) -> &mut IndexMap<String, IndexMap<String, Option<String>>>;

@@ -42,21 +42,6 @@ pub enum ReasonData {
     Fixed {
         package: BasePackageHandle,
     },
-    /// Phase B placeholder for an arbitrary PHP-side value not yet mapped to a real variant.
-    Mixed(PhpMixed),
-}
-
-impl From<PhpMixed> for ReasonData {
-    fn from(value: PhpMixed) -> Self {
-        // TODO(phase-b): callers should construct the appropriate variant directly;
-        // this catch-all keeps the rule constructors building while reason_data threading
-        // through PhpMixed in the resolver is still in transition.
-        match value {
-            PhpMixed::String(s) => ReasonData::String(s),
-            PhpMixed::Int(i) => ReasonData::Int(i),
-            other => ReasonData::Mixed(other),
-        }
-    }
 }
 
 // reason constants and // their reason data contents
@@ -106,8 +91,8 @@ impl Rule {
         &mut self.base_mut().bitfield
     }
 
-    fn reason_data(&self) -> Option<&ReasonData> {
-        self.base().reason_data.as_ref()
+    fn reason_data(&self) -> &ReasonData {
+        &self.base().reason_data
     }
 
     pub fn get_literals(&self) -> Vec<i64> {
@@ -161,8 +146,7 @@ impl Rule {
 
     /// @phpstan-return ReasonData
     pub fn get_reason_data(&self) -> &ReasonData {
-        // TODO(phase-b): reason_data() returns Option; PHP getReasonData unconditional
-        self.reason_data().unwrap()
+        self.reason_data()
     }
 
     pub fn get_required_package(&self) -> Option<String> {
@@ -774,7 +758,7 @@ impl std::fmt::Display for Rule {
 pub struct RuleBase {
     pub(crate) bitfield: i64,
     pub(crate) request: Option<Request>,
-    pub(crate) reason_data: Option<ReasonData>,
+    pub(crate) reason_data: ReasonData,
 }
 
 impl RuleBase {
@@ -788,7 +772,7 @@ impl RuleBase {
         Self {
             bitfield,
             request: None,
-            reason_data: Some(reason_data),
+            reason_data,
         }
     }
 

@@ -10,6 +10,7 @@ use shirabe_external_packages::symfony::console::SingleCommandApplication;
 use shirabe_external_packages::symfony::console::command::Command;
 use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
 use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
+use shirabe_external_packages::symfony::console::helper::HelperInterface;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputDefinition;
@@ -165,9 +166,14 @@ impl Application {
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i64> {
-        // TODO(phase-b): Factory::create_output returns ConsoleOutput, not std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>.
-        // The PHP code falls back to a default output when none is supplied; for now we
-        // forward the caller-provided output as-is.
+        let output = match output {
+            Some(output) => Some(output),
+            None => Some(
+                std::rc::Rc::new(std::cell::RefCell::new(Factory::create_output()))
+                    as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+            ),
+        };
+
         self.inner.run(input, output)
     }
 
@@ -183,10 +189,12 @@ impl Application {
             .borrow()
             .has_parameter_option(&["--no-scripts"], false);
 
-        // PHP: static $stdin = null;
-        // We use an Option here to mimic the lazy initialization.
-        // TODO(phase-b): stdin caching across calls needs proper resource handling; for
-        // now we recompute on each call via PhpMixed values to keep types consistent.
+        // PHP: static $stdin = null; — cached across doRun calls so the php://stdin handle is
+        // opened once.
+        // TODO(phase-c): faithfully caching the stdin resource across calls needs a real
+        // file-handle/resource model (PhpMixed currently boxes the handle opaquely) plus a
+        // function-static store. Recomputing per call is observably equivalent for a single
+        // invocation but differs if doRun is re-entered; deferred until the resource model lands.
         let stdin: PhpMixed = if defined("STDIN") {
             shirabe_php_shim::stdin_handle()
         } else {
@@ -200,23 +208,17 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        let mut helpers: Vec<PhpMixed> = vec![];
-        // TODO(phase-b): QuestionHelper does not yet implement the Helper trait;
-        // packing it as PhpMixed defers the issue.
-        helpers.push(PhpMixed::Null);
-        let _ = QuestionHelper;
-        // TODO(phase-b): ConsoleIO::new takes Box<dyn>, but here input/output are
-        // borrowed references — defer construction until ownership story is sorted.
-        let _ = ConsoleIO::new;
-        let _ = HelperSet::new(helpers);
-        // self.io stays as the NullIO that was set during construction.
-        let io_owned = self.io.clone();
-        let _ = io_owned;
+        // PHP: $this->io = new ConsoleIO($input, $output, new HelperSet([new QuestionHelper()]));
+        let helpers: Vec<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> =
+            vec![std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper))];
+        self.io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
+            input.clone(),
+            output.clone(),
+            HelperSet::new(helpers),
+        )));
 
         // Register error handler again to pass it the IO instance
-        // TODO(phase-b): ErrorHandler::register expects Box<dyn IOInterface + Send>,
-        // not a borrow; passing None until the IO sharing story is settled.
-        ErrorHandler::register(None);
+        ErrorHandler::register(Some(self.io.clone()));
 
         if input.borrow().has_parameter_option(&["--no-cache"], false) {
             self.io
@@ -259,8 +261,11 @@ impl Application {
         if let Some(ref raw) = raw_command_name {
             match self.inner.find(raw) {
                 Ok(cmd) => {
-                    // TODO(phase-b): BaseApplication::find returns PhpMixed; calling
-                    // get_name() requires a Command trait downcast that is not yet wired.
+                    // TODO(phase-c): the Symfony Application stub keeps its command registry as
+                    // PhpMixed with a todo!() find(), per the "Symfony stays todo!()" policy.
+                    // Reading the resolved command's getName() needs the full typed-command
+                    // registry, which lives in the external-package stub; until that is modelled
+                    // we cannot recover the bound command name here.
                     let _ = cmd;
                     command_name = Some(String::new());
                 }
@@ -440,8 +445,9 @@ impl Application {
                         plugin_warnings.push(format!("<warning>Plugin command {} ({}) would override a Composer command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         // Compatibility layer for symfony/console <7.4
-                        // TODO(phase-b): add_command/add accept PhpMixed; the symfony
-                        // stubs do not yet expose typed command insertion.
+                        // TODO(phase-c): registering a plugin command needs the Symfony
+                        // Application's typed add()/addCommand(); the external-package stub keeps
+                        // its registry as PhpMixed/todo!() per the "Symfony stays todo!()" policy.
                         let _ = command;
                     }
                 }
@@ -484,9 +490,10 @@ impl Application {
         let is_proxy_command = false;
         if let Some(ref name) = self.get_command_name_before_binding(input.clone()) {
             if let Ok(command) = self.inner.find(name) {
-                // TODO(phase-b): BaseApplication::find returns PhpMixed; we cannot yet
-                // extract a typed command name or detect proxy commands without the
-                // command trait downcast story.
+                // TODO(phase-c): same blocker as the earlier find() call — the Symfony command
+                // registry is a PhpMixed/todo!() stub, so the resolved command's name and its
+                // isProxyCommand() flag cannot be recovered until the typed-command registry is
+                // modelled in the external package.
                 let _ = command;
                 command_name = Some(String::new());
             }
@@ -681,20 +688,26 @@ impl Application {
                                             &dummy_str,
                                             vec![PhpMixed::String(script.clone())],
                                         );
-                                        // TODO(phase-b): SingleCommandApplication has no class_name() yet.
+                                        // TODO(phase-c): the script's command class is built by
+                                        // reflection (instantiate_class) and stays PhpMixed; the
+                                        // SingleCommandApplication / Command typed registry it
+                                        // belongs to is an external-package todo!() stub.
                                         let _ = SingleCommandApplication::new;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
-                                        // TODO(phase-b): cmd is PhpMixed; get_name/set_name/get_description/set_description
-                                        // require the command trait to be unwrapped. Defer until that lands.
+                                        // TODO(phase-c): cmd is the PhpMixed result of reflection
+                                        // instantiation; reading/overriding its
+                                        // name/description requires the typed Command model that
+                                        // the Symfony stub does not yet provide.
                                         let _ = description.clone();
                                         let _ = &mut cmd;
                                         cmd
                                     } else {
                                         // fallback to usual aliasing behavior
-                                        // TODO(phase-b): ScriptAliasCommand returns Result; bury it
-                                        // into PhpMixed::Null until the command-as-PhpMixed path is
-                                        // replaced by a typed trait object.
+                                        // TODO(phase-c): ScriptAliasCommand is a typed BaseCommand
+                                        // but this code path stores commands as PhpMixed; it can
+                                        // only be carried as a typed trait object once the Symfony
+                                        // command registry is modelled.
                                         let _ = ScriptAliasCommand::new(
                                             script.clone(),
                                             Some(description.clone()),
@@ -704,8 +717,9 @@ impl Application {
                                     };
 
                                     // Compatibility layer for symfony/console <7.4
-                                    // TODO(phase-b): add_command/add take PhpMixed but expect a
-                                    // command instance; pending typed-command rewiring.
+                                    // TODO(phase-c): self.inner.add() takes PhpMixed but must
+                                    // register a typed command instance; blocked on the Symfony
+                                    // command-registry model (external-package todo!() stub).
                                     let _ = self.inner.add(cmd);
                                 }
                             }
@@ -719,13 +733,15 @@ impl Application {
         let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
             if input.borrow().has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime(true));
-                // TODO(phase-b): enable_debugging is defined only on ConsoleIO, not
-                // through IOInterface. Skip until the IO concrete type is known here.
+                // PHP: $this->io->enableDebugging($startTime).
+                // TODO(phase-c): enableDebugging exists only on ConsoleIO, not on IOInterface,
+                // and self.io is still the NullIO because the ConsoleIO construction above is
+                // deferred (Symfony HelperSet/Helper modelling). Once self.io is the real
+                // ConsoleIO this becomes a concrete-type call on it.
                 let _ = start_time.unwrap();
             }
 
-            // TODO(phase-b): BaseApplication exposes only `run`, not `do_run`.
-            let result: i64 = todo!("BaseApplication::do_run");
+            let result: i64 = self.inner.do_run(input.clone(), output.clone())?;
 
             if input
                 .borrow()
@@ -1012,8 +1028,9 @@ impl Application {
                     } else {
                         if required {
                             self.io.write_error(&e.to_string());
-                            // TODO(phase-b): BaseApplication::are_exceptions_caught not yet
-                            // available; fall through to returning the error.
+                            if self.inner.are_exceptions_caught() {
+                                std::process::exit(1);
+                            }
                             return Err(e);
                         }
                     }
@@ -1027,8 +1044,10 @@ impl Application {
     /// Removes the cached composer instance
     pub fn reset_composer(&mut self) {
         self.composer = None;
-        // TODO(phase-b): reset_authentications is defined on BaseIO not IOInterface;
-        // skipped until the cross-trait dispatch story is settled.
+        let io = self.get_io();
+        if let Some(base_io) = io.borrow_mut().as_base_io_mut() {
+            base_io.reset_authentications();
+        }
     }
 
     /// Delegates to the underlying BaseApplication's `find` method (PHP Symfony Console).
@@ -1041,16 +1060,17 @@ impl Application {
     }
 
     pub fn get_help(&self) -> String {
-        // TODO(phase-b): BaseApplication::get_help is not yet exposed via the stub.
-        format!("{}{}", Self::LOGO, "")
+        format!("{}{}", Self::LOGO, self.inner.get_help())
     }
 
     /// Initializes all the composer commands.
     pub(crate) fn get_default_commands(&self) -> Vec<Box<dyn Command>> {
-        // TODO(phase-b): each shirabe command struct needs its own `impl Command` (the orphan
-        // rule disallowed a blanket `impl<C: HasBaseCommandData> Command for C`). Until those
-        // are written, expose only the inner symfony defaults.
-        // TODO(phase-b): BaseApplication::get_default_commands is not yet exposed.
+        // PHP: array_merge(parent::getDefaultCommands(), [new AboutCommand(), ...]).
+        // TODO(phase-c): the composer commands implement the shirabe BaseCommand trait, not the
+        // Symfony Command trait, and the orphan rule forbids a blanket
+        // `impl<C: HasBaseCommandData> Command for C`. Each command needs its own `impl Command`
+        // (or a wrapper) before they can be returned as `Box<dyn Command>`; the parent list is
+        // likewise a Symfony stub (get_default_commands returns Vec<PhpMixed>/todo!()).
         vec![]
     }
 
@@ -1061,7 +1081,13 @@ impl Application {
     ) -> Option<String> {
         let mut input = clone(&input);
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
-        // TODO(phase-b): BaseApplication::get_definition returns PhpMixed, not InputDefinition.
+        // PHP: $input = clone $input; try { $input->bind($this->getDefinition()); } catch (...) {}
+        //      return $input->getFirstArgument();
+        // TODO(phase-c): two blockers. (1) PHP clones the input so binding does not mutate the
+        // caller's instance; the `clone` php-shim must stay todo!() and dyn InputInterface has no
+        // deep-clone, so we cannot produce an independent copy to bind. (2) $this->getDefinition()
+        // returns the application's typed InputDefinition, but the Symfony Application stub returns
+        // PhpMixed. Until both land, getFirstArgument cannot be computed and we return None.
         let _ = input;
         let _ = self.inner.get_definition();
         None
@@ -1090,48 +1116,42 @@ impl Application {
     }
 
     pub(crate) fn get_default_input_definition(&self) -> InputDefinition {
-        // TODO(phase-b): BaseApplication::get_default_input_definition is not yet exposed.
-        let mut definition = InputDefinition::new(vec![]);
-        let _ = InputOption::new(
+        let mut definition = self.inner.get_default_input_definition();
+        definition.add_option(InputOption::new(
             "--profile",
             None,
             Some(InputOption::VALUE_NONE),
             "Display timing and memory usage information",
             PhpMixed::Null,
-        );
-        definition.add_option(PhpMixed::Null);
-        let _ = InputOption::new(
+        ));
+        definition.add_option(InputOption::new(
             "--no-plugins",
             None,
             Some(InputOption::VALUE_NONE),
             "Whether to disable plugins.",
             PhpMixed::Null,
-        );
-        definition.add_option(PhpMixed::Null);
-        let _ = InputOption::new(
+        ));
+        definition.add_option(InputOption::new(
             "--no-scripts",
             None,
             Some(InputOption::VALUE_NONE),
             "Skips the execution of all scripts defined in composer.json file.",
             PhpMixed::Null,
-        );
-        definition.add_option(PhpMixed::Null);
-        let _ = InputOption::new(
+        ));
+        definition.add_option(InputOption::new(
             "--working-dir",
             Some("-d"),
             Some(InputOption::VALUE_REQUIRED),
             "If specified, use the given directory as working directory.",
             PhpMixed::Null,
-        );
-        definition.add_option(PhpMixed::Null);
-        let _ = InputOption::new(
+        ));
+        definition.add_option(InputOption::new(
             "--no-cache",
             None,
             Some(InputOption::VALUE_NONE),
             "Prevent use of the cache",
             PhpMixed::Null,
-        );
-        definition.add_option(PhpMixed::Null);
+        ));
 
         definition
     }
@@ -1140,9 +1160,10 @@ impl Application {
         // TODO(plugin): plugin command discovery is part of the plugin API
         let commands: Vec<Box<dyn Command>> = vec![];
 
-        // TODO(phase-b): Composer is a PHP class (no Clone) and the plugin manager
-        // pathway needs PluginCapability downcasting. Defer the full implementation
-        // until those are available; for now return the empty command list.
+        // TODO(phase-c): discovering plugin-provided commands walks the PluginManager and
+        // downcasts each plugin's CommandProvider capability — this is the Plugin API surface,
+        // which is intentionally unimplemented (see TODO(plugin) above). Returns an empty list
+        // until the plugin capability model exists.
         let _ = self.get_composer(false, Some(false), None)?;
         let _ = UnexpectedValueException {
             message: String::new(),
