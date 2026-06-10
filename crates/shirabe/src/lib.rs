@@ -2,7 +2,6 @@ pub mod advisory;
 pub mod autoload;
 pub mod cache;
 pub mod command;
-pub mod compiler;
 pub mod composer;
 pub mod config;
 pub mod console;

@@ -1683,14 +1683,6 @@ pub fn http_build_query(_data: &[(&str, &str)], _sep_str: &str, _sep: &str) -> S
     todo!()
 }
 
-pub fn token_get_all(_source: &str) -> Vec<PhpMixed> {
-    todo!()
-}
-
-pub const T_COMMENT: i64 = 315;
-pub const T_DOC_COMMENT: i64 = 316;
-pub const T_WHITESPACE: i64 = 317;
-
 pub fn dirname_levels(_path: &str, _levels: i64) -> String {
     todo!()
 }

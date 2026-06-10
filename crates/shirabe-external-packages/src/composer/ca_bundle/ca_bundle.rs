@@ -16,8 +16,4 @@ impl CaBundle {
     pub fn validate_ca_file(_ca_file: &str, _logger: ()) -> bool {
         todo!()
     }
-
-    pub fn get_bundled_ca_bundle_path() -> String {
-        todo!()
-    }
 }
