@@ -2,7 +2,7 @@
 
 use shirabe::console::Application;
 use shirabe::util::Platform;
-use shirabe_php_shim::{realpath, server_argv};
+use shirabe_php_shim::realpath;
 
 fn main() {
     // TODO(phase-c): the full initialization process in composer/bin/composer should be ported
@@ -10,7 +10,7 @@ fn main() {
 
     Platform::put_env(
         "COMPOSER_BINARY",
-        &realpath(&server_argv()[0]).unwrap_or_default(),
+        &realpath(&std::env::args().next().unwrap_or_default()).unwrap_or_default(),
     );
 
     // run the command application

@@ -1820,10 +1820,6 @@ pub fn server_contains_key(_name: &str) -> bool {
     todo!()
 }
 
-pub fn server_argv() -> Vec<String> {
-    todo!()
-}
-
 /// PHP superglobal $_ENV access
 pub fn env_get(_name: &str) -> Option<String> {
     todo!()

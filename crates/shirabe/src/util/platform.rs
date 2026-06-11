@@ -8,8 +8,8 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, defined, env_contains_key, env_get, env_set, env_unset,
     file_exists, file_get_contents, fopen, fstat, function_exists, getcwd, getenv, in_array,
     ini_get, is_array, is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid,
-    posix_getuid, posix_isatty, putenv, realpath, server_argv, server_contains_key, server_get,
-    server_set, server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    posix_getuid, posix_isatty, putenv, realpath, server_contains_key, server_get, server_set,
+    server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 
 use crate::util::ProcessExecutor;
@@ -349,11 +349,9 @@ impl Platform {
         false
     }
 
-    /// @return bool Whether the current command is for bash completion
+    /// Whether the current command is for bash completion
     pub fn is_input_completion_process() -> bool {
-        // PHP: $_SERVER['argv'][1] ?? null
-        let argv = server_argv();
-        argv.get(1).map(|s| s.as_str()) == Some("_complete")
+        std::env::args().nth(1).as_deref() == Some("_complete")
     }
 
     pub fn workaround_filesystem_issues() {
