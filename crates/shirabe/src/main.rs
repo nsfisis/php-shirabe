@@ -5,7 +5,7 @@ use shirabe::util::Platform;
 use shirabe_php_shim::realpath;
 
 fn main() {
-    // TODO(phase-c): the full initialization process in composer/bin/composer should be ported
+    // TODO(php-runtime): the full initialization process in composer/bin/composer should be ported
     // somewhere else that communicates with the real PHP runtime.
 
     Platform::put_env(

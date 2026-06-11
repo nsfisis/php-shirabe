@@ -898,8 +898,12 @@ pub fn in_array(_needle: PhpMixed, _haystack: &PhpMixed, _strict: bool) -> bool 
     todo!()
 }
 
-pub fn realpath(_path: &str) -> Option<String> {
-    todo!()
+// TODO(phase-c): takes &Path and returns Option<PathBuf>
+pub fn realpath(path: &str) -> Option<String> {
+    std::path::Path::new(path)
+        .canonicalize()
+        .ok()
+        .and_then(|p| p.to_str().map(ToOwned::to_owned))
 }
 
 pub const JSON_UNESCAPED_UNICODE: i64 = 256;
@@ -1799,8 +1803,20 @@ pub fn getenv(_name: &str) -> Option<String> {
     std::env::var(_name).ok()
 }
 
-pub fn putenv(_setting: &str) -> bool {
-    todo!()
+// TODO(phase-c): only the simple `^(\w+)=(.+)$` form is supported.
+pub fn putenv(setting: &str) -> bool {
+    let is_word =
+        |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_');
+    let Some((name, value)) = setting.split_once('=') else {
+        panic!("putenv: unsupported setting format: {setting:?}");
+    };
+    if !is_word(name) {
+        panic!("putenv: unsupported setting format: {setting:?}");
+    }
+    unsafe {
+        std::env::set_var(name, value);
+    }
+    true
 }
 
 /// PHP superglobal $_SERVER access
@@ -1808,13 +1824,11 @@ pub fn server_get(_name: &str) -> Option<String> {
     todo!()
 }
 
-pub fn server_set(_name: &str, _value: String) {
-    todo!()
-}
+// TODO(php-runtime): modify the real PHP's $_SERVER.
+pub fn server_set(_name: &str, _value: String) {}
 
-pub fn server_unset(_name: &str) {
-    todo!()
-}
+// TODO(php-runtime): modify the real PHP's $_SERVER.
+pub fn server_unset(_name: &str) {}
 
 pub fn server_contains_key(_name: &str) -> bool {
     todo!()
@@ -1825,13 +1839,11 @@ pub fn env_get(_name: &str) -> Option<String> {
     todo!()
 }
 
-pub fn env_set(_name: &str, _value: String) {
-    todo!()
-}
+// TODO(php-runtime): modify the real PHP's $_ENV.
+pub fn env_set(_name: &str, _value: String) {}
 
-pub fn env_unset(_name: &str) {
-    todo!()
-}
+// TODO(php-runtime): modify the real PHP's $_ENV.
+pub fn env_unset(_name: &str) {}
 
 pub fn env_contains_key(_name: &str) -> bool {
     todo!()
