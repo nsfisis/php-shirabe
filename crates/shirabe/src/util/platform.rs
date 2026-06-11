@@ -425,9 +425,4 @@ impl Platform {
 
         "/dev/null".to_string()
     }
-
-    /// PHP: rename($from, $to) — wrap the std rename so callers can use Platform::rename.
-    pub fn rename(from: &str, to: &str) -> bool {
-        std::fs::rename(from, to).is_ok()
-    }
 }

@@ -417,19 +417,22 @@ impl std::fmt::Display for ErrorException {
 impl std::error::Error for ErrorException {}
 
 pub fn is_bool(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::Bool(_))
 }
 
 pub fn is_string(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::String(_))
 }
 
 pub fn is_int(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::Int(_))
 }
 
 pub fn is_scalar(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(
+        _value,
+        PhpMixed::Bool(_) | PhpMixed::Int(_) | PhpMixed::Float(_) | PhpMixed::String(_)
+    )
 }
 
 pub fn is_numeric(_value: &PhpMixed) -> bool {
@@ -441,7 +444,7 @@ pub fn strtotime(_time: &str) -> Option<i64> {
 }
 
 pub fn strcasecmp(_s1: &str, _s2: &str) -> i64 {
-    todo!()
+    _s1.to_ascii_lowercase().cmp(&_s2.to_ascii_lowercase()) as i64
 }
 
 pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
@@ -449,11 +452,11 @@ pub fn sprintf(_format: &str, _args: &[PhpMixed]) -> String {
 }
 
 pub fn array_values<V: Clone>(_array: &IndexMap<String, V>) -> Vec<V> {
-    todo!()
+    _array.values().cloned().collect()
 }
 
 pub fn array_keys<V>(_array: &IndexMap<String, V>) -> Vec<String> {
-    todo!()
+    _array.keys().cloned().collect()
 }
 
 pub fn str_replace(_search: &str, _replace: &str, _subject: &str) -> String {
@@ -477,15 +480,16 @@ pub fn spl_autoload_functions() -> Vec<PhpMixed> {
 }
 
 pub fn array_push(_array: &mut Vec<String>, _value: String) -> i64 {
-    todo!()
+    _array.push(_value);
+    _array.len() as i64
 }
 
 pub fn array_search_in_vec(_needle: &str, _haystack: &[String]) -> Option<usize> {
-    todo!()
+    _haystack.iter().position(|s| s.as_str() == _needle)
 }
 
 pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
-    todo!()
+    _array.iter().map(|s| _callback(s)).collect()
 }
 
 pub fn is_callable(_value: &PhpMixed) -> bool {
@@ -493,7 +497,7 @@ pub fn is_callable(_value: &PhpMixed) -> bool {
 }
 
 pub fn is_object(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::Object(_))
 }
 
 pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> bool {
@@ -501,27 +505,27 @@ pub fn is_a(_object_or_class: &PhpMixed, _class: &str, _allow_string: bool) -> b
 }
 
 pub fn str_contains(_haystack: &str, _needle: &str) -> bool {
-    todo!()
+    _haystack.contains(_needle)
 }
 
 pub fn str_starts_with(_haystack: &str, _needle: &str) -> bool {
-    todo!()
+    _haystack.starts_with(_needle)
 }
 
 pub fn str_ends_with(_haystack: &str, _needle: &str) -> bool {
-    todo!()
+    _haystack.ends_with(_needle)
 }
 
 pub fn strpos(_haystack: &str, _needle: &str) -> Option<usize> {
-    todo!()
+    _haystack.find(_needle)
 }
 
 pub fn strtoupper(_s: &str) -> String {
-    todo!()
+    _s.to_ascii_uppercase()
 }
 
 pub fn strlen(_s: &str) -> i64 {
-    todo!()
+    _s.len() as i64
 }
 
 pub fn krsort<V>(_array: &mut IndexMap<i64, V>) {
@@ -529,7 +533,7 @@ pub fn krsort<V>(_array: &mut IndexMap<i64, V>) {
 }
 
 pub fn max_i64(_a: i64, _b: i64) -> i64 {
-    todo!()
+    _a.max(_b)
 }
 
 pub fn count_mixed(_value: &PhpMixed) -> i64 {
@@ -653,7 +657,7 @@ pub fn strtr(_str: &str, _from: &str, _to: &str) -> String {
 }
 
 pub fn implode(_glue: &str, _pieces: &[String]) -> String {
-    todo!()
+    _pieces.join(_glue)
 }
 
 pub fn version_compare(_v1: &str, _v2: &str, _op: &str) -> bool {
@@ -1190,7 +1194,7 @@ pub fn hash_file(_algo: &str, _filename: &str) -> Option<String> {
 }
 
 pub fn filesize(_path: &str) -> Option<i64> {
-    todo!()
+    std::fs::metadata(_path).ok().map(|m| m.len() as i64)
 }
 
 pub fn random_int(_min: i64, _max: i64) -> i64 {
@@ -1204,7 +1208,7 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(_value: &T, _flags: i64) -> 
 pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
 
 pub fn is_array(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
 
 pub fn strnatcasecmp(_s1: &str, _s2: &str) -> i64 {
@@ -1212,7 +1216,7 @@ pub fn strnatcasecmp(_s1: &str, _s2: &str) -> i64 {
 }
 
 pub fn file_exists(_path: &str) -> bool {
-    todo!()
+    std::path::Path::new(_path).exists()
 }
 
 pub fn is_writable(_path: &str) -> bool {
@@ -1220,19 +1224,21 @@ pub fn is_writable(_path: &str) -> bool {
 }
 
 pub fn unlink(_path: &str) -> bool {
-    todo!()
+    std::fs::remove_file(_path).is_ok()
 }
 
 pub fn file_put_contents(_path: &str, _data: &[u8]) -> Option<i64> {
-    todo!()
+    std::fs::write(_path, _data)
+        .ok()
+        .map(|_| _data.len() as i64)
 }
 
 pub fn str_repeat(_s: &str, _count: usize) -> String {
-    todo!()
+    _s.repeat(_count)
 }
 
 pub fn strrpos(_haystack: &str, _needle: &str) -> Option<usize> {
-    todo!()
+    _haystack.rfind(_needle)
 }
 
 pub fn gzcompress(_data: &[u8]) -> Option<Vec<u8>> {
@@ -1244,11 +1250,13 @@ pub fn bzcompress(_data: &[u8]) -> Option<Vec<u8>> {
 }
 
 pub fn getcwd() -> Option<String> {
-    todo!()
+    std::env::current_dir()
+        .ok()
+        .map(|p| p.to_string_lossy().into_owned())
 }
 
 pub fn chdir(_path: &str) -> anyhow::Result<()> {
-    todo!()
+    Ok(std::env::set_current_dir(_path)?)
 }
 
 pub fn glob(_pattern: &str) -> Vec<String> {
@@ -1439,7 +1447,7 @@ pub fn stream_get_contents_with_max(stream: PhpMixed, max_length: Option<i64>) -
 }
 
 pub fn bin2hex(_data: &[u8]) -> String {
-    todo!()
+    _data.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 pub fn random_bytes(_length: usize) -> Vec<u8> {
@@ -1447,7 +1455,7 @@ pub fn random_bytes(_length: usize) -> Vec<u8> {
 }
 
 pub fn is_dir(_path: &str) -> bool {
-    todo!()
+    std::path::Path::new(_path).is_dir()
 }
 
 pub fn file_get_contents(_path: &str) -> Option<String> {
@@ -1465,15 +1473,15 @@ pub fn file_get_contents5(
 }
 
 pub fn strtolower(_s: &str) -> String {
-    todo!()
+    _s.to_ascii_lowercase()
 }
 
 pub fn ctype_alnum(_s: &str) -> bool {
-    todo!()
+    !_s.is_empty() && _s.bytes().all(|b| b.is_ascii_alphanumeric())
 }
 
 pub fn ord(_c: &str) -> i64 {
-    todo!()
+    _c.as_bytes().first().copied().unwrap_or(0) as i64
 }
 
 pub fn gethostname() -> String {
@@ -1503,11 +1511,15 @@ pub fn get_current_user() -> String {
 pub const FILE_IGNORE_NEW_LINES: i64 = 2;
 
 pub fn array_diff(_array1: &[String], _array2: &[String]) -> Vec<String> {
-    todo!()
+    _array1
+        .iter()
+        .filter(|&x| !_array2.contains(x))
+        .cloned()
+        .collect()
 }
 
 pub fn copy(_source: &str, _dest: &str) -> bool {
-    todo!()
+    std::fs::copy(_source, _dest).is_ok()
 }
 
 pub fn exec(
@@ -1547,11 +1559,11 @@ pub fn iterator_to_array<I>(iter: I) -> Vec<I::Item>
 where
     I: IntoIterator,
 {
-    todo!()
+    iter.into_iter().collect()
 }
 
 pub fn end_arr<V: Clone>(_array: &IndexMap<String, V>) -> Option<V> {
-    todo!()
+    _array.values().last().cloned()
 }
 
 pub fn fileowner(_filename: &str) -> Option<i64> {
@@ -1575,7 +1587,7 @@ pub fn key(_value: PhpMixed) -> Option<String> {
 }
 
 pub fn reset<T: Clone>(_array: &[T]) -> Option<T> {
-    todo!()
+    _array.first().cloned()
 }
 
 pub const OPENSSL_ALGO_SHA384: i64 = 9;
@@ -1584,11 +1596,15 @@ pub fn array_intersect_key(
     _array1: &IndexMap<String, PhpMixed>,
     _array2: &IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
-    todo!()
+    _array1
+        .iter()
+        .filter(|(k, _)| _array2.contains_key(k.as_str()))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
 }
 
 pub fn is_file(_path: &str) -> bool {
-    todo!()
+    std::path::Path::new(_path).is_file()
 }
 
 pub fn spl_object_hash<T: ?Sized>(_object: &T) -> String {
@@ -1607,7 +1623,9 @@ pub fn stream_context_create(
 }
 
 pub fn stripos(_haystack: &str, _needle: &str) -> Option<usize> {
-    todo!()
+    _haystack
+        .to_ascii_lowercase()
+        .find(_needle.to_ascii_lowercase().as_str())
 }
 
 pub fn php_uname(_mode: &str) -> String {
@@ -1651,7 +1669,10 @@ pub fn glob_with_flags(_pattern: &str, _flags: i64) -> Vec<String> {
 }
 
 pub fn time() -> i64 {
-    todo!()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
 }
 
 pub fn date(_format: &str, _timestamp: Option<i64>) -> String {
@@ -1663,7 +1684,7 @@ pub fn trigger_error(_message: &str, _error_level: i64) {
 }
 
 pub fn sys_get_temp_dir() -> String {
-    todo!()
+    std::env::temp_dir().to_string_lossy().into_owned()
 }
 
 pub fn json_decode(_s: &str, _assoc: bool) -> anyhow::Result<PhpMixed> {
@@ -1705,7 +1726,7 @@ pub fn array_search(_needle: &str, _haystack: &IndexMap<String, String>) -> Opti
 }
 
 pub fn strcmp(_s1: &str, _s2: &str) -> i64 {
-    todo!()
+    _s1.cmp(_s2) as i64
 }
 
 pub fn rtrim(_s: &str, _chars: Option<&str>) -> String {
@@ -1713,11 +1734,13 @@ pub fn rtrim(_s: &str, _chars: Option<&str>) -> String {
 }
 
 pub fn rmdir(_dir: &str) -> bool {
-    todo!()
+    std::fs::remove_dir(_dir).is_ok()
 }
 
 pub fn is_link(_path: &str) -> bool {
-    todo!()
+    std::fs::symlink_metadata(_path)
+        .map(|m| m.file_type().is_symlink())
+        .unwrap_or(false)
 }
 
 pub fn str_pad(_input: &str, _length: usize, _pad_string: &str, _pad_type: i64) -> String {
@@ -1729,7 +1752,7 @@ pub const STR_PAD_RIGHT: i64 = 1;
 pub const STR_PAD_BOTH: i64 = 2;
 
 pub fn abs(_value: i64) -> i64 {
-    todo!()
+    _value.abs()
 }
 
 pub fn ucfirst(_s: &str) -> String {
@@ -1741,7 +1764,7 @@ pub fn strval(_value: &PhpMixed) -> String {
 }
 
 pub fn usleep(_microseconds: u64) {
-    todo!()
+    std::thread::sleep(std::time::Duration::from_micros(_microseconds));
 }
 
 pub fn mb_strlen(_s: &str, _encoding: &str) -> i64 {
@@ -1773,7 +1796,7 @@ pub fn fstat(_stream: PhpMixed) -> PhpMixed {
 }
 
 pub fn getenv(_name: &str) -> Option<String> {
-    todo!()
+    std::env::var(_name).ok()
 }
 
 pub fn putenv(_setting: &str) -> bool {
@@ -1827,26 +1850,30 @@ pub fn count(_value: &PhpMixed) -> i64 {
 }
 
 pub fn array_shift<T>(_array: &mut Vec<T>) -> Option<T> {
-    todo!()
+    if _array.is_empty() {
+        None
+    } else {
+        Some(_array.remove(0))
+    }
 }
 
 pub fn array_pop<T>(_array: &mut Vec<T>) -> Option<T> {
-    todo!()
+    _array.pop()
 }
 
 pub fn array_unshift<T>(_array: &mut Vec<T>, _value: T) {
-    todo!()
+    _array.insert(0, _value);
 }
 
 pub fn array_reverse<T: Clone>(_array: &[T], _preserve_keys: bool) -> Vec<T> {
-    todo!()
+    _array.iter().rev().cloned().collect()
 }
 
 pub fn array_filter<T: Clone, F>(_array: &[T], _callback: F) -> Vec<T>
 where
     F: Fn(&T) -> bool,
 {
-    todo!()
+    _array.iter().filter(|&x| _callback(x)).cloned().collect()
 }
 
 pub fn array_filter_map<F>(
@@ -1856,32 +1883,40 @@ pub fn array_filter_map<F>(
 where
     F: Fn(&PhpMixed) -> bool,
 {
-    todo!()
+    _array
+        .iter()
+        .filter(|(_, v)| _callback(v.as_ref()))
+        .map(|(k, v)| (k.clone(), v.as_ref().clone()))
+        .collect()
 }
 
 pub fn array_all<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    todo!()
+    _array.iter().all(|x| _callback(x))
 }
 
 pub fn array_any<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    todo!()
+    _array.iter().any(|x| _callback(x))
 }
 
 pub fn array_reduce<T, U, F>(_array: &[T], _callback: F, _initial: U) -> U
 where
     F: Fn(U, &T) -> U,
 {
-    todo!()
+    _array.iter().fold(_initial, |acc, x| _callback(acc, x))
 }
 
 pub fn array_intersect<T: Clone + PartialEq>(_array1: &[T], _array2: &[T]) -> Vec<T> {
-    todo!()
+    _array1
+        .iter()
+        .filter(|&x| _array2.contains(x))
+        .cloned()
+        .collect()
 }
 
 pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
@@ -1889,15 +1924,17 @@ pub fn mkdir(_pathname: &str, _mode: u32, _recursive: bool) -> bool {
 }
 
 pub fn rename(_old_name: &str, _new_name: &str) -> bool {
-    todo!()
+    std::fs::rename(_old_name, _new_name).is_ok()
 }
 
 pub fn clearstatcache() {
-    todo!()
+    // Rust performs a fresh syscall for every metadata query; there is no stat
+    // cache to invalidate.
 }
 
 pub fn clearstatcache2(_clear_realpath_cache: bool, _filename: &str) {
-    todo!()
+    // Rust performs a fresh syscall for every metadata query; there is no stat
+    // cache to invalidate.
 }
 
 pub fn disk_free_space(_directory: &str) -> Option<f64> {
@@ -1905,7 +1942,11 @@ pub fn disk_free_space(_directory: &str) -> Option<f64> {
 }
 
 pub fn filemtime(_filename: &str) -> Option<i64> {
-    todo!()
+    std::fs::metadata(_filename)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
 }
 
 /// Equivalent to PHP's __DIR__ magic constant
@@ -1923,15 +1964,19 @@ pub fn array_flip(_array: &PhpMixed) -> PhpMixed {
 }
 
 pub fn array_flip_strings(_array: &[String]) -> IndexMap<String, PhpMixed> {
-    todo!()
+    _array
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.clone(), PhpMixed::Int(i as i64)))
+        .collect()
 }
 
 pub fn max(_a: i64, _b: i64) -> i64 {
-    todo!()
+    _a.max(_b)
 }
 
 pub fn array_key_exists<V>(_key: &str, _array: &IndexMap<String, V>) -> bool {
-    todo!()
+    _array.contains_key(_key)
 }
 
 pub fn fgets(_handle: PhpMixed) -> Option<String> {
@@ -1955,7 +2000,7 @@ pub fn ltrim(_s: &str, _chars: Option<&str>) -> String {
 }
 
 pub fn floor(_value: f64) -> f64 {
-    todo!()
+    _value.floor()
 }
 
 pub fn chr(_value: u8) -> String {
@@ -1993,7 +2038,7 @@ pub fn json_last_error() -> i64 {
 }
 
 pub fn sort<T: Ord>(_array: &mut Vec<T>) {
-    todo!()
+    _array.sort();
 }
 
 pub fn sort_with_flags<T: Ord>(_array: &mut Vec<T>, _flags: i64) {
@@ -2010,7 +2055,8 @@ pub fn usort<T, F>(_array: &mut Vec<T>, _compare: F)
 where
     F: FnMut(&T, &T) -> i64,
 {
-    todo!()
+    let mut compare = _compare;
+    _array.sort_by(|a, b| compare(a, b).cmp(&0));
 }
 
 pub fn ksort<V>(_array: &mut IndexMap<String, V>) {
@@ -2018,7 +2064,7 @@ pub fn ksort<V>(_array: &mut IndexMap<String, V>) {
 }
 
 pub fn is_null(_value: &PhpMixed) -> bool {
-    todo!()
+    matches!(_value, PhpMixed::Null)
 }
 
 pub fn r#eval(_code: &str) -> PhpMixed {
@@ -2043,7 +2089,7 @@ pub fn array_pop_first<T>(_array: &mut Vec<T>) -> Option<T> {
 }
 
 pub fn reset_first<T: Clone>(_array: &[T]) -> Option<T> {
-    todo!()
+    _array.first().cloned()
 }
 
 pub fn call_user_func<T>(_callback: &str, _args: &[PhpMixed]) -> T
@@ -2085,7 +2131,7 @@ pub fn array_map<T, U, F>(_callback: F, _array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
 {
-    todo!()
+    _array.iter().map(|x| _callback(x)).collect()
 }
 
 impl Phar {
@@ -2229,7 +2275,7 @@ pub fn date_default_timezone_set(_tz: &str) -> bool {
 }
 
 pub fn getmypid() -> i64 {
-    todo!()
+    std::process::id() as i64
 }
 
 pub fn ini_set(_varname: &str, _value: &str) -> Option<String> {
@@ -2268,7 +2314,11 @@ pub fn array_filter_use_key(
     _array: &IndexMap<String, PhpMixed>,
     _callback: Box<dyn Fn(&str) -> bool>,
 ) -> IndexMap<String, PhpMixed> {
-    todo!()
+    _array
+        .iter()
+        .filter(|(k, _)| _callback(k.as_str()))
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
 }
 
 pub fn escapeshellcmd(_command: &str) -> String {
@@ -2280,7 +2330,7 @@ pub fn system(_command: &str, _result_code: Option<&mut i64>) -> Option<String> 
 }
 
 pub fn array_chunk<T: Clone>(_array: &[T], _size: i64, _preserve_keys: bool) -> Vec<Vec<T>> {
-    todo!()
+    _array.chunks(_size as usize).map(|c| c.to_vec()).collect()
 }
 
 pub fn number_format(
@@ -2297,15 +2347,16 @@ pub fn is_executable(_path: &str) -> bool {
 }
 
 pub fn gc_collect_cycles() -> i64 {
-    todo!()
+    // Rust has no cycle collector; nothing is collected.
+    0
 }
 
 pub fn gc_disable() {
-    todo!()
+    // Rust has no cycle collector to disable.
 }
 
 pub fn gc_enable() {
-    todo!()
+    // Rust has no cycle collector to enable.
 }
 
 pub fn addcslashes(_string: &str, _charlist: &str) -> String {
@@ -2324,11 +2375,15 @@ where
 }
 
 pub fn end<V: Clone>(_array: &[V]) -> Option<V> {
-    todo!()
+    _array.last().cloned()
 }
 
 pub fn fileatime(_filename: &str) -> Option<i64> {
-    todo!()
+    std::fs::metadata(_filename)
+        .ok()
+        .and_then(|m| m.accessed().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs() as i64)
 }
 
 pub fn fread(_handle: PhpMixed, _length: i64) -> Option<String> {
@@ -2351,11 +2406,14 @@ pub fn array_diff_key(
     _array1: IndexMap<String, PhpMixed>,
     _array2: &IndexMap<String, PhpMixed>,
 ) -> IndexMap<String, PhpMixed> {
-    todo!()
+    _array1
+        .into_iter()
+        .filter(|(k, _)| !_array2.contains_key(k.as_str()))
+        .collect()
 }
 
 pub fn min(_a: i64, _b: i64) -> i64 {
-    todo!()
+    _a.min(_b)
 }
 
 pub fn escapeshellarg(_arg: &str) -> String {

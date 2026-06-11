@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     RuntimeException, UnexpectedValueException, ZipArchive, array_keys, array_replace_recursive,
     class_exists, dirname, extension_loaded, file_exists, file_get_contents, file_put_contents,
     implode, in_array, is_array, is_dir, is_file, is_string, json_decode, mkdir, pathinfo,
-    realpath, str_replace, strpos, strtr, substr, trim,
+    realpath, rename, str_replace, strpos, strtr, substr, trim,
 };
 
 use crate::autoload::AutoloadGenerator;
@@ -182,7 +182,7 @@ impl Factory {
             {
                 let from = format!("{}/cache", home);
                 let to = format!("{}/Library/Caches/composer", user_dir);
-                let _ = Silencer::call(|| Ok::<bool, anyhow::Error>(Platform::rename(&from, &to)));
+                let _ = Silencer::call(|| Ok::<bool, anyhow::Error>(rename(&from, &to)));
             }
 
             return Ok(format!("{}/Library/Caches/composer", user_dir));
