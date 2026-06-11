@@ -6,12 +6,12 @@ use indexmap::IndexMap;
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_external_packages::symfony::console::Application as BaseApplication;
-use shirabe_external_packages::symfony::console::SingleCommandApplication;
 use shirabe_external_packages::symfony::console::command::Command;
 use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
 use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
 use shirabe_external_packages::symfony::console::helper::HelperInterface;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::HelperSetKey;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputDefinition;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -103,8 +103,9 @@ impl Application {
     const LOGO: &'static str = "   ______\n  / ____/___  ____ ___  ____  ____  ________  _____\n / /   / __ \\/ __ `__ \\/ __ \\/ __ \\/ ___/ _ \\/ ___/\n/ /___/ /_/ / / / / / / /_/ / /_/ (__  )  __/ /\n\\____/\\____/_/ /_/ /_/ .___/\\____/____/\\___/_/\n                    /_/\n";
 
     pub fn new(name: String, mut version: String) -> Self {
-        let mut inner = BaseApplication::new(&name, &version);
-        inner.set_catch_errors(true);
+        // PHP: if (method_exists($this, 'setCatchErrors')) { $this->setCatchErrors(true); }
+        // This Symfony Console port does not provide `setCatchErrors`, so the guarded call
+        // is skipped, matching `method_exists` evaluating to false.
 
         // PHP: static $shutdownRegistered = false; — register only once globally
         static SHUTDOWN_REGISTERED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
@@ -147,8 +148,7 @@ impl Application {
         let initial_working_directory = getcwd();
 
         // PHP: parent::__construct($name, $version);
-        // BaseApplication is mock-imported; assume new(name, version) above also recorded the version.
-        let _ = (name, version);
+        let inner = BaseApplication::__construct(&name, &version);
 
         Self {
             inner,
@@ -184,10 +184,10 @@ impl Application {
     ) -> anyhow::Result<i64> {
         self.disable_plugins_by_default = input
             .borrow()
-            .has_parameter_option(&["--no-plugins"], false);
+            .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
         self.disable_scripts_by_default = input
             .borrow()
-            .has_parameter_option(&["--no-scripts"], false);
+            .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
 
         // PHP: static $stdin = null; — cached across doRun calls so the php://stdin handle is
         // opened once.
@@ -209,18 +209,29 @@ impl Application {
         }
 
         // PHP: $this->io = new ConsoleIO($input, $output, new HelperSet([new QuestionHelper()]));
-        let helpers: Vec<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> =
-            vec![std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper))];
+        let mut helpers: IndexMap<
+            HelperSetKey,
+            std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
+        > = IndexMap::new();
+        helpers.insert(
+            HelperSetKey::Int(0),
+            std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default())),
+        );
+        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
+        HelperSet::new(&helper_set, helpers);
         self.io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
             input.clone(),
             output.clone(),
-            HelperSet::new(helpers),
+            helper_set.borrow().clone(),
         )));
 
         // Register error handler again to pass it the IO instance
         ErrorHandler::register(Some(self.io.clone()));
 
-        if input.borrow().has_parameter_option(&["--no-cache"], false) {
+        if input
+            .borrow()
+            .has_parameter_option(PhpMixed::from(vec!["--no-cache"]), false)
+        {
             self.io
                 .write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
@@ -308,10 +319,22 @@ impl Application {
             && !file_exists(&Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
-                || (input.borrow().has_parameter_option(&["--file"], true) == false
-                    && input.borrow().has_parameter_option(&["-f"], true) == false))
-            && input.borrow().has_parameter_option(&["--help"], true) == false
-            && input.borrow().has_parameter_option(&["-h"], true) == false
+                || (input
+                    .borrow()
+                    .has_parameter_option(PhpMixed::from(vec!["--file"]), true)
+                    == false
+                    && input
+                        .borrow()
+                        .has_parameter_option(PhpMixed::from(vec!["-f"]), true)
+                        == false))
+            && input
+                .borrow()
+                .has_parameter_option(PhpMixed::from(vec!["--help"]), true)
+                == false
+            && input
+                .borrow()
+                .has_parameter_option(PhpMixed::from(vec!["-h"]), true)
+                == false
         {
             let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
@@ -394,7 +417,7 @@ impl Application {
         ]);
         let may_need_plugin_command = !input
             .borrow()
-            .has_parameter_option(&["--version", "-V"], false)
+            .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), false)
             && (command_name.is_none()
                 || in_array(
                     command_name.as_deref().unwrap_or("").into(),
@@ -692,7 +715,7 @@ impl Application {
                                         // reflection (instantiate_class) and stays PhpMixed; the
                                         // SingleCommandApplication / Command typed registry it
                                         // belongs to is an external-package todo!() stub.
-                                        let _ = SingleCommandApplication::new;
+                                        // let _ = SingleCommandApplication::new;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
                                         // TODO(phase-c): cmd is the PhpMixed result of reflection
@@ -717,10 +740,15 @@ impl Application {
                                     };
 
                                     // Compatibility layer for symfony/console <7.4
-                                    // TODO(phase-c): self.inner.add() takes PhpMixed but must
-                                    // register a typed command instance; blocked on the Symfony
-                                    // command-registry model (external-package todo!() stub).
-                                    let _ = self.inner.add(cmd);
+                                    // TODO(phase-c): self.inner.add() takes Rc<RefCell<dyn Command>>
+                                    // but `cmd` here is the PhpMixed result of reflection-based
+                                    // plugin command instantiation; registering it as a typed
+                                    // command instance is blocked on the Symfony command-registry
+                                    // model (external-package todo!() stub).
+                                    let _ = &cmd;
+                                    todo!(
+                                        "plugin: register reflection-instantiated command on Application::add"
+                                    );
                                 }
                             }
                         }
@@ -731,7 +759,10 @@ impl Application {
 
         let mut start_time: Option<f64> = None;
         let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
-            if input.borrow().has_parameter_option(&["--profile"], false) {
+            if input
+                .borrow()
+                .has_parameter_option(PhpMixed::from(vec!["--profile"]), false)
+            {
                 start_time = Some(microtime(true));
                 // PHP: $this->io->enableDebugging($startTime).
                 // TODO(phase-c): enableDebugging exists only on ConsoleIO, not on IOInterface,
@@ -745,7 +776,7 @@ impl Application {
 
             if input
                 .borrow()
-                .has_parameter_option(&["--version", "-V"], true)
+                .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), true)
             {
                 self.io.write_error(&sprintf(
                     "<info>PHP</info> version <comment>%s</comment> (%s)",
@@ -828,7 +859,11 @@ impl Application {
     ) -> anyhow::Result<Option<String>> {
         let working_dir = input
             .borrow()
-            .get_parameter_option(&["--working-dir", "-d"], PhpMixed::Null, true)
+            .get_parameter_option(
+                PhpMixed::from(vec!["--working-dir", "-d"]),
+                PhpMixed::Null,
+                true,
+            )
             .as_string()
             .map(|s| s.to_string());
         if let Some(ref wd) = working_dir {
@@ -1089,7 +1124,6 @@ impl Application {
         // returns the application's typed InputDefinition, but the Symfony Application stub returns
         // PhpMixed. Until both land, getFirstArgument cannot be computed and we return None.
         let _ = input;
-        let _ = self.inner.get_definition();
         None
     }
 
@@ -1115,45 +1149,45 @@ impl Application {
         )
     }
 
-    pub(crate) fn get_default_input_definition(&self) -> InputDefinition {
+    pub(crate) fn get_default_input_definition(&self) -> anyhow::Result<InputDefinition> {
         let mut definition = self.inner.get_default_input_definition();
         definition.add_option(InputOption::new(
             "--profile",
-            None,
-            Some(InputOption::VALUE_NONE),
-            "Display timing and memory usage information",
             PhpMixed::Null,
-        ));
+            Some(InputOption::VALUE_NONE),
+            "Display timing and memory usage information".to_string(),
+            PhpMixed::Null,
+        )?)?;
         definition.add_option(InputOption::new(
             "--no-plugins",
-            None,
-            Some(InputOption::VALUE_NONE),
-            "Whether to disable plugins.",
             PhpMixed::Null,
-        ));
+            Some(InputOption::VALUE_NONE),
+            "Whether to disable plugins.".to_string(),
+            PhpMixed::Null,
+        )?)?;
         definition.add_option(InputOption::new(
             "--no-scripts",
-            None,
-            Some(InputOption::VALUE_NONE),
-            "Skips the execution of all scripts defined in composer.json file.",
             PhpMixed::Null,
-        ));
+            Some(InputOption::VALUE_NONE),
+            "Skips the execution of all scripts defined in composer.json file.".to_string(),
+            PhpMixed::Null,
+        )?)?;
         definition.add_option(InputOption::new(
             "--working-dir",
-            Some("-d"),
+            PhpMixed::from("-d"),
             Some(InputOption::VALUE_REQUIRED),
-            "If specified, use the given directory as working directory.",
+            "If specified, use the given directory as working directory.".to_string(),
             PhpMixed::Null,
-        ));
+        )?)?;
         definition.add_option(InputOption::new(
             "--no-cache",
-            None,
-            Some(InputOption::VALUE_NONE),
-            "Prevent use of the cache",
             PhpMixed::Null,
-        ));
+            Some(InputOption::VALUE_NONE),
+            "Prevent use of the cache".to_string(),
+            PhpMixed::Null,
+        )?)?;
 
-        definition
+        Ok(definition)
     }
 
     fn get_plugin_commands(&mut self) -> anyhow::Result<Vec<Box<dyn Command>>> {

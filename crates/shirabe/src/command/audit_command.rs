@@ -85,7 +85,7 @@ impl AuditCommand {
 
         let abandoned = input
             .borrow()
-            .get_option("abandoned")
+            .get_option("abandoned")?
             .as_string()
             .map(|s| s.to_string());
         if abandoned.is_some()
@@ -115,7 +115,7 @@ impl AuditCommand {
 
         let mut ignore_severities: indexmap::IndexMap<String, Option<String>> =
             indexmap::IndexMap::new();
-        let cli_severities = input.borrow().get_option("ignore-severity");
+        let cli_severities = input.borrow().get_option("ignore-severity")?;
         if let Some(list) = cli_severities.as_list() {
             for sev in list {
                 if let Some(s) = sev.as_string() {
@@ -128,7 +128,7 @@ impl AuditCommand {
         }
         let ignore_unreachable = input
             .borrow()
-            .get_option("ignore-unreachable")
+            .get_option("ignore-unreachable")?
             .as_bool()
             .unwrap_or(false)
             || audit_config.ignore_unreachable;
@@ -158,7 +158,7 @@ impl AuditCommand {
         let mut composer = crate::command::composer_full_mut(composer);
         if input
             .borrow()
-            .get_option("locked")
+            .get_option("locked")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -173,7 +173,7 @@ impl AuditCommand {
             let locked_repo = locker.get_locked_repository(
                 !input
                     .borrow()
-                    .get_option("no-dev")
+                    .get_option("no-dev")?
                     .as_bool()
                     .unwrap_or(false),
             )?;

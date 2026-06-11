@@ -123,6 +123,7 @@ pub trait PackageDiscoveryTrait {
                 &input
                     .borrow()
                     .get_option("stability")
+                    .expect("get_minimum_stability returns String, not Result; stability option is guaranteed present by the has_option guard above")
                     .as_string()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "stable".to_string()),

@@ -53,7 +53,7 @@ impl SearchCommand {
 
         let format = input
             .borrow()
-            .get_option("format")
+            .get_option("format")?
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| "text".to_string());
@@ -109,13 +109,13 @@ impl SearchCommand {
         let mut mode: i64 = repository_interface::SEARCH_FULLTEXT;
         if input
             .borrow()
-            .get_option("only-name")
+            .get_option("only-name")?
             .as_bool()
             .unwrap_or(false)
         {
             if input
                 .borrow()
-                .get_option("only-vendor")
+                .get_option("only-vendor")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -128,7 +128,7 @@ impl SearchCommand {
             mode = repository_interface::SEARCH_NAME;
         } else if input
             .borrow()
-            .get_option("only-vendor")
+            .get_option("only-vendor")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -137,11 +137,11 @@ impl SearchCommand {
 
         let r#type = input
             .borrow()
-            .get_option("type")
+            .get_option("type")?
             .as_string()
             .map(|s| s.to_string());
 
-        let tokens_arg = input.borrow().get_argument("tokens");
+        let tokens_arg = input.borrow().get_argument("tokens")?;
         let token_strings: Vec<String> = tokens_arg
             .as_array()
             .map(|arr| {
@@ -182,7 +182,7 @@ impl SearchCommand {
                 if let Some(link) = link {
                     io.write(&format!(
                         "<href={}>{}</>{}{}{}",
-                        OutputFormatter::escape(link),
+                        OutputFormatter::escape(link)?,
                         result.name,
                         " ".repeat(name_length as usize - result.name.len()),
                         warning,

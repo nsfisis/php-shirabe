@@ -3,7 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
 
 #[derive(Debug)]
 pub struct HtmlOutputFormatter {
@@ -41,14 +42,19 @@ impl HtmlOutputFormatter {
         //8 => "conceal"
     ];
 
-    pub fn new(styles: IndexMap<String, OutputFormatterStyle>) -> Self {
+    pub fn new(styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>>) -> Self {
         Self {
             inner: OutputFormatter::new(true, styles),
         }
     }
 
-    pub fn format(&self, message: Option<&str>) -> Option<String> {
-        let formatted = self.inner.format(message.unwrap_or(""));
+    pub fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>> {
+        let formatted = self.inner.format(message)?;
+
+        let formatted = match formatted {
+            Some(formatted) => formatted,
+            None => return Ok(None),
+        };
 
         let clear_escape_codes = "(?:39|49|0|22|24|25|27|28)";
         let pattern = format!(
@@ -56,7 +62,11 @@ impl HtmlOutputFormatter {
             clear_escape_codes, clear_escape_codes
         );
 
-        Preg::replace_callback(&pattern, |matches| self.format_html(matches), &formatted).ok()
+        Ok(Some(Preg::replace_callback(
+            &pattern,
+            |matches| self.format_html(matches),
+            &formatted,
+        )?))
     }
 
     fn format_html(&self, matches: &IndexMap<CaptureKey, String>) -> String {

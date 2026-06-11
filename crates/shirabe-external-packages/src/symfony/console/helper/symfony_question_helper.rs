@@ -1,0 +1,182 @@
+use crate::symfony::console::formatter::output_formatter::OutputFormatter;
+use crate::symfony::console::helper::question_helper::QuestionHelper;
+use crate::symfony::console::output::output_interface;
+use crate::symfony::console::output::output_interface::OutputInterface;
+use crate::symfony::console::question::choice_question::ChoiceQuestion;
+use crate::symfony::console::question::confirmation_question::ConfirmationQuestion;
+use crate::symfony::console::question::question::Question;
+use crate::symfony::console::style::symfony_style::SymfonyStyle;
+use shirabe_php_shim::AsAny;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+
+/// Symfony Style Guide compliant question helper.
+#[derive(Debug, Default)]
+pub struct SymfonyQuestionHelper {
+    inner: QuestionHelper,
+}
+
+impl SymfonyQuestionHelper {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn write_prompt(
+        &self,
+        output: Rc<RefCell<dyn OutputInterface>>,
+        question: &Question,
+    ) {
+        let mut text = OutputFormatter::escape_trailing_backslash(&question.get_question());
+        let default = question.get_default();
+
+        if question.is_multiline() {
+            text += &shirabe_php_shim::sprintf(
+                " (press %s to continue)",
+                &[PhpMixed::String(self.get_eof_shortcut())],
+            );
+        }
+
+        // switch (true)
+        if matches!(default, PhpMixed::Null) {
+            text = shirabe_php_shim::sprintf(" <info>%s</info>:", &[PhpMixed::String(text)]);
+        } else if question
+            .as_any()
+            .downcast_ref::<ConfirmationQuestion>()
+            .is_some()
+        {
+            text = shirabe_php_shim::sprintf(
+                " <info>%s (yes/no)</info> [<comment>%s</comment>]:",
+                &[
+                    PhpMixed::String(text),
+                    PhpMixed::String(
+                        if shirabe_php_shim::boolval(&default) {
+                            "yes"
+                        } else {
+                            "no"
+                        }
+                        .to_string(),
+                    ),
+                ],
+            );
+        } else if let Some(choice_question) = question
+            .as_any()
+            .downcast_ref::<ChoiceQuestion>()
+            .filter(|q| q.is_multiselect())
+        {
+            let choices = choice_question.get_choices();
+            let default_parts = shirabe_php_shim::explode(",", &default.to_string());
+
+            let resolved: Vec<String> = default_parts
+                .iter()
+                .map(|value| {
+                    choices
+                        .get(&shirabe_php_shim::trim(value, None))
+                        .map(|v| v.to_string())
+                        .unwrap()
+                })
+                .collect();
+
+            text = shirabe_php_shim::sprintf(
+                " <info>%s</info> [<comment>%s</comment>]:",
+                &[
+                    PhpMixed::String(text),
+                    PhpMixed::String(OutputFormatter::escape(&resolved.join(", ")).unwrap()),
+                ],
+            );
+        } else if let Some(choice_question) = question.as_any().downcast_ref::<ChoiceQuestion>() {
+            let choices = choice_question.get_choices();
+            text = shirabe_php_shim::sprintf(
+                " <info>%s</info> [<comment>%s</comment>]:",
+                &[
+                    PhpMixed::String(text),
+                    PhpMixed::String(
+                        OutputFormatter::escape(
+                            &choices
+                                .get(&default.to_string())
+                                .map(|v| (**v).clone())
+                                .unwrap_or(default.clone())
+                                .to_string(),
+                        )
+                        .unwrap(),
+                    ),
+                ],
+            );
+        } else {
+            text = shirabe_php_shim::sprintf(
+                " <info>%s</info> [<comment>%s</comment>]:",
+                &[
+                    PhpMixed::String(text),
+                    PhpMixed::String(OutputFormatter::escape(&default.to_string()).unwrap()),
+                ],
+            );
+        }
+
+        output
+            .borrow()
+            .writeln(&[text], output_interface::OUTPUT_NORMAL);
+
+        let mut prompt = " > ".to_string();
+
+        if let Some(choice_question) = question.as_any().downcast_ref::<ChoiceQuestion>() {
+            output.borrow().writeln(
+                &self
+                    .inner
+                    .format_choice_question_choices(choice_question, "comment"),
+                output_interface::OUTPUT_NORMAL,
+            );
+
+            prompt = choice_question.get_prompt().to_string();
+        }
+
+        output
+            .borrow()
+            .write(&[prompt], false, output_interface::OUTPUT_NORMAL);
+    }
+
+    pub(crate) fn write_error(
+        &self,
+        output: Rc<RefCell<dyn OutputInterface>>,
+        error: &shirabe_php_shim::Exception,
+    ) {
+        let is_symfony_style = {
+            let borrowed = output.borrow();
+            (*borrowed)
+                .as_any()
+                .downcast_ref::<SymfonyStyle>()
+                .is_some()
+        };
+        if is_symfony_style {
+            // $output->newLine(); $output->error($error->getMessage());
+            // SymfonyStyle's newLine()/error() require mutable access to the
+            // concrete type; mutable downcasting through the trait object is
+            // resolved in a later phase.
+            todo!("SymfonyStyle newLine()/error() require &mut SymfonyStyle");
+        }
+
+        self.inner.write_error(output, error);
+    }
+
+    fn get_eof_shortcut(&self) -> String {
+        if shirabe_php_shim::php_os_family() == "Windows" {
+            return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
+        }
+
+        "<comment>Ctrl+D</comment>".to_string()
+    }
+}
+
+impl Deref for SymfonyQuestionHelper {
+    type Target = QuestionHelper;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl DerefMut for SymfonyQuestionHelper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}

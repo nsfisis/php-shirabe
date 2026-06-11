@@ -21,7 +21,12 @@ impl InputArgument {
         default: Option<PhpMixed>,
         // TODO(cli-completion): suggested_values closure / list dropped along with completion support
     ) -> Result<Self> {
-        let inner = BaseInputArgument::new(name, mode, description, default);
+        let inner = BaseInputArgument::new(
+            name.to_string(),
+            mode,
+            description.to_string(),
+            default.unwrap_or(PhpMixed::Null),
+        )?;
         Ok(Self { inner })
     }
 }

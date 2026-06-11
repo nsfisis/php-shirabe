@@ -218,7 +218,7 @@ impl StatusCommand {
             for (path, changes) in &errors {
                 if input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false)
                 {
@@ -241,7 +241,7 @@ impl StatusCommand {
             for (path, changes) in &unpushed_changes {
                 if input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false)
                 {
@@ -266,7 +266,7 @@ impl StatusCommand {
             for (path, changes) in &vcs_version_changes {
                 if input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false)
                 {
@@ -332,7 +332,7 @@ impl StatusCommand {
         if (!errors.is_empty() || !unpushed_changes.is_empty() || !vcs_version_changes.is_empty())
             && !input
                 .borrow()
-                .get_option("verbose")
+                .get_option("verbose")?
                 .as_bool()
                 .unwrap_or(false)
         {

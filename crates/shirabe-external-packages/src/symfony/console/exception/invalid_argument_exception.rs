@@ -1,13 +1,14 @@
+use super::exception_interface::ExceptionInterface;
+
 #[derive(Debug)]
-pub struct InvalidArgumentException {
-    pub message: String,
-    pub code: i64,
-}
+pub struct InvalidArgumentException(pub shirabe_php_shim::InvalidArgumentException);
 
 impl std::fmt::Display for InvalidArgumentException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "{}", self.0)
     }
 }
 
 impl std::error::Error for InvalidArgumentException {}
+
+impl ExceptionInterface for InvalidArgumentException {}

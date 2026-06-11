@@ -163,25 +163,27 @@ impl RemoveCommand {
     ) -> anyhow::Result<i64> {
         if input
             .borrow()
-            .get_argument("packages")
+            .get_argument("packages")?
             .as_list()
             .map(|l| l.is_empty())
             .unwrap_or(true)
             && !input
                 .borrow()
-                .get_option("unused")
+                .get_option("unused")?
                 .as_bool()
                 .unwrap_or(false)
         {
-            return Err(anyhow::anyhow!(InvalidArgumentException {
-                message: "Not enough arguments (missing: \"packages\").".to_string(),
-                code: 0,
-            }));
+            return Err(anyhow::anyhow!(InvalidArgumentException(
+                shirabe_php_shim::InvalidArgumentException {
+                    message: "Not enough arguments (missing: \"packages\").".to_string(),
+                    code: 0,
+                }
+            )));
         }
 
         let mut packages: Vec<String> = input
             .borrow()
-            .get_argument("packages")
+            .get_argument("packages")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -192,7 +194,7 @@ impl RemoveCommand {
 
         if input
             .borrow()
-            .get_option("unused")
+            .get_option("unused")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -276,12 +278,12 @@ impl RemoveCommand {
             false,
         );
 
-        let r#type = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        let r#type = if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
         };
-        let alt_type = if !input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        let alt_type = if !input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
@@ -290,7 +292,7 @@ impl RemoveCommand {
 
         if input
             .borrow()
-            .get_option("update-with-dependencies")
+            .get_option("update-with-dependencies")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -317,7 +319,7 @@ impl RemoveCommand {
 
         let dry_run = input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
         let mut to_remove: IndexMap<String, Vec<String>> = IndexMap::new();
@@ -447,7 +449,7 @@ impl RemoveCommand {
 
         if input
             .borrow()
-            .get_option("no-update")
+            .get_option("no-update")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -534,7 +536,7 @@ impl RemoveCommand {
             .set_output_progress(
                 !input
                     .borrow()
-                    .get_option("no-progress")
+                    .get_option("no-progress")?
                     .as_bool()
                     .unwrap_or(false),
             );
@@ -543,12 +545,12 @@ impl RemoveCommand {
 
         let update_dev_mode = !input
             .borrow()
-            .get_option("update-no-dev")
+            .get_option("update-no-dev")?
             .as_bool()
             .unwrap_or(false);
         let optimize = input
             .borrow()
-            .get_option("optimize-autoloader")
+            .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -559,7 +561,7 @@ impl RemoveCommand {
                 .unwrap_or(false);
         let authoritative = input
             .borrow()
-            .get_option("classmap-authoritative")
+            .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -570,13 +572,13 @@ impl RemoveCommand {
                 .unwrap_or(false);
         let apcu_prefix = input
             .borrow()
-            .get_option("apcu-autoloader-prefix")
+            .get_option("apcu-autoloader-prefix")?
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
-                .get_option("apcu-autoloader")
+                .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
             || composer
@@ -587,7 +589,7 @@ impl RemoveCommand {
                 .unwrap_or(false);
         let minimal_changes = input
             .borrow()
-            .get_option("minimal-changes")
+            .get_option("minimal-changes")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -602,12 +604,12 @@ impl RemoveCommand {
         let mut flags = String::new();
         if input
             .borrow()
-            .get_option("update-with-all-dependencies")
+            .get_option("update-with-all-dependencies")?
             .as_bool()
             .unwrap_or(false)
             || input
                 .borrow()
-                .get_option("with-all-dependencies")
+                .get_option("with-all-dependencies")?
                 .as_bool()
                 .unwrap_or(false)
         {
@@ -616,7 +618,7 @@ impl RemoveCommand {
             flags += " --with-all-dependencies";
         } else if input
             .borrow()
-            .get_option("no-update-with-dependencies")
+            .get_option("no-update-with-dependencies")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -633,7 +635,7 @@ impl RemoveCommand {
         install.set_verbose(
             input
                 .borrow()
-                .get_option("verbose")
+                .get_option("verbose")?
                 .as_bool()
                 .unwrap_or(false),
         );
@@ -645,7 +647,7 @@ impl RemoveCommand {
         install.set_install(
             !input
                 .borrow()
-                .get_option("no-install")
+                .get_option("no-install")?
                 .as_bool()
                 .unwrap_or(false),
         );

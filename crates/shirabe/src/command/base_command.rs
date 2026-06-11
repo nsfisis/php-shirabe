@@ -369,10 +369,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         // shared Application handle is the prerequisite, so only the input flags are honoured here.
         let mut disable_plugins = input
             .borrow()
-            .has_parameter_option(&["--no-plugins"], false);
+            .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
         let mut disable_scripts = input
             .borrow()
-            .has_parameter_option(&["--no-scripts"], false);
+            .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
 
         if self.is_self_update_command() {
             disable_plugins = true;
@@ -411,7 +411,9 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             )?;
         }
 
-        if input.borrow().has_parameter_option(&["--no-ansi"], false)
+        if input
+            .borrow()
+            .has_parameter_option(PhpMixed::from(vec!["--no-ansi"]), false)
             && input.borrow().has_option("no-progress")
         {
             input
@@ -443,7 +445,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                     if false
                         == input
                             .borrow()
-                            .get_option(option_name)
+                            .get_option(option_name)?
                             .as_bool()
                             .unwrap_or(false)
                         && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
@@ -459,7 +461,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         if true == input.borrow().has_option("ignore-platform-reqs") {
             if !input
                 .borrow()
-                .get_option("ignore-platform-reqs")
+                .get_option("ignore-platform-reqs")?
                 .as_bool()
                 .unwrap_or(false)
                 && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
@@ -477,13 +479,13 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             && (!input.borrow().has_option("ignore-platform-reqs")
                 || !input
                     .borrow()
-                    .get_option("ignore-platform-reqs")
+                    .get_option("ignore-platform-reqs")?
                     .as_bool()
                     .unwrap_or(false))
         {
             let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
             let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
-            if 0 == count(&input.borrow().get_option("ignore-platform-req"))
+            if 0 == count(&input.borrow().get_option("ignore-platform-req")?)
                 && ignore_platform_req_env.is_some()
                 && "" != ignore_str
             {
@@ -519,11 +521,11 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         let disable_plugins = disable_plugins
             || input
                 .borrow()
-                .has_parameter_option(&["--no-plugins"], false);
+                .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
         let disable_scripts = disable_scripts.unwrap_or(false)
             || input
                 .borrow()
-                .has_parameter_option(&["--no-scripts"], false);
+                .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
 
         // PHP: if ($app instanceof Application && $app->getDisablePluginsByDefault()) $disablePlugins = true;
         //      (same for getDisableScriptsByDefault()).
@@ -565,11 +567,11 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         }
 
         if input.borrow().has_option("prefer-install")
-            && is_string(&input.borrow().get_option("prefer-install"))
+            && is_string(&input.borrow().get_option("prefer-install")?)
         {
             if input
                 .borrow()
-                .get_option("prefer-source")
+                .get_option("prefer-source")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -582,7 +584,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             }
             if input
                 .borrow()
-                .get_option("prefer-dist")
+                .get_option("prefer-dist")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -593,7 +595,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
                 }
                 .into());
             }
-            let prefer_install = input.borrow().get_option("prefer-install");
+            let prefer_install = input.borrow().get_option("prefer-install")?;
             match prefer_install.as_string().unwrap_or("") {
                 "dist" => {
                     input
@@ -624,37 +626,37 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
         if input
             .borrow()
-            .get_option("prefer-source")
+            .get_option("prefer-source")?
             .as_bool()
             .unwrap_or(false)
             || input
                 .borrow()
-                .get_option("prefer-dist")
+                .get_option("prefer-dist")?
                 .as_bool()
                 .unwrap_or(false)
             || (keep_vcs_requires_prefer_source
                 && input.borrow().has_option("keep-vcs")
                 && input
                     .borrow()
-                    .get_option("keep-vcs")
+                    .get_option("keep-vcs")?
                     .as_bool()
                     .unwrap_or(false))
         {
             prefer_source = input
                 .borrow()
-                .get_option("prefer-source")
+                .get_option("prefer-source")?
                 .as_bool()
                 .unwrap_or(false)
                 || (keep_vcs_requires_prefer_source
                     && input.borrow().has_option("keep-vcs")
                     && input
                         .borrow()
-                        .get_option("keep-vcs")
+                        .get_option("keep-vcs")?
                         .as_bool()
                         .unwrap_or(false));
             prefer_dist = input
                 .borrow()
-                .get_option("prefer-dist")
+                .get_option("prefer-dist")?
                 .as_bool()
                 .unwrap_or(false);
         }
@@ -681,14 +683,14 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         if true
             == input
                 .borrow()
-                .get_option("ignore-platform-reqs")
+                .get_option("ignore-platform-reqs")?
                 .as_bool()
                 .unwrap_or(false)
         {
             return Ok(PlatformRequirementFilterFactory::ignore_all());
         }
 
-        let ignores = input.borrow().get_option("ignore-platform-req");
+        let ignores = input.borrow().get_option("ignore-platform-req")?;
         if count(&ignores) > 0 {
             return Ok(PlatformRequirementFilterFactory::from_bool_or_list(
                 ignores,
@@ -737,7 +739,10 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
         let mut renderer = Table::new(output);
-        renderer.set_style("compact");
+        renderer
+            .set_style(PhpMixed::from("compact"))
+            .expect("Table::set_style I/O cannot fail")
+            .expect("'compact' is a built-in table style");
         renderer.set_rows(table).render();
         let _ = TableSeparator::new();
     }
@@ -771,7 +776,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             .into());
         }
 
-        let val = input.borrow().get_option(opt_name);
+        let val = input.borrow().get_option(opt_name)?;
         let formats: Vec<Box<PhpMixed>> = Auditor::FORMATS
             .iter()
             .map(|s| Box::new(PhpMixed::String(s.to_string())))
@@ -800,14 +805,14 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         let audit = if input.borrow().has_option("audit") {
             input
                 .borrow()
-                .get_option("audit")
+                .get_option("audit")?
                 .as_bool()
                 .unwrap_or(false)
         } else {
             !(input.borrow().has_option("no-audit")
                 && input
                     .borrow()
-                    .get_option("no-audit")
+                    .get_option("no-audit")?
                     .as_bool()
                     .unwrap_or(false))
         };
@@ -824,7 +829,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
             || (input.borrow().has_option("no-security-blocking")
                 && input
                     .borrow()
-                    .get_option("no-security-blocking")
+                    .get_option("no-security-blocking")?
                     .as_bool()
                     .unwrap_or(false))
         {

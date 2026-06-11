@@ -417,12 +417,12 @@ impl Auditor {
                     }
                     .into());
                 }
-                self.output_advisories_table(io_as_console.unwrap(), advisories);
+                self.output_advisories_table(io_as_console.unwrap(), advisories)?;
 
                 Ok(())
             }
             Self::FORMAT_PLAIN => {
-                self.output_advisories_plain(io, advisories);
+                self.output_advisories_plain(io, advisories)?;
 
                 Ok(())
             }
@@ -440,7 +440,7 @@ impl Auditor {
         &self,
         io: &ConsoleIO,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
-    ) {
+    ) -> Result<()> {
         for package_advisories in advisories.values() {
             for advisory in package_advisories {
                 let mut headers: Vec<String> = vec![
@@ -475,22 +475,26 @@ impl Auditor {
                             .unwrap_or_else(|| "None specified".to_string()),
                     );
                 }
-                io.get_table()
+                let mut table = io.get_table();
+                table
                     .set_horizontal(true)
-                    .set_headers(headers.into_iter().map(|h| h.into()).collect())
-                    .add_row(ConsoleIO::sanitize(
-                        PhpMixed::List(
-                            row.into_iter()
-                                .map(|s| Box::new(PhpMixed::String(s)))
-                                .collect(),
-                        ),
-                        false,
-                    ))
+                    .set_headers(headers.into_iter().map(|h| h.into()).collect());
+                table.add_row(ConsoleIO::sanitize(
+                    PhpMixed::List(
+                        row.into_iter()
+                            .map(|s| Box::new(PhpMixed::String(s)))
+                            .collect(),
+                    ),
+                    false,
+                ))??;
+                table
                     .set_column_width(1, 80)
                     .set_column_max_width(1, 80)
                     .render();
             }
         }
+
+        Ok(())
     }
 
     /// @param array<string, array<SecurityAdvisory>> $advisories
@@ -498,7 +502,7 @@ impl Auditor {
         &self,
         io: &mut dyn IOInterface,
         advisories: &IndexMap<String, Vec<AnySecurityAdvisory>>,
-    ) {
+    ) -> Result<()> {
         let mut error: Vec<String> = vec![];
         let mut first_advisory = true;
         for package_advisories in advisories.values() {
@@ -513,11 +517,11 @@ impl Auditor {
                 error.push(format!("Severity: {}", self.get_severity(sa)));
                 error.push(format!("Advisory ID: {}", self.get_advisory_id(sa)));
                 error.push(format!("CVE: {}", self.get_cve(sa)));
-                error.push(format!("Title: {}", OutputFormatter::escape(&sa.title)));
+                error.push(format!("Title: {}", OutputFormatter::escape(&sa.title)?));
                 error.push(format!("URL: {}", self.get_url(sa)));
                 error.push(format!(
                     "Affected versions: {}",
-                    OutputFormatter::escape(&sa.affected_versions().get_pretty_string())
+                    OutputFormatter::escape(&sa.affected_versions().get_pretty_string())?
                 ));
                 error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
                 if let Some(ignored) = advisory.as_ignored() {
@@ -535,6 +539,8 @@ impl Auditor {
         for line in &error {
             io.write_error(line);
         }
+
+        Ok(())
     }
 
     /// @param array<CompletePackageInterface> $packages
@@ -625,7 +631,8 @@ impl Auditor {
         if package_url.is_some() {
             format!(
                 "<href={}>{}</>",
-                OutputFormatter::escape(&package_url.unwrap()),
+                OutputFormatter::escape(&package_url.unwrap())
+                    .expect("OutputFormatter::escape does not fail"),
                 package.get_pretty_name()
             )
         } else {
@@ -673,8 +680,8 @@ impl Auditor {
         let link = advisory.link.as_ref().unwrap();
         format!(
             "<href={}>{}</>",
-            OutputFormatter::escape(link),
-            OutputFormatter::escape(link)
+            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail"),
+            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail")
         )
     }
 

@@ -74,9 +74,9 @@ impl ReinstallCommand {
         let mut packages_to_reinstall: Vec<crate::package::PackageInterfaceHandle> = vec![];
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
-        let type_option = input.borrow().get_option("type");
+        let type_option = input.borrow().get_option("type")?;
         let type_count = type_option.as_list().map_or(0, |l| l.len());
-        let packages_arg = input.borrow().get_argument("packages");
+        let packages_arg = input.borrow().get_argument("packages")?;
         let packages_count = packages_arg.as_list().map_or(0, |l| l.len());
 
         if type_count > 0 {
@@ -198,13 +198,13 @@ impl ReinstallCommand {
         installation_manager.borrow_mut().set_output_progress(
             !input
                 .borrow()
-                .get_option("no-progress")
+                .get_option("no-progress")?
                 .as_bool()
                 .unwrap_or(false),
         );
         if input
             .borrow()
-            .get_option("no-plugins")
+            .get_option("no-plugins")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -245,13 +245,13 @@ impl ReinstallCommand {
 
         if !input
             .borrow()
-            .get_option("no-autoloader")
+            .get_option("no-autoloader")?
             .as_bool()
             .unwrap_or(false)
         {
             let optimize = input
                 .borrow()
-                .get_option("optimize-autoloader")
+                .get_option("optimize-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
                 || config
@@ -261,7 +261,7 @@ impl ReinstallCommand {
                     .unwrap_or(false);
             let authoritative = input
                 .borrow()
-                .get_option("classmap-authoritative")
+                .get_option("classmap-authoritative")?
                 .as_bool()
                 .unwrap_or(false)
                 || config
@@ -271,13 +271,13 @@ impl ReinstallCommand {
                     .unwrap_or(false);
             let apcu_prefix = input
                 .borrow()
-                .get_option("apcu-autoloader-prefix")
+                .get_option("apcu-autoloader-prefix")?
                 .as_string()
                 .map(|s| s.to_string());
             let apcu = apcu_prefix.is_some()
                 || input
                     .borrow()
-                    .get_option("apcu-autoloader")
+                    .get_option("apcu-autoloader")?
                     .as_bool()
                     .unwrap_or(false)
                 || config

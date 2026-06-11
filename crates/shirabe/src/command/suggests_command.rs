@@ -69,7 +69,7 @@ impl SuggestsCommand {
             let locked_repo = composer.get_locker().borrow_mut().get_locked_repository(
                 !input
                     .borrow()
-                    .get_option("no-dev")
+                    .get_option("no-dev")?
                     .as_bool()
                     .unwrap_or(false),
             )?;
@@ -95,7 +95,7 @@ impl SuggestsCommand {
         let mut installed_repo = InstalledRepository::new(installed_repos);
         let mut reporter = SuggestedPackagesReporter::new(self.get_io().clone());
 
-        let filter = input.borrow().get_argument("packages");
+        let filter = input.borrow().get_argument("packages")?;
         let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
         let root_pkg_as_base: crate::package::BasePackageHandle =
             composer.get_package().clone().into();
@@ -111,7 +111,7 @@ impl SuggestsCommand {
 
         if input
             .borrow()
-            .get_option("by-suggestion")
+            .get_option("by-suggestion")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -119,18 +119,23 @@ impl SuggestsCommand {
         }
         if input
             .borrow()
-            .get_option("by-package")
+            .get_option("by-package")?
             .as_bool()
             .unwrap_or(false)
         {
             mode |= SuggestedPackagesReporter::MODE_BY_PACKAGE;
         }
-        if input.borrow().get_option("list").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("list")?
+            .as_bool()
+            .unwrap_or(false)
+        {
             mode = SuggestedPackagesReporter::MODE_LIST;
         }
 
         let only_dependents_of: Option<crate::package::PackageInterfaceHandle> =
-            if empty(&filter) && !input.borrow().get_option("all").as_bool().unwrap_or(false) {
+            if empty(&filter) && !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
                 Some(composer.get_package().clone().into())
             } else {
                 None

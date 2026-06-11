@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyleInterface;
 use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, Phar, PhpMixed,
@@ -405,15 +406,19 @@ impl Factory {
         }
     }
 
-    pub fn create_additional_styles() -> IndexMap<String, OutputFormatterStyle> {
-        let mut styles: IndexMap<String, OutputFormatterStyle> = IndexMap::new();
+    pub fn create_additional_styles() -> IndexMap<String, Box<dyn OutputFormatterStyleInterface>> {
+        let mut styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>> = IndexMap::new();
         styles.insert(
             "highlight".to_string(),
-            OutputFormatterStyle::new(Some("red"), None, Some(vec![])),
+            Box::new(OutputFormatterStyle::new(Some("red"), None, vec![])),
         );
         styles.insert(
             "warning".to_string(),
-            OutputFormatterStyle::new(Some("black"), Some("yellow"), Some(vec![])),
+            Box::new(OutputFormatterStyle::new(
+                Some("black"),
+                Some("yellow"),
+                vec![],
+            )),
         );
         styles
     }
@@ -423,10 +428,11 @@ impl Factory {
         let formatter = OutputFormatter::new(false, styles);
 
         ConsoleOutput::new(
-            shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL,
+            Some(shirabe_external_packages::symfony::console::output::output_interface::VERBOSITY_NORMAL),
             None,
             Some(std::rc::Rc::new(std::cell::RefCell::new(formatter))),
         )
+        .expect("ConsoleOutput::new does not fail for stdout/stderr streams")
     }
 
     /// Creates a Composer instance

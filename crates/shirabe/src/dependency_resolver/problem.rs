@@ -816,7 +816,8 @@ impl Problem {
                                 OutputFormatter::escape(&format!(
                                     "https://packagist.org/security-advisories/{}",
                                     advisory_id
-                                )),
+                                ))
+                                .expect("OutputFormatter::escape does not fail"),
                                 advisory_id
                             );
                         }

@@ -59,7 +59,7 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         if input
             .borrow()
-            .get_option("locked")
+            .get_option("locked")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -94,7 +94,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 && (root_pkg.get_requires().len() > 0 || root_pkg.get_dev_requires().len() > 0)
             {
                 output.borrow().writeln(
-                    "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>",
+                    &["<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>".to_string()],
                     shirabe_external_packages::symfony::console::output::OUTPUT_NORMAL,
                 );
 
@@ -122,14 +122,14 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let needle = input
             .borrow()
-            .get_argument(Self::ARGUMENT_PACKAGE)
+            .get_argument(Self::ARGUMENT_PACKAGE)?
             .as_string()
             .unwrap_or_default()
             .to_string();
         let text_constraint: String = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
             input
                 .borrow()
-                .get_argument(Self::ARGUMENT_CONSTRAINT)
+                .get_argument(Self::ARGUMENT_CONSTRAINT)?
                 .as_string()
                 .unwrap_or("*")
                 .to_string()
@@ -246,13 +246,13 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let render_tree = input
             .borrow()
-            .get_option(Self::OPTION_TREE)
+            .get_option(Self::OPTION_TREE)?
             .as_bool()
             .unwrap_or(false);
         let recursive = render_tree
             || input
                 .borrow()
-                .get_option(Self::OPTION_RECURSIVE)
+                .get_option(Self::OPTION_RECURSIVE)?
                 .as_bool()
                 .unwrap_or(false);
 
@@ -357,7 +357,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 let name_with_link = match &package_url {
                     Some(url) => format!(
                         "<href={}>{}</>",
-                        OutputFormatter::escape(url),
+                        OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
                         package.get_pretty_name()
                     ),
                     None => package.get_pretty_name().to_string(),
@@ -399,12 +399,12 @@ pub trait BaseDependencyCommand: BaseCommand {
             "blue".to_string(),
         ];
         for color in self.colors() {
-            let style = OutputFormatterStyle::new(Some(color), None, None);
+            let style = OutputFormatterStyle::new(Some(color), None, vec![]);
             output
                 .borrow()
                 .get_formatter()
                 .borrow_mut()
-                .set_style(color, style);
+                .set_style(color, Box::new(style));
         }
     }
 
@@ -428,7 +428,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let name_with_link = match &package_url {
                 Some(url) => format!(
                     "<href={}>{}</>",
-                    OutputFormatter::escape(url),
+                    OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
                     package.get_pretty_name()
                 ),
                 None => package.get_pretty_name().to_string(),

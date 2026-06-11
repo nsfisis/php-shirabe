@@ -74,24 +74,24 @@ impl RepositoryCommand {
         let action = strtolower(
             &input
                 .borrow()
-                .get_argument("action")
+                .get_argument("action")?
                 .as_string()
                 .unwrap_or("")
                 .to_string(),
         );
         let name = input
             .borrow()
-            .get_argument("name")
+            .get_argument("name")?
             .as_string()
             .map(|s| s.to_string());
         let arg1 = input
             .borrow()
-            .get_argument("arg1")
+            .get_argument("arg1")?
             .as_string()
             .map(|s| s.to_string());
         let arg2 = input
             .borrow()
-            .get_argument("arg2")
+            .get_argument("arg2")?
             .as_string()
             .map(|s| s.to_string());
 
@@ -154,12 +154,12 @@ impl RepositoryCommand {
 
                 let before = input
                     .borrow()
-                    .get_option("before")
+                    .get_option("before")?
                     .as_string()
                     .map(|s| s.to_string());
                 let after = input
                     .borrow()
-                    .get_option("after")
+                    .get_option("after")?
                     .as_string()
                     .map(|s| s.to_string());
                 if before.is_some() && after.is_some() {
@@ -190,7 +190,7 @@ impl RepositoryCommand {
 
                 let append = input
                     .borrow()
-                    .get_option("append")
+                    .get_option("append")?
                     .as_bool()
                     .unwrap_or(false);
                 self.config_source.as_mut().unwrap().add_repository(
@@ -291,7 +291,7 @@ impl RepositoryCommand {
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     let append = input
                         .borrow()
-                        .get_option("append")
+                        .get_option("append")?
                         .as_bool()
                         .unwrap_or(false);
                     self.config_source.as_mut().unwrap().add_repository(

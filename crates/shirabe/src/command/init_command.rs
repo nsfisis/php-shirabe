@@ -5,6 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
 use shirabe_external_packages::symfony::console::helper::FormatterHelper;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -189,7 +190,7 @@ impl InitCommand {
 
         let repositories: Vec<String> = input
             .borrow()
-            .get_option("repository")
+            .get_option("repository")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -287,7 +288,7 @@ impl InitCommand {
             autoload_path = Some(ap.clone());
             let name = input
                 .borrow()
-                .get_option("name")
+                .get_option("name")?
                 .as_string()
                 .unwrap_or("")
                 .to_string();
@@ -395,7 +396,7 @@ impl InitCommand {
         if autoload_path.is_some() {
             let name = input
                 .borrow()
-                .get_option("name")
+                .get_option("name")?
                 .as_string()
                 .unwrap_or("")
                 .to_string();
@@ -420,11 +421,11 @@ impl InitCommand {
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-        self.initialize(input.clone(), output);
+    ) -> anyhow::Result<()> {
+        self.initialize(input.clone(), output)?;
 
         if !input.borrow().is_interactive() {
-            if input.borrow().get_option("name").is_null() {
+            if input.borrow().get_option("name")?.is_null() {
                 let name = self.get_default_package_name();
                 input
                     .borrow_mut()
@@ -432,7 +433,7 @@ impl InitCommand {
                     .expect("name option is defined");
             }
 
-            if input.borrow().get_option("author").is_null() {
+            if input.borrow().get_option("author")?.is_null() {
                 let author = self.get_default_author();
                 input
                     .borrow_mut()
@@ -440,6 +441,8 @@ impl InitCommand {
                     .expect("author option is defined");
             }
         }
+
+        Ok(())
     }
 
     pub(crate) fn interact(
@@ -459,7 +462,7 @@ impl InitCommand {
         // initialize repos if configured
         let repositories: Vec<String> = input
             .borrow()
-            .get_option("repository")
+            .get_option("repository")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -532,7 +535,9 @@ impl InitCommand {
             &format!(
                 "\n{}\n",
                 formatter.format_block(
-                    &["Welcome to the Composer config generator"],
+                    FormatBlockMessages::String(
+                        "Welcome to the Composer config generator".to_string(),
+                    ),
                     "bg=blue;fg=white",
                     true,
                 )
@@ -550,7 +555,7 @@ impl InitCommand {
 
         let mut name = input
             .borrow()
-            .get_option("name")
+            .get_option("name")?
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.get_default_package_name());
@@ -598,7 +603,7 @@ impl InitCommand {
 
         let description = input
             .borrow()
-            .get_option("description")
+            .get_option("description")?
             .as_string()
             .map(|s| s.to_string());
         let description_default = description.clone();
@@ -615,7 +620,7 @@ impl InitCommand {
 
         let author = input
             .borrow()
-            .get_option("author")
+            .get_option("author")?
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| self.get_default_author().unwrap_or_default());
@@ -663,7 +668,7 @@ impl InitCommand {
 
         let minimum_stability = input
             .borrow()
-            .get_option("stability")
+            .get_option("stability")?
             .as_string()
             .map(|s| s.to_string());
         let minimum_stability_default = minimum_stability.clone();
@@ -710,7 +715,7 @@ impl InitCommand {
             .borrow_mut()
             .set_option("stability", minimum_stability_value);
 
-        let type_val = input.borrow().get_option("type");
+        let type_val = input.borrow().get_option("type")?;
         let type_str = type_val.as_string().unwrap_or("").to_string();
         let mut type_value = io.ask(
             format!(
@@ -726,7 +731,7 @@ impl InitCommand {
 
         let mut license = input
             .borrow()
-            .get_option("license")
+            .get_option("license")?
             .as_string()
             .map(|s| s.to_string());
         if license.is_none() {
@@ -792,7 +797,7 @@ impl InitCommand {
         let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
         let require: Vec<String> = input
             .borrow()
-            .get_option("require")
+            .get_option("require")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -826,7 +831,7 @@ impl InitCommand {
         let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
         let require_dev: Vec<String> = input
             .borrow()
-            .get_option("require-dev")
+            .get_option("require-dev")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -861,14 +866,14 @@ impl InitCommand {
         // --autoload - input and validation
         let mut autoload = input
             .borrow()
-            .get_option("autoload")
+            .get_option("autoload")?
             .as_string()
             .map(|s| s.to_string())
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "src/".to_string());
         let name_str = input
             .borrow()
-            .get_option("name")
+            .get_option("name")?
             .as_string()
             .unwrap_or("")
             .to_string();
@@ -1098,7 +1103,7 @@ impl InitCommand {
             // TODO(phase-c): Application::find returns PhpMixed (the Symfony command registry is a
             // todo!() stub), so the resolved command's run() cannot be invoked until the typed
             // command registry is modelled.
-            let _ = ArrayInput::new(IndexMap::new(), None);
+            let _ = ArrayInput::new(vec![], None);
             let _ = output;
             Ok(())
         });
@@ -1121,7 +1126,7 @@ impl InitCommand {
             // PHP: $command->run(new ArrayInput([]), $output);
             // TODO(phase-c): same blocker as update_dependencies — Application::find returns
             // PhpMixed (Symfony command registry todo!() stub), so run() cannot be invoked.
-            let _ = ArrayInput::new(IndexMap::new(), None);
+            let _ = ArrayInput::new(vec![], None);
             let _ = output;
             Ok(())
         });

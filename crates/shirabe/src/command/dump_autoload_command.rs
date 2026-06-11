@@ -86,7 +86,7 @@ impl DumpAutoloadCommand {
 
         let optimize = input
             .borrow()
-            .get_option("optimize")
+            .get_option("optimize")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -96,7 +96,7 @@ impl DumpAutoloadCommand {
                 .unwrap_or(false);
         let authoritative = input
             .borrow()
-            .get_option("classmap-authoritative")
+            .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -106,11 +106,15 @@ impl DumpAutoloadCommand {
                 .unwrap_or(false);
         let apcu_prefix = input
             .borrow()
-            .get_option("apcu-prefix")
+            .get_option("apcu-prefix")?
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
-            || input.borrow().get_option("apcu").as_bool().unwrap_or(false)
+            || input
+                .borrow()
+                .get_option("apcu")?
+                .as_bool()
+                .unwrap_or(false)
             || config
                 .borrow_mut()
                 .get("apcu-autoloader")
@@ -119,7 +123,7 @@ impl DumpAutoloadCommand {
 
         if input
             .borrow()
-            .get_option("strict-psr")
+            .get_option("strict-psr")?
             .as_bool()
             .unwrap_or(false)
             && !optimize
@@ -133,7 +137,7 @@ impl DumpAutoloadCommand {
         }
         if input
             .borrow()
-            .get_option("strict-ambiguous")
+            .get_option("strict-ambiguous")?
             .as_bool()
             .unwrap_or(false)
             && !optimize
@@ -160,7 +164,7 @@ impl DumpAutoloadCommand {
         let platform_requirement_filter = self.get_platform_requirement_filter(input.clone())?;
         if input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -171,7 +175,7 @@ impl DumpAutoloadCommand {
         }
         if input
             .borrow()
-            .get_option("no-dev")
+            .get_option("no-dev")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -180,10 +184,10 @@ impl DumpAutoloadCommand {
                 .borrow_mut()
                 .set_dev_mode(false);
         }
-        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             if input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -218,7 +222,7 @@ impl DumpAutoloadCommand {
             .set_platform_requirement_filter(platform_requirement_filter);
         let strict_ambiguous = input
             .borrow()
-            .get_option("strict-ambiguous")
+            .get_option("strict-ambiguous")?
             .as_bool()
             .unwrap_or(false);
 
@@ -266,7 +270,7 @@ impl DumpAutoloadCommand {
         if missing_dependencies
             || (input
                 .borrow()
-                .get_option("strict-psr")
+                .get_option("strict-psr")?
                 .as_bool()
                 .unwrap_or(false)
                 && !class_map.get_psr_violations().is_empty())
@@ -276,7 +280,7 @@ impl DumpAutoloadCommand {
 
         if input
             .borrow()
-            .get_option("strict-ambiguous")
+            .get_option("strict-ambiguous")?
             .as_bool()
             .unwrap_or(false)
             && !class_map.get_ambiguous_classes(None)?.is_empty()

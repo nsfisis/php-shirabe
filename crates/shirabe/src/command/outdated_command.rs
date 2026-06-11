@@ -62,7 +62,7 @@ impl OutdatedCommand {
 
         if input
             .borrow()
-            .get_option("no-interaction")
+            .get_option("no-interaction")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -70,7 +70,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("no-plugins")
+            .get_option("no-plugins")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -78,7 +78,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("no-scripts")
+            .get_option("no-scripts")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -86,30 +86,30 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("no-cache")
+            .get_option("no-cache")?
             .as_bool()
             .unwrap_or(false)
         {
             args.insert("--no-cache".to_string(), PhpMixed::Bool(true));
         }
-        if !input.borrow().get_option("all").as_bool().unwrap_or(false) {
+        if !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
             args.insert("--outdated".to_string(), PhpMixed::Bool(true));
         }
         if input
             .borrow()
-            .get_option("direct")
+            .get_option("direct")?
             .as_bool()
             .unwrap_or(false)
         {
             args.insert("--direct".to_string(), PhpMixed::Bool(true));
         }
-        let package_arg = input.borrow().get_argument("package");
+        let package_arg = input.borrow().get_argument("package")?;
         if !matches!(package_arg, PhpMixed::Null) {
             args.insert("package".to_string(), package_arg);
         }
         if input
             .borrow()
-            .get_option("strict")
+            .get_option("strict")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -117,7 +117,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("major-only")
+            .get_option("major-only")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -125,7 +125,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("minor-only")
+            .get_option("minor-only")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -133,7 +133,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("patch-only")
+            .get_option("patch-only")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -141,7 +141,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("locked")
+            .get_option("locked")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -149,7 +149,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("no-dev")
+            .get_option("no-dev")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -157,7 +157,7 @@ impl OutdatedCommand {
         }
         if input
             .borrow()
-            .get_option("sort-by-age")
+            .get_option("sort-by-age")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -165,20 +165,25 @@ impl OutdatedCommand {
         }
         args.insert(
             "--ignore-platform-req".to_string(),
-            input.borrow().get_option("ignore-platform-req"),
+            input.borrow().get_option("ignore-platform-req")?,
         );
         if input
             .borrow()
-            .get_option("ignore-platform-reqs")
+            .get_option("ignore-platform-reqs")?
             .as_bool()
             .unwrap_or(false)
         {
             args.insert("--ignore-platform-reqs".to_string(), PhpMixed::Bool(true));
         }
-        args.insert("--format".to_string(), input.borrow().get_option("format"));
-        args.insert("--ignore".to_string(), input.borrow().get_option("ignore"));
+        args.insert("--format".to_string(), input.borrow().get_option("format")?);
+        args.insert("--ignore".to_string(), input.borrow().get_option("ignore")?);
 
-        let input = ArrayInput::new(args, None);
+        let input = ArrayInput::new(
+            args.into_iter()
+                .map(|(k, v)| (PhpMixed::String(k), v))
+                .collect(),
+            None,
+        )?;
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(input));

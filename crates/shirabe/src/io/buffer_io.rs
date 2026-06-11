@@ -6,11 +6,11 @@ use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterInterface;
 use shirabe_external_packages::symfony::console::helper::HelperInterface;
 use shirabe_external_packages::symfony::console::helper::HelperSet;
+use shirabe_external_packages::symfony::console::helper::HelperSetKey;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_external_packages::symfony::console::output::StreamOutput;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, RuntimeException, fopen, fseek, fwrite, rewind, stream_get_contents,
     strip_tags,
@@ -27,7 +27,7 @@ impl BufferIO {
         verbosity: i64,
         formatter: Option<Box<dyn OutputFormatterInterface>>,
     ) -> Result<Self> {
-        let mut input_obj = StringInput::new(&input);
+        let mut input_obj = StringInput::new(&input)?;
         input_obj.set_interactive(false);
 
         let stream = fopen("php://memory", "rw");
@@ -39,21 +39,34 @@ impl BufferIO {
             .into());
         }
 
-        let decorated = formatter.as_ref().map_or(false, |f| f.is_decorated());
-        // TODO(phase-c): wire StreamOutput as the output. The console tree merge made StreamOutput
-        // implement the unified OutputInterface; StreamOutput::new is still a stub.
+        let _decorated = formatter.as_ref().map_or(false, |f| f.is_decorated());
+        // TODO(phase-c): wire StreamOutput as the output. StreamOutput::new requires a
+        // PhpResource, but `fopen` here yields a PhpMixed; PhpMixed has no resource variant,
+        // so the stream cannot be passed through yet (same PhpResource/PhpMixed gap noted in
+        // QuestionHelper). The constructed StreamOutput is therefore not wired as the output.
+        // formatter, stream and verbosity feed the pending StreamOutput::new wiring below.
         let _ = formatter;
-        let _ = StreamOutput::new(stream, verbosity, Some(decorated));
+        let _ = stream;
+        let _ = verbosity;
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
-            todo!("wire StreamOutput as the ConsoleIO output");
+            todo!("wire StreamOutput as the ConsoleIO output (needs PhpResource stream)");
 
-        let helpers: Vec<std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>> =
-            vec![std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper))];
+        let question_helper: std::rc::Rc<std::cell::RefCell<dyn HelperInterface>> =
+            std::rc::Rc::new(std::cell::RefCell::new(QuestionHelper::default()));
+        let mut helpers: indexmap::IndexMap<
+            HelperSetKey,
+            std::rc::Rc<std::cell::RefCell<dyn HelperInterface>>,
+        > = indexmap::IndexMap::new();
+        helpers.insert(HelperSetKey::Int(0), question_helper);
+        let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
+        HelperSet::new(&helper_set, helpers);
+        let helper_set = helper_set.borrow().clone();
+
         let inner = ConsoleIO::new(
             std::rc::Rc::new(std::cell::RefCell::new(input_obj))
                 as std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
             output,
-            HelperSet::new(helpers),
+            helper_set,
         );
 
         Ok(Self { inner })

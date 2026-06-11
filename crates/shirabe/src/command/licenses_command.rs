@@ -8,6 +8,7 @@ use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_external_packages::symfony::console::style::StyleInterface;
 use shirabe_external_packages::symfony::console::style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
 
@@ -98,7 +99,7 @@ impl LicensesCommand {
 
         let packages = if input
             .borrow()
-            .get_option("locked")
+            .get_option("locked")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -112,7 +113,7 @@ impl LicensesCommand {
             }
             let no_dev = input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false);
             let repo = locker.get_locked_repository(!no_dev)?;
@@ -124,7 +125,7 @@ impl LicensesCommand {
 
             if input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -146,7 +147,7 @@ impl LicensesCommand {
 
         let format = input
             .borrow()
-            .get_option("format")
+            .get_option("format")?
             .as_string()
             .unwrap_or("text")
             .to_string();
@@ -171,7 +172,7 @@ impl LicensesCommand {
                 io.write("");
 
                 let mut table = Table::new(output);
-                table.set_style("compact");
+                table.set_style(shirabe_php_shim::PhpMixed::from("compact"))??;
                 table.set_headers(vec![
                     PhpMixed::String("Name".to_string()),
                     PhpMixed::String("Version".to_string()),
@@ -182,7 +183,7 @@ impl LicensesCommand {
                     let name = if let Some(link) = link {
                         format!(
                             "<href={}>{}</>",
-                            OutputFormatter::escape(&link),
+                            OutputFormatter::escape(&link)?,
                             package.get_pretty_name()
                         )
                     } else {

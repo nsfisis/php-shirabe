@@ -24,9 +24,10 @@ impl InputOption {
         default: Option<PhpMixed>,
         // TODO(cli-completion): suggested_values closure / list dropped along with completion support
     ) -> Result<Self> {
-        let shortcut_str = shortcut.as_ref().and_then(|s| s.as_string());
+        let shortcut = shortcut.unwrap_or(PhpMixed::Null);
         let default_mixed = default.unwrap_or(PhpMixed::Null);
-        let inner = BaseInputOption::new(name, shortcut_str, mode, description, default_mixed);
+        let inner =
+            BaseInputOption::new(name, shortcut, mode, description.to_string(), default_mixed)?;
         Ok(Self { inner })
     }
 }

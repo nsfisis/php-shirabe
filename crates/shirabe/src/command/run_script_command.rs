@@ -123,8 +123,12 @@ impl RunScriptCommand {
             return Ok(());
         }
 
-        if input.borrow().get_argument("script").as_string().is_some()
-            || input.borrow().get_option("list").as_bool().unwrap_or(false)
+        if input.borrow().get_argument("script")?.as_string().is_some()
+            || input
+                .borrow()
+                .get_option("list")?
+                .as_bool()
+                .unwrap_or(false)
         {
             return Ok(());
         }
@@ -154,11 +158,16 @@ impl RunScriptCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
-        if input.borrow().get_option("list").as_bool().unwrap_or(false) {
+        if input
+            .borrow()
+            .get_option("list")?
+            .as_bool()
+            .unwrap_or(false)
+        {
             return self.list_scripts(output);
         }
 
-        let script = match input.borrow().get_argument("script").as_string() {
+        let script = match input.borrow().get_argument("script")?.as_string() {
             None => {
                 return Err(RuntimeException {
                     message: "Missing required argument \"script\"".to_string(),
@@ -184,10 +193,10 @@ impl RunScriptCommand {
         let dispatcher = crate::command::composer_full(&composer)
             .get_event_dispatcher()
             .clone();
-        let dev_mode = input.borrow().get_option("dev").as_bool().unwrap_or(false)
+        let dev_mode = input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             || !input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false);
         let io = self.get_io();
@@ -213,7 +222,7 @@ impl RunScriptCommand {
 
         let args: Vec<String> = input
             .borrow()
-            .get_argument("args")
+            .get_argument("args")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -222,7 +231,7 @@ impl RunScriptCommand {
             })
             .unwrap_or_default();
 
-        if let Some(timeout_val) = input.borrow().get_option("timeout").as_string() {
+        if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
             let timeout_str = timeout_val.to_string();
             if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
                 return Err(RuntimeException {

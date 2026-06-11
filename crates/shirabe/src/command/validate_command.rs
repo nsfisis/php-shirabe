@@ -115,7 +115,7 @@ impl ValidateCommand {
     ) -> Result<i64> {
         let file = input
             .borrow()
-            .get_argument("file")
+            .get_argument("file")?
             .as_string()
             .map(|s| s.to_string())
             .map(Ok)
@@ -134,7 +134,7 @@ impl ValidateCommand {
         let validator = ConfigValidator::new(io.clone());
         let check_all = if input
             .borrow()
-            .get_option("no-check-all")
+            .get_option("no-check-all")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -144,17 +144,17 @@ impl ValidateCommand {
         };
         let check_publish = !input
             .borrow()
-            .get_option("no-check-publish")
+            .get_option("no-check-publish")?
             .as_bool()
             .unwrap_or(false);
         let check_lock = !input
             .borrow()
-            .get_option("no-check-lock")
+            .get_option("no-check-lock")?
             .as_bool()
             .unwrap_or(false);
         let check_version = if input
             .borrow()
-            .get_option("no-check-version")
+            .get_option("no-check-version")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -164,7 +164,7 @@ impl ValidateCommand {
         };
         let is_strict = input
             .borrow()
-            .get_option("strict")
+            .get_option("strict")?
             .as_bool()
             .unwrap_or(false);
         let (mut errors, mut publish_errors, mut warnings) =
@@ -183,7 +183,7 @@ impl ValidateCommand {
                 .unwrap_or(true))
             || input
                 .borrow()
-                .get_option("check-lock")
+                .get_option("check-lock")?
                 .as_bool()
                 .unwrap_or(false);
         let locker = composer.get_locker().clone();
@@ -221,7 +221,7 @@ impl ValidateCommand {
 
         if input
             .borrow()
-            .get_option("with-dependencies")
+            .get_option("with-dependencies")?
             .as_bool()
             .unwrap_or(false)
         {

@@ -69,19 +69,19 @@ impl InstallCommand {
     ) -> Result<i64> {
         let io = self.get_io().clone();
 
-        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>");
         }
         if input
             .borrow()
-            .get_option("no-suggest")
+            .get_option("no-suggest")?
             .as_bool()
             .unwrap_or(false)
         {
             io.write_error("<warning>You are using the deprecated option \"--no-suggest\". It has no effect and will break in Composer 3.</warning>");
         }
 
-        let args = input.borrow().get_argument("packages");
+        let args = input.borrow().get_argument("packages")?;
         let args_vec: Vec<String> = args
             .as_list()
             .map(|l| {
@@ -101,7 +101,7 @@ impl InstallCommand {
 
         if input
             .borrow()
-            .get_option("no-install")
+            .get_option("no-install")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -132,7 +132,7 @@ impl InstallCommand {
 
         let optimize = input
             .borrow()
-            .get_option("optimize-autoloader")
+            .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -142,7 +142,7 @@ impl InstallCommand {
                 .unwrap_or(false);
         let authoritative = input
             .borrow()
-            .get_option("classmap-authoritative")
+            .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -152,13 +152,13 @@ impl InstallCommand {
                 .unwrap_or(false);
         let apcu_prefix = input
             .borrow()
-            .get_option("apcu-autoloader-prefix")
+            .get_option("apcu-autoloader-prefix")?
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
-                .get_option("apcu-autoloader")
+                .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
             || config
@@ -173,7 +173,7 @@ impl InstallCommand {
             .set_output_progress(
                 !input
                     .borrow()
-                    .get_option("no-progress")
+                    .get_option("no-progress")?
                     .as_bool()
                     .unwrap_or(false),
             );
@@ -182,21 +182,21 @@ impl InstallCommand {
             .set_dry_run(
                 input
                     .borrow()
-                    .get_option("dry-run")
+                    .get_option("dry-run")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_download_only(
                 input
                     .borrow()
-                    .get_option("download-only")
+                    .get_option("download-only")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_verbose(
                 input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -205,14 +205,14 @@ impl InstallCommand {
             .set_dev_mode(
                 !input
                     .borrow()
-                    .get_option("no-dev")
+                    .get_option("no-dev")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_dump_autoloader(
                 !input
                     .borrow()
-                    .get_option("no-autoloader")
+                    .get_option("no-autoloader")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -226,14 +226,14 @@ impl InstallCommand {
             .set_error_on_audit(
                 input
                     .borrow()
-                    .get_option("audit")
+                    .get_option("audit")?
                     .as_bool()
                     .unwrap_or(false),
             );
 
         if input
             .borrow()
-            .get_option("no-plugins")
+            .get_option("no-plugins")?
             .as_bool()
             .unwrap_or(false)
         {

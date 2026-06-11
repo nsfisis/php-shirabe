@@ -159,6 +159,11 @@ impl PhpMixed {
         matches!(self, PhpMixed::Null)
     }
 
+    /// PHP loose boolean cast `(bool) $value`.
+    pub fn to_bool(&self) -> bool {
+        todo!()
+    }
+
     pub fn get(&self, key: &str) -> Option<&PhpMixed> {
         self.as_array().and_then(|m| m.get(key).map(|v| v.as_ref()))
     }
@@ -207,9 +212,31 @@ impl PhpMixed {
     }
 }
 
+impl From<()> for PhpMixed {
+    fn from(_value: ()) -> Self {
+        PhpMixed::Null
+    }
+}
+
 impl From<bool> for PhpMixed {
     fn from(value: bool) -> Self {
         PhpMixed::Bool(value)
+    }
+}
+
+/// Blanket downcast helper so trait objects (`dyn Command`, `dyn OutputInterface`,
+/// etc.) can be downcast to their concrete type, mirroring PHP `instanceof`.
+pub trait AsAny {
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+}
+
+impl<T: std::any::Any> AsAny for T {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
@@ -627,6 +654,10 @@ pub fn strip_tags(_str: &str) -> String {
 }
 
 pub const PHP_EOL: &str = "\n";
+
+pub const FILE_APPEND: i64 = 8;
+
+pub const STDIN: PhpResource = PhpResource;
 
 pub fn fopen(_file: &str, _mode: &str) -> PhpMixed {
     todo!()
@@ -2492,7 +2523,7 @@ pub struct StdClass {
     pub data: IndexMap<String, Box<PhpMixed>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PhpResource;
 
 pub fn gethostbyname(_hostname: &str) -> String {
@@ -2548,3 +2579,322 @@ pub const PHP_OS: &str = match std::env::consts::OS.as_bytes() {
     b"solaris" | b"illumos" => "SunOS",
     _ => std::env::consts::OS,
 };
+
+// ===== Symfony Console Phase B shim additions =====
+
+pub fn instance_of<T>(_value: &PhpMixed) -> bool {
+    todo!()
+}
+pub fn to_array(_value: PhpMixed) -> IndexMap<String, Box<PhpMixed>> {
+    todo!()
+}
+pub fn to_string(_value: &PhpMixed) -> String {
+    todo!()
+}
+pub fn to_bool(_value: &PhpMixed) -> bool {
+    todo!()
+}
+pub fn php_truthy(_value: &PhpMixed) -> bool {
+    todo!()
+}
+pub fn boolval(_value: &PhpMixed) -> bool {
+    todo!()
+}
+pub fn is_iterable(_value: &PhpMixed) -> bool {
+    todo!()
+}
+
+pub fn shell_exec(_command: &str) -> Option<String> {
+    todo!()
+}
+
+pub fn mb_detect_encoding(
+    _s: &str,
+    _encodings: Option<Vec<String>>,
+    _strict: bool,
+) -> Option<String> {
+    todo!()
+}
+pub fn mb_strwidth(_s: &str, _encoding: Option<&str>) -> i64 {
+    todo!()
+}
+pub fn mb_substr(_s: &str, _start: i64, _length: Option<i64>, _encoding: Option<&str>) -> String {
+    todo!()
+}
+pub fn mb_str_split(_s: &str, _length: i64) -> Vec<String> {
+    todo!()
+}
+pub fn mb_convert_variables(_to: &str, _from: &str, _vars: &mut Vec<String>) -> Option<String> {
+    todo!()
+}
+
+pub fn ceil(_v: f64) -> f64 {
+    todo!()
+}
+pub fn intdiv(_a: i64, _b: i64) -> i64 {
+    todo!()
+}
+pub fn hexdec(_s: &str) -> i64 {
+    todo!()
+}
+pub fn byte_at(_s: &str, _i: usize) -> u8 {
+    todo!()
+}
+pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
+    todo!()
+}
+pub fn stripcslashes(_s: &str) -> String {
+    todo!()
+}
+pub fn str_bitand(_a: &str, _b: &str) -> String {
+    todo!()
+}
+pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
+    todo!()
+}
+pub fn ctype_digit(_s: &str) -> bool {
+    todo!()
+}
+pub fn is_numeric_string(_s: &str) -> bool {
+    todo!()
+}
+pub fn is_numeric_to_int(_value: &PhpMixed) -> i64 {
+    todo!()
+}
+pub fn explode_limit(_delimiter: &str, _string: &str, _limit: i64) -> Vec<String> {
+    todo!()
+}
+pub fn sort_natural_flag_case(_values: &mut Vec<String>) {
+    todo!()
+}
+pub fn get_debug_type_obj<T>(_value: &T) -> String {
+    todo!()
+}
+pub fn dir() -> String {
+    todo!()
+}
+pub fn exit(_status: i64) -> ! {
+    todo!()
+}
+
+pub fn preg_match_all(_pattern: &str, _subject: &str) -> Vec<Vec<String>> {
+    todo!()
+}
+pub fn preg_match_all_simple(
+    _pattern: &str,
+    _subject: &str,
+    _matches: &mut Vec<Vec<String>>,
+) -> anyhow::Result<i64> {
+    todo!()
+}
+pub fn preg_match_all_set_order(
+    _pattern: &str,
+    _subject: &str,
+    _matches: &mut Vec<Vec<String>>,
+) -> anyhow::Result<i64> {
+    todo!()
+}
+pub fn preg_match_offset(
+    _pattern: &str,
+    _subject: &str,
+    _matches: &mut Vec<String>,
+    _flags: i64,
+    _offset: i64,
+) -> bool {
+    todo!()
+}
+pub fn preg_match_groups(_pattern: &str, _subject: &str) -> Option<Vec<String>> {
+    todo!()
+}
+pub fn preg_grep(_pattern: &str, _input: &Vec<String>) -> Vec<String> {
+    todo!()
+}
+pub fn preg_split_chars(_pattern: &str, _subject: &str) -> Vec<String> {
+    todo!()
+}
+
+#[derive(Debug, Default)]
+pub struct PregOffsetCaptureMatches {
+    groups: Vec<Vec<(String, usize)>>,
+}
+impl PregOffsetCaptureMatches {
+    pub fn group(&self, i: usize) -> &[(String, usize)] {
+        &self.groups[i]
+    }
+}
+pub fn preg_match_all_offset_capture(
+    _pattern: &str,
+    _subject: &str,
+    _matches: &mut PregOffsetCaptureMatches,
+) -> anyhow::Result<i64> {
+    todo!()
+}
+pub fn preg_replace_callback<F>(
+    _pattern: &str,
+    _callback: F,
+    _subject: &str,
+) -> anyhow::Result<String>
+where
+    F: FnMut(&[Option<String>]) -> anyhow::Result<String>,
+{
+    todo!()
+}
+
+pub fn is_resource_value(_resource: &PhpResource) -> bool {
+    todo!()
+}
+pub fn get_resource_type(_resource: &PhpResource) -> String {
+    todo!()
+}
+pub fn stream_isatty_resource(_resource: &PhpResource) -> bool {
+    todo!()
+}
+pub fn fwrite_resource(_resource: &PhpResource, _data: &str) {
+    todo!()
+}
+pub fn fflush_resource(_resource: &PhpResource) {
+    todo!()
+}
+pub fn fgetc(_resource: &PhpResource) -> Option<String> {
+    todo!()
+}
+pub fn ftell(_resource: &PhpResource) -> i64 {
+    todo!()
+}
+pub fn stream_get_meta_data(_resource: &PhpResource) -> IndexMap<String, Box<PhpMixed>> {
+    todo!()
+}
+pub fn stream_set_blocking(_resource: &PhpResource, _enable: bool) -> bool {
+    todo!()
+}
+pub fn stream_select(
+    _read: &mut Vec<PhpResource>,
+    _write: &mut Vec<PhpResource>,
+    _except: &mut Vec<PhpResource>,
+    _seconds: i64,
+    _microseconds: Option<i64>,
+) -> i64 {
+    todo!()
+}
+pub fn php_fopen_resource(_path: &str, _mode: &str) -> PhpResource {
+    todo!()
+}
+pub fn php_stdout_resource() -> PhpResource {
+    todo!()
+}
+pub fn php_stderr_resource() -> PhpResource {
+    todo!()
+}
+pub fn stdin() -> PhpResource {
+    todo!()
+}
+
+pub fn proc_open(_command: &str, _descriptorspec: &Vec<PhpMixed>, _pipes: &mut PhpMixed) -> bool {
+    todo!()
+}
+pub fn proc_close(_process: bool) -> i64 {
+    todo!()
+}
+
+pub fn sapi_windows_vt100_support(_resource: &PhpResource) -> bool {
+    todo!()
+}
+pub fn sapi_windows_cp_get(_kind: Option<&str>) -> i64 {
+    todo!()
+}
+pub fn sapi_windows_cp_set(_codepage: i64) -> bool {
+    todo!()
+}
+pub fn sapi_windows_cp_conv(_in_codepage: i64, _out_codepage: i64, _subject: &str) -> String {
+    todo!()
+}
+
+pub const SIGINT: i64 = 2;
+pub const SIGTERM: i64 = 15;
+pub const SIGUSR1: i64 = 10;
+pub const SIGUSR2: i64 = 12;
+pub fn pcntl_async_signals(_enable: bool) {
+    todo!()
+}
+pub fn pcntl_signal(_signal: i64, _handler: PhpMixed) -> bool {
+    todo!()
+}
+pub fn pcntl_signal_get_handler(_signal: i64) -> PhpMixed {
+    todo!()
+}
+pub fn call_php_callable(_callback: &PhpMixed, _args: &[PhpMixed]) -> PhpMixed {
+    todo!()
+}
+
+pub fn cli_set_process_title(_title: &str) -> bool {
+    todo!()
+}
+pub fn setproctitle(_title: &str) {
+    todo!()
+}
+pub fn spl_object_hash_process<T>(_object: &T) -> String {
+    todo!()
+}
+
+pub fn server(_key: &str) -> String {
+    todo!()
+}
+pub fn server_argv() -> Vec<String> {
+    todo!()
+}
+pub fn server_php_self() -> String {
+    todo!()
+}
+pub fn server_shell() -> Option<String> {
+    todo!()
+}
+
+pub fn file_put_contents3(_filename: &str, _data: &str, _flags: i64) -> Option<i64> {
+    todo!()
+}
+
+#[derive(Debug)]
+pub struct DirectoryIteratorEntry;
+impl DirectoryIteratorEntry {
+    pub fn get_basename(&self) -> String {
+        todo!()
+    }
+    pub fn is_file(&self) -> bool {
+        todo!()
+    }
+    pub fn get_extension(&self) -> String {
+        todo!()
+    }
+}
+pub fn directory_iterator(_path: &str) -> Vec<DirectoryIteratorEntry> {
+    todo!()
+}
+
+pub fn array_key_last(_array: &IndexMap<String, Box<PhpMixed>>) -> usize {
+    todo!()
+}
+pub fn array_splice_mixed(
+    _array: &mut Vec<PhpMixed>,
+    _offset: i64,
+    _length: i64,
+    _replacement: Vec<PhpMixed>,
+) {
+    todo!()
+}
+
+pub fn str_replace_arrays(_search: &[String], _replace: &[String], _subject: &str) -> String {
+    todo!()
+}
+pub fn str_replace_arr(_search: &[&str], _replace: &str, _subject: &str) -> String {
+    todo!()
+}
+
+pub fn php_exception_get_code(_error: &anyhow::Error) -> i64 {
+    todo!()
+}
+pub fn sscanf(_subject: &str, _format: &str, _a: &mut i64, _b: &mut i64) -> i64 {
+    todo!()
+}
+pub fn trigger_deprecation(_package: &str, _version: &str, _message: &str, _arg: &str) {
+    todo!()
+}

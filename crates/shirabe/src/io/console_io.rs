@@ -10,6 +10,7 @@ use shirabe_external_packages::symfony::console::helper::ProgressBar;
 use shirabe_external_packages::symfony::console::helper::QuestionHelper;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_external_packages::symfony::console::output::ConsoleOutputInterface;
 use shirabe_external_packages::symfony::console::output::output_interface::{
     self as output_interface, OutputInterface,
@@ -17,9 +18,8 @@ use shirabe_external_packages::symfony::console::output::output_interface::{
 use shirabe_external_packages::symfony::console::question::ChoiceQuestion;
 use shirabe_external_packages::symfony::console::question::Question;
 use shirabe_php_shim::{
-    PhpMixed, array_filter, array_keys, array_search, count, function_exists, implode, in_array,
-    is_array, is_string, mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat,
-    strip_tags, strlen,
+    AsAny, PhpMixed, array_search, function_exists, implode, in_array, is_array, is_string,
+    mb_check_encoding, mb_convert_encoding, microtime, sprintf, str_repeat, strip_tags, strlen,
 };
 use std::cell::RefCell;
 
@@ -129,9 +129,18 @@ impl ConsoleIO {
             messages
         };
 
-        if stderr && let Some(console_output) = self.output.borrow().as_console_output_interface() {
-            console_output.get_error_output().borrow().write(
-                &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
+        let error_output = if stderr {
+            let output = self.output.borrow();
+            (*output)
+                .as_any()
+                .downcast_ref::<ConsoleOutput>()
+                .map(|console_output| console_output.get_error_output())
+        } else {
+            None
+        };
+        if let Some(error_output) = error_output {
+            error_output.borrow().write(
+                &[Self::to_string_list(&messages).join(if newline { "\n" } else { "" })],
                 newline,
                 sf_verbosity,
             );
@@ -145,7 +154,7 @@ impl ConsoleIO {
         }
 
         self.output.borrow().write(
-            &Self::to_string_list(&messages).join(if newline { "\n" } else { "" }),
+            &[Self::to_string_list(&messages).join(if newline { "\n" } else { "" })],
             newline,
             sf_verbosity,
         );
@@ -239,7 +248,8 @@ impl ConsoleIO {
     }
 
     pub fn get_progress_bar(&self, max: i64) -> ProgressBar {
-        ProgressBar::new(self.get_error_output(), max)
+        // PHP ProgressBar::__construct default $minSecondsBetweenRedraws = 1 / 25.
+        ProgressBar::new(self.get_error_output(), max, 1.0 / 25.0)
     }
 
     pub fn get_table(&self) -> Table {
@@ -247,8 +257,14 @@ impl ConsoleIO {
     }
 
     fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
-        if let Some(console_output) = self.output.borrow().as_console_output_interface() {
-            return console_output.get_error_output();
+        let output = self.output.borrow();
+        let error_output = (*output)
+            .as_any()
+            .downcast_ref::<ConsoleOutput>()
+            .map(|console_output| console_output.get_error_output());
+        drop(output);
+        if let Some(error_output) = error_output {
+            return error_output;
         }
 
         self.output.clone()
@@ -358,6 +374,31 @@ impl ConsoleIO {
             _ => vec![],
         }
     }
+
+    /// Resolves the "question" helper and delegates to `QuestionHelper::ask`.
+    ///
+    /// PHP: `$this->helperSet->get('question')->ask($this->input, $this->getErrorOutput(), $question)`.
+    /// `HelperSet::get` and `QuestionHelper::ask` both surface PHP exceptions; ConsoleIO does not
+    /// catch them, so an unrecoverable error here is a PHP fatal. The double `Result` is collapsed:
+    /// the outer `anyhow::Result` (fatal) and the inner `MissingInputException` (unhandled, hence
+    /// also fatal in PHP) both abort.
+    fn ask_question(&self, question: &Question) -> PhpMixed {
+        let helper_rc = self
+            .helper_set
+            .get("question")
+            .expect("the \"question\" helper is always registered");
+        let error_output = self.get_error_output();
+        let mut helper = helper_rc.borrow_mut();
+        let question_helper = (*helper)
+            .as_any_mut()
+            .downcast_mut::<QuestionHelper>()
+            .expect("the \"question\" helper is a QuestionHelper");
+        let mut input = self.input.borrow_mut();
+        question_helper
+            .ask(&mut *input, error_output, question)
+            .expect("QuestionHelper::ask raised a fatal error")
+            .expect("QuestionHelper::ask returned no input")
+    }
 }
 
 impl IOInterfaceImmutable for ConsoleIO {
@@ -434,7 +475,6 @@ impl IOInterfaceImmutable for ConsoleIO {
     }
 
     fn ask(&self, question: String, default: PhpMixed) -> PhpMixed {
-        let helper = self.helper_set.get::<QuestionHelper>("question");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -444,15 +484,12 @@ impl IOInterfaceImmutable for ConsoleIO {
         } else {
             Some(default)
         };
-        let question = Question::new(&sanitized_question, sanitized_default);
+        let question = Question::new(sanitized_question, sanitized_default);
 
-        helper
-            .borrow()
-            .ask(self.input.clone(), self.get_error_output(), &question)
+        self.ask_question(&question)
     }
 
     fn ask_confirmation(&self, question: String, default: bool) -> bool {
-        let helper = self.helper_set.get::<QuestionHelper>("question");
         let sanitized = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
@@ -464,11 +501,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             "/^no?$/i".to_string(),
         );
 
-        let result = helper.borrow().ask(
-            self.input.clone(),
-            self.get_error_output(),
-            question.inner(),
-        );
+        let result = self.ask_question(question.inner());
         result.as_bool().unwrap_or(false)
     }
 
@@ -488,18 +521,33 @@ impl IOInterfaceImmutable for ConsoleIO {
         } else {
             Some(default)
         };
-        let mut question = Question::new(&sanitized_question, sanitized_default);
-        // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed>; adapt the
-        // None answer to PHP's null and forward the validator's Result unchanged.
-        let adapted: Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>> =
-            Box::new(move |answer: Option<PhpMixed>| validator(answer.unwrap_or(PhpMixed::Null)));
+        let mut question = Question::new(sanitized_question, sanitized_default);
+        // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>;
+        // adapt the None answer to PHP's null and translate the validator's anyhow error into the
+        // InvalidArgumentException the Question validator type expects (QuestionHelper retries on it).
+        let adapted: Box<
+            dyn Fn(
+                Option<PhpMixed>,
+            ) -> Result<
+                PhpMixed,
+                shirabe_external_packages::symfony::console::exception::InvalidArgumentException,
+            >,
+        > = Box::new(move |answer: Option<PhpMixed>| {
+            validator(answer.unwrap_or(PhpMixed::Null)).map_err(|e| {
+                shirabe_external_packages::symfony::console::exception::InvalidArgumentException(
+                    shirabe_php_shim::InvalidArgumentException {
+                        message: e.to_string(),
+                        code: 0,
+                    },
+                )
+            })
+        });
         question.set_validator(Some(adapted));
-        question.set_max_attempts(attempts);
+        question
+            .set_max_attempts(attempts)
+            .map_err(|e| anyhow::anyhow!(e.0.message))?;
 
-        let helper = self.helper_set.get::<QuestionHelper>("question");
-        Ok(helper
-            .borrow()
-            .ask(self.input.clone(), self.get_error_output(), &question))
+        Ok(self.ask_question(&question))
     }
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
@@ -507,13 +555,13 @@ impl IOInterfaceImmutable for ConsoleIO {
             .as_string()
             .unwrap_or("")
             .to_string();
-        let mut question = Question::new(&sanitized_question, Some(PhpMixed::Null));
-        question.set_hidden(true);
+        let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
+        // setHidden only throws when an autocompleter is set, which is not the case here.
+        question
+            .set_hidden(true)
+            .expect("a freshly constructed question has no autocompleter");
 
-        let helper = self.helper_set.get::<QuestionHelper>("question");
-        let result = helper
-            .borrow()
-            .ask(self.input.clone(), self.get_error_output(), &question);
+        let result = self.ask_question(&question);
         result.as_string().map(|s| s.to_string())
     }
 
@@ -533,35 +581,45 @@ impl IOInterfaceImmutable for ConsoleIO {
                 .map(|s| Box::new(PhpMixed::String(s)))
                 .collect(),
         );
-        let _helper = self.helper_set.get::<QuestionHelper>("question");
+        let _helper = self
+            .helper_set
+            .get("question")
+            .expect("the \"question\" helper is always registered");
         let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
             .as_string()
             .unwrap_or("")
             .to_string();
-        // TODO(phase-b): ChoiceQuestion::new expects Vec<PhpMixed>; collect from the
-        // sanitized PhpMixed::List.
+        // ChoiceQuestion::new expects an IndexMap<String, Box<PhpMixed>>; project the
+        // sanitized choice list/map into the keyed form, preserving keys.
         let sanitized_choices_mixed = Self::sanitize(choices.clone(), true);
-        let sanitized_choices: Vec<PhpMixed> = match sanitized_choices_mixed {
-            PhpMixed::List(l) => l.into_iter().map(|b| *b).collect(),
-            PhpMixed::Array(a) => a.into_values().map(|b| *b).collect(),
-            other => vec![other],
+        let sanitized_choices: IndexMap<String, Box<PhpMixed>> = match sanitized_choices_mixed {
+            PhpMixed::List(l) => l
+                .into_iter()
+                .enumerate()
+                .map(|(i, b)| (i.to_string(), b))
+                .collect(),
+            PhpMixed::Array(a) => a,
+            other => indexmap! { "0".to_string() => Box::new(other) },
         };
         let sanitized_default = if is_string(&default) {
             Some(Self::sanitize(default, true))
         } else {
             Some(default)
         };
+        // Empty choices raise a LogicException (programmer error in PHP).
         let mut question =
-            ChoiceQuestion::new(&sanitized_question, sanitized_choices, sanitized_default);
+            ChoiceQuestion::new(sanitized_question, sanitized_choices, sanitized_default)
+                .expect("select() always provides at least one choice");
         // PHP: IOInterface requires false, and Question requires null or int
-        let max_attempts = match attempts {
+        let _max_attempts = match attempts {
             PhpMixed::Bool(false) => None,
             PhpMixed::Int(i) => Some(i),
             _ => None,
         };
-        // ChoiceQuestion delegates set_max_attempts to its inner Question.
-        question.0.set_max_attempts(max_attempts);
-        question.set_error_message(&error_message);
+        // TODO(phase-c): PHP calls $question->setMaxAttempts($attempts), inherited from Question.
+        // ChoiceQuestion (shirabe-external-packages) keeps its inner Question private and exposes
+        // no setMaxAttempts passthrough, so the attempts cannot be propagated here yet. See report.
+        question.set_error_message(error_message);
         question.set_multiselect(multiselect);
 
         // TODO(phase-c): QuestionHelper::ask takes a concrete `&Question`, but PHP passes a

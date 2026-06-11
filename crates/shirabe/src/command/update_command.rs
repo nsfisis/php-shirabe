@@ -78,7 +78,7 @@ impl UpdateCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
         let io = self.get_io().clone();
-        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             io.write_error3(
                 "<warning>You are using the deprecated option \"--dev\". It has no effect and will break in Composer 3.</warning>",
                 true,
@@ -87,7 +87,7 @@ impl UpdateCommand {
         }
         if input
             .borrow()
-            .get_option("no-suggest")
+            .get_option("no-suggest")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -111,7 +111,7 @@ impl UpdateCommand {
 
         let mut packages: Vec<String> = input
             .borrow()
-            .get_argument("packages")
+            .get_argument("packages")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -122,7 +122,7 @@ impl UpdateCommand {
         let mut reqs: IndexMap<String, String> = self.format_requirements(
             input
                 .borrow()
-                .get_option("with")
+                .get_option("with")?
                 .as_list()
                 .map(|l| {
                     l.iter()
@@ -196,7 +196,7 @@ impl UpdateCommand {
 
         if input
             .borrow()
-            .get_option("patch-only")
+            .get_option("patch-only")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -241,7 +241,7 @@ impl UpdateCommand {
 
         if input
             .borrow()
-            .get_option("interactive")
+            .get_option("interactive")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -256,14 +256,14 @@ impl UpdateCommand {
 
         if input
             .borrow()
-            .get_option("root-reqs")
+            .get_option("root-reqs")?
             .as_bool()
             .unwrap_or(false)
         {
             let mut requires: Vec<String> = array_keys(&root_package.get_requires());
             if !input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
@@ -290,7 +290,11 @@ impl UpdateCommand {
                 true,
             )
         });
-        let update_mirrors = input.borrow().get_option("lock").as_bool().unwrap_or(false)
+        let update_mirrors = input
+            .borrow()
+            .get_option("lock")?
+            .as_bool()
+            .unwrap_or(false)
             || filtered_packages.len() != packages.len();
         packages = filtered_packages;
 
@@ -314,7 +318,7 @@ impl UpdateCommand {
             .set_output_progress(
                 !input
                     .borrow()
-                    .get_option("no-progress")
+                    .get_option("no-progress")?
                     .as_bool()
                     .unwrap_or(false),
             );
@@ -327,7 +331,7 @@ impl UpdateCommand {
 
         let optimize = input
             .borrow()
-            .get_option("optimize-autoloader")
+            .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -337,7 +341,7 @@ impl UpdateCommand {
                 .unwrap_or(false);
         let authoritative = input
             .borrow()
-            .get_option("classmap-authoritative")
+            .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -347,13 +351,13 @@ impl UpdateCommand {
                 .unwrap_or(false);
         let apcu_prefix: Option<String> = input
             .borrow()
-            .get_option("apcu-autoloader-prefix")
+            .get_option("apcu-autoloader-prefix")?
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
-                .get_option("apcu-autoloader")
+                .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
             || config
@@ -363,7 +367,7 @@ impl UpdateCommand {
                 .unwrap_or(false);
         let minimal_changes = input
             .borrow()
-            .get_option("minimal-changes")
+            .get_option("minimal-changes")?
             .as_bool()
             .unwrap_or(false)
             || config
@@ -375,7 +379,7 @@ impl UpdateCommand {
         let mut update_allow_transitive_dependencies = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if input
             .borrow()
-            .get_option("with-all-dependencies")
+            .get_option("with-all-dependencies")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -383,7 +387,7 @@ impl UpdateCommand {
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps;
         } else if input
             .borrow()
-            .get_option("with-dependencies")
+            .get_option("with-dependencies")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -395,14 +399,14 @@ impl UpdateCommand {
             .set_dry_run(
                 input
                     .borrow()
-                    .get_option("dry-run")
+                    .get_option("dry-run")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_verbose(
                 input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -411,14 +415,14 @@ impl UpdateCommand {
             .set_dev_mode(
                 !input
                     .borrow()
-                    .get_option("no-dev")
+                    .get_option("no-dev")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_dump_autoloader(
                 !input
                     .borrow()
-                    .get_option("no-autoloader")
+                    .get_option("no-autoloader")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -429,7 +433,7 @@ impl UpdateCommand {
             .set_install(
                 !input
                     .borrow()
-                    .get_option("no-install")
+                    .get_option("no-install")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -440,14 +444,14 @@ impl UpdateCommand {
             .set_prefer_stable(
                 input
                     .borrow()
-                    .get_option("prefer-stable")
+                    .get_option("prefer-stable")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_prefer_lowest(
                 input
                     .borrow()
-                    .get_option("prefer-lowest")
+                    .get_option("prefer-lowest")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -459,7 +463,7 @@ impl UpdateCommand {
 
         if input
             .borrow()
-            .get_option("no-plugins")
+            .get_option("no-plugins")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -468,8 +472,14 @@ impl UpdateCommand {
 
         let mut result = install.run()?;
 
-        if result == 0 && !input.borrow().get_option("lock").as_bool().unwrap_or(false) {
-            let mut bump_after_update = input.borrow().get_option("bump-after-update");
+        if result == 0
+            && !input
+                .borrow()
+                .get_option("lock")?
+                .as_bool()
+                .unwrap_or(false)
+        {
+            let mut bump_after_update = input.borrow().get_option("bump-after-update")?;
             // PHP: false === $bumpAfterUpdate (strict)
             if matches!(bump_after_update, PhpMixed::Bool(false)) {
                 bump_after_update = composer.get_config().borrow().get("bump-after-update");
@@ -489,12 +499,12 @@ impl UpdateCommand {
                     bump_after_update.as_string() == Some("no-dev"),
                     input
                         .borrow()
-                        .get_option("dry-run")
+                        .get_option("dry-run")?
                         .as_bool()
                         .unwrap_or(false),
                     input
                         .borrow()
-                        .get_argument("packages")
+                        .get_argument("packages")?
                         .as_list()
                         .map(|l| {
                             l.iter()

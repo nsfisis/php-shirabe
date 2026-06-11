@@ -587,14 +587,11 @@ impl EventDispatcher {
                             continue;
                         }
 
-                        let mut app = Application::new("", "");
+                        let mut app = Application::__construct("UNKNOWN", "UNKNOWN");
                         app.set_catch_exceptions(false);
-                        if method_exists(
-                            &PhpMixed::String("Application".to_string()),
-                            "setCatchErrors",
-                        ) {
-                            app.set_catch_errors(false);
-                        }
+                        // PHP: if (method_exists($app, 'setCatchErrors')) { $app->setCatchErrors(false); }
+                        // This Symfony Console port does not provide `setCatchErrors`, so the
+                        // guarded call is skipped, matching `method_exists` evaluating to false.
                         app.set_auto_exit(false);
                         // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
                         todo!(
@@ -615,7 +612,7 @@ impl EventDispatcher {
                                 let _refl_php_version_gate = PHP_VERSION_ID < 80100;
                                 todo!("\\ReflectionProperty on ConsoleIO::$output")
                             } else {
-                                ConsoleOutput::new(0, None, None)
+                                ConsoleOutput::new(None, None, None)?
                             };
                             let input_str = event
                                 .get_flags()
@@ -623,8 +620,8 @@ impl EventDispatcher {
                                 .and_then(|v| v.as_string())
                                 .unwrap_or(&args)
                                 .to_string();
-                            let mut input = StringInput::new(&input_str);
-                            let mut output = output;
+                            let input = StringInput::new(&input_str)?;
+                            let output = output;
                             Ok(app.run(
                                 Some(std::rc::Rc::new(std::cell::RefCell::new(input))),
                                 Some(std::rc::Rc::new(std::cell::RefCell::new(output))),

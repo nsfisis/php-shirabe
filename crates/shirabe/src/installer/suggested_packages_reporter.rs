@@ -201,6 +201,7 @@ impl SuggestedPackagesReporter {
 
     fn escape_output(&self, string: &str) -> String {
         OutputFormatter::escape(&self.remove_control_characters(string))
+            .expect("OutputFormatter::escape does not fail")
     }
 
     fn remove_control_characters(&self, string: &str) -> String {

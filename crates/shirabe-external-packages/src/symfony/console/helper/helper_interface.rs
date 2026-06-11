@@ -1,17 +1,15 @@
-use crate::symfony::console::helper::HelperSet;
+use crate::symfony::console::helper::helper_set::HelperSet;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-pub trait HelperInterface: std::fmt::Debug {
-    fn set_helper_set(&mut self, _helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>) {
-        todo!()
-    }
+/// HelperInterface is the interface all helpers must implement.
+pub trait HelperInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
+    /// Sets the helper set associated with this helper.
+    fn set_helper_set(&mut self, helper_set: Option<Rc<RefCell<HelperSet>>>);
 
-    fn get_helper_set(&self) -> Option<std::rc::Rc<std::cell::RefCell<HelperSet>>> {
-        todo!()
-    }
+    /// Gets the helper set associated with this helper.
+    fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>>;
 
-    fn get_name(&self) -> String {
-        todo!()
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any;
+    /// Returns the canonical name of this helper.
+    fn get_name(&self) -> String;
 }

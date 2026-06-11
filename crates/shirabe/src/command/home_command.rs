@@ -78,7 +78,7 @@ impl HomeCommand {
 
         let packages: Vec<String> = input
             .borrow()
-            .get_argument("packages")
+            .get_argument("packages")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -98,10 +98,14 @@ impl HomeCommand {
 
         let show_homepage = input
             .borrow()
-            .get_option("homepage")
+            .get_option("homepage")?
             .as_bool()
             .unwrap_or(false);
-        let show_only = input.borrow().get_option("show").as_bool().unwrap_or(false);
+        let show_only = input
+            .borrow()
+            .get_option("show")?
+            .as_bool()
+            .unwrap_or(false);
 
         for package_name in &packages {
             let mut handled = false;

@@ -4,10 +4,12 @@ use std::path::Path;
 
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::input::ArgvInput;
+use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, RuntimeException, chdir};
+use shirabe_php_shim::{AsAny, LogicException, RuntimeException, chdir};
 
 use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
 use crate::console::input::InputArgument;
@@ -56,12 +58,35 @@ impl GlobalCommand {
             );
     }
 
+    // TODO remove for Symfony 6+ as it is then in the interface.
+    // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
+    // `$input->__toString()`. `InputInterface` does not declare `__toString`, so the
+    // concrete stringable input types are matched explicitly.
+    fn input_to_string(input: &dyn InputInterface) -> Result<String> {
+        let input_any = input.as_any();
+        if let Some(argv_input) = input_any.downcast_ref::<ArgvInput>() {
+            Ok(argv_input.to_string())
+        } else if let Some(array_input) = input_any.downcast_ref::<ArrayInput>() {
+            Ok(array_input.to_string())
+        } else if input_any.is::<StringInput>() {
+            // StringInput's stringification is not exposed by shirabe-external-packages
+            // (its inner ArgvInput is pub(crate) and it defines no public __toString).
+            todo!("StringInput::__toString is not accessible from the shirabe crate")
+        } else {
+            Err(LogicException {
+                message: "Expected an Input instance that is stringable".to_string(),
+                code: 0,
+            }
+            .into())
+        }
+    }
+
     pub fn run(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &input.borrow().to_input_string())?;
+        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?)?;
         let mut args: Vec<String> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with('-') {
@@ -123,12 +148,12 @@ impl GlobalCommand {
         let new_input_str = Preg::replace4(
             r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}",
             "",
-            &input.borrow().to_input_string(),
+            &Self::input_to_string(&*input.borrow())?,
             1,
         )?;
         self.get_application()?.reset_composer();
 
-        Ok(StringInput::new(&new_input_str))
+        Ok(StringInput::new(&new_input_str)?)
     }
 
     pub fn is_proxy_command(&self) -> bool {

@@ -464,7 +464,7 @@ impl AutoloadGenerator {
         if !ambiguous_classes.is_empty() {
             self.io.write_error(&format!(
                 "<info>To resolve ambiguity in classes not under your control you can ignore them by path using <href={}>exclude-from-classmap</>",
-                OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")
+                OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?
             ));
         }
 

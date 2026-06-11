@@ -88,7 +88,7 @@ impl ArchiveCommand {
 
         let format = input
             .borrow()
-            .get_option("format")
+            .get_option("format")?
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
@@ -102,7 +102,7 @@ impl ArchiveCommand {
 
         let dir = input
             .borrow()
-            .get_option("dir")
+            .get_option("dir")?
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
@@ -120,24 +120,24 @@ impl ArchiveCommand {
             &config,
             input
                 .borrow()
-                .get_argument("package")
+                .get_argument("package")?
                 .as_string()
                 .map(|s| s.to_string()),
             input
                 .borrow()
-                .get_argument("version")
+                .get_argument("version")?
                 .as_string()
                 .map(|s| s.to_string()),
             &format,
             &dir,
             input
                 .borrow()
-                .get_option("file")
+                .get_option("file")?
                 .as_string()
                 .map(|s| s.to_string()),
             input
                 .borrow()
-                .get_option("ignore-filters")
+                .get_option("ignore-filters")?
                 .as_bool()
                 .unwrap_or(false),
             composer.as_ref(),

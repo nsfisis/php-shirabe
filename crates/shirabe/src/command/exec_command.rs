@@ -49,8 +49,12 @@ impl ExecCommand {
             return Ok(());
         }
 
-        if input.borrow().get_argument("binary").as_string().is_some()
-            || input.borrow().get_option("list").as_bool().unwrap_or(false)
+        if input.borrow().get_argument("binary")?.as_string().is_some()
+            || input
+                .borrow()
+                .get_option("list")?
+                .as_bool()
+                .unwrap_or(false)
         {
             return Ok(());
         }
@@ -82,8 +86,12 @@ impl ExecCommand {
     ) -> Result<i64> {
         let composer = self.require_composer(None, None)?;
 
-        if input.borrow().get_option("list").as_bool().unwrap_or(false)
-            || input.borrow().get_argument("binary").as_string().is_none()
+        if input
+            .borrow()
+            .get_option("list")?
+            .as_bool()
+            .unwrap_or(false)
+            || input.borrow().get_argument("binary")?.as_string().is_none()
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
@@ -115,7 +123,7 @@ impl ExecCommand {
 
         let binary = input
             .borrow()
-            .get_argument("binary")
+            .get_argument("binary")?
             .as_string()
             .unwrap_or("")
             .to_string();
@@ -141,7 +149,7 @@ impl ExecCommand {
 
         let args = input
             .borrow()
-            .get_argument("args")
+            .get_argument("args")?
             .as_list()
             .map(|l| {
                 l.iter()

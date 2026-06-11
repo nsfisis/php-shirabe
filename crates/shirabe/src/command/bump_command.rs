@@ -62,7 +62,7 @@ impl BumpCommand {
     ) -> Result<i64> {
         let packages_filter: Vec<String> = input
             .borrow()
-            .get_argument("packages")
+            .get_argument("packages")?
             .as_list()
             .map(|l| {
                 l.iter()
@@ -73,17 +73,17 @@ impl BumpCommand {
 
         let dev_only = input
             .borrow()
-            .get_option("dev-only")
+            .get_option("dev-only")?
             .as_bool()
             .unwrap_or(false);
         let no_dev_only = input
             .borrow()
-            .get_option("no-dev-only")
+            .get_option("no-dev-only")?
             .as_bool()
             .unwrap_or(false);
         let dry_run = input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
         let io = self.get_io().clone();

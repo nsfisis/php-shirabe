@@ -119,12 +119,12 @@ impl CreateProjectCommand {
         let (prefer_source, prefer_dist) =
             self.get_preferred_install_options(&config.borrow(), input.clone(), true)?;
 
-        if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             io.write_error("<warning>You are using the deprecated option \"dev\". Dev packages are installed by default now.</warning>");
         }
         if input
             .borrow()
-            .get_option("no-custom-installers")
+            .get_option("no-custom-installers")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -135,9 +135,9 @@ impl CreateProjectCommand {
         }
 
         if input.borrow().is_interactive()
-            && input.borrow().get_option("ask").as_bool().unwrap_or(false)
+            && input.borrow().get_option("ask")?.as_bool().unwrap_or(false)
         {
-            let package = input.borrow().get_argument("package");
+            let package = input.borrow().get_argument("package")?;
             if package.is_null() {
                 return Err(RuntimeException {
                     message: "Not enough arguments (missing: \"package\").".to_string(),
@@ -156,8 +156,8 @@ impl CreateProjectCommand {
                 .set_argument("directory", io.ask(prompt, PhpMixed::Null));
         }
 
-        let repository_opt = input.borrow().get_option("repository");
-        let repository_url_opt = input.borrow().get_option("repository-url");
+        let repository_opt = input.borrow().get_option("repository")?;
+        let repository_url_opt = input.borrow().get_option("repository-url")?;
         let repositories = if repository_opt
             .as_list()
             .map(|l| l.len() > 0)
@@ -174,61 +174,61 @@ impl CreateProjectCommand {
             input.clone(),
             input
                 .borrow()
-                .get_argument("package")
+                .get_argument("package")?
                 .as_string()
                 .map(|s| s.to_string()),
             input
                 .borrow()
-                .get_argument("directory")
+                .get_argument("directory")?
                 .as_string()
                 .map(|s| s.to_string()),
             input
                 .borrow()
-                .get_argument("version")
+                .get_argument("version")?
                 .as_string()
                 .map(|s| s.to_string()),
             input
                 .borrow()
-                .get_option("stability")
+                .get_option("stability")?
                 .as_string()
                 .map(|s| s.to_string()),
             prefer_source,
             prefer_dist,
             !input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false),
             repositories,
             input
                 .borrow()
-                .get_option("no-plugins")
+                .get_option("no-plugins")?
                 .as_bool()
                 .unwrap_or(false),
             input
                 .borrow()
-                .get_option("no-scripts")
+                .get_option("no-scripts")?
                 .as_bool()
                 .unwrap_or(false),
             input
                 .borrow()
-                .get_option("no-progress")
+                .get_option("no-progress")?
                 .as_bool()
                 .unwrap_or(false),
             input
                 .borrow()
-                .get_option("no-install")
+                .get_option("no-install")?
                 .as_bool()
                 .unwrap_or(false),
             Some(self.get_platform_requirement_filter(input.clone())?),
             !input
                 .borrow()
-                .get_option("no-secure-http")
+                .get_option("no-secure-http")?
                 .as_bool()
                 .unwrap_or(false),
             input
                 .borrow()
-                .get_option("add-repository")
+                .get_option("add-repository")?
                 .as_bool()
                 .unwrap_or(false),
         )
@@ -478,9 +478,9 @@ impl CreateProjectCommand {
         }
 
         let mut has_vcs = installed_from_vcs;
-        let remove_vcs = !input.borrow().get_option("keep-vcs").as_bool().unwrap_or(false)
+        let remove_vcs = !input.borrow().get_option("keep-vcs")?.as_bool().unwrap_or(false)
             && installed_from_vcs
-            && (input.borrow().get_option("remove-vcs").as_bool().unwrap_or(false)
+            && (input.borrow().get_option("remove-vcs")?.as_bool().unwrap_or(false)
                 || !io.is_interactive()
                 || io.ask_confirmation(
                     "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ".to_string(),

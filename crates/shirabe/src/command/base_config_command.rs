@@ -31,10 +31,10 @@ pub trait BaseConfigCommand: BaseCommand {
 
         if input
             .borrow()
-            .get_option("global")
+            .get_option("global")?
             .as_bool()
             .unwrap_or(false)
-            && !input.borrow().get_option("file").is_null()
+            && !input.borrow().get_option("file")?.is_null()
         {
             return Err(anyhow::anyhow!("--file and --global can not be combined"));
         }
@@ -48,7 +48,7 @@ pub trait BaseConfigCommand: BaseCommand {
         // When using --global flag, set baseDir to home directory for correct absolute path resolution
         if input
             .borrow()
-            .get_option("global")
+            .get_option("global")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -56,7 +56,7 @@ pub trait BaseConfigCommand: BaseCommand {
             config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
-        let config_file = self.get_composer_config_file(input.clone(), &*config_rc.borrow());
+        let config_file = self.get_composer_config_file(input.clone(), &*config_rc.borrow())?;
 
         // Create global composer.json if invoked using `composer global [config-cmd]`
         if (config_file == "composer.json" || config_file == "./composer.json")
@@ -77,7 +77,7 @@ pub trait BaseConfigCommand: BaseCommand {
         // Initialize the global file if it's not there, ignoring any warnings or notices
         if input
             .borrow()
-            .get_option("global")
+            .get_option("global")?
             .as_bool()
             .unwrap_or(false)
             && !self.config_file().unwrap().borrow().exists()
@@ -116,21 +116,21 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         if input
             .borrow()
-            .get_option("global")
+            .get_option("global")?
             .as_bool()
             .unwrap_or(false)
         {
-            format!("{}/config.json", config.get("home"))
+            Ok(format!("{}/config.json", config.get("home")))
         } else {
-            input
+            Ok(input
                 .borrow()
-                .get_option("file")
+                .get_option("file")?
                 .as_string()
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default())
+                .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default()))
         }
     }
 
@@ -140,21 +140,21 @@ pub trait BaseConfigCommand: BaseCommand {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         config: &Config,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         if input
             .borrow()
-            .get_option("global")
+            .get_option("global")?
             .as_bool()
             .unwrap_or(false)
         {
-            format!("{}/auth.json", config.get("home"))
+            Ok(format!("{}/auth.json", config.get("home")))
         } else {
-            let composer_config = self.get_composer_config_file(input, config);
+            let composer_config = self.get_composer_config_file(input, config)?;
             let parent = std::path::Path::new(&composer_config)
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
-            format!("{}/auth.json", parent)
+            Ok(format!("{}/auth.json", parent))
         }
     }
 }

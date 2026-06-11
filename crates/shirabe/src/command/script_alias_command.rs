@@ -118,10 +118,10 @@ impl ScriptAliasCommand {
             .into());
         }
 
-        let dev_mode = input.borrow().get_option("dev").as_bool().unwrap_or(false)
+        let dev_mode = input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             || !input
                 .borrow()
-                .get_option("no-dev")
+                .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false);
 

@@ -60,7 +60,7 @@ impl CheckPlatformReqsCommand {
 
         let no_dev = input
             .borrow()
-            .get_option("no-dev")
+            .get_option("no-dev")?
             .as_bool()
             .unwrap_or(false);
 
@@ -69,7 +69,7 @@ impl CheckPlatformReqsCommand {
 
         let installed_repo_base: crate::repository::RepositoryInterfaceHandle = if input
             .borrow()
-            .get_option("lock")
+            .get_option("lock")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -248,7 +248,7 @@ impl CheckPlatformReqsCommand {
 
         let format = input
             .borrow()
-            .get_option("format")
+            .get_option("format")?
             .as_string()
             .unwrap_or("text")
             .to_string();

@@ -163,7 +163,7 @@ impl RequireCommand {
 
         if input
             .borrow()
-            .get_option("no-suggest")
+            .get_option("no-suggest")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -240,7 +240,7 @@ impl RequireCommand {
             return Ok(1);
         }
 
-        if input.borrow().get_option("fixed").as_bool() == Some(true) {
+        if input.borrow().get_option("fixed")?.as_bool() == Some(true) {
             let config = self.json.as_ref().unwrap().borrow_mut().read()?;
 
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
@@ -255,7 +255,7 @@ impl RequireCommand {
 
             /// @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
             if package_type != "project"
-                && !input.borrow().get_option("dev").as_bool().unwrap_or(false)
+                && !input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             {
                 self.get_io().write_error3("<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>", true, io_interface::NORMAL);
 
@@ -301,7 +301,7 @@ impl RequireCommand {
             output.clone(),
             input
                 .borrow()
-                .get_argument("packages")
+                .get_argument("packages")?
                 .as_list()
                 .map(|l| {
                     l.iter()
@@ -314,12 +314,12 @@ impl RequireCommand {
             // if there is no update, we need to use the best possible version constraint directly as we cannot rely on the solver to guess the best constraint
             input
                 .borrow()
-                .get_option("no-update")
+                .get_option("no-update")?
                 .as_bool()
                 .unwrap_or(false),
             input
                 .borrow()
-                .get_option("fixed")
+                .get_option("fixed")?
                 .as_bool()
                 .unwrap_or(false),
         );
@@ -346,7 +346,7 @@ impl RequireCommand {
 
         let mut requirements = self.format_requirements(requirements)?;
 
-        if !input.borrow().get_option("dev").as_bool().unwrap_or(false)
+        if !input.borrow().get_option("dev")?.as_bool().unwrap_or(false)
             && self.get_io().is_interactive()
             && !composer.is_global()
         {
@@ -422,12 +422,12 @@ impl RequireCommand {
             // unset($devPackages, $pkgDevTags);
         }
 
-        let mut require_key = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        let mut require_key = if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             "require-dev"
         } else {
             "require"
         };
-        let mut remove_key = if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+        let mut remove_key = if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             "require"
         } else {
             "require-dev"
@@ -470,7 +470,7 @@ impl RequireCommand {
                         PhpMixed::String(package.clone()),
                         PhpMixed::String(remove_key.to_string()),
                         PhpMixed::String(
-                            if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+                            if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                                 "with"
                             } else {
                                 "without"
@@ -499,7 +499,7 @@ impl RequireCommand {
                     let q2 = sprintf(
                         "<info>Do you want to re-run the command %s --dev?</info> [<comment>yes</comment>]? ",
                         &[PhpMixed::String(
-                            if input.borrow().get_option("dev").as_bool().unwrap_or(false) {
+                            if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                                 "without"
                             } else {
                                 "with"
@@ -521,7 +521,7 @@ impl RequireCommand {
 
         let sort_packages = input
             .borrow()
-            .get_option("sort-packages")
+            .get_option("sort-packages")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -551,7 +551,7 @@ impl RequireCommand {
 
         if !input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -573,7 +573,7 @@ impl RequireCommand {
 
         if input
             .borrow()
-            .get_option("no-update")
+            .get_option("no-update")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -596,7 +596,7 @@ impl RequireCommand {
         );
         let dry_run = input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false);
 
@@ -611,7 +611,7 @@ impl RequireCommand {
                         dry_run,
                         input
                             .borrow()
-                            .get_option("fixed")
+                            .get_option("fixed")?
                             .as_bool()
                             .unwrap_or(false),
                     )?
@@ -752,7 +752,7 @@ impl RequireCommand {
 
         if input
             .borrow()
-            .get_option("dry-run")
+            .get_option("dry-run")?
             .as_bool()
             .unwrap_or(false)
         {
@@ -804,12 +804,12 @@ impl RequireCommand {
 
         let update_dev_mode = !input
             .borrow()
-            .get_option("update-no-dev")
+            .get_option("update-no-dev")?
             .as_bool()
             .unwrap_or(false);
         let optimize = input
             .borrow()
-            .get_option("optimize-autoloader")
+            .get_option("optimize-autoloader")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -820,7 +820,7 @@ impl RequireCommand {
                 .unwrap_or(false);
         let authoritative = input
             .borrow()
-            .get_option("classmap-authoritative")
+            .get_option("classmap-authoritative")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -831,13 +831,13 @@ impl RequireCommand {
                 .unwrap_or(false);
         let apcu_prefix = input
             .borrow()
-            .get_option("apcu-autoloader-prefix")
+            .get_option("apcu-autoloader-prefix")?
             .as_string()
             .map(|s| s.to_string());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
-                .get_option("apcu-autoloader")
+                .get_option("apcu-autoloader")?
                 .as_bool()
                 .unwrap_or(false)
             || composer
@@ -848,7 +848,7 @@ impl RequireCommand {
                 .unwrap_or(false);
         let minimal_changes = input
             .borrow()
-            .get_option("minimal-changes")
+            .get_option("minimal-changes")?
             .as_bool()
             .unwrap_or(false)
             || composer
@@ -862,12 +862,12 @@ impl RequireCommand {
         let mut flags = String::new();
         if input
             .borrow()
-            .get_option("update-with-all-dependencies")
+            .get_option("update-with-all-dependencies")?
             .as_bool()
             .unwrap_or(false)
             || input
                 .borrow()
-                .get_option("with-all-dependencies")
+                .get_option("with-all-dependencies")?
                 .as_bool()
                 .unwrap_or(false)
         {
@@ -876,12 +876,12 @@ impl RequireCommand {
             flags += " --with-all-dependencies";
         } else if input
             .borrow()
-            .get_option("update-with-dependencies")
+            .get_option("update-with-dependencies")?
             .as_bool()
             .unwrap_or(false)
             || input
                 .borrow()
-                .get_option("with-dependencies")
+                .get_option("with-dependencies")?
                 .as_bool()
                 .unwrap_or(false)
         {
@@ -918,7 +918,7 @@ impl RequireCommand {
             .set_output_progress(
                 !input
                     .borrow()
-                    .get_option("no-progress")
+                    .get_option("no-progress")?
                     .as_bool()
                     .unwrap_or(false),
             );
@@ -935,14 +935,14 @@ impl RequireCommand {
             .set_dry_run(
                 input
                     .borrow()
-                    .get_option("dry-run")
+                    .get_option("dry-run")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_verbose(
                 input
                     .borrow()
-                    .get_option("verbose")
+                    .get_option("verbose")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -956,7 +956,7 @@ impl RequireCommand {
             .set_install(
                 !input
                     .borrow()
-                    .get_option("no-install")
+                    .get_option("no-install")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -968,14 +968,14 @@ impl RequireCommand {
             .set_prefer_stable(
                 input
                     .borrow()
-                    .get_option("prefer-stable")
+                    .get_option("prefer-stable")?
                     .as_bool()
                     .unwrap_or(false),
             )
             .set_prefer_lowest(
                 input
                     .borrow()
-                    .get_option("prefer-lowest")
+                    .get_option("prefer-lowest")?
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -1001,7 +1001,7 @@ impl RequireCommand {
                     self,
                     input
                         .borrow()
-                        .get_argument("packages")
+                        .get_argument("packages")?
                         .as_list()
                         .map(|l| {
                             l.iter()
