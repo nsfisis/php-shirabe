@@ -95,12 +95,8 @@ impl OutputFormatter {
         &self,
         string: &str,
     ) -> anyhow::Result<Option<Box<dyn OutputFormatterStyleInterface>>> {
-        if self.styles.contains_key(string) {
-            // PHP returns the shared style instance; ownership cannot be expressed without Clone
-            // on the trait object.
-            // TODO(human-review): returning a shared style here needs an Rc/Clone strategy in
-            // Phase C.
-            return Ok(Some(todo!()));
+        if let Some(style) = self.styles.get(string) {
+            return Ok(Some(style.clone_box()));
         }
 
         let mut matches: Vec<Vec<String>> = vec![];
@@ -281,8 +277,15 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
 
         let mut offset: i64 = 0;
         let mut output = String::new();
-        let open_tag_regex = "[a-z](?:[^\\\\<>]*+ | \\\\.)*";
-        let close_tag_regex = "[a-z][^<>]*+";
+        // Accurate PCRE patterns (possessive quantifiers `*+`), unsupported by the
+        // `regex` crate:
+        //   let open_tag_regex = "[a-z](?:[^\\\\<>]*+ | \\\\.)*";
+        //   let close_tag_regex = "[a-z][^<>]*+";
+        // TODO(phase-c): restore the possessive quantifiers once a PCRE-compatible
+        // engine is available; greedy quantifiers match the same tags here but may
+        // differ in pathological backtracking cases.
+        let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
+        let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
         let mut matches: shirabe_php_shim::PregOffsetCaptureMatches = Default::default();
         shirabe_php_shim::preg_match_all_offset_capture(

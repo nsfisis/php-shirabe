@@ -50,7 +50,7 @@ fn available_options_get(name: &str) -> Option<(i64, i64)> {
         .map(|(_, v)| *v)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Color {
     foreground: String,
     background: String,
@@ -119,10 +119,7 @@ impl Color {
             return String::new();
         }
 
-        shirabe_php_shim::sprintf(
-            "\u{1b}[%sm",
-            &[shirabe_php_shim::implode(";", &set_codes).into()],
-        )
+        format!("\u{1b}[{}m", shirabe_php_shim::implode(";", &set_codes))
     }
 
     pub fn unset(&self) -> String {
@@ -140,10 +137,7 @@ impl Color {
             return String::new();
         }
 
-        shirabe_php_shim::sprintf(
-            "\u{1b}[%sm",
-            &[shirabe_php_shim::implode(";", &unset_codes).into()],
-        )
+        format!("\u{1b}[{}m", shirabe_php_shim::implode(";", &unset_codes))
     }
 
     fn parse_color(color: &str, background: bool) -> Result<String, InvalidArgumentException> {

@@ -490,12 +490,37 @@ pub fn str_replace(_search: &str, _replace: &str, _subject: &str) -> String {
     todo!()
 }
 
-pub fn php_to_string(_value: &PhpMixed) -> String {
-    todo!()
+pub fn php_to_string(value: &PhpMixed) -> String {
+    match value {
+        PhpMixed::Null => String::new(),
+        PhpMixed::Bool(true) => "1".to_string(),
+        PhpMixed::Bool(false) => String::new(),
+        PhpMixed::Int(i) => i.to_string(),
+        PhpMixed::Float(f) => f.to_string(),
+        PhpMixed::String(s) => s.clone(),
+        // PHP renders any array as the literal string "Array".
+        PhpMixed::List(_) | PhpMixed::Array(_) => "Array".to_string(),
+        PhpMixed::Object(_) => todo!(),
+    }
 }
 
-pub fn substr(_s: &str, _start: i64, _length: Option<i64>) -> String {
-    todo!()
+// Byte-based, matching PHP's substr. A negative start/length counts from the end.
+// The result is reinterpreted as UTF-8 (lossily), which only matters when a slice
+// boundary falls inside a multibyte sequence.
+pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
+    let bytes = s.as_bytes();
+    let len = bytes.len() as i64;
+    let start = if start < 0 {
+        (len + start).max(0)
+    } else {
+        start.min(len)
+    };
+    let end = match length {
+        None => len,
+        Some(l) if l < 0 => (len + l).max(start),
+        Some(l) => (start + l).min(len),
+    };
+    String::from_utf8_lossy(&bytes[start as usize..end as usize]).into_owned()
 }
 
 pub const FILTER_VALIDATE_EMAIL: i64 = 274;
@@ -603,8 +628,28 @@ pub fn get_debug_type(_value: &PhpMixed) -> String {
     todo!()
 }
 
-pub fn defined(_name: &str) -> bool {
-    todo!()
+// Models the constants defined in a standard modern PHP CLI environment on a
+// non-Windows platform with the common extensions loaded (curl, openssl, json).
+// Windows-only, HHVM and Composer-bootstrap constants are reported undefined.
+pub fn defined(name: &str) -> bool {
+    matches!(
+        name,
+        "CURLMOPT_MAX_HOST_CONNECTIONS"
+            | "CURL_HTTP_VERSION_2_0"
+            | "CURL_HTTP_VERSION_3"
+            | "CURL_VERSION_HTTP2"
+            | "CURL_VERSION_HTTP3"
+            | "CURL_VERSION_HTTPS_PROXY"
+            | "CURL_VERSION_LIBZ"
+            | "CURL_VERSION_ZSTD"
+            | "GLOB_BRACE"
+            | "JSON_ERROR_UTF8"
+            | "OPENSSL_VERSION_TEXT"
+            | "PHP_BINARY"
+            | "SIGINT"
+            | "STDIN"
+            | "STDOUT"
+    )
 }
 
 pub fn hash(_algo: &str, _data: &str) -> String {
@@ -625,8 +670,22 @@ pub fn unpack(_format: &str, _data: &[u8]) -> Option<IndexMap<String, Box<PhpMix
 
 pub const PHP_VERSION_ID: i64 = 80100;
 
-pub fn extension_loaded(_name: &str) -> bool {
-    todo!()
+// Models the extensions loaded in a standard PHP CLI environment running Composer.
+// Opt-in extensions (apcu, xdebug, ionCube, uopz) are reported absent.
+pub fn extension_loaded(name: &str) -> bool {
+    matches!(
+        name,
+        "Phar"
+            | "curl"
+            | "filter"
+            | "hash"
+            | "iconv"
+            | "intl"
+            | "mbstring"
+            | "openssl"
+            | "zip"
+            | "zlib"
+    )
 }
 
 pub fn gzopen(_file: &str, _mode: &str) -> PhpMixed {
@@ -657,7 +716,7 @@ pub const PHP_EOL: &str = "\n";
 
 pub const FILE_APPEND: i64 = 8;
 
-pub const STDIN: PhpResource = PhpResource;
+pub const STDIN: PhpResource = PhpResource::Stdin;
 
 pub fn fopen(_file: &str, _mode: &str) -> PhpMixed {
     todo!()
@@ -703,8 +762,15 @@ pub fn microtime(_get_as_float: bool) -> f64 {
     todo!()
 }
 
-pub fn error_reporting(_level: Option<i64>) -> i64 {
-    todo!()
+static ERROR_REPORTING_LEVEL: std::sync::atomic::AtomicI64 =
+    std::sync::atomic::AtomicI64::new(E_ALL);
+
+pub fn error_reporting(level: Option<i64>) -> i64 {
+    let old = ERROR_REPORTING_LEVEL.load(std::sync::atomic::Ordering::Relaxed);
+    if let Some(level) = level {
+        ERROR_REPORTING_LEVEL.store(level, std::sync::atomic::Ordering::Relaxed);
+    }
+    old
 }
 
 pub const E_ALL: i64 = 32767;
@@ -974,12 +1040,52 @@ pub fn stream_get_contents(_stream: PhpMixed) -> Option<String> {
     todo!()
 }
 
-pub fn class_exists(_name: &str) -> bool {
-    todo!()
+// Models the classes available in a standard PHP CLI environment running Composer:
+// the common bundled extensions (zip, Phar) plus Composer's own runtime classes.
+pub fn class_exists(name: &str) -> bool {
+    matches!(name, "Composer\\InstalledVersions" | "Phar" | "ZipArchive")
 }
 
-pub fn function_exists(_name: &str) -> bool {
-    todo!()
+// Models the functions available in a standard modern PHP CLI environment on a
+// non-Windows platform with the common extensions loaded (curl, mbstring, iconv,
+// zlib, posix, pcntl). Opt-in or Windows-only functions are reported absent.
+pub fn function_exists(name: &str) -> bool {
+    matches!(
+        name,
+        "bzcompress"
+            | "cli_set_process_title"
+            | "curl_multi_exec"
+            | "curl_multi_init"
+            | "curl_multi_setopt"
+            | "curl_share_init"
+            | "curl_strerror"
+            | "date_default_timezone_get"
+            | "date_default_timezone_set"
+            | "disk_free_space"
+            | "exec"
+            | "filter_var"
+            | "getmypid"
+            | "gzcompress"
+            | "iconv"
+            | "ini_set"
+            | "json_decode"
+            | "mb_check_encoding"
+            | "mb_convert_encoding"
+            | "mb_strlen"
+            | "pcntl_async_signals"
+            | "pcntl_signal"
+            | "php_strip_whitespace"
+            | "php_uname"
+            | "posix_geteuid"
+            | "posix_getpwuid"
+            | "posix_getuid"
+            | "posix_isatty"
+            | "proc_open"
+            | "putenv"
+            | "shell_exec"
+            | "stream_isatty"
+            | "symlink"
+    )
 }
 
 pub fn mb_convert_encoding(_string: Vec<u8>, _to_encoding: &str, _from_encoding: &str) -> String {
@@ -1071,9 +1177,19 @@ pub fn filter_var(_value: &str, _filter: i64) -> bool {
     todo!()
 }
 
+// Models the configuration of a standard PHP CLI environment. Settings belonging
+// to extensions that are not loaded (apcu, uopz, xdebug) are not registered, so
+// PHP's ini_get returns false (None) for them.
 pub fn ini_get(option: &str) -> Option<String> {
-    let _ = option;
-    todo!()
+    match option {
+        "allow_url_fopen" => Some("1".to_string()),
+        "default_socket_timeout" => Some("60".to_string()),
+        "disable_functions" => Some(String::new()),
+        "mbstring.func_overload" => Some("0".to_string()),
+        "memory_limit" => Some("-1".to_string()),
+        "open_basedir" => Some(String::new()),
+        _ => None,
+    }
 }
 
 pub fn apcu_add(key: &str, var: PhpMixed) -> bool {
@@ -1302,8 +1418,8 @@ pub fn basename(_path: &str) -> String {
     todo!()
 }
 
-pub fn explode(_delimiter: &str, _string: &str) -> Vec<String> {
-    todo!()
+pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
+    string.split(delimiter).map(|s| s.to_string()).collect()
 }
 
 pub fn explode_with_limit(delimiter: &str, string: &str, limit: i64) -> Vec<String> {
@@ -1663,8 +1779,24 @@ pub fn stripos(_haystack: &str, _needle: &str) -> Option<usize> {
         .find(_needle.to_ascii_lowercase().as_str())
 }
 
-pub fn php_uname(_mode: &str) -> String {
-    todo!()
+pub fn php_uname(mode: &str) -> String {
+    match mode {
+        // sysname, as reported by uname(2). On Windows PHP returns "Windows NT",
+        // which differs from PHP_OS.
+        "s" => match std::env::consts::OS {
+            "linux" => "Linux",
+            "macos" => "Darwin",
+            "windows" => "Windows NT",
+            "freebsd" => "FreeBSD",
+            "netbsd" => "NetBSD",
+            "openbsd" => "OpenBSD",
+            "dragonfly" => "DragonFly",
+            "solaris" => "SunOS",
+            other => other,
+        }
+        .to_string(),
+        _ => todo!(),
+    }
 }
 
 pub fn uasort<T, F>(_array: &mut Vec<T>, _compare: F)
@@ -1743,8 +1875,33 @@ pub fn dirname_levels(_path: &str, _levels: i64) -> String {
     todo!()
 }
 
-pub fn strtr_array(_s: &str, _pairs: &IndexMap<String, String>) -> String {
-    todo!()
+// Byte-based, matching PHP's array form of strtr: at each position the longest
+// matching key wins (insertion order breaks ties), and replacements are not
+// re-scanned. Empty keys are ignored.
+pub fn strtr_array(s: &str, pairs: &IndexMap<String, String>) -> String {
+    let mut keys: Vec<&String> = pairs.keys().filter(|k| !k.is_empty()).collect();
+    keys.sort_by(|a, b| b.len().cmp(&a.len()));
+
+    let bytes = s.as_bytes();
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let mut matched = false;
+        for key in &keys {
+            let kb = key.as_bytes();
+            if bytes[i..].starts_with(kb) {
+                result.extend_from_slice(pairs[*key].as_bytes());
+                i += kb.len();
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            result.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8_lossy(&result).into_owned()
 }
 
 pub fn array_search_mixed(
@@ -1794,8 +1951,8 @@ pub fn ucfirst(_s: &str) -> String {
     todo!()
 }
 
-pub fn strval(_value: &PhpMixed) -> String {
-    todo!()
+pub fn strval(value: &PhpMixed) -> String {
+    php_to_string(value)
 }
 
 pub fn usleep(_microseconds: u64) {
@@ -1850,9 +2007,10 @@ pub fn putenv(setting: &str) -> bool {
     true
 }
 
-/// PHP superglobal $_SERVER access
-pub fn server_get(_name: &str) -> Option<String> {
-    todo!()
+/// PHP superglobal $_SERVER access. In the CLI SAPI $_SERVER is populated from
+/// the environment, which is the only source modeled here.
+pub fn server_get(name: &str) -> Option<String> {
+    std::env::var(name).ok()
 }
 
 // TODO(php-runtime): modify the real PHP's $_SERVER.
@@ -1861,8 +2019,8 @@ pub fn server_set(_name: &str, _value: String) {}
 // TODO(php-runtime): modify the real PHP's $_SERVER.
 pub fn server_unset(_name: &str) {}
 
-pub fn server_contains_key(_name: &str) -> bool {
-    todo!()
+pub fn server_contains_key(name: &str) -> bool {
+    std::env::var_os(name).is_some()
 }
 
 /// PHP superglobal $_ENV access
@@ -2205,8 +2363,9 @@ pub fn php_strip_whitespace(_path: &str) -> String {
     todo!()
 }
 
+// The shim does not raise PHP-level errors, so there is never a last error.
 pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
-    todo!()
+    None
 }
 
 pub fn is_readable(_path: &str) -> bool {
@@ -2305,12 +2464,20 @@ pub fn clone<T: Clone>(_value: T) -> T {
     todo!()
 }
 
+static DEFAULT_TIMEZONE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+// PHP defaults to "UTC" when no default timezone has been configured.
 pub fn date_default_timezone_get() -> String {
-    todo!()
+    DEFAULT_TIMEZONE
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or_else(|| "UTC".to_string())
 }
 
-pub fn date_default_timezone_set(_tz: &str) -> bool {
-    todo!()
+pub fn date_default_timezone_set(tz: &str) -> bool {
+    *DEFAULT_TIMEZONE.lock().unwrap() = Some(tz.to_string());
+    true
 }
 
 pub fn getmypid() -> i64 {
@@ -2329,8 +2496,22 @@ pub fn memory_get_peak_usage(_real_usage: bool) -> i64 {
     todo!()
 }
 
-pub fn register_shutdown_function(_callback: Box<dyn Fn()>) {
-    todo!()
+thread_local! {
+    static SHUTDOWN_FUNCTIONS: std::cell::RefCell<Vec<Box<dyn Fn()>>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+pub fn register_shutdown_function(callback: Box<dyn Fn()>) {
+    SHUTDOWN_FUNCTIONS.with(|f| f.borrow_mut().push(callback));
+}
+
+// Runs the registered shutdown functions in registration order, mirroring PHP
+// executing them at the end of the request. Must be invoked at every process exit.
+pub fn run_shutdown_functions() {
+    let functions = SHUTDOWN_FUNCTIONS.with(|f| std::mem::take(&mut *f.borrow_mut()));
+    for callback in &functions {
+        callback();
+    }
 }
 
 pub fn round(_value: f64, _precision: i64) -> f64 {
@@ -2524,7 +2705,12 @@ pub struct StdClass {
 }
 
 #[derive(Debug, Clone)]
-pub struct PhpResource;
+pub enum PhpResource {
+    Stdin,
+    Stdout,
+    Stderr,
+    File(std::rc::Rc<std::cell::RefCell<std::fs::File>>),
+}
 
 pub fn gethostbyname(_hostname: &str) -> String {
     todo!()
@@ -2594,11 +2780,22 @@ pub fn to_string(_value: &PhpMixed) -> String {
 pub fn to_bool(_value: &PhpMixed) -> bool {
     todo!()
 }
-pub fn php_truthy(_value: &PhpMixed) -> bool {
-    todo!()
+pub fn php_truthy(value: &PhpMixed) -> bool {
+    match value {
+        PhpMixed::Null => false,
+        PhpMixed::Bool(b) => *b,
+        PhpMixed::Int(i) => *i != 0,
+        PhpMixed::Float(f) => *f != 0.0,
+        // PHP treats only "" and "0" as falsy strings.
+        PhpMixed::String(s) => !s.is_empty() && s != "0",
+        PhpMixed::List(items) => !items.is_empty(),
+        PhpMixed::Array(entries) => !entries.is_empty(),
+        // Objects are always truthy.
+        PhpMixed::Object(_) => true,
+    }
 }
-pub fn boolval(_value: &PhpMixed) -> bool {
-    todo!()
+pub fn boolval(value: &PhpMixed) -> bool {
+    php_truthy(value)
 }
 pub fn is_iterable(_value: &PhpMixed) -> bool {
     todo!()
@@ -2637,8 +2834,8 @@ pub fn intdiv(_a: i64, _b: i64) -> i64 {
 pub fn hexdec(_s: &str) -> i64 {
     todo!()
 }
-pub fn byte_at(_s: &str, _i: usize) -> u8 {
-    todo!()
+pub fn byte_at(s: &str, i: usize) -> u8 {
+    s.as_bytes().get(i).copied().unwrap_or(0)
 }
 pub fn str_split(_s: &str, _length: i64) -> Vec<String> {
     todo!()
@@ -2673,8 +2870,10 @@ pub fn get_debug_type_obj<T>(_value: &T) -> String {
 pub fn dir() -> String {
     todo!()
 }
-pub fn exit(_status: i64) -> ! {
-    todo!()
+pub fn exit(status: i64) -> ! {
+    // PHP runs registered shutdown functions before terminating.
+    run_shutdown_functions();
+    std::process::exit(status as i32);
 }
 
 pub fn preg_match_all(_pattern: &str, _subject: &str) -> Vec<Vec<String>> {
@@ -2722,12 +2921,63 @@ impl PregOffsetCaptureMatches {
         &self.groups[i]
     }
 }
+// Translates a PHP PCRE pattern (delimiters + trailing modifiers) into a regex
+// the `regex` crate can compile. Only delimiter stripping and the i/x/s/m
+// modifiers are handled; PCRE-only constructs (possessive quantifiers,
+// lookaround, backreferences) are not supported by `regex` and must be avoided
+// in the caller's pattern.
+// TODO(phase-c): replace with a faithful PCRE engine to restore full semantics.
+fn compile_php_pattern(pattern: &str) -> anyhow::Result<regex::Regex> {
+    let delimiter = pattern
+        .chars()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("empty regex pattern"))?;
+    let end = pattern
+        .rfind(delimiter)
+        .filter(|&i| i > 0)
+        .ok_or_else(|| anyhow::anyhow!("unterminated regex pattern: {pattern}"))?;
+    let inner = &pattern[delimiter.len_utf8()..end];
+    let modifiers = &pattern[end + delimiter.len_utf8()..];
+
+    let flags: String = modifiers
+        .chars()
+        .filter(|c| matches!(c, 'i' | 'x' | 's' | 'm'))
+        .collect();
+
+    let translated = if flags.is_empty() {
+        inner.to_string()
+    } else {
+        format!("(?{flags}){inner}")
+    };
+
+    Ok(regex::Regex::new(&translated)?)
+}
+
 pub fn preg_match_all_offset_capture(
-    _pattern: &str,
-    _subject: &str,
-    _matches: &mut PregOffsetCaptureMatches,
+    pattern: &str,
+    subject: &str,
+    matches: &mut PregOffsetCaptureMatches,
 ) -> anyhow::Result<i64> {
-    todo!()
+    let re = compile_php_pattern(pattern)?;
+    let group_count = re.captures_len();
+    matches.groups = vec![Vec::new(); group_count];
+
+    let mut count = 0;
+    for caps in re.captures_iter(subject) {
+        count += 1;
+        for g in 0..group_count {
+            // PHP stores ["", -1] for non-participating groups under
+            // PREG_OFFSET_CAPTURE; the unsigned offset here approximates -1 as 0,
+            // which callers must not rely on for absent groups.
+            let entry = caps
+                .get(g)
+                .map(|m| (m.as_str().to_string(), m.start()))
+                .unwrap_or_else(|| (String::new(), 0));
+            matches.groups[g].push(entry);
+        }
+    }
+
+    Ok(count)
 }
 pub fn preg_replace_callback<F>(
     _pattern: &str,
@@ -2741,19 +2991,50 @@ where
 }
 
 pub fn is_resource_value(_resource: &PhpResource) -> bool {
-    todo!()
+    true
 }
 pub fn get_resource_type(_resource: &PhpResource) -> String {
-    todo!()
+    "stream".to_string()
 }
-pub fn stream_isatty_resource(_resource: &PhpResource) -> bool {
-    todo!()
+pub fn stream_isatty_resource(resource: &PhpResource) -> bool {
+    use std::io::IsTerminal;
+    match resource {
+        PhpResource::Stdin => std::io::stdin().is_terminal(),
+        PhpResource::Stdout => std::io::stdout().is_terminal(),
+        PhpResource::Stderr => std::io::stderr().is_terminal(),
+        PhpResource::File(_) => false,
+    }
 }
-pub fn fwrite_resource(_resource: &PhpResource, _data: &str) {
-    todo!()
+pub fn fwrite_resource(resource: &PhpResource, data: &str) {
+    use std::io::Write;
+    let bytes = data.as_bytes();
+    match resource {
+        PhpResource::Stdin => {}
+        PhpResource::Stdout => {
+            let _ = std::io::stdout().write_all(bytes);
+        }
+        PhpResource::Stderr => {
+            let _ = std::io::stderr().write_all(bytes);
+        }
+        PhpResource::File(file) => {
+            let _ = file.borrow_mut().write_all(bytes);
+        }
+    }
 }
-pub fn fflush_resource(_resource: &PhpResource) {
-    todo!()
+pub fn fflush_resource(resource: &PhpResource) {
+    use std::io::Write;
+    match resource {
+        PhpResource::Stdin => {}
+        PhpResource::Stdout => {
+            let _ = std::io::stdout().flush();
+        }
+        PhpResource::Stderr => {
+            let _ = std::io::stderr().flush();
+        }
+        PhpResource::File(file) => {
+            let _ = file.borrow_mut().flush();
+        }
+    }
 }
 pub fn fgetc(_resource: &PhpResource) -> Option<String> {
     todo!()
@@ -2776,24 +3057,51 @@ pub fn stream_select(
 ) -> i64 {
     todo!()
 }
-pub fn php_fopen_resource(_path: &str, _mode: &str) -> PhpResource {
-    todo!()
+pub fn php_fopen_resource(path: &str, mode: &str) -> PhpResource {
+    match path {
+        "php://output" | "php://stdout" => return PhpResource::Stdout,
+        "php://stderr" => return PhpResource::Stderr,
+        "php://stdin" | "php://input" => return PhpResource::Stdin,
+        _ => {}
+    }
+    // Strip the binary/text flags PHP accepts as part of the mode.
+    let base_mode: String = mode.chars().filter(|c| *c != 'b' && *c != 't').collect();
+    let mut options = std::fs::OpenOptions::new();
+    match base_mode.as_str() {
+        "r" => options.read(true),
+        "r+" => options.read(true).write(true),
+        "w" => options.write(true).create(true).truncate(true),
+        "w+" => options.read(true).write(true).create(true).truncate(true),
+        "a" => options.append(true).create(true),
+        "a+" => options.read(true).append(true).create(true),
+        "x" => options.write(true).create_new(true),
+        "x+" => options.read(true).write(true).create_new(true),
+        _ => options.read(true),
+    };
+    let file = options
+        .open(path)
+        .unwrap_or_else(|e| panic!("php_fopen_resource failed to open {path:?}: {e}"));
+    PhpResource::File(std::rc::Rc::new(std::cell::RefCell::new(file)))
 }
 pub fn php_stdout_resource() -> PhpResource {
-    todo!()
+    PhpResource::Stdout
 }
 pub fn php_stderr_resource() -> PhpResource {
-    todo!()
+    PhpResource::Stderr
 }
 pub fn stdin() -> PhpResource {
-    todo!()
+    PhpResource::Stdin
 }
 
+// TODO(phase-c): reports proc_open as unavailable, so callers (terminal size and
+// tty detection) fall back to their defaults. A real implementation requires a
+// non-lossy signature able to hold the child process and its pipes; defer it to
+// the broader process-subsystem work (ProcessExecutor).
 pub fn proc_open(_command: &str, _descriptorspec: &Vec<PhpMixed>, _pipes: &mut PhpMixed) -> bool {
-    todo!()
+    false
 }
 pub fn proc_close(_process: bool) -> i64 {
-    todo!()
+    -1
 }
 
 pub fn sapi_windows_vt100_support(_resource: &PhpResource) -> bool {
@@ -2813,9 +3121,9 @@ pub const SIGINT: i64 = 2;
 pub const SIGTERM: i64 = 15;
 pub const SIGUSR1: i64 = 10;
 pub const SIGUSR2: i64 = 12;
-pub fn pcntl_async_signals(_enable: bool) {
-    todo!()
-}
+// No-op until real signal handling is wired up; signal registration itself is
+// deferred (see the TODO(plugin) notes in SignalRegistry::register).
+pub fn pcntl_async_signals(_enable: bool) {}
 pub fn pcntl_signal(_signal: i64, _handler: PhpMixed) -> bool {
     todo!()
 }

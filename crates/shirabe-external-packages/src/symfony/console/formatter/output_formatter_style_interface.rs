@@ -17,4 +17,9 @@ pub trait OutputFormatterStyleInterface: std::fmt::Debug {
 
     /// Applies the style to a given text.
     fn apply(&mut self, text: &str) -> String;
+
+    /// Clones the style into a new boxed trait object. PHP shares the style
+    /// instance by reference; styles are immutable once configured, so cloning
+    /// is behaviorally equivalent here.
+    fn clone_box(&self) -> Box<dyn OutputFormatterStyleInterface>;
 }

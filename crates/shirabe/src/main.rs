@@ -2,7 +2,7 @@
 
 use shirabe::console::Application;
 use shirabe::util::Platform;
-use shirabe_php_shim::realpath;
+use shirabe_php_shim::{realpath, run_shutdown_functions};
 
 fn main() {
     // TODO(php-runtime): the full initialization process in composer/bin/composer should be ported
@@ -15,11 +15,10 @@ fn main() {
 
     // run the command application
     let mut application = Application::new("Composer".to_string(), String::new());
-    match application.run(None, None) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("{}", e);
-            std::process::exit(1);
-        }
+    let result = application.run(None, None);
+    run_shutdown_functions();
+    if let Err(e) = result {
+        eprintln!("{}", e);
+        std::process::exit(1);
     }
 }

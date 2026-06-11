@@ -546,13 +546,7 @@ impl Application {
     pub fn get_long_version(&self) -> String {
         if "UNKNOWN" != self.get_name() {
             if "UNKNOWN" != self.get_version() {
-                return shirabe_php_shim::sprintf(
-                    "%s <info>%s</info>",
-                    &[
-                        PhpMixed::from(self.get_name()),
-                        PhpMixed::from(self.get_version()),
-                    ],
-                );
+                return format!("{} <info>{}</info>", self.get_name(), self.get_version());
             }
 
             return self.get_name();

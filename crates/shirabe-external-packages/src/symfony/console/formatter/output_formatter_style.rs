@@ -2,7 +2,7 @@ use crate::symfony::console::color::Color;
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 
 /// Formatter style class for defining styles.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OutputFormatterStyle {
     color: Color,
     foreground: String,
@@ -92,5 +92,9 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
         }
 
         self.color.apply(&text)
+    }
+
+    fn clone_box(&self) -> Box<dyn OutputFormatterStyleInterface> {
+        Box::new(self.clone())
     }
 }

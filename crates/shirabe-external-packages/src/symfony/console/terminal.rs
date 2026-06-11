@@ -127,11 +127,8 @@ impl Terminal {
     /// Returns whether STDOUT has vt100 support (some Windows 10+ configurations).
     fn has_vt100_support() -> bool {
         shirabe_php_shim::function_exists("sapi_windows_vt100_support") && {
-            // PHP passes the `fopen('php://stdout', 'w')` resource. The shim's `fopen`
-            // returns `PhpMixed` but `sapi_windows_vt100_support` expects
-            // `&PhpResource`; bridge with a placeholder resource.
-            let _ = shirabe_php_shim::fopen("php://stdout", "w");
-            shirabe_php_shim::sapi_windows_vt100_support(&shirabe_php_shim::PhpResource)
+            let stream = shirabe_php_shim::php_fopen_resource("php://stdout", "w");
+            shirabe_php_shim::sapi_windows_vt100_support(&stream)
         }
     }
 
