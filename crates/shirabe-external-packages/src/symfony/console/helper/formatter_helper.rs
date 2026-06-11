@@ -14,14 +14,12 @@ pub struct FormatterHelper {
 impl FormatterHelper {
     /// Formats a message within a section.
     pub fn format_section(&self, section: &str, message: &str, style: &str) -> String {
-        shirabe_php_shim::sprintf(
-            "<%s>[%s]</%s> %s",
-            &[
-                shirabe_php_shim::PhpMixed::String(style.to_string()),
-                shirabe_php_shim::PhpMixed::String(section.to_string()),
-                shirabe_php_shim::PhpMixed::String(style.to_string()),
-                shirabe_php_shim::PhpMixed::String(message.to_string()),
-            ],
+        format!(
+            "<{}>[{}]</{}> {}",
+            shirabe_php_shim::PhpMixed::String(style.to_string()),
+            shirabe_php_shim::PhpMixed::String(section.to_string()),
+            shirabe_php_shim::PhpMixed::String(style.to_string()),
+            shirabe_php_shim::PhpMixed::String(message.to_string()),
         )
     }
 
@@ -38,10 +36,11 @@ impl FormatterHelper {
         let mut lines: Vec<String> = Vec::new();
         for message in &messages {
             let message = OutputFormatter::escape(message).unwrap();
-            lines.push(shirabe_php_shim::sprintf(
-                if large { "  %s  " } else { " %s " },
-                &[shirabe_php_shim::PhpMixed::String(message.clone())],
-            ));
+            lines.push(if large {
+                format!("  {}  ", message)
+            } else {
+                format!(" {} ", message)
+            });
             len = std::cmp::max(Helper::width(&message) + (if large { 4 } else { 2 }), len);
         }
 
@@ -65,13 +64,11 @@ impl FormatterHelper {
 
         let mut i = 0;
         while i < messages.len() {
-            messages[i] = shirabe_php_shim::sprintf(
-                "<%s>%s</%s>",
-                &[
-                    shirabe_php_shim::PhpMixed::String(style.to_string()),
-                    shirabe_php_shim::PhpMixed::String(messages[i].clone()),
-                    shirabe_php_shim::PhpMixed::String(style.to_string()),
-                ],
+            messages[i] = format!(
+                "<{}>{}</{}>",
+                shirabe_php_shim::PhpMixed::String(style.to_string()),
+                shirabe_php_shim::PhpMixed::String(messages[i].clone()),
+                shirabe_php_shim::PhpMixed::String(style.to_string()),
             );
             i += 1;
         }

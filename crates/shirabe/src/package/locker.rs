@@ -750,9 +750,9 @@ impl Locker {
 
             if name.is_empty() || version.is_empty() {
                 return Err(LogicException {
-                    message: sprintf(
-                        "Package \"%s\" has no version or name and can not be locked",
-                        &[PhpMixed::String(package.to_string())],
+                    message: format!(
+                        "Package \"{}\" has no version or name and can not be locked",
+                        PhpMixed::String(package.to_string()),
                     ),
                     code: 0,
                 }
@@ -975,11 +975,8 @@ impl Locker {
                         let _ = &results;
                         let mut description = provider.get_pretty_version();
                         if provider.get_name() != link.get_target() {
-                            'outer: for (method, text) in [
-                                ("getReplaces", "replaced as %s by %s"),
-                                ("getProvides", "provided as %s by %s"),
-                            ]
-                            .iter()
+                            'outer: for (method, verb) in
+                                [("getReplaces", "replaced"), ("getProvides", "provided")].iter()
                             {
                                 let provider_links = match *method {
                                     "getReplaces" => provider.get_replaces(),
@@ -988,20 +985,17 @@ impl Locker {
                                 };
                                 for provider_link in provider_links.values() {
                                     if provider_link.get_target() == link.get_target() {
-                                        description = sprintf(
-                                            text,
-                                            &[
-                                                PhpMixed::String(
-                                                    provider_link
-                                                        .get_pretty_constraint()
-                                                        .to_string(),
-                                                ),
-                                                PhpMixed::String(format!(
-                                                    "{} {}",
-                                                    provider.get_pretty_name(),
-                                                    provider.get_pretty_version()
-                                                )),
-                                            ],
+                                        description = format!(
+                                            "{} as {} by {}",
+                                            verb,
+                                            PhpMixed::String(
+                                                provider_link.get_pretty_constraint().to_string(),
+                                            ),
+                                            PhpMixed::String(format!(
+                                                "{} {}",
+                                                provider.get_pretty_name(),
+                                                provider.get_pretty_version()
+                                            )),
                                         );
                                         break 'outer;
                                     }

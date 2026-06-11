@@ -95,11 +95,9 @@ impl ProcessHelper {
             }
             None => {
                 anyhow::bail!(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "Invalid command provided to \"%s()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                        &[shirabe_php_shim::PhpMixed::String(
-                            "ProcessHelper::run".to_string()
-                        )],
+                    message: format!(
+                        "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
+                        shirabe_php_shim::PhpMixed::String("ProcessHelper::run".to_string()),
                     ),
                     code: 0,
                 });
@@ -130,12 +128,12 @@ impl ProcessHelper {
             let message = if process.is_successful() {
                 "Command ran successfully".to_string()
             } else {
-                shirabe_php_shim::sprintf(
-                    "%s Command did not run successfully",
-                    &[match process.get_exit_code() {
+                format!(
+                    "{} Command did not run successfully",
+                    match process.get_exit_code() {
                         Some(code) => shirabe_php_shim::PhpMixed::Int(code),
                         None => shirabe_php_shim::PhpMixed::Null,
-                    }],
+                    },
                 )
             };
             let stopped = Self::formatter_stop(
@@ -151,11 +149,9 @@ impl ProcessHelper {
 
         if !process.is_successful() && error.is_some() {
             output.borrow().writeln(
-                &[shirabe_php_shim::sprintf(
-                    "<error>%s</error>",
-                    &[shirabe_php_shim::PhpMixed::String(
-                        self.escape_string(error.unwrap()),
-                    )],
+                &[format!(
+                    "<error>{}</error>",
+                    shirabe_php_shim::PhpMixed::String(self.escape_string(error.unwrap()),),
                 )],
                 output_interface::OUTPUT_NORMAL,
             );

@@ -31,10 +31,7 @@ impl Cursor {
 
     pub fn move_up(&self, lines: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%dA",
-                &[shirabe_php_shim::PhpMixed::Int(lines)],
-            )],
+            &[format!("\x1b[{}A", shirabe_php_shim::PhpMixed::Int(lines),)],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -44,10 +41,7 @@ impl Cursor {
 
     pub fn move_down(&self, lines: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%dB",
-                &[shirabe_php_shim::PhpMixed::Int(lines)],
-            )],
+            &[format!("\x1b[{}B", shirabe_php_shim::PhpMixed::Int(lines),)],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -57,9 +51,9 @@ impl Cursor {
 
     pub fn move_right(&self, columns: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%dC",
-                &[shirabe_php_shim::PhpMixed::Int(columns)],
+            &[format!(
+                "\x1b[{}C",
+                shirabe_php_shim::PhpMixed::Int(columns),
             )],
             false,
             output_interface::OUTPUT_NORMAL,
@@ -70,9 +64,9 @@ impl Cursor {
 
     pub fn move_left(&self, columns: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%dD",
-                &[shirabe_php_shim::PhpMixed::Int(columns)],
+            &[format!(
+                "\x1b[{}D",
+                shirabe_php_shim::PhpMixed::Int(columns),
             )],
             false,
             output_interface::OUTPUT_NORMAL,
@@ -83,10 +77,7 @@ impl Cursor {
 
     pub fn move_to_column(&self, column: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%dG",
-                &[shirabe_php_shim::PhpMixed::Int(column)],
-            )],
+            &[format!("\x1b[{}G", shirabe_php_shim::PhpMixed::Int(column),)],
             false,
             output_interface::OUTPUT_NORMAL,
         );
@@ -96,12 +87,10 @@ impl Cursor {
 
     pub fn move_to_position(&self, column: i64, row: i64) -> &Self {
         self.output.borrow().write(
-            &[shirabe_php_shim::sprintf(
-                "\x1b[%d;%dH",
-                &[
-                    shirabe_php_shim::PhpMixed::Int(row + 1),
-                    shirabe_php_shim::PhpMixed::Int(column),
-                ],
+            &[format!(
+                "\x1b[{};{}H",
+                shirabe_php_shim::PhpMixed::Int(row + 1),
+                shirabe_php_shim::PhpMixed::Int(column),
             )],
             false,
             output_interface::OUTPUT_NORMAL,
@@ -243,11 +232,9 @@ impl Cursor {
             None,
         );
 
-        shirabe_php_shim::shell_exec(&shirabe_php_shim::sprintf(
-            "stty %s",
-            &[shirabe_php_shim::PhpMixed::String(
-                stty_mode.unwrap_or_default(),
-            )],
+        shirabe_php_shim::shell_exec(&format!(
+            "stty {}",
+            shirabe_php_shim::PhpMixed::String(stty_mode.unwrap_or_default(),),
         ));
 
         let mut row: i64 = 0;

@@ -386,9 +386,9 @@ impl DiagnoseCommand {
                         let limit = arr.get("limit").and_then(|v| v.as_int()).unwrap_or(0);
                         if 10 > remaining {
                             io.write("<warning>WARNING</warning>");
-                            io.write(&sprintf(
-                                "<comment>GitHub has a rate limit on their API. You currently have <options=bold>%u</options=bold> out of <options=bold>%u</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
-                                &[remaining.into(), limit.into()],
+                            io.write(&format!(
+                                "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
+                                remaining, limit,
                             ));
                         } else {
                             self.output_result(PhpMixed::Bool(true));
@@ -1288,9 +1288,9 @@ impl DiagnoseCommand {
                     ),
                     other => {
                         return Err(InvalidArgumentException {
-                            message: sprintf(
-                                "DiagnoseCommand: Unknown error type \"%s\". Please report at https://github.com/composer/composer/issues/new.",
-                                &[other.to_string().into()],
+                            message: format!(
+                                "DiagnoseCommand: Unknown error type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                                other.to_string(),
                             ),
                             code: 0,
                         }
@@ -1367,9 +1367,9 @@ impl DiagnoseCommand {
                     ),
                     other => {
                         return Err(InvalidArgumentException {
-                            message: sprintf(
-                                "DiagnoseCommand: Unknown warning type \"%s\". Please report at https://github.com/composer/composer/issues/new.",
-                                &[other.to_string().into()],
+                            message: format!(
+                                "DiagnoseCommand: Unknown warning type \"{}\". Please report at https://github.com/composer/composer/issues/new.",
+                                other.to_string(),
                             ),
                             code: 0,
                         }

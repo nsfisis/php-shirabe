@@ -309,8 +309,8 @@ where
 }
 
 impl std::fmt::Display for PhpMixed {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.pad(&php_to_string(self))
     }
 }
 

@@ -195,15 +195,12 @@ impl AuthHelper {
 
                 message = format!(
                     "{}\n",
-                    sprintf(
-                        &format!(
-                            "GitHub API limit (%d calls/hr) is exhausted, could not fetch {}. {} You can also wait until %s for the rate limit to reset.",
-                            url, message,
-                        ),
-                        &[
-                            rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
-                            rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
-                        ],
+                    format!(
+                        "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.",
+                        rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
+                        url,
+                        message,
+                        rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
                     ),
                 );
             } else {

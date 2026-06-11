@@ -82,9 +82,9 @@ impl GitHubDriver {
         .unwrap_or(false)
         {
             return Err(InvalidArgumentException {
-                message: sprintf(
-                    "The GitHub repository URL %s is invalid.",
-                    &[PhpMixed::String(self.inner.url.clone())],
+                message: format!(
+                    "The GitHub repository URL {} is invalid.",
+                    PhpMixed::String(self.inner.url.clone()),
                 ),
                 code: 0,
             }
@@ -366,14 +366,12 @@ impl GitHubDriver {
                     }) {
                         support.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "https://%s/%s/%s/tree/%s",
-                                &[
-                                    PhpMixed::String(self.inner.origin_url.clone()),
-                                    PhpMixed::String(self.owner.clone()),
-                                    PhpMixed::String(self.repository.clone()),
-                                    PhpMixed::String(label_str),
-                                ],
+                            Box::new(PhpMixed::String(format!(
+                                "https://{}/{}/{}/tree/{}",
+                                PhpMixed::String(self.inner.origin_url.clone()),
+                                PhpMixed::String(self.owner.clone()),
+                                PhpMixed::String(self.repository.clone()),
+                                PhpMixed::String(label_str),
                             ))),
                         );
                     }
@@ -390,13 +388,11 @@ impl GitHubDriver {
                     }) {
                         support.insert(
                             "issues".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "https://%s/%s/%s/issues",
-                                &[
-                                    PhpMixed::String(self.inner.origin_url.clone()),
-                                    PhpMixed::String(self.owner.clone()),
-                                    PhpMixed::String(self.repository.clone()),
-                                ],
+                            Box::new(PhpMixed::String(format!(
+                                "https://{}/{}/{}/issues",
+                                PhpMixed::String(self.inner.origin_url.clone()),
+                                PhpMixed::String(self.owner.clone()),
+                                PhpMixed::String(self.repository.clone()),
                             ))),
                         );
                     }
@@ -1169,12 +1165,10 @@ impl GitHubDriver {
                                 e.get_headers().map(|h| h.as_slice()).unwrap_or(&[]),
                             );
                             self.inner.io.write_error3(
-                                &sprintf(
-                                    "<error>GitHub API limit (%d calls/hr) is exhausted. You are already authorized so you have to wait until %s before doing more requests</error>",
-                                    &[
-                                        rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
-                                        rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
-                                    ],
+                                &format!(
+                                    "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",
+                                    rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
+                                    rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
                                 ),
                                 true,
                                 io_interface::NORMAL,

@@ -243,9 +243,9 @@ impl OutputFormatterInterface for OutputFormatter {
         if !self.has_style(name) {
             return Err(anyhow::anyhow!(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "Undefined style: \"%s\".",
-                        &[shirabe_php_shim::PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "Undefined style: \"{}\".",
+                        shirabe_php_shim::PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 },

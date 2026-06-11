@@ -95,9 +95,9 @@ impl GitBitbucketDriver {
         .unwrap_or(false)
         {
             return Err(InvalidArgumentException {
-                message: sprintf(
-                    "The Bitbucket repository URL %s is invalid. It must be the HTTPS URL of a Bitbucket repository.",
-                    &[PhpMixed::String(self.inner.url.clone())],
+                message: format!(
+                    "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
+                    PhpMixed::String(self.inner.url.clone()),
                 ),
                 code: 0,
             }
@@ -154,24 +154,22 @@ impl GitBitbucketDriver {
     ///
     /// @phpstan-impure
     fn get_repo_data(&mut self) -> Result<bool> {
-        let resource = sprintf(
-            "https://api.bitbucket.org/2.0/repositories/%s/%s?%s",
-            &[
-                PhpMixed::String(self.owner.clone()),
-                PhpMixed::String(self.repository.clone()),
-                PhpMixed::String(http_build_query_mixed(
-                    &{
-                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                        m.insert(
-                            "fields".to_string(),
-                            PhpMixed::String("-project,-owner".to_string()),
-                        );
-                        m
-                    },
-                    "",
-                    "&",
-                )),
-            ],
+        let resource = format!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
+            PhpMixed::String(self.owner.clone()),
+            PhpMixed::String(self.repository.clone()),
+            PhpMixed::String(http_build_query_mixed(
+                &{
+                    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                    m.insert(
+                        "fields".to_string(),
+                        PhpMixed::String("-project,-owner".to_string()),
+                    );
+                    m
+                },
+                "",
+                "&",
+            )),
         );
 
         let repo_data = self
@@ -358,28 +356,24 @@ impl GitBitbucketDriver {
                         if let PhpMixed::Array(support_map) = support_entry {
                             support_map.insert(
                                 "source".to_string(),
-                                Box::new(PhpMixed::String(sprintf(
-                                    "https://%s/%s/%s/src",
-                                    &[
-                                        PhpMixed::String(self.inner.origin_url.clone()),
-                                        PhpMixed::String(self.owner.clone()),
-                                        PhpMixed::String(self.repository.clone()),
-                                    ],
+                                Box::new(PhpMixed::String(format!(
+                                    "https://{}/{}/{}/src",
+                                    PhpMixed::String(self.inner.origin_url.clone()),
+                                    PhpMixed::String(self.owner.clone()),
+                                    PhpMixed::String(self.repository.clone()),
                                 ))),
                             );
                         }
                     } else if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "https://%s/%s/%s/src/%s/?at=%s",
-                                &[
-                                    PhpMixed::String(self.inner.origin_url.clone()),
-                                    PhpMixed::String(self.owner.clone()),
-                                    PhpMixed::String(self.repository.clone()),
-                                    PhpMixed::String(hash.unwrap()),
-                                    PhpMixed::String(label.clone()),
-                                ],
+                            Box::new(PhpMixed::String(format!(
+                                "https://{}/{}/{}/src/{}/?at={}",
+                                PhpMixed::String(self.inner.origin_url.clone()),
+                                PhpMixed::String(self.owner.clone()),
+                                PhpMixed::String(self.repository.clone()),
+                                PhpMixed::String(hash.unwrap()),
+                                PhpMixed::String(label.clone()),
                             ))),
                         );
                     }
@@ -398,13 +392,11 @@ impl GitBitbucketDriver {
                     if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "issues".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "https://%s/%s/%s/issues",
-                                &[
-                                    PhpMixed::String(self.inner.origin_url.clone()),
-                                    PhpMixed::String(self.owner.clone()),
-                                    PhpMixed::String(self.repository.clone()),
-                                ],
+                            Box::new(PhpMixed::String(format!(
+                                "https://{}/{}/{}/issues",
+                                PhpMixed::String(self.inner.origin_url.clone()),
+                                PhpMixed::String(self.owner.clone()),
+                                PhpMixed::String(self.repository.clone()),
                             ))),
                         );
                     }
@@ -444,14 +436,12 @@ impl GitBitbucketDriver {
             }
         }
 
-        let resource = sprintf(
-            "https://api.bitbucket.org/2.0/repositories/%s/%s/src/%s/%s",
-            &[
-                PhpMixed::String(self.owner.clone()),
-                PhpMixed::String(self.repository.clone()),
-                PhpMixed::String(identifier),
-                PhpMixed::String(file.to_string()),
-            ],
+        let resource = format!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}/src/{}/{}",
+            PhpMixed::String(self.owner.clone()),
+            PhpMixed::String(self.repository.clone()),
+            PhpMixed::String(identifier),
+            PhpMixed::String(file.to_string()),
         );
 
         Ok(self
@@ -474,13 +464,11 @@ impl GitBitbucketDriver {
             }
         }
 
-        let resource = sprintf(
-            "https://api.bitbucket.org/2.0/repositories/%s/%s/commit/%s?fields=date",
-            &[
-                PhpMixed::String(self.owner.clone()),
-                PhpMixed::String(self.repository.clone()),
-                PhpMixed::String(identifier),
-            ],
+        let resource = format!(
+            "https://api.bitbucket.org/2.0/repositories/{}/{}/commit/{}?fields=date",
+            PhpMixed::String(self.owner.clone()),
+            PhpMixed::String(self.repository.clone()),
+            PhpMixed::String(identifier),
         );
         let commit = self
             .fetch_with_oauth_credentials(&resource, false)?
@@ -517,13 +505,11 @@ impl GitBitbucketDriver {
             return fallback.get_dist(identifier).ok().flatten();
         }
 
-        let url = sprintf(
-            "https://bitbucket.org/%s/%s/get/%s.zip",
-            &[
-                PhpMixed::String(self.owner.clone()),
-                PhpMixed::String(self.repository.clone()),
-                PhpMixed::String(identifier.to_string()),
-            ],
+        let url = format!(
+            "https://bitbucket.org/{}/{}/get/{}.zip",
+            PhpMixed::String(self.owner.clone()),
+            PhpMixed::String(self.repository.clone()),
+            PhpMixed::String(identifier.to_string()),
         );
 
         let mut m: IndexMap<String, String> = IndexMap::new();
@@ -542,28 +528,26 @@ impl GitBitbucketDriver {
 
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
-            let mut resource = sprintf(
-                "%s?%s",
-                &[
-                    PhpMixed::String(self.tags_url.clone()),
-                    PhpMixed::String(http_build_query_mixed(
-                        &{
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert("pagelen".to_string(), PhpMixed::Int(100));
-                            m.insert(
-                                "fields".to_string(),
-                                PhpMixed::String("values.name,values.target.hash,next".to_string()),
-                            );
-                            m.insert(
-                                "sort".to_string(),
-                                PhpMixed::String("-target.date".to_string()),
-                            );
-                            m
-                        },
-                        "",
-                        "&",
-                    )),
-                ],
+            let mut resource = format!(
+                "{}?{}",
+                PhpMixed::String(self.tags_url.clone()),
+                PhpMixed::String(http_build_query_mixed(
+                    &{
+                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                        m.insert("pagelen".to_string(), PhpMixed::Int(100));
+                        m.insert(
+                            "fields".to_string(),
+                            PhpMixed::String("values.name,values.target.hash,next".to_string()),
+                        );
+                        m.insert(
+                            "sort".to_string(),
+                            PhpMixed::String("-target.date".to_string()),
+                        );
+                        m
+                    },
+                    "",
+                    "&",
+                )),
             );
             let mut has_next = true;
             while has_next {
@@ -623,30 +607,28 @@ impl GitBitbucketDriver {
 
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
-            let mut resource = sprintf(
-                "%s?%s",
-                &[
-                    PhpMixed::String(self.branches_url.clone()),
-                    PhpMixed::String(http_build_query_mixed(
-                        &{
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert("pagelen".to_string(), PhpMixed::Int(100));
-                            m.insert(
-                                "fields".to_string(),
-                                PhpMixed::String(
-                                    "values.name,values.target.hash,values.heads,next".to_string(),
-                                ),
-                            );
-                            m.insert(
-                                "sort".to_string(),
-                                PhpMixed::String("-target.date".to_string()),
-                            );
-                            m
-                        },
-                        "",
-                        "&",
-                    )),
-                ],
+            let mut resource = format!(
+                "{}?{}",
+                PhpMixed::String(self.branches_url.clone()),
+                PhpMixed::String(http_build_query_mixed(
+                    &{
+                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                        m.insert("pagelen".to_string(), PhpMixed::Int(100));
+                        m.insert(
+                            "fields".to_string(),
+                            PhpMixed::String(
+                                "values.name,values.target.hash,values.heads,next".to_string(),
+                            ),
+                        );
+                        m.insert(
+                            "sort".to_string(),
+                            PhpMixed::String("-target.date".to_string()),
+                        );
+                        m
+                    },
+                    "",
+                    "&",
+                )),
             );
             let mut has_next = true;
             while has_next {

@@ -195,9 +195,9 @@ impl ValidatingArrayLoader {
                 for index in &license_keys {
                     let license = licenses[index].clone();
                     if !is_string(&*license) {
-                        self.warnings.push(sprintf(
-                            "License %s should be a string.",
-                            &[PhpMixed::String(json_encode(&*license).unwrap_or_default())],
+                        self.warnings.push(format!(
+                            "License {} should be a string.",
+                            PhpMixed::String(json_encode(&*license).unwrap_or_default()),
                         ));
                         licenses.shift_remove(index);
                     }
@@ -218,23 +218,21 @@ impl ValidatingArrayLoader {
                             if license_validator
                                 .validate(&trim(&license_to_validate, Some(" \t\n\r\0\u{0B}")))
                             {
-                                self.warnings.push(sprintf(
-                                    "License %s must not contain extra spaces, make sure to trim it.",
-                                    &[PhpMixed::String(
+                                self.warnings.push(format!(
+                                    "License {} must not contain extra spaces, make sure to trim it.",
+                                    PhpMixed::String(
                                         json_encode(&PhpMixed::String(license_str.clone()))
                                             .unwrap_or_default(),
-                                    )],
+                                    ),
                                 ));
                             } else {
-                                self.warnings.push(sprintf(
-                                    &format!(
-                                        "License %s is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
-                                        PHP_EOL
-                                    ),
-                                    &[PhpMixed::String(
+                                self.warnings.push(format!(
+                                    "License {} is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
+                                    PhpMixed::String(
                                         json_encode(&PhpMixed::String(license_str.clone()))
                                             .unwrap_or_default(),
-                                    )],
+                                    ),
+                                    PHP_EOL
                                 ));
                             }
                         }
@@ -251,11 +249,9 @@ impl ValidatingArrayLoader {
                     Box::new(PhpMixed::Array(reindexed_map)),
                 );
             } else {
-                self.warnings.push(sprintf(
-                    "License must be a string or array of strings, got %s.",
-                    &[PhpMixed::String(
-                        json_encode(&*license_val).unwrap_or_default(),
-                    )],
+                self.warnings.push(format!(
+                    "License must be a string or array of strings, got {}.",
+                    PhpMixed::String(json_encode(&*license_val).unwrap_or_default(),),
                 ));
                 self.config.shift_remove("license");
             }

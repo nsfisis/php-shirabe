@@ -85,9 +85,9 @@ impl DescriptorHelper {
         if !self.descriptors.contains_key(&format) {
             return Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "Unsupported format \"%s\".",
-                        &[shirabe_php_shim::PhpMixed::String(format.clone())],
+                    message: format!(
+                        "Unsupported format \"{}\".",
+                        shirabe_php_shim::PhpMixed::String(format.clone()),
                     ),
                     code: 0,
                 },

@@ -60,9 +60,9 @@ impl HelperSet {
         if !self.has(name) {
             return Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The helper \"%s\" is not defined.",
-                        &[shirabe_php_shim::PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "The helper \"{}\" is not defined.",
+                        shirabe_php_shim::PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 },

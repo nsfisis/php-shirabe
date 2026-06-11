@@ -148,10 +148,7 @@ impl ArgvInput {
                     }
                 };
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"-%s\" option does not exist.",
-                        &[PhpMixed::String(bad)],
-                    ),
+                    message: format!("The \"-{}\" option does not exist.", PhpMixed::String(bad),),
                     code: 0,
                 })
                 .into());
@@ -251,17 +248,15 @@ impl ArgvInput {
                     Some(symfony_command_name)
                         if !matches!(symfony_command_name, PhpMixed::Null) =>
                     {
-                        shirabe_php_shim::sprintf(
-                            "Too many arguments to \"%s\" command, expected arguments \"%s\".",
-                            &[
-                                symfony_command_name.clone(),
-                                PhpMixed::String(shirabe_php_shim::implode("\" \"", &names)),
-                            ],
+                        format!(
+                            "Too many arguments to \"{}\" command, expected arguments \"{}\".",
+                            symfony_command_name.clone(),
+                            PhpMixed::String(shirabe_php_shim::implode("\" \"", &names)),
                         )
                     }
-                    _ => shirabe_php_shim::sprintf(
-                        "Too many arguments, expected arguments \"%s\".",
-                        &[PhpMixed::String(shirabe_php_shim::implode("\" \"", &names))],
+                    _ => format!(
+                        "Too many arguments, expected arguments \"{}\".",
+                        PhpMixed::String(shirabe_php_shim::implode("\" \"", &names)),
                     ),
                 }
             } else if symfony_command_name
@@ -269,17 +264,15 @@ impl ArgvInput {
                 .map(|n| !matches!(n, PhpMixed::Null))
                 .unwrap_or(false)
             {
-                shirabe_php_shim::sprintf(
-                    "No arguments expected for \"%s\" command, got \"%s\".",
-                    &[
-                        symfony_command_name.clone().unwrap(),
-                        PhpMixed::String(token.to_string()),
-                    ],
+                format!(
+                    "No arguments expected for \"{}\" command, got \"{}\".",
+                    symfony_command_name.clone().unwrap(),
+                    PhpMixed::String(token.to_string()),
                 )
             } else {
-                shirabe_php_shim::sprintf(
-                    "No arguments expected, got \"%s\".",
-                    &[PhpMixed::String(token.to_string())],
+                format!(
+                    "No arguments expected, got \"{}\".",
+                    PhpMixed::String(token.to_string()),
                 )
             };
 
@@ -295,9 +288,9 @@ impl ArgvInput {
     fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: shirabe_php_shim::sprintf(
-                    "The \"-%s\" option does not exist.",
-                    &[PhpMixed::String(shortcut.to_string())],
+                message: format!(
+                    "The \"-{}\" option does not exist.",
+                    PhpMixed::String(shortcut.to_string()),
                 ),
                 code: 0,
             })
@@ -320,9 +313,9 @@ impl ArgvInput {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"--%s\" option does not exist.",
-                        &[PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "The \"--{}\" option does not exist.",
+                        PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 })
@@ -332,9 +325,9 @@ impl ArgvInput {
             let option_name = self.inner.definition.negation_to_name(name)?;
             if !matches!(value, PhpMixed::Null) {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"--%s\" option does not accept a value.",
-                        &[PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "The \"--{}\" option does not accept a value.",
+                        PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 })
@@ -351,9 +344,9 @@ impl ArgvInput {
 
         if !matches!(value, PhpMixed::Null) && !option.accept_value() {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                message: shirabe_php_shim::sprintf(
-                    "The \"--%s\" option does not accept a value.",
-                    &[PhpMixed::String(name.to_string())],
+                message: format!(
+                    "The \"--{}\" option does not accept a value.",
+                    PhpMixed::String(name.to_string()),
                 ),
                 code: 0,
             })
@@ -379,9 +372,9 @@ impl ArgvInput {
         if matches!(value, PhpMixed::Null) {
             if option.is_value_required() {
                 return Err(RuntimeException(shirabe_php_shim::RuntimeException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"--%s\" option requires a value.",
-                        &[PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "The \"--{}\" option requires a value.",
+                        PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 })

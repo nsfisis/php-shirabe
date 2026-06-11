@@ -56,22 +56,20 @@ impl TextDescriptor {
         let spacing_width = total_width - shirabe_php_shim::strlen(argument.get_name());
 
         self.write_text(
-            &shirabe_php_shim::sprintf(
-                "  <info>%s</info>  %s%s%s",
-                &[
-                    PhpMixed::String(argument.get_name().to_string()),
-                    PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
-                    // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                    PhpMixed::String(Preg::replace(
-                        "/\\s*[\\r\\n]\\s*/",
-                        &format!(
-                            "\n{}",
-                            shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
-                        ),
-                        argument.get_description(),
-                    )?),
-                    PhpMixed::String(default),
-                ],
+            &format!(
+                "  <info>{}</info>  {}{}{}",
+                PhpMixed::String(argument.get_name().to_string()),
+                PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
+                // + 4 = 2 spaces before <info>, 2 spaces after </info>
+                PhpMixed::String(Preg::replace(
+                    "/\\s*[\\r\\n]\\s*/",
+                    &format!(
+                        "\n{}",
+                        shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
+                    ),
+                    argument.get_description(),
+                )?),
+                PhpMixed::String(default),
             ),
             &options,
         );
@@ -112,28 +110,23 @@ impl TextDescriptor {
         let synopsis = format!(
             "{}{}",
             if option.get_shortcut().is_some() {
-                shirabe_php_shim::sprintf(
-                    "-%s, ",
-                    &[PhpMixed::String(option.get_shortcut().unwrap().to_string())],
+                format!(
+                    "-{}, ",
+                    PhpMixed::String(option.get_shortcut().unwrap().to_string()),
                 )
             } else {
                 "    ".to_string()
             },
             if option.is_negatable() {
-                shirabe_php_shim::sprintf(
-                    "--%1$s|--no-%1$s",
-                    &[
-                        PhpMixed::String(option.get_name().to_string()),
-                        PhpMixed::String(value.clone()),
-                    ],
+                format!(
+                    "--{0}|--no-{0}",
+                    PhpMixed::String(option.get_name().to_string()),
                 )
             } else {
-                shirabe_php_shim::sprintf(
-                    "--%1$s%2$s",
-                    &[
-                        PhpMixed::String(option.get_name().to_string()),
-                        PhpMixed::String(value.clone()),
-                    ],
+                format!(
+                    "--{0}{1}",
+                    PhpMixed::String(option.get_name().to_string()),
+                    PhpMixed::String(value.clone()),
                 )
             }
         );
@@ -141,27 +134,25 @@ impl TextDescriptor {
         let spacing_width = total_width - Helper::width(&synopsis);
 
         self.write_text(
-            &shirabe_php_shim::sprintf(
-                "  <info>%s</info>  %s%s%s%s",
-                &[
-                    PhpMixed::String(synopsis),
-                    PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
-                    // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                    PhpMixed::String(Preg::replace(
-                        "/\\s*[\\r\\n]\\s*/",
-                        &format!(
-                            "\n{}",
-                            shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
-                        ),
-                        option.get_description(),
-                    )?),
-                    PhpMixed::String(default),
-                    PhpMixed::String(if option.is_array() {
-                        "<comment> (multiple values allowed)</comment>".to_string()
-                    } else {
-                        String::new()
-                    }),
-                ],
+            &format!(
+                "  <info>{}</info>  {}{}{}{}",
+                PhpMixed::String(synopsis),
+                PhpMixed::String(shirabe_php_shim::str_repeat(" ", spacing_width as usize)),
+                // + 4 = 2 spaces before <info>, 2 spaces after </info>
+                PhpMixed::String(Preg::replace(
+                    "/\\s*[\\r\\n]\\s*/",
+                    &format!(
+                        "\n{}",
+                        shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
+                    ),
+                    option.get_description(),
+                )?),
+                PhpMixed::String(default),
+                PhpMixed::String(if option.is_array() {
+                    "<comment> (multiple values allowed)</comment>".to_string()
+                } else {
+                    String::new()
+                }),
             ),
             &options,
         );
@@ -294,12 +285,11 @@ impl TextDescriptor {
             for command in &command_list {
                 let command = command.borrow();
                 self.write_text(
-                    &shirabe_php_shim::sprintf(
-                        &format!("%-{}s %s", width),
-                        &[
-                            PhpMixed::String(command.get_name().unwrap_or_default()),
-                            PhpMixed::String(command.get_description()),
-                        ],
+                    &format!(
+                        "{:<w$} {}",
+                        PhpMixed::String(command.get_name().unwrap_or_default()),
+                        PhpMixed::String(command.get_description()),
+                        w = width as usize,
                     ),
                     &options,
                 );
@@ -361,9 +351,9 @@ impl TextDescriptor {
 
             if let Some(ref described_namespace) = described_namespace {
                 self.write_text(
-                    &shirabe_php_shim::sprintf(
-                        "<comment>Available commands for the \"%s\" namespace:</comment>",
-                        &[PhpMixed::String(described_namespace.clone())],
+                    &format!(
+                        "<comment>Available commands for the \"{}\" namespace:</comment>",
+                        PhpMixed::String(described_namespace.clone()),
                     ),
                     &options,
                 );
@@ -412,20 +402,18 @@ impl TextDescriptor {
                         String::new()
                     };
                     self.write_text(
-                        &shirabe_php_shim::sprintf(
-                            "  <info>%s</info>%s%s",
-                            &[
-                                PhpMixed::String(name.clone()),
-                                PhpMixed::String(shirabe_php_shim::str_repeat(
-                                    " ",
-                                    spacing_width as usize,
-                                )),
-                                PhpMixed::String(format!(
-                                    "{}{}",
-                                    command_aliases,
-                                    command.get_description()
-                                )),
-                            ],
+                        &format!(
+                            "  <info>{}</info>{}{}",
+                            PhpMixed::String(name.clone()),
+                            PhpMixed::String(shirabe_php_shim::str_repeat(
+                                " ",
+                                spacing_width as usize,
+                            )),
+                            PhpMixed::String(format!(
+                                "{}{}",
+                                command_aliases,
+                                command.get_description()
+                            )),
                         ),
                         &options,
                     );

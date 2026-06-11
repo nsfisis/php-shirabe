@@ -519,9 +519,10 @@ impl Filesystem {
             // Returning early-formatted Result is not possible without changing signature; panic to surface in tests.
             panic!(
                 "{}",
-                sprintf(
-                    "$from (%s) and $to (%s) must be absolute paths.",
-                    &[from.to_string().into(), to.to_string().into()]
+                format!(
+                    "$from ({}) and $to ({}) must be absolute paths.",
+                    from.to_string(),
+                    to.to_string()
                 )
             );
         }
@@ -583,9 +584,10 @@ impl Filesystem {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             panic!(
                 "{}",
-                sprintf(
-                    "$from (%s) and $to (%s) must be absolute paths.",
-                    &[from.to_string().into(), to.to_string().into()]
+                format!(
+                    "$from ({}) and $to ({}) must be absolute paths.",
+                    from.to_string(),
+                    to.to_string()
                 )
             );
         }

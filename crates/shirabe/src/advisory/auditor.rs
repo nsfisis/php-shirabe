@@ -551,16 +551,14 @@ impl Auditor {
         packages: &[CompletePackageInterfaceHandle],
         format: &str,
     ) -> Result<()> {
-        io.write_error(&sprintf(
-            "<error>Found %d abandoned package%s:</error>",
-            &[
-                PhpMixed::Int(packages.len() as i64),
-                PhpMixed::String(if packages.len() > 1 {
-                    "s".to_string()
-                } else {
-                    String::new()
-                }),
-            ],
+        io.write_error(&format!(
+            "<error>Found {} abandoned package{}:</error>",
+            PhpMixed::Int(packages.len() as i64),
+            PhpMixed::String(if packages.len() > 1 {
+                "s".to_string()
+            } else {
+                String::new()
+            }),
         ));
 
         if format == Self::FORMAT_PLAIN {
@@ -570,12 +568,10 @@ impl Auditor {
                 } else {
                     "No replacement was suggested".to_string()
                 };
-                io.write_error(&sprintf(
-                    "%s is abandoned. %s.",
-                    &[
-                        PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
-                        PhpMixed::String(replacement),
-                    ],
+                io.write_error(&format!(
+                    "{} is abandoned. {}.",
+                    PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
+                    PhpMixed::String(replacement),
                 ));
             }
 

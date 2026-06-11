@@ -384,9 +384,10 @@ impl Installer {
                 "No replacement was suggested".to_string()
             };
 
-            self.io.write_error(&sprintf(
-                "<warning>Package %s is abandoned, you should avoid using it. %s.</warning>",
-                &[complete.get_pretty_name().into(), replacement.into()],
+            self.io.write_error(&format!(
+                "<warning>Package {} is abandoned, you should avoid using it. {}.</warning>",
+                complete.get_pretty_name(),
+                replacement,
             ));
         }
 
@@ -461,13 +462,11 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(&sprintf(
-                    "<info>%d package%s you are using %s looking for funding.</info>",
-                    &[
-                        funding_count.into(),
-                        (if 1 == funding_count { "" } else { "s" }).into(),
-                        (if 1 == funding_count { "is" } else { "are" }).into(),
-                    ],
+                self.io.write_error(&format!(
+                    "<info>{} package{} you are using {} looking for funding.</info>",
+                    funding_count,
+                    (if 1 == funding_count { "" } else { "s" }),
+                    (if 1 == funding_count { "is" } else { "are" }),
                 ));
                 self.io
                     .write_error("<info>Use the `composer fund` command to find out more!</info>");
@@ -792,16 +791,14 @@ impl Installer {
                 .as_bool()
                 .unwrap_or(false)
             {
-                self.io.write_error(&sprintf(
-                    "<info>Lock file operations: %d install%s, %d update%s, %d removal%s</info>",
-                    &[
-                        (install_names.len() as i64).into(),
-                        (if 1 == install_names.len() { "" } else { "s" }).into(),
-                        (update_names.len() as i64).into(),
-                        (if 1 == update_names.len() { "" } else { "s" }).into(),
-                        (uninstalls.len() as i64).into(),
-                        (if 1 == uninstalls.len() { "" } else { "s" }).into(),
-                    ],
+                self.io.write_error(&format!(
+                    "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
+                    (install_names.len() as i64),
+                    (if 1 == install_names.len() { "" } else { "s" }),
+                    (update_names.len() as i64),
+                    (if 1 == update_names.len() { "" } else { "s" }),
+                    (uninstalls.len() as i64),
+                    (if 1 == uninstalls.len() { "" } else { "s" }),
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error3(
@@ -1185,16 +1182,14 @@ impl Installer {
         if installs.is_empty() && updates.is_empty() && uninstalls.is_empty() {
             self.io.write_error("Nothing to install, update or remove");
         } else {
-            self.io.write_error(&sprintf(
-                "<info>Package operations: %d install%s, %d update%s, %d removal%s</info>",
-                &[
-                    (installs.len() as i64).into(),
-                    (if 1 == installs.len() { "" } else { "s" }).into(),
-                    (updates.len() as i64).into(),
-                    (if 1 == updates.len() { "" } else { "s" }).into(),
-                    (uninstalls.len() as i64).into(),
-                    (if 1 == uninstalls.len() { "" } else { "s" }).into(),
-                ],
+            self.io.write_error(&format!(
+                "<info>Package operations: {} install{}, {} update{}, {} removal{}</info>",
+                (installs.len() as i64),
+                (if 1 == installs.len() { "" } else { "s" }),
+                (updates.len() as i64),
+                (if 1 == updates.len() { "" } else { "s" }),
+                (uninstalls.len() as i64),
+                (if 1 == uninstalls.len() { "" } else { "s" }),
             ));
             if !installs.is_empty() {
                 self.io.write_error3(

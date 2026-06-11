@@ -75,19 +75,16 @@ impl Color {
             if available.is_none() {
                 return Err(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: shirabe_php_shim::sprintf(
-                            "Invalid option specified: \"%s\". Expected one of (%s).",
-                            &[
-                                option.clone().into(),
-                                shirabe_php_shim::implode(
-                                    ", ",
-                                    &AVAILABLE_OPTIONS
-                                        .iter()
-                                        .map(|(k, _)| k.to_string())
-                                        .collect::<Vec<String>>(),
-                                )
-                                .into(),
-                            ],
+                        message: format!(
+                            "Invalid option specified: \"{}\". Expected one of ({}).",
+                            option.clone(),
+                            shirabe_php_shim::implode(
+                                ", ",
+                                &AVAILABLE_OPTIONS
+                                    .iter()
+                                    .map(|(k, _)| k.to_string())
+                                    .collect::<Vec<String>>(),
+                            ),
                         ),
                         code: 0,
                     },
@@ -156,10 +153,7 @@ impl Color {
             if shirabe_php_shim::strlen(&color) != 6 {
                 return Err(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: shirabe_php_shim::sprintf(
-                            "Invalid \"%s\" color.",
-                            &[color.clone().into()],
-                        ),
+                        message: format!("Invalid \"{}\" color.", color.clone(),),
                         code: 0,
                     },
                 ));
@@ -184,12 +178,10 @@ impl Color {
         available.extend(BRIGHT_COLORS.iter().map(|(k, _)| k.to_string()));
         Err(InvalidArgumentException(
             shirabe_php_shim::InvalidArgumentException {
-                message: shirabe_php_shim::sprintf(
-                    "Invalid \"%s\" color; expected one of (%s).",
-                    &[
-                        color.into(),
-                        shirabe_php_shim::implode(", ", &available).into(),
-                    ],
+                message: format!(
+                    "Invalid \"{}\" color; expected one of ({}).",
+                    color,
+                    shirabe_php_shim::implode(", ", &available),
                 ),
                 code: 0,
             },
@@ -206,7 +198,7 @@ impl Color {
             return Self::degrade_hex_color_to_ansi(r, g, b).to_string();
         }
 
-        shirabe_php_shim::sprintf("8;2;%d;%d;%d", &[r.into(), g.into(), b.into()])
+        format!("8;2;{};{};{}", r, g, b)
     }
 
     fn degrade_hex_color_to_ansi(r: i64, g: i64, b: i64) -> i64 {

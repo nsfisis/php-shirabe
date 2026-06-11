@@ -109,13 +109,11 @@ impl ConsoleIO {
             let mapped: Vec<String> = arr
                 .into_iter()
                 .map(|message| {
-                    sprintf(
-                        "[%.1fMiB/%.2fs] %s",
-                        &[
-                            PhpMixed::Float(memory_usage),
-                            PhpMixed::Float(time_spent),
-                            PhpMixed::String(message),
-                        ],
+                    format!(
+                        "[{:.1}MiB/{:.2}s] {}",
+                        memory_usage,
+                        time_spent,
+                        PhpMixed::String(message),
                     )
                 })
                 .collect();

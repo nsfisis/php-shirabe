@@ -824,9 +824,9 @@ impl VcsDownloader for GitDownloader {
                 io_interface::NORMAL,
             );
             self.inner.io.write_error3(
-                &sprintf(
-                    "    Cloning to cache at %s",
-                    &[PhpMixed::String(cache_path.clone())],
+                &format!(
+                    "    Cloning to cache at {}",
+                    PhpMixed::String(cache_path.clone()),
                 ),
                 true,
                 io_interface::DEBUG,

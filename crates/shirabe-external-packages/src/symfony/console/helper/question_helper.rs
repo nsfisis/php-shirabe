@@ -301,9 +301,10 @@ impl QuestionHelper {
             let padding =
                 shirabe_php_shim::str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
-            messages.push(shirabe_php_shim::sprintf(
-                &format!("  [<{tag}>%s{padding}</{tag}>] %s"),
-                &[PhpMixed::String(key.clone()), (**value).clone()],
+            messages.push(format!(
+                "  [<{tag}>{}{padding}</{tag}>] {}",
+                PhpMixed::String(key.clone()),
+                (**value).clone(),
             ));
         }
 

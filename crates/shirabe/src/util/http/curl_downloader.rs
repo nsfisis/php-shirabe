@@ -1527,15 +1527,13 @@ impl CurlDownloader {
                                 &job,
                                 anyhow::anyhow!(
                                     TransportException::new(
-                                        sprintf(
-                                            "IP \"%s\" is blocked for \"%s\".",
-                                            &[
-                                                primary_ip.clone(),
-                                                progress_now
-                                                    .get("url")
-                                                    .cloned()
-                                                    .unwrap_or(PhpMixed::Null),
-                                            ],
+                                        format!(
+                                            "IP \"{}\" is blocked for \"{}\".",
+                                            primary_ip.clone(),
+                                            progress_now
+                                                .get("url")
+                                                .cloned()
+                                                .unwrap_or(PhpMixed::Null),
                                         ),
                                         0,
                                     )
@@ -1611,19 +1609,17 @@ impl CurlDownloader {
 
         if !target_url.is_empty() {
             self.io.write_error3(
-                &sprintf(
-                    "Following redirect (%u) %s",
-                    &[
-                        PhpMixed::Int(
-                            job.get("attributes")
-                                .and_then(|v| v.as_array())
-                                .and_then(|a| a.get("redirects"))
-                                .and_then(|b| b.as_int())
-                                .unwrap_or(0)
-                                + 1,
-                        ),
-                        PhpMixed::String(Url::sanitize(target_url.clone())),
-                    ],
+                &format!(
+                    "Following redirect ({}) {}",
+                    PhpMixed::Int(
+                        job.get("attributes")
+                            .and_then(|v| v.as_array())
+                            .and_then(|a| a.get("redirects"))
+                            .and_then(|b| b.as_int())
+                            .unwrap_or(0)
+                            + 1,
+                    ),
+                    PhpMixed::String(Url::sanitize(target_url.clone())),
                 ),
                 true,
                 crate::io::DEBUG,

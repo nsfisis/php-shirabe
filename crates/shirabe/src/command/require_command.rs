@@ -446,9 +446,9 @@ impl RequireCommand {
         let version_parser = VersionParser::new();
         for (package, constraint) in &requirements {
             if strtolower(package) == composer.get_package().get_name() {
-                let msg = sprintf(
-                    "<error>Root package '%s' cannot require itself in its composer.json</error>",
-                    &[PhpMixed::String(package.clone())],
+                let msg = format!(
+                    "<error>Root package '{}' cannot require itself in its composer.json</error>",
+                    PhpMixed::String(package.clone()),
                 );
                 self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 
@@ -464,48 +464,46 @@ impl RequireCommand {
             self.get_inconsistent_require_keys(&requirements, require_key);
         if (inconsistent_require_keys.len() as i64) > 0 {
             for package in &inconsistent_require_keys {
-                let warn_msg = sprintf(
-                    "%s is currently present in the %s key and you ran the command %s the --dev flag, which will move it to the %s key.",
-                    &[
-                        PhpMixed::String(package.clone()),
-                        PhpMixed::String(remove_key.to_string()),
-                        PhpMixed::String(
-                            if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
-                                "with"
-                            } else {
-                                "without"
-                            }
-                            .to_string(),
-                        ),
-                        PhpMixed::String(require_key.to_string()),
-                    ],
+                let warn_msg = format!(
+                    "{} is currently present in the {} key and you ran the command {} the --dev flag, which will move it to the {} key.",
+                    PhpMixed::String(package.clone()),
+                    PhpMixed::String(remove_key.to_string()),
+                    PhpMixed::String(
+                        if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
+                            "with"
+                        } else {
+                            "without"
+                        }
+                        .to_string(),
+                    ),
+                    PhpMixed::String(require_key.to_string()),
                 );
                 self.get_io().warning(&warn_msg, &[]);
             }
 
             if self.get_io().is_interactive() {
-                let q1 = sprintf(
-                    "<info>Do you want to move %s?</info> [<comment>no</comment>]? ",
-                    &[PhpMixed::String(
+                let q1 = format!(
+                    "<info>Do you want to move {}?</info> [<comment>no</comment>]? ",
+                    PhpMixed::String(
                         if (inconsistent_require_keys.len() as i64) > 1 {
                             "these requirements"
                         } else {
                             "this requirement"
                         }
                         .to_string(),
-                    )],
+                    ),
                 );
                 if !self.get_io().ask_confirmation(q1, false) {
-                    let q2 = sprintf(
-                        "<info>Do you want to re-run the command %s --dev?</info> [<comment>yes</comment>]? ",
-                        &[PhpMixed::String(
+                    let q2 = format!(
+                        "<info>Do you want to re-run the command {} --dev?</info> [<comment>yes</comment>]? ",
+                        PhpMixed::String(
                             if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
                                 "without"
                             } else {
                                 "with"
                             }
                             .to_string(),
-                        )],
+                        ),
                     );
                     if !self.get_io().ask_confirmation(q2, true) {
                         return Ok(0);
@@ -1086,14 +1084,10 @@ impl RequireCommand {
                 );
             }
             self.get_io().write_error3(
-                &sprintf(
-                    "Using version <info>%s</info> for <info>%s</info>",
-                    &[
-                        PhpMixed::String(
-                            requirements.get(package_name).cloned().unwrap_or_default(),
-                        ),
-                        PhpMixed::String(package_name.clone()),
-                    ],
+                &format!(
+                    "Using version <info>{}</info> for <info>{}</info>",
+                    PhpMixed::String(requirements.get(package_name).cloned().unwrap_or_default(),),
+                    PhpMixed::String(package_name.clone()),
                 ),
                 true,
                 io_interface::NORMAL,

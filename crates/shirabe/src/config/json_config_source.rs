@@ -35,9 +35,9 @@ impl JsonConfigSource {
         if self.file.borrow().exists() {
             if !is_writable(self.file.borrow().get_path()) {
                 return Err(RuntimeException {
-                    message: sprintf(
-                        "The file \"%s\" is not writable.",
-                        &[PhpMixed::String(self.file.borrow().get_path().to_string())],
+                    message: format!(
+                        "The file \"{}\" is not writable.",
+                        PhpMixed::String(self.file.borrow().get_path().to_string()),
                     ),
                     code: 0,
                 }
@@ -46,9 +46,9 @@ impl JsonConfigSource {
 
             if !Filesystem::is_readable(self.file.borrow().get_path()) {
                 return Err(RuntimeException {
-                    message: sprintf(
-                        "The file \"%s\" is not readable.",
-                        &[PhpMixed::String(self.file.borrow().get_path().to_string())],
+                    message: format!(
+                        "The file \"{}\" is not readable.",
+                        PhpMixed::String(self.file.borrow().get_path().to_string()),
                     ),
                     code: 0,
                 }
@@ -456,9 +456,9 @@ impl ConfigSourceInterface for JsonConfigSource {
                 }
                 let Some(index_to_insert) = index_to_insert else {
                     return Err(RuntimeException {
-                        message: sprintf(
-                            "The referenced repository \"%s\" does not exist.",
-                            &[PhpMixed::String(reference_name.to_string())],
+                        message: format!(
+                            "The referenced repository \"{}\" does not exist.",
+                            PhpMixed::String(reference_name.to_string()),
                         ),
                         code: 0,
                     }

@@ -815,9 +815,9 @@ impl ProgressBar {
                 shirabe_php_shim::PhpMixed::String(s) => s,
                 shirabe_php_shim::PhpMixed::Int(i) => i.to_string(),
                 shirabe_php_shim::PhpMixed::Float(f) => {
-                    shirabe_php_shim::sprintf("%s", &[shirabe_php_shim::PhpMixed::Float(f)])
+                    format!("{}", shirabe_php_shim::PhpMixed::Float(f))
                 }
-                other => shirabe_php_shim::sprintf("%s", &[other]),
+                other => format!("{}", other),
             })
         };
 

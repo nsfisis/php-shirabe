@@ -206,9 +206,9 @@ impl ArrayInput {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(InvalidOptionException(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"-%s\" option does not exist.",
-                        &[PhpMixed::String(shortcut.to_string())],
+                    message: format!(
+                        "The \"-{}\" option does not exist.",
+                        PhpMixed::String(shortcut.to_string()),
                     ),
                     code: 0,
                 },
@@ -233,9 +233,9 @@ impl ArrayInput {
             if !self.inner.definition.has_negation(name) {
                 return Err(InvalidOptionException(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: shirabe_php_shim::sprintf(
-                            "The \"--%s\" option does not exist.",
-                            &[PhpMixed::String(name.to_string())],
+                        message: format!(
+                            "The \"--{}\" option does not exist.",
+                            PhpMixed::String(name.to_string()),
                         ),
                         code: 0,
                     },
@@ -257,9 +257,9 @@ impl ArrayInput {
             if option.is_value_required() {
                 return Err(InvalidOptionException(InvalidArgumentException(
                     shirabe_php_shim::InvalidArgumentException {
-                        message: shirabe_php_shim::sprintf(
-                            "The \"--%s\" option requires a value.",
-                            &[PhpMixed::String(name.to_string())],
+                        message: format!(
+                            "The \"--{}\" option requires a value.",
+                            PhpMixed::String(name.to_string()),
                         ),
                         code: 0,
                     },
@@ -282,10 +282,7 @@ impl ArrayInput {
         if !self.inner.definition.has_argument(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"%s\" argument does not exist.",
-                        &[name.clone()],
-                    ),
+                    message: format!("The \"{}\" argument does not exist.", name.clone(),),
                     code: 0,
                 })
                 .into(),

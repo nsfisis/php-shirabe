@@ -347,12 +347,10 @@ impl EventDispatcher {
                         "?".to_string()
                     };
                     self.io.write_error3(
-                        &sprintf(
-                            "> %s: %s",
-                            &[
-                                PhpMixed::String(formatted_event_name_with_args.clone()),
-                                PhpMixed::String(format!("{}->{}", prefix, method_name)),
-                            ],
+                        &format!(
+                            "> {}: {}",
+                            PhpMixed::String(formatted_event_name_with_args.clone()),
+                            PhpMixed::String(format!("{}->{}", prefix, method_name)),
                         ),
                         true,
                         crate::io::VERBOSE,
@@ -364,12 +362,10 @@ impl EventDispatcher {
                 match callable {
                     Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
                         self.io.write_error3(
-                            &sprintf(
-                                "> %s: %s",
-                                &[
-                                    PhpMixed::String(formatted_event_name_with_args.clone()),
-                                    PhpMixed::String(callable_str.clone()),
-                                ],
+                            &format!(
+                                "> {}: {}",
+                                PhpMixed::String(formatted_event_name_with_args.clone()),
+                                PhpMixed::String(callable_str.clone()),
                             ),
                             true,
                             crate::io::VERBOSE,
@@ -424,15 +420,11 @@ impl EventDispatcher {
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
-                                self.io.write_error3(&sprintf(
-                                    &format!(
-                                        "<error>Script %s handling the %s event returned with error code {}</error>",
-                                        exit_code
-                                    ),
-                                    &[
-                                        PhpMixed::String(callable_str.clone()),
-                                        PhpMixed::String(event.get_name().to_string()),
-                                    ],
+                                self.io.write_error3(&format!(
+                                    "<error>Script {} handling the {} event returned with error code {}</error>",
+                                    PhpMixed::String(callable_str.clone()),
+                                    PhpMixed::String(event.get_name().to_string()),
+                                    exit_code
                                 ), true, crate::io::QUIET);
 
                                 return Err(anyhow::anyhow!(ScriptExecutionException(
@@ -454,9 +446,9 @@ impl EventDispatcher {
                                 ))
                                 .is_empty()
                             {
-                                self.io.write_error3(&sprintf(
-                                    "<warning>You made a reference to a non-existent script %s</warning>",
-                                    &[PhpMixed::String(callable_str.clone())],
+                                self.io.write_error3(&format!(
+                                    "<warning>You made a reference to a non-existent script {}</warning>",
+                                    PhpMixed::String(callable_str.clone()),
                                 ), true, crate::io::QUIET);
                             }
 
@@ -481,12 +473,10 @@ impl EventDispatcher {
                                 Err(e) => {
                                     if e.downcast_ref::<ScriptExecutionException>().is_some() {
                                         self.io.write_error3(
-                                            &sprintf(
-                                                "<error>Script %s was called via %s</error>",
-                                                &[
-                                                    PhpMixed::String(callable_str.clone()),
-                                                    PhpMixed::String(event.get_name().to_string()),
-                                                ],
+                                            &format!(
+                                                "<error>Script {} was called via {}</error>",
+                                                PhpMixed::String(callable_str.clone()),
+                                                PhpMixed::String(event.get_name().to_string()),
                                             ),
                                             true,
                                             crate::io::QUIET,
@@ -526,17 +516,13 @@ impl EventDispatcher {
                                 r#return = if let PhpMixed::Bool(false) = v { 1 } else { 0 };
                             }
                             Err(e) => {
-                                let message =
-                                    "Script %s handling the %s event terminated with an exception";
                                 self.io.write_error3(
                                     &format!(
                                         "<error>{}</error>",
-                                        sprintf(
-                                            message,
-                                            &[
-                                                PhpMixed::String(callable_str.clone()),
-                                                PhpMixed::String(event.get_name().to_string()),
-                                            ],
+                                        format!(
+                                            "Script {} handling the {} event terminated with an exception",
+                                            PhpMixed::String(callable_str.clone()),
+                                            PhpMixed::String(event.get_name().to_string()),
                                         )
                                     ),
                                     true,
@@ -630,17 +616,13 @@ impl EventDispatcher {
                         match result {
                             Ok(v) => r#return = v,
                             Err(e) => {
-                                let message =
-                                    "Script %s handling the %s event terminated with an exception";
                                 self.io.write_error3(
                                     &format!(
                                         "<error>{}</error>",
-                                        sprintf(
-                                            message,
-                                            &[
-                                                PhpMixed::String(callable_str.clone()),
-                                                PhpMixed::String(event.get_name().to_string()),
-                                            ],
+                                        format!(
+                                            "Script {} handling the {} event terminated with an exception",
+                                            PhpMixed::String(callable_str.clone()),
+                                            PhpMixed::String(event.get_name().to_string()),
                                         )
                                     ),
                                     true,
@@ -676,19 +658,17 @@ impl EventDispatcher {
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                &sprintf(
-                                    "> %s: %s",
-                                    &[
-                                        PhpMixed::String(event.get_name().to_string()),
-                                        PhpMixed::String(exec.clone()),
-                                    ],
+                                &format!(
+                                    "> {}: {}",
+                                    PhpMixed::String(event.get_name().to_string()),
+                                    PhpMixed::String(exec.clone()),
                                 ),
                                 true,
                                 crate::io::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
                             self.io.write_error3(
-                                &sprintf("> %s", &[PhpMixed::String(exec.clone())]),
+                                &format!("> {}", PhpMixed::String(exec.clone())),
                                 true,
                                 crate::io::NORMAL,
                             );
@@ -815,15 +795,11 @@ impl EventDispatcher {
 
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
-                            self.io.write_error3(&sprintf(
-                                &format!(
-                                    "<error>Script %s handling the %s event returned with error code {}</error>",
-                                    exit_code
-                                ),
-                                &[
-                                    PhpMixed::String(callable_str.clone()),
-                                    PhpMixed::String(event.get_name().to_string()),
-                                ],
+                            self.io.write_error3(&format!(
+                                "<error>Script {} handling the {} event returned with error code {}</error>",
+                                PhpMixed::String(callable_str.clone()),
+                                PhpMixed::String(event.get_name().to_string()),
+                                exit_code
                             ), true, crate::io::QUIET);
 
                             return Err(anyhow::anyhow!(ScriptExecutionException(
@@ -921,25 +897,21 @@ impl EventDispatcher {
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                &sprintf(
-                    "> %s: %s::%s",
-                    &[
-                        PhpMixed::String(event.get_name().to_string()),
-                        PhpMixed::String(class_name.to_string()),
-                        PhpMixed::String(method_name.to_string()),
-                    ],
+                &format!(
+                    "> {}: {}::{}",
+                    PhpMixed::String(event.get_name().to_string()),
+                    PhpMixed::String(class_name.to_string()),
+                    PhpMixed::String(method_name.to_string()),
                 ),
                 true,
                 crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
-                &sprintf(
-                    "> %s::%s",
-                    &[
-                        PhpMixed::String(class_name.to_string()),
-                        PhpMixed::String(method_name.to_string()),
-                    ],
+                &format!(
+                    "> {}::{}",
+                    PhpMixed::String(class_name.to_string()),
+                    PhpMixed::String(method_name.to_string()),
                 ),
                 true,
                 crate::io::NORMAL,
@@ -1111,9 +1083,9 @@ impl EventDispatcher {
         let event_name = event.get_name().to_string();
         if self.event_stack.iter().any(|n| n == &event_name) {
             return Err(anyhow::anyhow!(RuntimeException {
-                message: sprintf(
-                    "Circular call to script handler '%s' detected",
-                    &[PhpMixed::String(event_name)],
+                message: format!(
+                    "Circular call to script handler '{}' detected",
+                    PhpMixed::String(event_name),
                 ),
                 code: 0,
             }));

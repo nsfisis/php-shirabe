@@ -88,9 +88,9 @@ impl GitLabDriver {
             .unwrap_or(false)
         {
             return Err(InvalidArgumentException {
-                message: sprintf(
-                    "The GitLab repository URL %s is invalid. It must be the HTTP URL of a GitLab project.",
-                    &[PhpMixed::String(self.inner.url.clone())],
+                message: format!(
+                    "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
+                    PhpMixed::String(self.inner.url.clone()),
                 ),
                 code: 0,
             }
@@ -366,9 +366,10 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "source".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "%s/-/tree/%s",
-                                &[PhpMixed::String(web_url), PhpMixed::String(label_str)],
+                            Box::new(PhpMixed::String(format!(
+                                "{}/-/tree/{}",
+                                PhpMixed::String(web_url),
+                                PhpMixed::String(label_str),
                             ))),
                         );
                     }
@@ -396,9 +397,9 @@ impl GitLabDriver {
                     }) {
                         support.insert(
                             "issues".to_string(),
-                            Box::new(PhpMixed::String(sprintf(
-                                "%s/-/issues",
-                                &[PhpMixed::String(web_url)],
+                            Box::new(PhpMixed::String(format!(
+                                "{}/-/issues",
+                                PhpMixed::String(web_url),
                             ))),
                         );
                     }
@@ -617,7 +618,7 @@ impl GitLabDriver {
                     ]),
                     true,
                 ) {
-                format!("%{}", sprintf("%02X", &[PhpMixed::Int(ord(&character))]))
+                format!("%{}", format!("{:02X}", ord(&character)))
             } else {
                 character
             };

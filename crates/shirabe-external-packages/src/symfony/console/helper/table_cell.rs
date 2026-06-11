@@ -36,9 +36,9 @@ impl TableCell {
         if !diff.is_empty() {
             return Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The TableCell does not support the following options: '%s'.",
-                        &[shirabe_php_shim::PhpMixed::String(diff.join("', '"))],
+                    message: format!(
+                        "The TableCell does not support the following options: '{}'.",
+                        shirabe_php_shim::PhpMixed::String(diff.join("', '")),
                     ),
                     code: 0,
                 },

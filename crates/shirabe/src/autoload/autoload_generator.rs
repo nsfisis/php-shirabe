@@ -1597,9 +1597,10 @@ impl AutoloadGenerator {
             );
             let value = Preg::replace("/ +$/m", "", &value).unwrap_or_default();
 
-            file.push_str(&sprintf(
-                "    public static $%s = %s;\n\n",
-                &[prop.clone().into(), value.clone().into()],
+            file.push_str(&format!(
+                "    public static ${} = {};\n\n",
+                prop.clone(),
+                value.clone(),
             ));
             if "files" != prop.as_str() {
                 initializer.push_str(&format!(

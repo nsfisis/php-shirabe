@@ -524,24 +524,20 @@ impl Application {
 
         if !is_proxy_command {
             self.io.write_error3(
-                &sprintf(
-                    "Running %s (%s) with %s on %s",
-                    &[
-                        composer::get_version().into(),
-                        composer::RELEASE_DATE.into(),
-                        (if defined("HHVM_VERSION") {
-                            format!("HHVM {}", shirabe_php_shim::HHVM_VERSION.unwrap_or(""))
-                        } else {
-                            format!("PHP {}", PHP_VERSION)
-                        })
-                        .into(),
-                        (if function_exists("php_uname") {
-                            format!("{} / {}", php_uname("s"), php_uname("r"))
-                        } else {
-                            "Unknown OS".to_string()
-                        })
-                        .into(),
-                    ],
+                &format!(
+                    "Running {} ({}) with {} on {}",
+                    composer::get_version(),
+                    composer::RELEASE_DATE,
+                    (if defined("HHVM_VERSION") {
+                        format!("HHVM {}", shirabe_php_shim::HHVM_VERSION.unwrap_or(""))
+                    } else {
+                        format!("PHP {}", PHP_VERSION)
+                    }),
+                    (if function_exists("php_uname") {
+                        format!("{} / {}", php_uname("s"), php_uname("r"))
+                    } else {
+                        "Unknown OS".to_string()
+                    }),
                 ),
                 true,
                 io_interface::DEBUG,
@@ -562,9 +558,9 @@ impl Application {
                 && command_name.as_deref() != Some("selfupdate")
                 && time() > shirabe_php_shim::composer_dev_warning_time()
             {
-                self.io.write_error(&sprintf(
-                    "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"%s self-update\" to get the latest version.</warning>",
-                    &[shirabe_php_shim::server_get("PHP_SELF").unwrap_or_default().into()],
+                self.io.write_error(&format!(
+                    "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
+                    shirabe_php_shim::server_get("PHP_SELF").unwrap_or_default(),
                 ));
             }
 
@@ -605,7 +601,7 @@ impl Application {
                     && unlink(&tempfile)
                     && !file_exists(&tempfile))
                 {
-                    return Ok(Some(sprintf("<error>PHP temp directory (%s) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", &[sys_get_temp_dir().into()])));
+                    return Ok(Some(format!("<error>PHP temp directory ({}) does not exist or is not writable to Composer. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir())));
                 }
                 Ok(None)
             })
@@ -778,9 +774,9 @@ impl Application {
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), true)
             {
-                self.io.write_error(&sprintf(
-                    "<info>PHP</info> version <comment>%s</comment> (%s)",
-                    &[PHP_VERSION.into(), PHP_BINARY.into()],
+                self.io.write_error(&format!(
+                    "<info>PHP</info> version <comment>{}</comment> ({})",
+                    PHP_VERSION, PHP_BINARY,
                 ));
                 self.io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",
@@ -1132,20 +1128,15 @@ impl Application {
         if !composer::BRANCH_ALIAS_VERSION.is_empty()
             && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
         {
-            branch_alias_string = sprintf(
-                " (%s)",
-                &[composer::BRANCH_ALIAS_VERSION.to_string().into()],
-            );
+            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION.to_string(),);
         }
 
-        sprintf(
-            "<info>%s</info> version <comment>%s%s</comment> %s",
-            &[
-                self.inner.get_name().into(),
-                self.inner.get_version().into(),
-                branch_alias_string.into(),
-                composer::RELEASE_DATE.into(),
-            ],
+        format!(
+            "<info>{}</info> version <comment>{}{}</comment> {}",
+            self.inner.get_name(),
+            self.inner.get_version(),
+            branch_alias_string,
+            composer::RELEASE_DATE,
         )
     }
 

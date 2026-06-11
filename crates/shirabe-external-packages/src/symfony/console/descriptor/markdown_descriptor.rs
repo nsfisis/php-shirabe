@@ -256,20 +256,18 @@ impl MarkdownDescriptor {
                 &command_names
                     .iter()
                     .map(|command_name| {
-                        Ok(shirabe_php_shim::sprintf(
-                            "* [`%s`](#%s)",
-                            &[
-                                PhpMixed::String(command_name.clone()),
-                                PhpMixed::String(shirabe_php_shim::str_replace(
-                                    ":",
-                                    "",
-                                    &description
-                                        .get_command(command_name)?
-                                        .borrow()
-                                        .get_name()
-                                        .unwrap_or_default(),
-                                )),
-                            ],
+                        Ok(format!(
+                            "* [`{}`](#{})",
+                            PhpMixed::String(command_name.clone()),
+                            PhpMixed::String(shirabe_php_shim::str_replace(
+                                ":",
+                                "",
+                                &description
+                                    .get_command(command_name)?
+                                    .borrow()
+                                    .get_name()
+                                    .unwrap_or_default(),
+                            )),
                         ))
                     })
                     .collect::<anyhow::Result<Vec<String>>>()?
@@ -294,12 +292,10 @@ impl MarkdownDescriptor {
     fn get_application_title(&self, application: &Application) -> String {
         if "UNKNOWN" != application.get_name() {
             if "UNKNOWN" != application.get_version() {
-                return shirabe_php_shim::sprintf(
-                    "%s %s",
-                    &[
-                        PhpMixed::String(application.get_name()),
-                        PhpMixed::String(application.get_version()),
-                    ],
+                return format!(
+                    "{} {}",
+                    PhpMixed::String(application.get_name()),
+                    PhpMixed::String(application.get_version()),
                 );
             }
 

@@ -263,9 +263,9 @@ impl Solver {
         self.run_sat()?;
         self.io.write_error3("", true, crate::io::DEBUG);
         self.io.write_error3(
-            &sprintf(
-                "Dependency resolution completed in %.3f seconds",
-                &[PhpMixed::Float(microtime(true) - before)],
+            &format!(
+                "Dependency resolution completed in {:.3} seconds",
+                microtime(true) - before,
             ),
             true,
             crate::io::VERBOSE,

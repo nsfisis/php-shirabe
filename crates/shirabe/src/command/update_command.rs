@@ -660,11 +660,11 @@ impl UpdateCommand {
         table.render();
 
         if io.ask_confirmation(
-            sprintf(
-                "Would you like to continue and update the above package%s [<comment>yes</comment>]? ",
-                &[PhpMixed::String(
+            format!(
+                "Would you like to continue and update the above package{} [<comment>yes</comment>]? ",
+                PhpMixed::String(
                     if 1 == packages.len() { "" } else { "s" }.to_string(),
-                )],
+                ),
             ),
             true,
         ) {

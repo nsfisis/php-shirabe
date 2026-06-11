@@ -110,12 +110,10 @@ impl DownloadManager {
         let r#type = strtolower(r#type);
         if !self.downloaders.contains_key(&r#type) {
             return Err(InvalidArgumentException {
-                message: sprintf(
-                    "Unknown downloader type: %s. Available types: %s.",
-                    &[
-                        PhpMixed::String(r#type),
-                        PhpMixed::String(implode(", ", &array_keys(&self.downloaders))),
-                    ],
+                message: format!(
+                    "Unknown downloader type: {}. Available types: {}.",
+                    PhpMixed::String(r#type),
+                    PhpMixed::String(implode(", ", &array_keys(&self.downloaders))),
                 ),
                 code: 0,
             }
@@ -159,14 +157,12 @@ impl DownloadManager {
         let downloader_installation_source = downloader.borrow().get_installation_source();
         if installation_source.as_deref() != Some(&downloader_installation_source) {
             return Err(LogicException {
-                message: sprintf(
-                    "Downloader \"%s\" is a %s type downloader and can not be used to download %s for package %s",
-                    &[
-                        PhpMixed::String(shirabe_php_shim::get_class_obj(&*downloader.borrow())),
-                        PhpMixed::String(downloader_installation_source),
-                        PhpMixed::String(installation_source.clone().unwrap_or_default()),
-                        PhpMixed::String(package.to_string()),
-                    ],
+                message: format!(
+                    "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
+                    PhpMixed::String(shirabe_php_shim::get_class_obj(&*downloader.borrow())),
+                    PhpMixed::String(downloader_installation_source),
+                    PhpMixed::String(installation_source.clone().unwrap_or_default()),
+                    PhpMixed::String(package.to_string()),
                 ),
                 code: 0,
             }

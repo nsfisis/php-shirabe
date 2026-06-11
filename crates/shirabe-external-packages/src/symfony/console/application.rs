@@ -353,9 +353,9 @@ impl Application {
                     .borrow()
                     .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
                 let formatted_block = FormatterHelper::default().format_block(
-                    FormatBlockMessages::String(shirabe_php_shim::sprintf(
-                        "Command \"%s\" is not defined.",
-                        &[PhpMixed::from(name.clone())],
+                    FormatBlockMessages::String(format!(
+                        "Command \"{}\" is not defined.",
+                        PhpMixed::from(name.clone()),
                     )),
                     "error",
                     true,
@@ -364,9 +364,9 @@ impl Application {
                     .borrow()
                     .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
                 if !style.confirm(
-                    &shirabe_php_shim::sprintf(
-                        "Do you want to run \"%s\" instead? ",
-                        &[PhpMixed::from(alternative.clone())],
+                    &format!(
+                        "Do you want to run \"{}\" instead? ",
+                        PhpMixed::from(alternative.clone()),
                     ),
                     false,
                 ) {
@@ -595,11 +595,9 @@ impl Application {
 
         if command.borrow().get_name().is_none() {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: shirabe_php_shim::sprintf(
-                    "The command defined in \"%s\" cannot have an empty name.",
-                    &[PhpMixed::from(shirabe_php_shim::get_debug_type_obj(
-                        &command,
-                    ))],
+                message: format!(
+                    "The command defined in \"{}\" cannot have an empty name.",
+                    PhpMixed::from(shirabe_php_shim::get_debug_type_obj(&command,)),
                 ),
                 code: 0,
             })
@@ -624,9 +622,9 @@ impl Application {
 
         if !self.has(name) {
             return Err(CommandNotFoundException::new(
-                shirabe_php_shim::sprintf(
-                    "The command \"%s\" does not exist.",
-                    &[PhpMixed::from(name.to_string())],
+                format!(
+                    "The command \"{}\" does not exist.",
+                    PhpMixed::from(name.to_string()),
                 ),
                 Vec::new(),
                 0,
@@ -637,9 +635,9 @@ impl Application {
         // When the command has a different name than the one used at the command loader level
         if !self.commands.contains_key(name) {
             return Err(CommandNotFoundException::new(
-                shirabe_php_shim::sprintf(
-                    "The \"%s\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
-                    &[PhpMixed::from(name.to_string())],
+                format!(
+                    "The \"{}\" command cannot be found because it is registered under multiple names. Make sure you don't set a different name via constructor or \"setName()\".",
+                    PhpMixed::from(name.to_string()),
                 ),
                 Vec::new(),
                 0,
@@ -742,9 +740,9 @@ impl Application {
         let namespaces = shirabe_php_shim::preg_grep(&format!("{{^{}}}", expr), &all_namespaces);
 
         if namespaces.is_empty() {
-            let mut message = shirabe_php_shim::sprintf(
-                "There are no commands defined in the \"%s\" namespace.",
-                &[PhpMixed::from(namespace.to_string())],
+            let mut message = format!(
+                "There are no commands defined in the \"{}\" namespace.",
+                PhpMixed::from(namespace.to_string()),
             );
 
             let alternatives = self.find_alternatives(namespace, &all_namespaces);
@@ -769,12 +767,10 @@ impl Application {
         let exact = namespaces.iter().any(|n| n == namespace);
         if namespaces.len() > 1 && !exact {
             return Err(NamespaceNotFoundException(CommandNotFoundException::new(
-                shirabe_php_shim::sprintf(
-                    "The namespace \"%s\" is ambiguous.\nDid you mean one of these?\n%s.",
-                    &[
-                        PhpMixed::from(namespace.to_string()),
-                        PhpMixed::from(self.get_abbreviation_suggestions(&namespaces)),
-                    ],
+                format!(
+                    "The namespace \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                    PhpMixed::from(namespace.to_string()),
+                    PhpMixed::from(self.get_abbreviation_suggestions(&namespaces)),
                 ),
                 namespaces.clone(),
                 0,
@@ -845,9 +841,9 @@ impl Application {
                 self.find_namespace(&name[..pos as usize])?;
             }
 
-            let mut message = shirabe_php_shim::sprintf(
-                "Command \"%s\" is not defined.",
-                &[PhpMixed::from(name.to_string())],
+            let mut message = format!(
+                "Command \"{}\" is not defined.",
+                PhpMixed::from(name.to_string()),
             );
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
@@ -956,12 +952,10 @@ impl Application {
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
                     return Err(CommandNotFoundException::new(
-                        shirabe_php_shim::sprintf(
-                            "Command \"%s\" is ambiguous.\nDid you mean one of these?\n%s.",
-                            &[
-                                PhpMixed::from(name.to_string()),
-                                PhpMixed::from(suggestions),
-                            ],
+                        format!(
+                            "Command \"{}\" is ambiguous.\nDid you mean one of these?\n{}.",
+                            PhpMixed::from(name.to_string()),
+                            PhpMixed::from(suggestions),
                         ),
                         commands.clone(),
                         0,
@@ -976,9 +970,9 @@ impl Application {
 
         if command.borrow().is_hidden() {
             return Err(CommandNotFoundException::new(
-                shirabe_php_shim::sprintf(
-                    "The command \"%s\" does not exist.",
-                    &[PhpMixed::from(name.to_string())],
+                format!(
+                    "The command \"{}\" does not exist.",
+                    PhpMixed::from(name.to_string()),
                 ),
                 Vec::new(),
                 0,
@@ -1075,15 +1069,15 @@ impl Application {
 
         if let Some(running_command) = &self.running_command {
             output.borrow().writeln(
-                &[shirabe_php_shim::sprintf(
-                    "<info>%s</info>",
-                    &[PhpMixed::from(
+                &[format!(
+                    "<info>{}</info>",
+                    PhpMixed::from(
                         OutputFormatter::escape(&shirabe_php_shim::sprintf(
                             &running_command.borrow_mut().get_synopsis(false),
                             &[PhpMixed::from(self.get_name())],
                         ))
                         .unwrap(),
-                    )],
+                    ),
                 )],
                 output_interface::VERBOSITY_QUIET,
             );

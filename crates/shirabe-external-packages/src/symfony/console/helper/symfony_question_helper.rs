@@ -32,33 +32,31 @@ impl SymfonyQuestionHelper {
         let default = question.get_default();
 
         if question.is_multiline() {
-            text += &shirabe_php_shim::sprintf(
-                " (press %s to continue)",
-                &[PhpMixed::String(self.get_eof_shortcut())],
+            text += &format!(
+                " (press {} to continue)",
+                PhpMixed::String(self.get_eof_shortcut()),
             );
         }
 
         // switch (true)
         if matches!(default, PhpMixed::Null) {
-            text = shirabe_php_shim::sprintf(" <info>%s</info>:", &[PhpMixed::String(text)]);
+            text = format!(" <info>{}</info>:", PhpMixed::String(text));
         } else if question
             .as_any()
             .downcast_ref::<ConfirmationQuestion>()
             .is_some()
         {
-            text = shirabe_php_shim::sprintf(
-                " <info>%s (yes/no)</info> [<comment>%s</comment>]:",
-                &[
-                    PhpMixed::String(text),
-                    PhpMixed::String(
-                        if shirabe_php_shim::boolval(&default) {
-                            "yes"
-                        } else {
-                            "no"
-                        }
-                        .to_string(),
-                    ),
-                ],
+            text = format!(
+                " <info>{} (yes/no)</info> [<comment>{}</comment>]:",
+                PhpMixed::String(text),
+                PhpMixed::String(
+                    if shirabe_php_shim::boolval(&default) {
+                        "yes"
+                    } else {
+                        "no"
+                    }
+                    .to_string(),
+                ),
             );
         } else if let Some(choice_question) = question
             .as_any()
@@ -78,38 +76,32 @@ impl SymfonyQuestionHelper {
                 })
                 .collect();
 
-            text = shirabe_php_shim::sprintf(
-                " <info>%s</info> [<comment>%s</comment>]:",
-                &[
-                    PhpMixed::String(text),
-                    PhpMixed::String(OutputFormatter::escape(&resolved.join(", ")).unwrap()),
-                ],
+            text = format!(
+                " <info>{}</info> [<comment>{}</comment>]:",
+                PhpMixed::String(text),
+                PhpMixed::String(OutputFormatter::escape(&resolved.join(", ")).unwrap()),
             );
         } else if let Some(choice_question) = question.as_any().downcast_ref::<ChoiceQuestion>() {
             let choices = choice_question.get_choices();
-            text = shirabe_php_shim::sprintf(
-                " <info>%s</info> [<comment>%s</comment>]:",
-                &[
-                    PhpMixed::String(text),
-                    PhpMixed::String(
-                        OutputFormatter::escape(
-                            &choices
-                                .get(&default.to_string())
-                                .map(|v| (**v).clone())
-                                .unwrap_or(default.clone())
-                                .to_string(),
-                        )
-                        .unwrap(),
-                    ),
-                ],
+            text = format!(
+                " <info>{}</info> [<comment>{}</comment>]:",
+                PhpMixed::String(text),
+                PhpMixed::String(
+                    OutputFormatter::escape(
+                        &choices
+                            .get(&default.to_string())
+                            .map(|v| (**v).clone())
+                            .unwrap_or(default.clone())
+                            .to_string(),
+                    )
+                    .unwrap(),
+                ),
             );
         } else {
-            text = shirabe_php_shim::sprintf(
-                " <info>%s</info> [<comment>%s</comment>]:",
-                &[
-                    PhpMixed::String(text),
-                    PhpMixed::String(OutputFormatter::escape(&default.to_string()).unwrap()),
-                ],
+            text = format!(
+                " <info>{}</info> [<comment>{}</comment>]:",
+                PhpMixed::String(text),
+                PhpMixed::String(OutputFormatter::escape(&default.to_string()).unwrap()),
             );
         }
 

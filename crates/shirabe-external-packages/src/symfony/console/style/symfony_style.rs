@@ -336,7 +336,7 @@ impl SymfonyStyle {
         let mut r#type = r#type.map(|t| t.to_string());
         let mut line_indentation = String::new();
         if let Some(t) = &r#type {
-            let formatted = shirabe_php_shim::sprintf("[%s] ", &[PhpMixed::String(t.clone())]);
+            let formatted = format!("[{}] ", PhpMixed::String(t.clone()));
             indent_length = shirabe_php_shim::strlen(&formatted);
             line_indentation = shirabe_php_shim::str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
@@ -409,12 +409,10 @@ impl SymfonyStyle {
             ));
 
             if let Some(style) = style {
-                *line = shirabe_php_shim::sprintf(
-                    "<%s>%s</>",
-                    &[
-                        PhpMixed::String(style.to_string()),
-                        PhpMixed::String(line.clone()),
-                    ],
+                *line = format!(
+                    "<{}>{}</>",
+                    PhpMixed::String(style.to_string()),
+                    PhpMixed::String(line.clone()),
                 );
             }
         }
@@ -505,21 +503,19 @@ impl StyleInterface for SymfonyStyle {
         self.auto_prepend_block();
         self.writeln(
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String(shirabe_php_shim::sprintf(
-                    "<comment>%s</>",
-                    &[PhpMixed::String(
-                        OutputFormatter::escape_trailing_backslash(message),
-                    )],
+                Box::new(PhpMixed::String(format!(
+                    "<comment>{}</>",
+                    PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
                 ))),
-                Box::new(PhpMixed::String(shirabe_php_shim::sprintf(
-                    "<comment>%s</>",
-                    &[PhpMixed::String(shirabe_php_shim::str_repeat(
+                Box::new(PhpMixed::String(format!(
+                    "<comment>{}</>",
+                    PhpMixed::String(shirabe_php_shim::str_repeat(
                         "=",
                         Helper::width(&Helper::remove_decoration(
                             &mut *self.get_formatter().borrow_mut(),
                             message,
                         )) as usize,
-                    ))],
+                    )),
                 ))),
             ]),
             OUTPUT_NORMAL,
@@ -532,21 +528,19 @@ impl StyleInterface for SymfonyStyle {
         self.auto_prepend_block();
         self.writeln(
             PhpMixed::List(vec![
-                Box::new(PhpMixed::String(shirabe_php_shim::sprintf(
-                    "<comment>%s</>",
-                    &[PhpMixed::String(
-                        OutputFormatter::escape_trailing_backslash(message),
-                    )],
+                Box::new(PhpMixed::String(format!(
+                    "<comment>{}</>",
+                    PhpMixed::String(OutputFormatter::escape_trailing_backslash(message),),
                 ))),
-                Box::new(PhpMixed::String(shirabe_php_shim::sprintf(
-                    "<comment>%s</>",
-                    &[PhpMixed::String(shirabe_php_shim::str_repeat(
+                Box::new(PhpMixed::String(format!(
+                    "<comment>{}</>",
+                    PhpMixed::String(shirabe_php_shim::str_repeat(
                         "-",
                         Helper::width(&Helper::remove_decoration(
                             &mut *self.get_formatter().borrow_mut(),
                             message,
                         )) as usize,
-                    ))],
+                    )),
                 ))),
             ]),
             OUTPUT_NORMAL,
@@ -558,9 +552,7 @@ impl StyleInterface for SymfonyStyle {
     fn listing(&mut self, elements: Vec<PhpMixed>) {
         self.auto_prepend_text();
         let elements: Vec<PhpMixed> = shirabe_php_shim::array_map(
-            |element: &PhpMixed| {
-                PhpMixed::String(shirabe_php_shim::sprintf(" * %s", &[element.clone()]))
-            },
+            |element: &PhpMixed| PhpMixed::String(format!(" * {}", element.clone())),
             &elements,
         );
 
@@ -582,10 +574,7 @@ impl StyleInterface for SymfonyStyle {
             vec![message]
         };
         for message in messages {
-            self.writeln(
-                PhpMixed::String(shirabe_php_shim::sprintf(" %s", &[message])),
-                OUTPUT_NORMAL,
-            );
+            self.writeln(PhpMixed::String(format!(" {}", message)), OUTPUT_NORMAL);
         }
     }
 

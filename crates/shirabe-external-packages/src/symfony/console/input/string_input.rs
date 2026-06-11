@@ -102,13 +102,9 @@ impl StringInput {
                 // should never happen
                 return Err(
                     InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: shirabe_php_shim::sprintf(
-                            "Unable to parse input near \"... %s ...\".",
-                            &[PhpMixed::String(shirabe_php_shim::substr(
-                                input,
-                                cursor,
-                                Some(10),
-                            ))],
+                        message: format!(
+                            "Unable to parse input near \"... {} ...\".",
+                            PhpMixed::String(shirabe_php_shim::substr(input, cursor, Some(10),)),
                         ),
                         code: 0,
                     })

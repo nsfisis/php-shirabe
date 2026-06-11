@@ -906,9 +906,9 @@ impl InitCommand {
                 if !Preg::is_match(r"{^[^/][A-Za-z0-9\-_/]+/$}", &value_or_default).unwrap_or(false)
                 {
                     return Err(InvalidArgumentException {
-                        message: sprintf(
-                            "The src folder name \"%s\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
-                            &[PhpMixed::String(value_or_default.clone())],
+                        message: format!(
+                            "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",
+                            PhpMixed::String(value_or_default.clone()),
                         ),
                         code: 0,
                     }
@@ -1057,9 +1057,9 @@ impl InitCommand {
             return false;
         }
 
-        let pattern = sprintf(
-            "{^/?%s(/\\*?)?$}",
-            &[PhpMixed::String(preg_quote(vendor, None))],
+        let pattern = format!(
+            "{{^/?{}(/\\*?)?$}}",
+            PhpMixed::String(preg_quote(vendor, None)),
         );
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
@@ -1240,9 +1240,10 @@ impl InitCommand {
         }
 
         if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Some(sprintf(
-                "%s <%s>",
-                &[PhpMixed::String(name), PhpMixed::String(email)],
+            return Some(format!(
+                "{} <{}>",
+                PhpMixed::String(name),
+                PhpMixed::String(email),
             ));
         }
 

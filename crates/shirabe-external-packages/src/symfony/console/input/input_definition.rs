@@ -90,9 +90,9 @@ impl InputDefinition {
 
         if self.arguments.contains_key(argument.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: shirabe_php_shim::sprintf(
-                    "An argument with name \"%s\" already exists.",
-                    &[PhpMixed::String(argument.get_name().to_string())],
+                message: format!(
+                    "An argument with name \"{}\" already exists.",
+                    PhpMixed::String(argument.get_name().to_string()),
                 ),
                 code: 0,
             })
@@ -101,12 +101,10 @@ impl InputDefinition {
 
         if let Some(last_array_argument) = &self.last_array_argument {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: shirabe_php_shim::sprintf(
-                    "Cannot add a required argument \"%s\" after an array argument \"%s\".",
-                    &[
-                        PhpMixed::String(argument.get_name().to_string()),
-                        PhpMixed::String(last_array_argument.get_name().to_string()),
-                    ],
+                message: format!(
+                    "Cannot add a required argument \"{}\" after an array argument \"{}\".",
+                    PhpMixed::String(argument.get_name().to_string()),
+                    PhpMixed::String(last_array_argument.get_name().to_string()),
                 ),
                 code: 0,
             })
@@ -116,12 +114,10 @@ impl InputDefinition {
         if argument.is_required() {
             if let Some(last_optional_argument) = &self.last_optional_argument {
                 return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: shirabe_php_shim::sprintf(
-                        "Cannot add a required argument \"%s\" after an optional one \"%s\".",
-                        &[
-                            PhpMixed::String(argument.get_name().to_string()),
-                            PhpMixed::String(last_optional_argument.get_name().to_string()),
-                        ],
+                    message: format!(
+                        "Cannot add a required argument \"{}\" after an optional one \"{}\".",
+                        PhpMixed::String(argument.get_name().to_string()),
+                        PhpMixed::String(last_optional_argument.get_name().to_string()),
                     ),
                     code: 0,
                 })
@@ -150,10 +146,7 @@ impl InputDefinition {
         if !self.has_argument(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"%s\" argument does not exist.",
-                        &[name.clone()],
-                    ),
+                    message: format!("The \"{}\" argument does not exist.", name.clone(),),
                     code: 0,
                 })
                 .into(),
@@ -240,9 +233,9 @@ impl InputDefinition {
         if let Some(existing) = self.options.get(option.get_name()) {
             if !option.equals(existing) {
                 return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: shirabe_php_shim::sprintf(
-                        "An option named \"%s\" already exists.",
-                        &[PhpMixed::String(option.get_name().to_string())],
+                    message: format!(
+                        "An option named \"{}\" already exists.",
+                        PhpMixed::String(option.get_name().to_string()),
                     ),
                     code: 0,
                 })
@@ -251,9 +244,9 @@ impl InputDefinition {
         }
         if self.negations.contains_key(option.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
-                message: shirabe_php_shim::sprintf(
-                    "An option named \"%s\" already exists.",
-                    &[PhpMixed::String(option.get_name().to_string())],
+                message: format!(
+                    "An option named \"{}\" already exists.",
+                    PhpMixed::String(option.get_name().to_string()),
                 ),
                 code: 0,
             })
@@ -265,9 +258,9 @@ impl InputDefinition {
                 if let Some(existing_name) = self.shortcuts.get(&shortcut) {
                     if !option.equals(&self.options[existing_name]) {
                         return Err(LogicException(shirabe_php_shim::LogicException {
-                            message: shirabe_php_shim::sprintf(
-                                "An option with shortcut \"%s\" already exists.",
-                                &[PhpMixed::String(shortcut.clone())],
+                            message: format!(
+                                "An option with shortcut \"{}\" already exists.",
+                                PhpMixed::String(shortcut.clone()),
                             ),
                             code: 0,
                         })
@@ -290,9 +283,9 @@ impl InputDefinition {
             let negated_name = format!("no-{}", option.get_name());
             if self.options.contains_key(&negated_name) {
                 return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: shirabe_php_shim::sprintf(
-                        "An option named \"%s\" already exists.",
-                        &[PhpMixed::String(negated_name.clone())],
+                    message: format!(
+                        "An option named \"{}\" already exists.",
+                        PhpMixed::String(negated_name.clone()),
                     ),
                     code: 0,
                 })
@@ -310,9 +303,9 @@ impl InputDefinition {
         if !self.has_option(name) {
             return Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"--%s\" option does not exist.",
-                        &[PhpMixed::String(name.to_string())],
+                    message: format!(
+                        "The \"--{}\" option does not exist.",
+                        PhpMixed::String(name.to_string()),
                     ),
                     code: 0,
                 })
@@ -365,9 +358,9 @@ impl InputDefinition {
         match self.shortcuts.get(shortcut) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"-%s\" option does not exist.",
-                        &[PhpMixed::String(shortcut.to_string())],
+                    message: format!(
+                        "The \"-{}\" option does not exist.",
+                        PhpMixed::String(shortcut.to_string()),
                     ),
                     code: 0,
                 })
@@ -382,9 +375,9 @@ impl InputDefinition {
         match self.negations.get(negation) {
             None => Err(
                 InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                    message: shirabe_php_shim::sprintf(
-                        "The \"--%s\" option does not exist.",
-                        &[PhpMixed::String(negation.to_string())],
+                    message: format!(
+                        "The \"--{}\" option does not exist.",
+                        PhpMixed::String(negation.to_string()),
                     ),
                     code: 0,
                 })
@@ -404,46 +397,39 @@ impl InputDefinition {
             for option in self.get_options().values() {
                 let mut value = String::new();
                 if option.accept_value() {
-                    value = shirabe_php_shim::sprintf(
-                        " %s%s%s",
-                        &[
-                            PhpMixed::String(if option.is_value_optional() {
-                                "[".to_string()
-                            } else {
-                                String::new()
-                            }),
-                            PhpMixed::String(shirabe_php_shim::strtoupper(option.get_name())),
-                            PhpMixed::String(if option.is_value_optional() {
-                                "]".to_string()
-                            } else {
-                                String::new()
-                            }),
-                        ],
+                    value = format!(
+                        " {}{}{}",
+                        PhpMixed::String(if option.is_value_optional() {
+                            "[".to_string()
+                        } else {
+                            String::new()
+                        }),
+                        PhpMixed::String(shirabe_php_shim::strtoupper(option.get_name())),
+                        PhpMixed::String(if option.is_value_optional() {
+                            "]".to_string()
+                        } else {
+                            String::new()
+                        }),
                     );
                 }
 
                 let shortcut = match option.get_shortcut() {
                     Some(shortcut) => {
-                        shirabe_php_shim::sprintf("-%s|", &[PhpMixed::String(shortcut.to_string())])
+                        format!("-{}|", PhpMixed::String(shortcut.to_string()))
                     }
                     None => String::new(),
                 };
                 let negation = if option.is_negatable() {
-                    shirabe_php_shim::sprintf(
-                        "|--no-%s",
-                        &[PhpMixed::String(option.get_name().to_string())],
-                    )
+                    format!("|--no-{}", PhpMixed::String(option.get_name().to_string()),)
                 } else {
                     String::new()
                 };
-                elements.push(shirabe_php_shim::sprintf(
-                    "[%s--%s%s%s]",
-                    &[
-                        PhpMixed::String(shortcut),
-                        PhpMixed::String(option.get_name().to_string()),
-                        PhpMixed::String(value),
-                        PhpMixed::String(negation),
-                    ],
+                elements.push(format!(
+                    "[{}--{}{}{}]",
+                    PhpMixed::String(shortcut),
+                    PhpMixed::String(option.get_name().to_string()),
+                    PhpMixed::String(value),
+                    PhpMixed::String(negation),
                 ));
             }
         }

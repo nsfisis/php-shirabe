@@ -27,24 +27,29 @@ impl PhpFileParser {
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
         let contents = php_strip_whitespace(path);
         if contents.is_empty() {
-            let message: &str;
+            let message: String;
             if !file_exists(path) {
-                message = "File at \"%s\" does not exist, check your classmap definitions";
+                message = format!(
+                    "File at \"{}\" does not exist, check your classmap definitions",
+                    path
+                );
             } else if !Self::is_readable(path) {
-                message = "File at \"%s\" is not readable, check its permissions";
+                message = format!(
+                    "File at \"{}\" is not readable, check its permissions",
+                    path
+                );
             } else if trim(file_get_contents(path).unwrap_or_default().as_str(), None).is_empty() {
                 // The input file was really empty and thus contains no classes
                 return Ok(vec![]);
             } else {
-                message =
-                    "File at \"%s\" could not be parsed as PHP, it may be binary or corrupted";
+                message = format!(
+                    "File at \"{}\" could not be parsed as PHP, it may be binary or corrupted",
+                    path
+                );
             }
 
             let error = error_get_last();
-            let mut message = sprintf(
-                message,
-                &[shirabe_php_shim::PhpMixed::String(path.to_string())],
-            );
+            let mut message = message;
             if let Some(error) = error
                 && let Some(err_msg) = error.get("message")
             {

@@ -649,7 +649,7 @@ impl ConfigCommand {
 
             if !boolean_validator(&PhpMixed::String(values[0].clone())) {
                 return Err(RuntimeException {
-                    message: sprintf("\"%s\" is an invalid value", &[values[0].clone().into()]),
+                    message: format!("\"{}\" is an invalid value", values[0].clone()),
                     code: 0,
                 }
                 .into());
@@ -1169,10 +1169,7 @@ impl ConfigCommand {
                 String::new()
             };
             return Err(RuntimeException {
-                message: sprintf(
-                    &format!("\"%s\" is an invalid value{}", suffix),
-                    &[values[0].clone().into()],
-                ),
+                message: format!("\"{}\" is an invalid value{}", values[0].clone(), suffix),
                 code: 0,
             }
             .into());
@@ -1239,9 +1236,10 @@ impl ConfigCommand {
                 String::new()
             };
             return Err(RuntimeException {
-                message: sprintf(
-                    &format!("%s is an invalid value{}", suffix),
-                    &[json_encode(&values_mixed).into()],
+                message: format!(
+                    "{} is an invalid value{}",
+                    PhpMixed::from(json_encode(&values_mixed)),
+                    suffix
                 ),
                 code: 0,
             }

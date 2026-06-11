@@ -155,11 +155,9 @@ impl ChoiceQuestion {
                 if results.len() > 1 {
                     return Err(InvalidArgumentException(
                         shirabe_php_shim::InvalidArgumentException {
-                            message: shirabe_php_shim::sprintf(
-                                "The provided answer is ambiguous. Value should be one of \"%s\".",
-                                &[PhpMixed::String(shirabe_php_shim::implode(
-                                    "\" or \"", &results,
-                                ))],
+                            message: format!(
+                                "The provided answer is ambiguous. Value should be one of \"{}\".",
+                                PhpMixed::String(shirabe_php_shim::implode("\" or \"", &results,)),
                             ),
                             code: 0,
                         },

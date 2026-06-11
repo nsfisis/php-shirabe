@@ -1086,21 +1086,19 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            &sprintf(
-                "Pool optimizer completed in %.3f seconds",
-                &[(microtime(true) - before).into()],
+            &format!(
+                "Pool optimizer completed in {:.3} seconds",
+                (microtime(true) - before),
             ),
             true,
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            &sprintf(
-                "<info>Found %s package versions referenced in your dependency graph. %s (%d%%) were optimized away.</info>",
-                &[
-                    number_format(total, 0, ".", ",").into(),
-                    number_format(filtered, 0, ".", ",").into(),
-                    round(100.0 / total * filtered, 0).into(),
-                ],
+            &format!(
+                "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>",
+                number_format(total, 0, ".", ","),
+                number_format(filtered, 0, ".", ","),
+                round(100.0 / total * filtered, 0),
             ),
             true,
             io_interface::VERY_VERBOSE,
@@ -1138,21 +1136,19 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            &sprintf(
-                "Security advisory pool filter completed in %.3f seconds",
-                &[(microtime(true) - before).into()],
+            &format!(
+                "Security advisory pool filter completed in {:.3} seconds",
+                (microtime(true) - before),
             ),
             true,
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            &sprintf(
-                "<info>Found %s package versions referenced in your dependency graph. %s (%d%%) were filtered away.</info>",
-                &[
-                    number_format(total, 0, ".", ",").into(),
-                    number_format(filtered, 0, ".", ",").into(),
-                    round(100.0 / total * filtered, 0).into(),
-                ],
+            &format!(
+                "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>",
+                number_format(total, 0, ".", ","),
+                number_format(filtered, 0, ".", ","),
+                round(100.0 / total * filtered, 0),
             ),
             true,
             io_interface::VERY_VERBOSE,
