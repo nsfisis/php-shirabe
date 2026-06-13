@@ -13,11 +13,6 @@ use shirabe_external_packages::symfony::console::command::signalable_command_int
 use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
 use shirabe_external_packages::symfony::console::completion::completion_input::CompletionInput;
 use shirabe_external_packages::symfony::console::completion::completion_suggestions::CompletionSuggestions;
-use shirabe_external_packages::symfony::console::console_events::ConsoleEvents;
-use shirabe_external_packages::symfony::console::event::console_command_event::ConsoleCommandEvent;
-use shirabe_external_packages::symfony::console::event::console_error_event::ConsoleErrorEvent;
-use shirabe_external_packages::symfony::console::event::console_signal_event::ConsoleSignalEvent;
-use shirabe_external_packages::symfony::console::event::console_terminate_event::ConsoleTerminateEvent;
 use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
 use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
 use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
@@ -53,7 +48,6 @@ use shirabe_external_packages::symfony::console::signal_registry::signal_registr
 use shirabe_external_packages::symfony::console::style::style_interface::StyleInterface;
 use shirabe_external_packages::symfony::console::style::symfony_style::SymfonyStyle;
 use shirabe_external_packages::symfony::console::terminal::Terminal;
-use shirabe_external_packages::symfony::contracts::event_dispatcher::event_dispatcher_interface::EventDispatcherInterface;
 use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
@@ -136,7 +130,6 @@ pub struct Application {
     auto_exit: bool,
     definition: Option<std::rc::Rc<std::cell::RefCell<InputDefinition>>>,
     helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
-    dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
     terminal: Terminal,
     default_command: String,
     single_command: bool,
@@ -207,7 +200,6 @@ impl Application {
             auto_exit: true,
             definition: None,
             helper_set: None,
-            dispatcher: None,
             terminal: Terminal::new(),
             default_command: "list".to_string(),
             single_command: false,
@@ -1298,15 +1290,6 @@ impl Application {
 /// are carried here under a `base_` prefix (`base_run`, `base_do_run`, `base_get_help`,
 /// `base_get_default_input_definition`, `base_get_default_commands`).
 impl Application {
-    /// @final
-    pub fn set_dispatcher(
-        &mut self,
-        dispatcher: std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>,
-    ) {
-        // TODO(plugin): the event dispatcher drives ConsoleEvents listeners (plugins).
-        self.dispatcher = Some(dispatcher);
-    }
-
     pub fn set_command_loader(&mut self, command_loader: Box<dyn CommandLoaderInterface>) {
         self.command_loader = Some(command_loader);
     }
@@ -1515,29 +1498,6 @@ impl Application {
                 };
 
                 if single_alternative.is_none() || !input.borrow().is_interactive() {
-                    let mut e = e;
-                    if self.dispatcher.is_some() {
-                        // TODO(plugin): dispatch ConsoleErrorEvent so listeners can handle/replace the error.
-                        let _event = ConsoleErrorEvent::new(
-                            todo!("wrap input as Box<dyn InputInterface> for the event"),
-                            todo!("wrap output as Box<dyn OutputInterface> for the event"),
-                            todo!("wrap anyhow::Error as Box<dyn Error> for the event"),
-                            None,
-                        );
-                        let event: ConsoleErrorEvent = _event;
-                        self.dispatcher
-                            .as_ref()
-                            .unwrap()
-                            .borrow_mut()
-                            .dispatch(todo!("event object"), ConsoleEvents::ERROR);
-
-                        if event.get_exit_code() == 0 {
-                            return Ok(0);
-                        }
-
-                        e = todo!("event.get_error() converted back to anyhow::Error");
-                    }
-
                     return Err(e);
                 }
 
@@ -1565,23 +1525,6 @@ impl Application {
                     ),
                     false,
                 ) {
-                    if self.dispatcher.is_some() {
-                        // TODO(plugin): dispatch ConsoleErrorEvent for the declined-alternative case.
-                        let event = ConsoleErrorEvent::new(
-                            todo!("wrap input as Box<dyn InputInterface>"),
-                            todo!("wrap output as Box<dyn OutputInterface>"),
-                            todo!("wrap error as Box<dyn Error>"),
-                            None,
-                        );
-                        self.dispatcher
-                            .as_ref()
-                            .unwrap()
-                            .borrow_mut()
-                            .dispatch(todo!("event object"), ConsoleEvents::ERROR);
-
-                        return Ok(event.get_exit_code());
-                    }
-
                     return Ok(1);
                 }
 
@@ -2471,7 +2414,7 @@ impl Application {
             let command_signals: Vec<i64> = Vec::new();
             let _ = std::marker::PhantomData::<dyn SignalableCommandInterface>;
 
-            if !command_signals.is_empty() || self.dispatcher.is_some() {
+            if !command_signals.is_empty() {
                 if self.signal_registry.is_none() {
                     return Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
                         message: "Unable to subscribe to signal events. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
@@ -2491,58 +2434,16 @@ impl Application {
                 }
             }
 
-            if self.dispatcher.is_some() {
-                // TODO(plugin): for each signal, register a handler that dispatches ConsoleSignalEvent.
-                for &signal in &self.signals_to_dispatch_event.clone() {
-                    let _event = ConsoleSignalEvent::new(
-                        todo!("Box<dyn SymfonyCommand>"),
-                        todo!("Box<dyn InputInterface>"),
-                        todo!("Box<dyn OutputInterface>"),
-                        signal,
-                    );
-                    todo!("register signal handler dispatching ConsoleEvents::SIGNAL");
-                }
-            }
-
             for _signal in command_signals {
                 // $this->signalRegistry->register($signal, [$command, 'handleSignal']);
                 todo!("register command->handle_signal as signal handler");
             }
         }
 
-        if self.dispatcher.is_none() {
-            return command.borrow_mut().run(
-                &mut *borrow_input_mut(&input),
-                &mut *borrow_output_mut(&output),
-            );
-        }
-
-        // bind before the console.command event, so the listeners have access to input options/arguments
-        match (|| -> anyhow::Result<()> {
-            command.borrow_mut().merge_application_definition(true);
-            input.borrow_mut().bind(command.borrow().get_definition())?;
-            Ok(())
-        })() {
-            Ok(()) => {}
-            Err(e) => {
-                // ignore invalid options/arguments for now, to allow the event listeners to customize the InputDefinition
-                if !is_exception_interface(&e) {
-                    return Err(e);
-                }
-            }
-        }
-
-        // TODO(plugin): the whole dispatcher block below drives ConsoleCommandEvent /
-        // ConsoleErrorEvent / ConsoleTerminateEvent. The event objects require Box<dyn ...>
-        // wrappers for input/output/command and the dispatcher's dispatch() contract; their
-        // construction is left to the plugin/event design.
-        let _ = ConsoleCommandEvent::RETURN_CODE_DISABLED;
-        let _ = std::marker::PhantomData::<(
-            ConsoleCommandEvent,
-            ConsoleErrorEvent,
-            ConsoleTerminateEvent,
-        )>;
-        todo!("dispatcher-driven command run (console.command / console.error / console.terminate)")
+        command.borrow_mut().run(
+            &mut *borrow_input_mut(&input),
+            &mut *borrow_output_mut(&output),
+        )
     }
 
     /// Gets the name of the command based on input.
