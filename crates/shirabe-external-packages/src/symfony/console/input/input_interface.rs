@@ -2,6 +2,9 @@ use crate::symfony::console::input::input_definition::InputDefinition;
 use shirabe_php_shim::PhpMixed;
 
 pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
+    /// Models PHP's `clone` operatior.
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
+
     fn get_first_argument(&self) -> Option<String>;
 
     fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool;

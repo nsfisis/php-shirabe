@@ -24,7 +24,7 @@ use shirabe_php_shim::PhpMixed;
 /// When passing an argument to the constructor, be sure that it respects
 /// the same rules as the argv one. It's almost always better to use the
 /// `StringInput` when you want to provide your own input.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArgvInput {
     pub(crate) inner: Input,
     tokens: Vec<String>,
@@ -543,6 +543,10 @@ impl ArgvInput {
 }
 
 impl InputInterface for ArgvInput {
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
+        std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
+    }
+
     fn get_first_argument(&self) -> Option<String> {
         ArgvInput::get_first_argument(self)
     }

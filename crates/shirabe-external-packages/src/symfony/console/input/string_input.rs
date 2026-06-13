@@ -10,7 +10,7 @@ use shirabe_php_shim::PhpMixed;
 /// Usage:
 ///
 ///     $input = new StringInput('foo --bar="foobar"');
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringInput {
     pub(crate) inner: ArgvInput,
 }
@@ -122,6 +122,10 @@ impl StringInput {
 }
 
 impl InputInterface for StringInput {
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
+        std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
+    }
+
     fn get_first_argument(&self) -> Option<String> {
         self.inner.get_first_argument()
     }

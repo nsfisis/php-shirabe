@@ -1,4 +1,5 @@
 //! ref: composer/src/Composer/Console/Application.php
+//! ref: composer/vendor/symfony/console/Application.php
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
@@ -19,7 +20,10 @@ use shirabe_external_packages::symfony::console::event::console_signal_event::Co
 use shirabe_external_packages::symfony::console::event::console_terminate_event::ConsoleTerminateEvent;
 use shirabe_external_packages::symfony::console::exception::CommandNotFoundException;
 use shirabe_external_packages::symfony::console::exception::ExceptionInterface;
+use shirabe_external_packages::symfony::console::exception::invalid_argument_exception::InvalidArgumentException as ConsoleInvalidArgumentException;
+use shirabe_external_packages::symfony::console::exception::invalid_option_exception::InvalidOptionException;
 use shirabe_external_packages::symfony::console::exception::logic_exception::LogicException as ConsoleLogicException;
+use shirabe_external_packages::symfony::console::exception::missing_input_exception::MissingInputException;
 use shirabe_external_packages::symfony::console::exception::namespace_not_found_exception::NamespaceNotFoundException;
 use shirabe_external_packages::symfony::console::exception::runtime_exception::RuntimeException as ConsoleRuntimeException;
 use shirabe_external_packages::symfony::console::formatter::output_formatter::OutputFormatter;
@@ -53,7 +57,7 @@ use shirabe_external_packages::symfony::contracts::event_dispatcher::event_dispa
 use shirabe_external_packages::symfony::process::exception::ProcessTimedOutException;
 use shirabe_php_shim::{
     LogicException as ShimLogicException, PHP_BINARY, PHP_VERSION, PHP_VERSION_ID, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_merge, bin2hex, chdir, clone, count,
+    RuntimeException, UnexpectedValueException, array_merge, bin2hex, chdir, count,
     date_default_timezone_get, date_default_timezone_set, defined, dirname, disk_free_space,
     error_get_last, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, get_class, getcwd, getmypid, glob, in_array, ini_set, is_array, is_dir,
@@ -324,7 +328,7 @@ impl Application {
 
         // determine command name to be executed without including plugin commands
         let mut command_name: Option<String> = Some(String::new());
-        let raw_command_name = self.get_command_name_before_binding(input.clone());
+        let raw_command_name = self.get_command_name_before_binding(input.clone())?;
         if let Some(ref raw) = raw_command_name {
             match self.find(raw) {
                 Ok(cmd) => {
@@ -567,7 +571,7 @@ impl Application {
 
         // determine command name to be executed incl plugin commands, and check if it's a proxy command
         let is_proxy_command = false;
-        if let Some(ref name) = self.get_command_name_before_binding(input.clone()) {
+        if let Some(ref name) = self.get_command_name_before_binding(input.clone())? {
             if let Ok(command) = self.find(name) {
                 // TODO(phase-c): same blocker as the earlier find() call — the Symfony command
                 // registry is a PhpMixed/todo!() stub, so the resolved command's name and its
@@ -1161,21 +1165,25 @@ impl Application {
     }
 
     /// This ensures we can find the correct command name even if a global input option is present before it
+    ///
+    /// e.g. "composer -d foo bar" should detect bar as the command name, and not foo
     fn get_command_name_before_binding(
-        &self,
+        &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Option<String> {
-        let mut input = clone(&input);
+    ) -> anyhow::Result<Option<String>> {
+        let input = input.borrow().dup();
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
-        // PHP: $input = clone $input; try { $input->bind($this->getDefinition()); } catch (...) {}
-        //      return $input->getFirstArgument();
-        // TODO(phase-c): two blockers. (1) PHP clones the input so binding does not mutate the
-        // caller's instance; the `clone` php-shim must stay todo!() and dyn InputInterface has no
-        // deep-clone, so we cannot produce an independent copy to bind. (2) $this->getDefinition()
-        // returns the application's typed InputDefinition, but the Symfony Application stub returns
-        // PhpMixed. Until both land, getFirstArgument cannot be computed and we return None.
-        let _ = input;
-        None
+        match input.borrow_mut().bind(&self.get_definition().borrow()) {
+            Ok(()) => {}
+            Err(e) => {
+                // Errors must be ignored, full binding/validation happens later when the command is known.
+                if !is_exception_interface(&e) {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(input.borrow().get_first_argument())
     }
 
     pub fn get_long_version(&self) -> String {
@@ -2925,6 +2933,10 @@ fn is_exception_interface(e: &anyhow::Error) -> bool {
         || e.downcast_ref::<NamespaceNotFoundException>().is_some()
         || e.downcast_ref::<ConsoleLogicException>().is_some()
         || e.downcast_ref::<ConsoleRuntimeException>().is_some()
+        || e.downcast_ref::<ConsoleInvalidArgumentException>()
+            .is_some()
+        || e.downcast_ref::<InvalidOptionException>().is_some()
+        || e.downcast_ref::<MissingInputException>().is_some()
 }
 
 /// Helper mirroring PHP's `$e instanceof CommandNotFoundException`.

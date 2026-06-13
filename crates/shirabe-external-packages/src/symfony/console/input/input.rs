@@ -11,7 +11,7 @@ use shirabe_php_shim::PhpMixed;
 ///  * `ArgvInput`: The input comes from the CLI arguments (argv)
 ///  * `StringInput`: The input is provided as a string
 ///  * `ArrayInput`: The input is provided as an array
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Input {
     pub(crate) definition: InputDefinition,
     pub(crate) stream: PhpMixed,

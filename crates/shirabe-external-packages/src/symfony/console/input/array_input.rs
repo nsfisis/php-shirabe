@@ -14,7 +14,7 @@ use shirabe_php_shim::PhpMixed;
 ///
 /// PHP arrays can mix integer and string keys; `parameters` preserves both the
 /// key type (`PhpMixed::Int` / `PhpMixed::String`) and the insertion order.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ArrayInput {
     pub(crate) inner: Input,
     parameters: Vec<(PhpMixed, PhpMixed)>,
@@ -298,6 +298,10 @@ impl ArrayInput {
 }
 
 impl InputInterface for ArrayInput {
+    fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>> {
+        std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
+    }
+
     fn get_first_argument(&self) -> Option<String> {
         ArrayInput::get_first_argument(self).map(|v| shirabe_php_shim::php_to_string(&v))
     }
