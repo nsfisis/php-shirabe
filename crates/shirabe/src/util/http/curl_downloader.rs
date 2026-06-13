@@ -20,9 +20,8 @@ use shirabe_php_shim::{
     curl_multi_select, curl_multi_setopt, curl_setopt, curl_setopt_array, curl_share_init,
     curl_share_setopt, curl_strerror, curl_version, defined, explode, fclose, fopen,
     function_exists, implode, in_array, ini_get, is_resource, json_decode, max, parse_url,
-    preg_quote, rename, restore_error_handler, rewind, rtrim, set_error_handler_closure, sprintf,
-    str_contains, stream_get_contents, stream_get_contents_with_max, stripos, strpos, substr,
-    unlink_silent, usleep, var_export,
+    preg_quote, rename, rewind, rtrim, sprintf, str_contains, stream_get_contents,
+    stream_get_contents_with_max, stripos, strpos, substr, unlink_silent, usleep, var_export,
 };
 
 use crate::config::Config;
@@ -362,28 +361,18 @@ impl CurlDownloader {
             "php://temp/maxmemory:524288".to_string()
         };
 
-        let error_message: std::rc::Rc<std::cell::RefCell<String>> =
-            std::rc::Rc::new(std::cell::RefCell::new(String::new()));
-        {
-            let error_message = error_message.clone();
-            set_error_handler_closure(Box::new(move |_code: i64, msg: &str| -> bool {
-                let mut em = error_message.borrow_mut();
-                if !em.is_empty() {
-                    em.push_str("\n");
-                }
-                em.push_str(&Preg::replace(r"{^fopen\(.*?\): }", "", msg).unwrap_or_default());
-                true
-            }));
-        }
+        // TODO(phase-c): PHP wraps this fopen in a set_error_handler to capture the warning text
+        // (stripping the "fopen(...): " prefix) into the message. Rust I/O reports failures through
+        // return values, not warnings, so error_message stays empty until fopen surfaces its reason.
+        let error_message = String::new();
         let body_handle = fopen(&body_target, "w+b");
-        restore_error_handler();
         if matches!(body_handle, PhpMixed::Bool(false)) {
             return Ok(Err(TransportException::new(
                 format!(
                     "The \"{}\" file could not be written to {}: {}",
                     url,
                     copy_to.unwrap_or("a temporary file"),
-                    error_message.borrow()
+                    error_message
                 ),
                 0,
             )));

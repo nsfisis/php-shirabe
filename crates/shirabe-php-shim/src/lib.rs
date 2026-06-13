@@ -1239,9 +1239,8 @@ pub fn include_file(file: &str) -> PhpMixed {
     todo!()
 }
 
-pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {
-    todo!()
-}
+// TODO(php-runtime): the callback should be registered in PHP runtime.
+pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {}
 
 pub fn debug_backtrace() -> Vec<IndexMap<String, Box<PhpMixed>>> {
     todo!()
@@ -1595,12 +1594,6 @@ pub fn curl_handle_id(_handle: &CurlHandle) -> i64 {
 }
 
 pub fn restore_error_handler() {
-    todo!()
-}
-
-/// Closure-capturing variant of PHP `set_error_handler()`.
-pub fn set_error_handler_closure(callback: Box<dyn FnMut(i64, &str) -> bool>) {
-    let _ = callback;
     todo!()
 }
 

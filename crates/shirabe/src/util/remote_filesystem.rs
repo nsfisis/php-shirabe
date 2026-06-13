@@ -8,8 +8,8 @@ use shirabe_php_shim::{
     RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
     array_replace_recursive, base64_encode, explode, extension_loaded, file_put_contents,
     filter_var, gethostbyname, http_clear_last_response_headers, http_get_last_response_headers,
-    ini_get, json_decode, parse_url, preg_quote, restore_error_handler, set_error_handler, sprintf,
-    strpos, strtolower, strtr, substr, trim, zlib_decode,
+    ini_get, json_decode, parse_url, preg_quote, sprintf, strpos, strtolower, strtr, substr, trim,
+    zlib_decode,
 };
 
 use crate::config::Config;
@@ -307,15 +307,9 @@ impl RemoteFilesystem {
         let mut error_message = String::new();
         let error_code = 0_i64;
         let mut result: Option<String> = None;
-        // TODO(phase-c): faithfully accumulating the file_get_contents warnings into
-        // error_message requires PHP's set_error_handler runtime mechanism — a global handler the
-        // stream layer invokes per warning, appending into error_message by &-reference.
-        // set_error_handler / restore_error_handler are php-shim functions that must stay todo!(),
-        // and get_remote_contents does not surface low-level read warnings through such a side
-        // channel, so error_message stays empty here. Resolving this needs a thread-local
-        // error-handler stack wired into the I/O layer.
-        set_error_handler(|_code, _msg, _file, _line| true);
-
+        // TODO(phase-c): PHP captures file_get_contents warnings here via set_error_handler. Rust
+        // reports I/O failures through return values rather than warnings, so error_message stays
+        // empty until get_remote_contents surfaces a read reason.
         let mut http_response_header: Vec<String> = Vec::new();
         let inner_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
             result = self.get_remote_contents(
@@ -429,7 +423,6 @@ impl RemoteFilesystem {
                 error_message
             );
         }
-        restore_error_handler();
         if let Some(e) = caught_e {
             if !self.retry {
                 let msg_owned = format!("{}", e);
@@ -616,15 +609,12 @@ impl RemoteFilesystem {
                 )));
             }
 
+            // TODO(phase-c): PHP captures the file_put_contents warning here via set_error_handler
+            // (see the get() reads above); Rust reports the failure through the return value, so
+            // put_error_message stays empty until file_put_contents surfaces a write reason.
             let put_error_message = String::new();
-            // TODO(phase-c): capturing the file_put_contents warning into put_error_message
-            // requires PHP's set_error_handler runtime mechanism (see the get() method above);
-            // set_error_handler is a php-shim that must stay todo!() and file_put_contents does not
-            // surface its warning text here, so put_error_message stays empty.
-            set_error_handler(|_code, _msg, _file, _line| true);
             let write_result =
                 file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());
-            restore_error_handler();
             if write_result.is_none() {
                 return Err(anyhow::anyhow!(TransportException::new(
                     format!(
