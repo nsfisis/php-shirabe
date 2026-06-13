@@ -1,7 +1,6 @@
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
-use crate::symfony::contracts::service::reset_interface::ResetInterface;
 
 #[derive(Debug)]
 pub struct OutputFormatterStyleStack {
@@ -98,11 +97,8 @@ impl OutputFormatterStyleStack {
     pub fn get_empty_style(&self) -> &dyn OutputFormatterStyleInterface {
         self.empty_style.as_ref()
     }
-}
 
-impl ResetInterface for OutputFormatterStyleStack {
-    /// Resets stack (ie. empty internal arrays).
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.styles = vec![];
     }
 }

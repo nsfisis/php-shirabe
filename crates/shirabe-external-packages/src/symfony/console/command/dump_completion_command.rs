@@ -230,14 +230,14 @@ impl Command for DumpCompletionCommand {
 
     fn set_application(
         &mut self,
-        application: Option<Rc<RefCell<crate::symfony::console::application::Application>>>,
+        application: Option<Rc<RefCell<dyn crate::symfony::console::application::Application>>>,
     ) {
         self.inner.set_application(application);
     }
 
     fn get_application(
         &self,
-    ) -> Option<Rc<RefCell<crate::symfony::console::application::Application>>> {
+    ) -> Option<Rc<RefCell<dyn crate::symfony::console::application::Application>>> {
         self.inner.get_application()
     }
 

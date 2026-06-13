@@ -106,7 +106,7 @@ impl XmlDescriptor {
 
     pub fn get_application_document(
         &self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         namespace: Option<String>,
         short: bool,
     ) -> DOMDocument {
@@ -209,7 +209,7 @@ impl XmlDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let namespace = match options.get("namespace") {
@@ -420,7 +420,7 @@ impl Descriptor for XmlDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         XmlDescriptor::describe_application(self, application, options)

@@ -3,9 +3,6 @@
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
-use shirabe_external_packages::symfony::console::Application;
-use shirabe_external_packages::symfony::console::input::StringInput;
-use shirabe_external_packages::symfony::console::output::ConsoleOutput;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
 use shirabe_external_packages::symfony::process::PhpExecutableFinder;
 use shirabe_php_shim::{
@@ -573,64 +570,28 @@ impl EventDispatcher {
                             continue;
                         }
 
-                        let mut app = Application::__construct("UNKNOWN", "UNKNOWN");
-                        app.set_catch_exceptions(false);
-                        // PHP: if (method_exists($app, 'setCatchErrors')) { $app->setCatchErrors(false); }
-                        // This Symfony Console port does not provide `setCatchErrors`, so the
-                        // guarded call is skipped, matching `method_exists` evaluating to false.
-                        app.set_auto_exit(false);
-                        // TODO(plugin): instantiate command class dynamically: `new $className($event->getName())`
+                        // PHP hosts the user's Command class in a throwaway, bare
+                        // `Symfony\Component\Console\Application` (NOT Composer's Application):
+                        //   $app = new Application();
+                        //   $app->setCatchExceptions(false);
+                        //   $app->setAutoExit(false);
+                        //   $cmd = new $className($event->getName());
+                        //   $app->add($cmd);
+                        //   $app->setDefaultCommand((string) $cmd->getName(), true);
+                        //   $return = $app->run(new StringInput(...), $output);
+                        //
+                        // TODO(plugin): a `scripts` entry naming a Symfony Command subclass is run by
+                        // hosting it in a bare Symfony console Application. This requires the PHP
+                        // runtime — both the dynamic `new $className(...)` instantiation and the real
+                        // Symfony Application. It will be implemented by generating a PHP bootstrap
+                        // (the boilerplate above) parameterized by the class name, event name and
+                        // args, then executing it via the PHP runtime with the child process
+                        // inheriting STDOUT/STDERR in place of reusing the in-memory output. No
+                        // Rust-side Symfony Application is involved, so none is constructed here.
+                        let _ = &additional_args;
                         todo!(
-                            "plugin: CommandBase::new — dynamic plugin command instantiation not supported"
+                            "plugin: run a `scripts` Command class via the PHP runtime (bare Symfony Application host)"
                         );
-                        let result = (|| -> anyhow::Result<i64> {
-                            let args = additional_args
-                                .iter()
-                                .map(|arg| ProcessExecutor::escape(arg))
-                                .collect::<Vec<_>>()
-                                .join(" ");
-                            // reusing the output from $this->io is mostly needed for tests, but generally speaking
-                            // it does not hurt to keep the same stream as the current Application
-                            let is_console_io = self.io.borrow().as_any().is::<ConsoleIO>();
-                            let output: ConsoleOutput = if is_console_io {
-                                // TODO(plugin): \ReflectionProperty to read private `output` from ConsoleIO
-                                // is required by the original PHP — needs user-decided porting strategy.
-                                let _refl_php_version_gate = PHP_VERSION_ID < 80100;
-                                todo!("\\ReflectionProperty on ConsoleIO::$output")
-                            } else {
-                                ConsoleOutput::new(None, None, None)?
-                            };
-                            let input_str = event
-                                .get_flags()
-                                .get("script-alias-input")
-                                .and_then(|v| v.as_string())
-                                .unwrap_or(&args)
-                                .to_string();
-                            let input = StringInput::new(&input_str)?;
-                            let output = output;
-                            Ok(app.run(
-                                Some(std::rc::Rc::new(std::cell::RefCell::new(input))),
-                                Some(std::rc::Rc::new(std::cell::RefCell::new(output))),
-                            )?)
-                        })();
-                        match result {
-                            Ok(v) => r#return = v,
-                            Err(e) => {
-                                self.io.write_error3(
-                                    &format!(
-                                        "<error>{}</error>",
-                                        format!(
-                                            "Script {} handling the {} event terminated with an exception",
-                                            PhpMixed::String(callable_str.clone()),
-                                            PhpMixed::String(event.get_name().to_string()),
-                                        )
-                                    ),
-                                    true,
-                                    crate::io::QUIET,
-                                );
-                                return Err(e);
-                            }
-                        }
                     }
                     Callable::String(callable_str) => {
                         let args = additional_args

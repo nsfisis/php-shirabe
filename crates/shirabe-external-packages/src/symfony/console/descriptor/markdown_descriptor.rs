@@ -214,7 +214,7 @@ impl MarkdownDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get("namespace") {
@@ -223,7 +223,7 @@ impl MarkdownDescriptor {
         };
         let mut description =
             ApplicationDescription::new(application.clone(), described_namespace, false);
-        let title = self.get_application_title(&application.borrow());
+        let title = self.get_application_title(&*application.borrow());
 
         self.write(
             &format!(
@@ -289,7 +289,7 @@ impl MarkdownDescriptor {
         Ok(())
     }
 
-    fn get_application_title(&self, application: &Application) -> String {
+    fn get_application_title(&self, application: &dyn Application) -> String {
         if "UNKNOWN" != application.get_name() {
             if "UNKNOWN" != application.get_version() {
                 return format!(
@@ -376,7 +376,7 @@ impl Descriptor for MarkdownDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_application(self, application, options)

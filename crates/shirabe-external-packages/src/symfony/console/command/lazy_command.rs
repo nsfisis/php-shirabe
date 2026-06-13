@@ -78,7 +78,7 @@ impl LazyCommand {
         self.get_command().ignore_validation_errors();
     }
 
-    pub fn set_application(&mut self, application: Option<Rc<RefCell<Application>>>) {
+    pub fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
         // if ($this->command instanceof parent)
         if let LazyCommandInner::Command(command) = &mut self.command {
             command.set_application(application.clone());
@@ -288,11 +288,11 @@ impl Command for LazyCommand {
         todo!()
     }
 
-    fn set_application(&mut self, application: Option<Rc<RefCell<Application>>>) {
+    fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
         LazyCommand::set_application(self, application);
     }
 
-    fn get_application(&self) -> Option<Rc<RefCell<Application>>> {
+    fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
         self.inner.get_application()
     }
 

@@ -991,8 +991,20 @@ pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
 }
 
-pub fn in_array(_needle: PhpMixed, _haystack: &PhpMixed, _strict: bool) -> bool {
-    todo!()
+pub fn in_array(needle: PhpMixed, haystack: &PhpMixed, strict: bool) -> bool {
+    let values: Vec<&PhpMixed> = match haystack {
+        PhpMixed::List(items) => items.iter().map(|item| item.as_ref()).collect(),
+        PhpMixed::Array(map) => map.values().map(|item| item.as_ref()).collect(),
+        _ => return false,
+    };
+
+    if !strict {
+        // TODO(phase-c): non-strict in_array needs PHP's loose `==` comparison semantics. Only the
+        // strict path is implemented; loose comparison is deferred rather than approximated.
+        todo!("non-strict in_array (PHP loose comparison)");
+    }
+
+    values.iter().any(|value| **value == needle)
 }
 
 // TODO(phase-c): takes &Path and returns Option<PathBuf>
@@ -1963,8 +1975,8 @@ pub fn mb_strlen(_s: &str, _encoding: &str) -> i64 {
     todo!()
 }
 
-pub fn stream_isatty(_stream: PhpMixed) -> bool {
-    todo!()
+pub fn stream_isatty(stream: PhpResource) -> bool {
+    stream_isatty_resource(&stream)
 }
 
 pub fn posix_getuid() -> i64 {
@@ -1979,11 +1991,11 @@ pub fn posix_getpwuid(_uid: i64) -> PhpMixed {
     todo!()
 }
 
-pub fn posix_isatty(_stream: PhpMixed) -> bool {
+pub fn posix_isatty(_stream: PhpResource) -> bool {
     todo!()
 }
 
-pub fn fstat(_stream: PhpMixed) -> PhpMixed {
+pub fn fstat(_stream: PhpResource) -> PhpMixed {
     todo!()
 }
 
@@ -2010,6 +2022,7 @@ pub fn putenv(setting: &str) -> bool {
 /// PHP superglobal $_SERVER access. In the CLI SAPI $_SERVER is populated from
 /// the environment, which is the only source modeled here.
 pub fn server_get(name: &str) -> Option<String> {
+    // TODO: is var_os() better?
     std::env::var(name).ok()
 }
 
@@ -2023,9 +2036,10 @@ pub fn server_contains_key(name: &str) -> bool {
     std::env::var_os(name).is_some()
 }
 
-/// PHP superglobal $_ENV access
-pub fn env_get(_name: &str) -> Option<String> {
-    todo!()
+/// PHP superglobal $_ENV access.
+pub fn env_get(name: &str) -> Option<String> {
+    // TODO: is var_os() better?
+    std::env::var(name).ok()
 }
 
 // TODO(php-runtime): modify the real PHP's $_ENV.
@@ -2034,8 +2048,8 @@ pub fn env_set(_name: &str, _value: String) {}
 // TODO(php-runtime): modify the real PHP's $_ENV.
 pub fn env_unset(_name: &str) {}
 
-pub fn env_contains_key(_name: &str) -> bool {
-    todo!()
+pub fn env_contains_key(name: &str) -> bool {
+    std::env::var_os(name).is_some()
 }
 
 pub fn trim(_s: &str, _chars: Option<&str>) -> String {
@@ -2515,10 +2529,6 @@ pub fn run_shutdown_functions() {
 }
 
 pub fn round(_value: f64, _precision: i64) -> f64 {
-    todo!()
-}
-
-pub fn stdin_handle() -> PhpMixed {
     todo!()
 }
 

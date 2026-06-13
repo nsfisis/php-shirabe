@@ -62,7 +62,7 @@ impl JsonDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get("namespace") {
@@ -418,7 +418,7 @@ impl Descriptor for JsonDescriptor {
 
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_application(self, application, options)

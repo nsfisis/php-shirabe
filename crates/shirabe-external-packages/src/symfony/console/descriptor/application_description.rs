@@ -9,7 +9,7 @@ use std::rc::Rc;
 /// @internal
 #[derive(Debug)]
 pub struct ApplicationDescription {
-    application: Rc<RefCell<Application>>,
+    application: Rc<RefCell<dyn Application>>,
     namespace: Option<String>,
     show_hidden: bool,
 
@@ -28,7 +28,7 @@ impl ApplicationDescription {
     pub const GLOBAL_NAMESPACE: &'static str = "_global";
 
     pub fn new(
-        application: Rc<RefCell<Application>>,
+        application: Rc<RefCell<dyn Application>>,
         namespace: Option<String>,
         show_hidden: bool,
     ) -> Self {

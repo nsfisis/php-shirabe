@@ -20,7 +20,7 @@ use std::rc::Rc;
 /// (defined below) and this concrete `BaseCommand` struct holding the base-class
 /// state and behavior. Subclasses embed a `BaseCommand` and implement `Command`.
 pub struct BaseCommand {
-    application: Option<Rc<RefCell<Application>>>,
+    application: Option<Rc<RefCell<dyn Application>>>,
     name: Option<String>,
     process_title: Option<String>,
     aliases: Vec<String>,
@@ -130,7 +130,7 @@ impl BaseCommand {
         self.ignore_validation_errors = true;
     }
 
-    pub fn set_application(&mut self, application: Option<Rc<RefCell<Application>>>) {
+    pub fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
         self.application = application.clone();
         if let Some(application) = application {
             self.set_helper_set(application.borrow_mut().get_helper_set());
@@ -151,7 +151,7 @@ impl BaseCommand {
     }
 
     /// Gets the application instance for this command.
-    pub fn get_application(&self) -> Option<Rc<RefCell<Application>>> {
+    pub fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
         self.application.clone()
     }
 
@@ -709,11 +709,11 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny {
         todo!()
     }
 
-    fn set_application(&mut self, _application: Option<Rc<RefCell<Application>>>) {
+    fn set_application(&mut self, _application: Option<Rc<RefCell<dyn Application>>>) {
         todo!()
     }
 
-    fn get_application(&self) -> Option<Rc<RefCell<Application>>> {
+    fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
         todo!()
     }
 

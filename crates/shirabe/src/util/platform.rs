@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use anyhow::Result;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, defined, env_contains_key, env_get, env_set, env_unset,
-    file_exists, file_get_contents, fopen, fstat, function_exists, getcwd, getenv, in_array,
+    PhpMixed, PhpResource, RuntimeException, defined, env_contains_key, env_get, env_set,
+    env_unset, file_exists, file_get_contents, fstat, function_exists, getcwd, getenv, in_array,
     ini_get, is_array, is_readable, mb_strlen, php_os_family, posix_geteuid, posix_getpwuid,
     posix_getuid, posix_isatty, putenv, realpath, server_contains_key, server_get, server_set,
     server_unset, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
@@ -288,21 +288,12 @@ impl Platform {
     }
 
     /// @param  ?resource $fd Open file descriptor or null to default to STDOUT
-    pub fn is_tty(fd: Option<PhpMixed>) -> bool {
+    pub fn is_tty(fd: Option<PhpResource>) -> bool {
         let fd = match fd {
             Some(f) => f,
             None => {
-                if defined("STDOUT") {
-                    // TODO(phase-c): map the STDOUT constant to a runtime stdout resource; depends
-                    // on the unmodeled PHP stream/resource layer.
-                    todo!("STDOUT constant")
-                } else {
-                    let fd = fopen("php://stdout", "w");
-                    if matches!(fd, PhpMixed::Bool(false)) {
-                        return false;
-                    }
-                    fd
-                }
+                // TODO(phase-c): STDOUT is not yet modeled as a `PhpResource` constant.
+                todo!("STDOUT resource constant")
             }
         };
 

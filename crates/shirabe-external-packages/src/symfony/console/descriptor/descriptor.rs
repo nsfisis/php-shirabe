@@ -48,7 +48,7 @@ pub trait Descriptor: DescriptorInterface {
             }
             // case $object instanceof Application:
             _ if todo!("$object instanceof Application") => {
-                let application: std::rc::Rc<std::cell::RefCell<Application>> =
+                let application: std::rc::Rc<std::cell::RefCell<dyn Application>> =
                     todo!("downcast object to Application");
                 self.describe_application(application, options)?;
             }
@@ -113,7 +113,7 @@ pub trait Descriptor: DescriptorInterface {
     /// Describes an Application instance.
     fn describe_application(
         &mut self,
-        application: std::rc::Rc<std::cell::RefCell<Application>>,
+        application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()>;
 }
