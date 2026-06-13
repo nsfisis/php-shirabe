@@ -321,8 +321,8 @@ pub struct Exception {
 }
 
 impl std::fmt::Display for Exception {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -335,8 +335,8 @@ pub struct RuntimeException {
 }
 
 impl std::fmt::Display for RuntimeException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -349,8 +349,8 @@ pub struct UnexpectedValueException {
 }
 
 impl std::fmt::Display for UnexpectedValueException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -363,8 +363,8 @@ pub struct InvalidArgumentException {
 }
 
 impl std::fmt::Display for InvalidArgumentException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -377,8 +377,8 @@ pub struct TypeError {
 }
 
 impl std::fmt::Display for TypeError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -391,8 +391,8 @@ pub struct LogicException {
 }
 
 impl std::fmt::Display for LogicException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -405,8 +405,8 @@ pub struct BadMethodCallException {
 }
 
 impl std::fmt::Display for BadMethodCallException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -419,8 +419,8 @@ pub struct OutOfBoundsException {
 }
 
 impl std::fmt::Display for OutOfBoundsException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -436,8 +436,8 @@ pub struct ErrorException {
 }
 
 impl std::fmt::Display for ErrorException {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
     }
 }
 
@@ -600,8 +600,17 @@ pub fn array_slice_strs(_value: &[String], _offset: i64, _length: Option<i64>) -
     todo!()
 }
 
-pub fn empty(_value: &PhpMixed) -> bool {
-    todo!()
+pub fn empty(value: &PhpMixed) -> bool {
+    match value {
+        PhpMixed::Null => true,
+        PhpMixed::Bool(b) => !*b,
+        PhpMixed::Int(i) => *i == 0,
+        PhpMixed::Float(f) => *f == 0.0,
+        PhpMixed::String(s) => s.is_empty() || s == "0",
+        PhpMixed::List(v) => v.is_empty(),
+        PhpMixed::Array(m) => m.is_empty(),
+        PhpMixed::Object(_) => false,
+    }
 }
 
 pub fn method_exists(_object: &PhpMixed, _method_name: &str) -> bool {
@@ -742,8 +751,16 @@ pub fn pathinfo(_path: PhpMixed, _option: i64) -> PhpMixed {
     todo!()
 }
 
-pub fn strtr(_str: &str, _from: &str, _to: &str) -> String {
-    todo!()
+pub fn strtr(str: &str, from: &str, to: &str) -> String {
+    let from: Vec<char> = from.chars().collect();
+    let to: Vec<char> = to.chars().collect();
+    let n = from.len().min(to.len());
+    str.chars()
+        .map(|c| match from[..n].iter().position(|&f| f == c) {
+            Some(i) => to[i],
+            None => c,
+        })
+        .collect()
 }
 
 pub fn implode(_glue: &str, _pieces: &[String]) -> String {
@@ -829,7 +846,7 @@ pub struct PharException {
 
 impl std::fmt::Display for PharException {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        f.write_str(&self.message)
     }
 }
 
@@ -2045,8 +2062,12 @@ pub fn env_contains_key(name: &str) -> bool {
     std::env::var_os(name).is_some()
 }
 
-pub fn trim(_s: &str, _chars: Option<&str>) -> String {
-    todo!()
+pub fn trim(s: &str, chars: Option<&str>) -> String {
+    let mask: Vec<char> = match chars {
+        Some(c) => c.chars().collect(),
+        None => vec![' ', '\t', '\n', '\r', '\0', '\x0B'],
+    };
+    s.trim_matches(|c| mask.contains(&c)).to_string()
 }
 
 pub fn count(_value: &PhpMixed) -> i64 {
@@ -2199,8 +2220,12 @@ pub fn inet_pton(_host: &str) -> Option<Vec<u8>> {
     todo!()
 }
 
-pub fn ltrim(_s: &str, _chars: Option<&str>) -> String {
-    todo!()
+pub fn ltrim(s: &str, chars: Option<&str>) -> String {
+    let mask: Vec<char> = match chars {
+        Some(c) => c.chars().collect(),
+        None => vec![' ', '\t', '\n', '\r', '\0', '\x0B'],
+    };
+    s.trim_start_matches(|c| mask.contains(&c)).to_string()
 }
 
 pub fn floor(_value: f64) -> f64 {
