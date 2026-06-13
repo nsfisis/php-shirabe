@@ -703,7 +703,7 @@ impl ConfigCommand {
 
         // handle repositories
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             "/^repos?(?:itories)?\\.(.+)/",
             &setting_key,
             Some(&mut matches),

@@ -173,7 +173,7 @@ impl BinaryInstaller {
         let line = fgets(handle.clone()).unwrap_or_default();
         fclose(handle);
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",
             &line,
             Some(&mut m),

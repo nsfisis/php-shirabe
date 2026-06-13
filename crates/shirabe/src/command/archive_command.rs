@@ -280,7 +280,7 @@ impl ArchiveCommand {
 
         if let Some(version_str) = &version {
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match_strict_groups3(
+            if Preg::match3(
                 r"{@(stable|RC|beta|alpha|dev)$}i",
                 version_str,
                 Some(&mut matches),

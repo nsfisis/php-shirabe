@@ -1178,7 +1178,7 @@ impl DiagnoseCommand {
         let phpinfo_str = ob_get_clean();
         let mut phpinfo_match: IndexMap<CaptureKey, String> = IndexMap::new();
         if phpinfo_str.is_some()
-            && Preg::is_match_strict_groups3(
+            && Preg::is_match3(
                 "{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m",
                 phpinfo_str.as_ref().unwrap(),
                 Some(&mut phpinfo_match),

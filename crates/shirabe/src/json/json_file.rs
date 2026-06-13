@@ -575,8 +575,7 @@ impl JsonFile {
 
     pub fn detect_indenting(json: Option<&str>) -> String {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m))
-            .unwrap_or(false)
+        if Preg::is_match3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m)).unwrap_or(false)
         {
             return m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
         }

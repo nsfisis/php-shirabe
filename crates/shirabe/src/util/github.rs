@@ -333,9 +333,7 @@ impl GitHub {
                 continue;
             }
             let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match_strict_groups3(r"{\burl=(?P<url>[^\s;]+)}", header, Some(&mut caps))
-                .unwrap_or(false)
-            {
+            if Preg::match3(r"{\burl=(?P<url>[^\s;]+)}", header, Some(&mut caps)).unwrap_or(false) {
                 return caps.get(&CaptureKey::ByName("url".to_string())).cloned();
             }
         }

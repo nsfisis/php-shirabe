@@ -206,8 +206,7 @@ impl ProcessExecutor {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match_strict_groups3(r"{^([^:/\\]++) }", &command_str, Some(&mut m))
-                    .unwrap_or(false)
+                if Preg::is_match3(r"{^([^:/\\]++) }", &command_str, Some(&mut m)).unwrap_or(false)
                 {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(

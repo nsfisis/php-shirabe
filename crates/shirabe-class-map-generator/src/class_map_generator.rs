@@ -381,7 +381,7 @@ impl ClassMapGenerator {
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         let mut r#match: indexmap::IndexMap<_, _> = indexmap![];
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
             Some(&mut r#match),

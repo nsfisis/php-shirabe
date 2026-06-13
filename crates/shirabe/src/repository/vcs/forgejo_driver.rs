@@ -605,9 +605,7 @@ impl ForgejoDriver {
         let links = explode(",", &header);
         for link in links {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match_strict_groups3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::match3(r#"{<(.+?)>; *rel="next"}"#, &link, Some(&mut m)).unwrap_or(false) {
                 if let Some(url) = m.get(&CaptureKey::ByIndex(1)) {
                     return Some(url.clone());
                 }

@@ -145,9 +145,7 @@ impl RemoteFilesystem {
         let mut value: Option<i64> = None;
         for header in headers {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3("{^HTTP/\\S+ (\\d+)}i", header, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::is_match3("{^HTTP/\\S+ (\\d+)}i", header, Some(&mut m)).unwrap_or(false) {
                 value = m
                     .get(&CaptureKey::ByIndex(1))
                     .and_then(|s| s.parse().ok())

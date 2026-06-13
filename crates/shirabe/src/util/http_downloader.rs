@@ -310,7 +310,7 @@ impl HttpDownloader {
 
         // capture username/password from URL if there is one
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i",
             &request.url,
             Some(&mut m),

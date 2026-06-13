@@ -701,7 +701,7 @@ impl Filesystem {
             shirabe_external_packages::composer::pcre::CaptureKey,
             String,
         > = indexmap::IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             "{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
             Some(&mut prefix_match),

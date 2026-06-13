@@ -210,11 +210,9 @@ impl VersionGuesser {
             for branch in self.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::is_match_strict_groups3(
-                        r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}",
-                        &branch,
-                        Some(&mut m),
-                    )
+                    if Preg::is_match3(r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}",
+                    &branch,
+                    Some(&mut m),)
                     .unwrap_or(false)
                     {
                         let g1 = m
@@ -245,11 +243,10 @@ impl VersionGuesser {
 
                 if !branch.is_empty() && {
                     let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
-                    !Preg::is_match_strict_groups3(r"{^ *.+/HEAD }", &branch, Some(&mut tmp))
-                        .unwrap_or(false)
+                    !Preg::is_match3(r"{^ *.+/HEAD }", &branch, Some(&mut tmp)).unwrap_or(false)
                 } {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::is_match_strict_groups3(
+                    if Preg::is_match3(
                         r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}",
                         &branch,
                         Some(&mut m),
@@ -761,9 +758,7 @@ impl VersionGuesser {
             }
         };
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(r"{^(\d+(?:\.\d+)*)-dev$}i", &version, Some(&mut m))
-            .unwrap_or(false)
-        {
+        if Preg::is_match3(r"{^(\d+(?:\.\d+)*)-dev$}i", &version, Some(&mut m)).unwrap_or(false) {
             return Ok(format!(
                 "{}.x-dev",
                 m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()

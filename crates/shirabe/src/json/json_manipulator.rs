@@ -134,7 +134,7 @@ impl JsonManipulator {
             )?;
         } else {
             let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3(
+            if Preg::is_match3(
                 "#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s",
                 &links,
                 Some(&mut groups),
@@ -1583,7 +1583,7 @@ impl JsonManipulator {
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
             let mut start = matches.get("start").cloned().unwrap_or_default();
             let end = matches.get("end").cloned().unwrap_or_default();
-            if Preg::is_match_strict_groups3("#,\\s*$#", &start, None).unwrap_or(false)
+            if Preg::is_match3("#,\\s*$#", &start, None).unwrap_or(false)
                 && Preg::is_match3("#^\\}$#", &end, None).unwrap_or(false)
             {
                 start = rtrim(

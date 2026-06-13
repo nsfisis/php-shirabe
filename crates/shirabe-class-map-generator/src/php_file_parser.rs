@@ -68,7 +68,7 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = Preg::match_all_strict_groups(&pattern, &contents)?;
+        let max_matches = Preg::match_all(&pattern, &contents)?;
         if max_matches == 0 {
             return Ok(vec![]);
         }

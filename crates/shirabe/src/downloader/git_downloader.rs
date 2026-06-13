@@ -99,7 +99,7 @@ impl GitDownloader {
 
         let mut refs = trim(&output, None);
         let mut head_match: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match_strict_groups3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match))
+        if !Preg::is_match3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match))
             .unwrap_or(false)
         {
             // could not match the HEAD for some reason
@@ -111,7 +111,7 @@ impl GitDownloader {
             .unwrap_or_default();
 
         let mut branches_match: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-        if !Preg::is_match_all_strict_groups3(
+        if !Preg::is_match_all3(
             &format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
             Some(&mut branches_match),
@@ -138,7 +138,7 @@ impl GitDownloader {
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
                 let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-                if Preg::is_match_all_strict_groups3(
+                if Preg::is_match_all3(
                     &format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)

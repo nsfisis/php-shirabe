@@ -215,9 +215,7 @@ impl GitDriver {
                 for branch in &branches {
                     if !branch.is_empty() {
                         let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::match_strict_groups3(r"{^\* +(\S+)}", branch, Some(&mut caps))
-                            .unwrap_or(false)
-                        {
+                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps)).unwrap_or(false) {
                             if let Some(name) = caps.get(&CaptureKey::ByIndex(1)) {
                                 self.root_identifier = Some(name.clone());
                                 break;
@@ -336,7 +334,7 @@ impl GitDriver {
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
                     let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match_strict_groups3(
+                    if Preg::match3(
                         r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
                         &tag,
                         Some(&mut caps),
@@ -381,7 +379,7 @@ impl GitDriver {
                     && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch).unwrap_or(false)
                 {
                     let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match_strict_groups3(
+                    if Preg::match3(
                         r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
                         &branch,
                         Some(&mut caps),

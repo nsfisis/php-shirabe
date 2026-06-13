@@ -895,7 +895,7 @@ impl Locker {
                         path.as_deref(),
                     )? {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::is_match_strict_groups3(
+                        if Preg::is_match3(
                             r"{^\s*(\d+)\s*}",
                             output.as_string().unwrap_or(""),
                             Some(&mut m),

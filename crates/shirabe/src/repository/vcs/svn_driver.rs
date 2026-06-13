@@ -322,12 +322,8 @@ impl SvnDriver {
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match_strict_groups3(
-                    r"{^Last Changed Date: ([^(]+)}",
-                    &line,
-                    Some(&mut m),
-                )
-                .unwrap_or(false)
+                if Preg::is_match3(r"{^Last Changed Date: ([^(]+)}", &line, Some(&mut m))
+                    .unwrap_or(false)
                 {
                     let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
@@ -358,12 +354,8 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match_strict_groups3(
-                                r"{^\s*(\S+).*?(\S+)\s*$}",
-                                &line,
-                                Some(&mut m),
-                            )
-                            .unwrap_or(false)
+                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
+                                .unwrap_or(false)
                             {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))
@@ -413,12 +405,8 @@ impl SvnDriver {
                     let line = trim(&line, None);
                     if !line.is_empty() {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::is_match_strict_groups3(
-                            r"{^\s*(\S+).*?(\S+)\s*$}",
-                            &line,
-                            Some(&mut m),
-                        )
-                        .unwrap_or(false)
+                        if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
+                            .unwrap_or(false)
                         {
                             let rev: i64 = m
                                 .get(&CaptureKey::ByIndex(1))
@@ -459,12 +447,8 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match_strict_groups3(
-                                r"{^\s*(\S+).*?(\S+)\s*$}",
-                                &line,
-                                Some(&mut m),
-                            )
-                            .unwrap_or(false)
+                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
+                                .unwrap_or(false)
                             {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))

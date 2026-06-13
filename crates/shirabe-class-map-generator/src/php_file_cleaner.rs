@@ -268,7 +268,6 @@ impl PhpFileCleaner {
     }
 
     fn r#match(&self, regex: &str, r#match: Option<&mut IndexMap<CaptureKey, String>>) -> bool {
-        Preg::is_match_strict_groups5(regex, &self.contents, r#match, 0, self.index)
-            .unwrap_or(false)
+        Preg::is_match5(regex, &self.contents, r#match, 0, self.index).unwrap_or(false)
     }
 }

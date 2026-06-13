@@ -87,7 +87,7 @@ impl GitBitbucketDriver {
     /// @inheritDoc
     pub fn initialize(&mut self) -> Result<()> {
         let mut m: indexmap::IndexMap<CaptureKey, String> = indexmap::IndexMap::new();
-        if !Preg::is_match_strict_groups3(
+        if !Preg::is_match3(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i",
             &self.inner.url,
             Some(&mut m),

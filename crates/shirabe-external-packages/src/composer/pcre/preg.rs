@@ -1,7 +1,6 @@
 //! ref: composer/vendor/composer/pcre/src/Preg.php
 
 use super::pcre_exception::PcreException;
-use super::unexpected_null_match_exception::UnexpectedNullMatchException;
 use indexmap::IndexMap;
 
 pub const PREG_PATTERN_ORDER: i64 = 1;
@@ -51,39 +50,8 @@ impl Preg {
         Ok(result == 1)
     }
 
-    pub fn match_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, String>>,
-    ) -> anyhow::Result<bool> {
-        Self::match_strict_groups5(pattern, subject, matches, 0, 0)
-    }
-
-    pub fn match_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
-    ) -> anyhow::Result<bool> {
-        Self::check_offset_capture(flags, "matchWithOffsets");
-
-        let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = preg_match(
-            pattern,
-            subject,
-            Some(&mut internal),
-            flags | PREG_UNMATCHED_AS_NULL,
-            offset,
-        )
-        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
-
-        let enforced = Self::enforce_non_null_matches(pattern, internal, "match")?;
-        if let Some(out) = matches {
-            *out = enforced;
-        }
-
-        Ok(result == 1)
+    pub fn match_all(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+        Self::match_all5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_all3(
@@ -116,38 +84,6 @@ impl Preg {
 
         if let Some(out) = matches {
             *out = null_to_empty_match_all(internal);
-        }
-
-        Ok(result as usize)
-    }
-
-    pub fn match_all_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<usize> {
-        Self::match_all_strict_groups5(pattern, subject, None, 0, 0)
-    }
-
-    pub fn match_all_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
-        flags: i64,
-        offset: usize,
-    ) -> anyhow::Result<usize> {
-        Self::check_offset_capture(flags, "matchAllWithOffsets");
-        Self::check_set_order(flags);
-
-        let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-        let result = preg_match_all(
-            pattern,
-            subject,
-            Some(&mut internal),
-            flags | PREG_UNMATCHED_AS_NULL,
-            offset,
-        )
-        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
-
-        let enforced = Self::enforce_non_null_match_all(pattern, internal, "matchAll")?;
-        if let Some(out) = matches {
-            *out = enforced;
         }
 
         Ok(result as usize)
@@ -315,24 +251,6 @@ impl Preg {
         Ok(result == 1)
     }
 
-    pub fn is_match_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, String>>,
-    ) -> anyhow::Result<bool> {
-        Self::match_strict_groups5(pattern, subject, matches, 0, 0)
-    }
-
-    pub fn is_match_strict_groups5(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, String>>,
-        flags: i64,
-        offset: usize,
-    ) -> anyhow::Result<bool> {
-        Self::match_strict_groups5(pattern, subject, matches, flags, offset)
-    }
-
     pub fn is_match_with_indexed_captures(
         pattern: &str,
         subject: &str,
@@ -376,14 +294,6 @@ impl Preg {
         Ok(Self::match_all5(pattern, subject, matches, 0, 0)? > 0)
     }
 
-    pub fn is_match_all_strict_groups3(
-        pattern: &str,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
-    ) -> anyhow::Result<bool> {
-        Ok(Self::match_all_strict_groups5(pattern, subject, matches, 0, 0)? > 0)
-    }
-
     pub fn is_match_all_with_offsets3(
         pattern: &str,
         subject: &str,
@@ -405,65 +315,6 @@ impl Preg {
             flags & PREG_SET_ORDER == 0,
             "PREG_SET_ORDER is not supported as it changes the type of $matches"
         );
-    }
-
-    fn enforce_non_null_matches(
-        pattern: &str,
-        matches: IndexMap<CaptureKey, Option<String>>,
-        variant_method: &str,
-    ) -> anyhow::Result<IndexMap<CaptureKey, String>> {
-        let mut result = IndexMap::new();
-        for (group, m) in matches {
-            match m {
-                None => {
-                    return Err(UnexpectedNullMatchException::new(format!(
-                        "Pattern \"{}\" had an unexpected unmatched group \"{}\", make sure the pattern always matches or use {}() instead.",
-                        pattern,
-                        capture_key_to_string(&group),
-                        variant_method
-                    ))
-                    .into());
-                }
-                Some(value) => {
-                    result.insert(group, value);
-                }
-            }
-        }
-        Ok(result)
-    }
-
-    fn enforce_non_null_match_all(
-        pattern: &str,
-        matches: IndexMap<CaptureKey, Vec<Option<String>>>,
-        variant_method: &str,
-    ) -> anyhow::Result<IndexMap<CaptureKey, Vec<String>>> {
-        let mut result = IndexMap::new();
-        for (group, group_matches) in matches {
-            let mut converted = Vec::with_capacity(group_matches.len());
-            for m in group_matches {
-                match m {
-                    None => {
-                        return Err(UnexpectedNullMatchException::new(format!(
-                            "Pattern \"{}\" had an unexpected unmatched group \"{}\", make sure the pattern always matches or use {}() instead.",
-                            pattern,
-                            capture_key_to_string(&group),
-                            variant_method
-                        ))
-                        .into());
-                    }
-                    Some(value) => converted.push(value),
-                }
-            }
-            result.insert(group, converted);
-        }
-        Ok(result)
-    }
-}
-
-fn capture_key_to_string(key: &CaptureKey) -> String {
-    match key {
-        CaptureKey::ByIndex(index) => index.to_string(),
-        CaptureKey::ByName(name) => name.clone(),
     }
 }
 

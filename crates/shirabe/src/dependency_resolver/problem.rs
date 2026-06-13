@@ -231,7 +231,7 @@ impl Problem {
                 ),
                 true,
             ) {
-                Preg::is_match_strict_groups3(
+                Preg::is_match3(
                     r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}",
                     &message,
                     Some(&mut m),

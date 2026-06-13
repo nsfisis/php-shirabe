@@ -689,12 +689,8 @@ impl EventDispatcher {
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match_strict_groups3(
-                                "{^[^\\'\"\\s/\\\\]+}",
-                                &path_and_args,
-                                Some(&mut m),
-                            )
-                            .unwrap_or(false)
+                            if Preg::is_match3("{^[^\\'\"\\s/\\\\]+}", &path_and_args, Some(&mut m))
+                                .unwrap_or(false)
                             {
                                 let m0 =
                                     m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();

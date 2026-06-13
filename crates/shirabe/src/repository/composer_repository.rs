@@ -792,7 +792,7 @@ impl ComposerRepository {
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
             let mut match_groups: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3(
+            if Preg::is_match3(
                 r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i",
                 &query,
                 Some(&mut match_groups),

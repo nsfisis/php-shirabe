@@ -399,20 +399,19 @@ impl VcsDownloader for SvnDownloader {
 
             let url_pattern = "#<url>(.*)</url>#";
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-            let base_url = if Preg::match_strict_groups3(url_pattern, &output, Some(&mut matches))
-                .unwrap_or(false)
-            {
-                matches
-                    .get(&CaptureKey::ByIndex(1))
-                    .cloned()
-                    .unwrap_or_default()
-            } else {
-                return Err(RuntimeException {
-                    message: format!("Unable to determine svn url for path {}", path),
-                    code: 0,
-                }
-                .into());
-            };
+            let base_url =
+                if Preg::match3(url_pattern, &output, Some(&mut matches)).unwrap_or(false) {
+                    matches
+                        .get(&CaptureKey::ByIndex(1))
+                        .cloned()
+                        .unwrap_or_default()
+                } else {
+                    return Err(RuntimeException {
+                        message: format!("Unable to determine svn url for path {}", path),
+                        code: 0,
+                    }
+                    .into());
+                };
 
             // strip paths from references and only keep the actual revision
             let from_revision =

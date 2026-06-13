@@ -375,7 +375,7 @@ pub trait PackageDiscoveryTrait {
                             }
 
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match_strict_groups3(
+                            if Preg::is_match3(
                                 r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}",
                                 &selection,
                                 Some(&mut m),

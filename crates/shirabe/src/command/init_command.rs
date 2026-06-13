@@ -928,7 +928,7 @@ impl InitCommand {
     /// @return array{name: string, email: string|null}
     fn parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
             author,
             Some(&mut m),
@@ -1022,9 +1022,7 @@ impl InitCommand {
         {
             self.git_config = Some(IndexMap::new());
             let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-            if Preg::is_match_all_strict_groups3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::is_match_all3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m)).unwrap_or(false) {
                 let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let values: Vec<String> =
                     m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();

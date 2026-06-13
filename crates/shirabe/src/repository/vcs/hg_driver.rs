@@ -244,9 +244,7 @@ impl HgDriver {
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match_strict_groups3(r"^([^\s]+)\s+\d+:(.*)$", &tag, Some(&mut m))
-                        .unwrap_or(false)
-                    {
+                    if Preg::match3(r"^([^\s]+)\s+\d+:(.*)$", &tag, Some(&mut m)).unwrap_or(false) {
                         tags.insert(
                             m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
                             m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
@@ -276,12 +274,8 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match_strict_groups3(
-                        r"^([^\s]+)\s+\d+:([a-f0-9]+)",
-                        &branch,
-                        Some(&mut m),
-                    )
-                    .unwrap_or(false)
+                    if Preg::match3(r"^([^\s]+)\s+\d+:([a-f0-9]+)", &branch, Some(&mut m))
+                        .unwrap_or(false)
                     {
                         let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {
@@ -303,12 +297,8 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match_strict_groups3(
-                        r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$",
-                        &branch,
-                        Some(&mut m),
-                    )
-                    .unwrap_or(false)
+                    if Preg::match3(r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$", &branch, Some(&mut m))
+                        .unwrap_or(false)
                     {
                         let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {

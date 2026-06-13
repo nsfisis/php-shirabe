@@ -74,7 +74,7 @@ impl GitHubDriver {
 
     pub fn initialize(&mut self) -> Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match_strict_groups3(
+        if !Preg::is_match3(
             r"#^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
             &self.inner.url,
             Some(&mut match_),
@@ -504,9 +504,7 @@ impl GitHubDriver {
         for line in Preg::split(r"{\r?\n}", &funding).unwrap_or_default() {
             let line = trim(&line, None);
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3(r"{^(\w+)\s*:\s*(.+)$}", &line, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::is_match3(r"{^(\w+)\s*:\s*(.+)$}", &line, Some(&mut m)).unwrap_or(false) {
                 let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if g2 == "[" {
@@ -514,8 +512,7 @@ impl GitHubDriver {
                     continue;
                 }
                 let mut m2: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match_strict_groups3(r"{^\[(.*?)\](?:\s*#.*)?$}", &g2, Some(&mut m2))
-                    .unwrap_or(false)
+                if Preg::is_match3(r"{^\[(.*?)\](?:\s*#.*)?$}", &g2, Some(&mut m2)).unwrap_or(false)
                 {
                     let inner = m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for item in array_map(
@@ -530,12 +527,8 @@ impl GitHubDriver {
                         );
                         result.push(entry);
                     }
-                } else if Preg::is_match_strict_groups3(
-                    r"{^([^#].*?)(?:\s+#.*)?$}",
-                    &g2,
-                    Some(&mut m2),
-                )
-                .unwrap_or(false)
+                } else if Preg::is_match3(r"{^([^#].*?)(?:\s+#.*)?$}", &g2, Some(&mut m2))
+                    .unwrap_or(false)
                 {
                     let mut entry = IndexMap::new();
                     entry.insert("type".to_string(), PhpMixed::String(g1.clone()));
@@ -549,15 +542,13 @@ impl GitHubDriver {
                     result.push(entry);
                 }
                 key = None;
-            } else if Preg::is_match_strict_groups3(r"{^(\w+)\s*:\s*#\s*$}", &line, Some(&mut m))
-                .unwrap_or(false)
+            } else if Preg::is_match3(r"{^(\w+)\s*:\s*#\s*$}", &line, Some(&mut m)).unwrap_or(false)
             {
                 key = Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
             } else if key.is_some() && {
                 let mut tmp: IndexMap<CaptureKey, String> = IndexMap::new();
-                Preg::is_match_strict_groups3(r"{^-\s*(.+)(?:\s+#.*)?$}", &line, Some(&mut m))
-                    .unwrap_or(false)
-                    || Preg::is_match_strict_groups3(r"{^(.+),(?:\s*#.*)?$}", &line, Some(&mut tmp))
+                Preg::is_match3(r"{^-\s*(.+)(?:\s+#.*)?$}", &line, Some(&mut m)).unwrap_or(false)
+                    || Preg::is_match3(r"{^(.+),(?:\s*#.*)?$}", &line, Some(&mut tmp))
                         .unwrap_or(false)
                         && {
                             m = tmp;
@@ -961,7 +952,7 @@ impl GitHubDriver {
         _deep: bool,
     ) -> anyhow::Result<bool> {
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match_strict_groups3(
+        if !Preg::is_match3(
             r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#",
             url,
             Some(&mut matches),
@@ -1329,9 +1320,7 @@ impl GitHubDriver {
         let links = explode(",", &header);
         for link in &links {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::is_match3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut m)).unwrap_or(false) {
                 return Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
             }
         }

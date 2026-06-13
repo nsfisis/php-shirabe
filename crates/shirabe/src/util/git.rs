@@ -227,7 +227,7 @@ impl Git {
                 cwd.map(|s| s.to_string()),
             );
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match_strict_groups3(
+            if Preg::is_match3(
                 r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im",
                 &output,
                 Some(&mut m),
@@ -251,7 +251,7 @@ impl Git {
         // public github, autoswitch protocols
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match_strict_groups3(
+        if Preg::is_match3(
             &format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
                 Self::get_github_domains_regex(&*self.config.borrow())
@@ -361,7 +361,7 @@ impl Git {
             // private github repository without ssh key access, try https with auth
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            let github_matched = Preg::is_match_strict_groups3(
+            let github_matched = Preg::is_match3(
                 &format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
                     Self::get_github_domains_regex(&*self.config.borrow())
@@ -370,7 +370,7 @@ impl Git {
                 Some(&mut m),
             )
             .unwrap_or(false)
-                || Preg::is_match_strict_groups3(
+                || Preg::is_match3(
                     &format!(
                         "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
                         Self::get_github_domains_regex(&*self.config.borrow())
@@ -430,13 +430,13 @@ impl Git {
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
             } else if {
-                let bb_matched = Preg::is_match_strict_groups3(
+                let bb_matched = Preg::is_match3(
                     r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
                     url,
                     Some(&mut m),
                 )
                 .unwrap_or(false)
-                    || Preg::is_match_strict_groups3(
+                    || Preg::is_match3(
                         r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
                         url,
                         Some(&mut m),
@@ -582,7 +582,7 @@ impl Git {
 
                 error_msg = self.process.borrow().get_error_output().to_string();
             } else if {
-                let gl_matched = Preg::is_match_strict_groups3(
+                let gl_matched = Preg::is_match3(
                     &format!(
                         "{{^(git)@{}:(.+?\\.git)$}}i",
                         Self::get_gitlab_domains_regex(&*self.config.borrow())
@@ -591,7 +591,7 @@ impl Git {
                     Some(&mut m),
                 )
                 .unwrap_or(false)
-                    || Preg::is_match_strict_groups3(
+                    || Preg::is_match3(
                         &format!(
                             "{{^(https?)://{}/(.*)}}i",
                             Self::get_gitlab_domains_regex(&*self.config.borrow())
@@ -1117,9 +1117,7 @@ impl Git {
     /// @return array<int, string>|null
     fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match_strict_groups3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m))
-            .unwrap_or(false)
-        {
+        if !Preg::is_match3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m)).unwrap_or(false) {
             return None;
         }
 
@@ -1204,12 +1202,8 @@ impl Git {
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match_strict_groups3(
-                    r"{^\s*HEAD branch:\s(.+)\s*$}m",
-                    &line,
-                    Some(&mut matches),
-                )
-                .unwrap_or(false)
+                if Preg::is_match3(r"{^\s*HEAD branch:\s(.+)\s*$}m", &line, Some(&mut matches))
+                    .unwrap_or(false)
                 {
                     return Ok(Some(
                         matches
@@ -1347,7 +1341,7 @@ impl Git {
             );
             if exit_code == 0 {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match_strict_groups3(
+                if Preg::is_match3(
                     r"/^git version (\d+(?:\.\d+)+)/m",
                     &output,
                     Some(&mut matches),

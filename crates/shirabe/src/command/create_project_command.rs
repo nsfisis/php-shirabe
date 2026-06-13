@@ -692,7 +692,7 @@ impl CreateProjectCommand {
                 stability = Some("stable".to_string());
             } else if {
                 let mut matched: IndexMap<CaptureKey, String> = IndexMap::new();
-                let ok = Preg::is_match_strict_groups3(
+                let ok = Preg::is_match3(
                     &format!(
                         "{{^[^,\\s]*?@({})$}}i",
                         implode(
