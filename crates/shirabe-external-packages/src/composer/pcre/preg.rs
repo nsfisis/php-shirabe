@@ -1,543 +1,925 @@
 //! ref: composer/vendor/composer/pcre/src/Preg.php
 
+use super::pcre_exception::PcreException;
+use super::unexpected_null_match_exception::UnexpectedNullMatchException;
+use indexmap::IndexMap;
+
+pub const PREG_PATTERN_ORDER: i64 = 1;
+pub const PREG_SET_ORDER: i64 = 2;
+pub const PREG_OFFSET_CAPTURE: i64 = 256;
+pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
+pub const PREG_SPLIT_NO_EMPTY: i64 = 1;
+pub const PREG_SPLIT_DELIM_CAPTURE: i64 = 2;
+pub const PREG_SPLIT_OFFSET_CAPTURE: i64 = 4;
+pub const PREG_GREP_INVERT: i64 = 1;
+
 #[derive(Debug)]
 pub struct Preg;
 
 impl Preg {
-    pub fn r#match(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    const ARRAY_MSG: &'static str =
+        "$subject as an array is not supported. You can use 'foreach' instead.";
+    const INVALID_TYPE_MSG: &'static str = "$subject must be a string, %s given.";
+
+    pub fn r#match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match5(pattern, subject, None, 0, 0)
     }
 
     pub fn match3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::check_offset_capture(flags, "matchWithOffsets");
+
+        let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+        let result = preg_match(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+
+        if let Some(out) = matches {
+            *out = drop_null_matches(internal);
+        }
+
+        Ok(result == 1)
     }
 
-    pub fn match_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn match_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match_strict_groups5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_strict_groups3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_strict_groups5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match_strict_groups4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_strict_groups5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match_strict_groups5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::check_offset_capture(flags, "matchWithOffsets");
+
+        let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+        let result = preg_match(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+
+        let enforced = Self::enforce_non_null_matches(pattern, internal, "match")?;
+        if let Some(out) = matches {
+            *out = enforced;
+        }
+
+        Ok(result == 1)
     }
 
-    pub fn match_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn match_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match_with_offsets5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_with_offsets3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_with_offsets5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match_with_offsets4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_with_offsets5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match_with_offsets5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        let mut internal: IndexMap<CaptureKey, (Option<String>, i64)> = IndexMap::new();
+        let result = preg_match_offset_capture(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+
+        if let Some(out) = matches {
+            *out = drop_null_offset_matches(internal);
+        }
+
+        Ok(result == 1)
     }
 
-    pub fn match_all(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
-        todo!()
+    pub fn match_all(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+        Self::match_all5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_all3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match_all4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match_all5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::check_offset_capture(flags, "matchAllWithOffsets");
+        Self::check_set_order(flags);
+
+        let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
+        let result = preg_match_all(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
+
+        if let Some(out) = matches {
+            *out = null_to_empty_match_all(internal);
+        }
+
+        Ok(result as usize)
     }
 
-    pub fn match_all_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
-        todo!()
+    pub fn match_all_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+        Self::match_all_strict_groups5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_all_strict_groups3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all_strict_groups5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match_all_strict_groups4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all_strict_groups5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match_all_strict_groups5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::check_offset_capture(flags, "matchAllWithOffsets");
+        Self::check_set_order(flags);
+
+        let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
+        let result = preg_match_all(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
+
+        let enforced = Self::enforce_non_null_match_all(pattern, internal, "matchAll")?;
+        if let Some(out) = matches {
+            *out = enforced;
+        }
+
+        Ok(result as usize)
     }
 
-    pub fn match_all_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<usize> {
-        todo!()
+    pub fn match_all_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+        Self::match_all_with_offsets5(pattern, subject, None, 0, 0)
     }
 
     pub fn match_all_with_offsets3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all_with_offsets5(pattern, subject, matches, 0, 0)
     }
 
     pub fn match_all_with_offsets4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        flags: i64,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::match_all_with_offsets5(pattern, subject, matches, flags, 0)
     }
 
     pub fn match_all_with_offsets5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<usize> {
-        todo!()
+        Self::check_set_order(flags);
+
+        let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
+        let result = preg_match_all_offset_capture(
+            pattern,
+            subject,
+            Some(&mut internal),
+            flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
+            offset,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
+
+        if let Some(out) = matches {
+            *out = null_to_empty_offset_match_all(internal);
+        }
+
+        Ok(result as usize)
     }
 
-    pub fn replace(_pattern: &str, _replacement: &str, _subject: &str) -> anyhow::Result<String> {
-        todo!()
+    pub fn replace(pattern: &str, replacement: &str, subject: &str) -> anyhow::Result<String> {
+        Self::replace_impl(pattern, replacement, subject, -1, None)
     }
 
     pub fn replace4(
-        _pattern: &str,
-        _replacement: &str,
-        _subject: &str,
-        _limit: i64,
+        pattern: &str,
+        replacement: &str,
+        subject: &str,
+        limit: i64,
     ) -> anyhow::Result<String> {
-        todo!()
+        Self::replace_impl(pattern, replacement, subject, limit, None)
     }
 
     pub fn replace5(
-        _pattern: &str,
-        _replacement: &str,
-        _subject: &str,
-        _limit: i64,
-        _count: &mut usize,
+        pattern: &str,
+        replacement: &str,
+        subject: &str,
+        limit: i64,
+        count: &mut usize,
     ) -> anyhow::Result<String> {
-        todo!()
+        Self::replace_impl(pattern, replacement, subject, limit, Some(count))
     }
 
-    pub fn replace_callback<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        _pattern: &str,
-        _replacement: F,
-        _subject: &str,
+    fn replace_impl(
+        pattern: &str,
+        replacement: &str,
+        subject: &str,
+        limit: i64,
+        count: Option<&mut usize>,
     ) -> anyhow::Result<String> {
-        todo!()
+        // `$subject` is statically a string here, so the is_scalar/is_array
+        // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
+        // unreachable and not reproduced.
+        preg_replace(pattern, replacement, subject, limit, count)
+            .ok_or_else(|| PcreException::from_function("preg_replace", pattern).into())
     }
 
-    pub fn replace_callback4<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        _pattern: &str,
-        _replacement: F,
-        _subject: &str,
-        _limit: i64,
+    pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
+        pattern: &str,
+        replacement: F,
+        subject: &str,
     ) -> anyhow::Result<String> {
-        todo!()
+        Self::replace_callback6(pattern, replacement, subject, -1, None, 0)
     }
 
-    pub fn replace_callback5<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        _pattern: &str,
-        _replacement: F,
-        _subject: &str,
-        _limit: i64,
-        _count: &mut usize,
+    pub fn replace_callback4<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
+        pattern: &str,
+        replacement: F,
+        subject: &str,
+        limit: i64,
     ) -> anyhow::Result<String> {
-        todo!()
+        Self::replace_callback6(pattern, replacement, subject, limit, None, 0)
     }
 
-    pub fn replace_callback6<F: FnMut(&indexmap::IndexMap<CaptureKey, String>) -> String>(
-        _pattern: &str,
-        _replacement: F,
-        _subject: &str,
-        _limit: i64,
-        _count: Option<&mut usize>,
-        _flags: i64,
+    pub fn replace_callback5<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
+        pattern: &str,
+        replacement: F,
+        subject: &str,
+        limit: i64,
+        count: &mut usize,
     ) -> anyhow::Result<String> {
-        todo!()
+        Self::replace_callback6(pattern, replacement, subject, limit, Some(count), 0)
     }
 
-    pub fn replace_callback_array(
-        _pattern: &indexmap::IndexMap<String, String>,
-        _subject: &str,
+    pub fn replace_callback6<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
+        pattern: &str,
+        mut replacement: F,
+        subject: &str,
+        limit: i64,
+        count: Option<&mut usize>,
+        flags: i64,
     ) -> anyhow::Result<String> {
-        todo!()
+        let adapter = |internal: &IndexMap<CaptureKey, Option<String>>| -> String {
+            replacement(&drop_null_matches_ref(internal))
+        };
+
+        preg_replace_callback(pattern, adapter, subject, limit, count, flags)
+            .ok_or_else(|| PcreException::from_function("preg_replace_callback", pattern).into())
     }
 
-    pub fn replace_callback_array3(
-        _pattern: &indexmap::IndexMap<String, String>,
-        _subject: &str,
-        _limit: i64,
-    ) -> anyhow::Result<String> {
-        todo!()
+    pub fn split(pattern: &str, subject: &str) -> anyhow::Result<Vec<String>> {
+        Self::split4(pattern, subject, -1, 0)
     }
 
-    pub fn replace_callback_array4(
-        _pattern: &indexmap::IndexMap<String, String>,
-        _subject: &str,
-        _limit: i64,
-        _count: &mut usize,
-    ) -> anyhow::Result<String> {
-        todo!()
-    }
-
-    pub fn replace_callback_array5(
-        _pattern: &indexmap::IndexMap<String, String>,
-        _subject: &str,
-        _limit: i64,
-        _count: Option<&mut usize>,
-        _flags: i64,
-    ) -> anyhow::Result<String> {
-        todo!()
-    }
-
-    pub fn split(_pattern: &str, _subject: &str) -> anyhow::Result<Vec<String>> {
-        todo!()
-    }
-
-    pub fn split3(_pattern: &str, _subject: &str, _limit: i64) -> anyhow::Result<Vec<String>> {
-        todo!()
+    pub fn split3(pattern: &str, subject: &str, limit: i64) -> anyhow::Result<Vec<String>> {
+        Self::split4(pattern, subject, limit, 0)
     }
 
     pub fn split4(
-        _pattern: &str,
-        _subject: &str,
-        _limit: i64,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        limit: i64,
+        flags: i64,
     ) -> anyhow::Result<Vec<String>> {
-        todo!()
+        assert!(
+            flags & PREG_SPLIT_OFFSET_CAPTURE == 0,
+            "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
+        );
+
+        preg_split(pattern, subject, limit, flags)
+            .ok_or_else(|| PcreException::from_function("preg_split", pattern).into())
     }
 
     pub fn split_with_offsets(
-        _pattern: &str,
-        _subject: &str,
+        pattern: &str,
+        subject: &str,
     ) -> anyhow::Result<Vec<(String, usize)>> {
-        todo!()
+        Self::split_with_offsets4(pattern, subject, -1, 0)
     }
 
     pub fn split_with_offsets3(
-        _pattern: &str,
-        _subject: &str,
-        _limit: i64,
+        pattern: &str,
+        subject: &str,
+        limit: i64,
     ) -> anyhow::Result<Vec<(String, usize)>> {
-        todo!()
+        Self::split_with_offsets4(pattern, subject, limit, 0)
     }
 
     pub fn split_with_offsets4(
-        _pattern: &str,
-        _subject: &str,
-        _limit: i64,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        limit: i64,
+        flags: i64,
     ) -> anyhow::Result<Vec<(String, usize)>> {
-        todo!()
+        preg_split_offset_capture(pattern, subject, limit, flags | PREG_SPLIT_OFFSET_CAPTURE)
+            .ok_or_else(|| PcreException::from_function("preg_split", pattern).into())
     }
 
-    pub fn grep(_pattern: &str, _array: &[&str]) -> anyhow::Result<Vec<String>> {
-        todo!()
+    pub fn grep(pattern: &str, array: &[&str]) -> anyhow::Result<Vec<String>> {
+        Self::grep3(pattern, array, 0)
     }
 
-    pub fn grep3(_pattern: &str, _array: &[&str], _flags: i64) -> anyhow::Result<Vec<String>> {
-        todo!()
+    pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> anyhow::Result<Vec<String>> {
+        preg_grep(pattern, array, flags)
+            .ok_or_else(|| PcreException::from_function("preg_grep", pattern).into())
     }
 
-    pub fn is_match(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match5(pattern, subject, None, 0, 0)
     }
 
     pub fn is_match3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match5(pattern, subject, matches, 0, 0)
     }
 
     pub fn is_match4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match5(pattern, subject, matches, flags, 0)
     }
 
     pub fn is_match5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match5(pattern, subject, matches, flags, offset)
     }
 
     pub fn is_match_named(
-        _pattern: &str,
-        _subject: &str,
-        _matches: &mut indexmap::IndexMap<String, String>,
+        pattern: &str,
+        subject: &str,
+        matches: &mut IndexMap<String, String>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+        let result = preg_match(
+            pattern,
+            subject,
+            Some(&mut internal),
+            PREG_UNMATCHED_AS_NULL,
+            0,
+        )
+        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+
+        matches.clear();
+        for (key, value) in internal {
+            if let (CaptureKey::ByName(name), Some(value)) = (key, value) {
+                matches.insert(name, value);
+            }
+        }
+
+        Ok(result == 1)
     }
 
-    pub fn is_match_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match_strict_groups5(pattern, subject, None, 0, 0)
     }
 
     pub fn is_match_strict_groups3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_strict_groups5(pattern, subject, matches, 0, 0)
     }
 
     pub fn is_match_strict_groups4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_strict_groups5(pattern, subject, matches, flags, 0)
     }
 
     pub fn is_match_strict_groups5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, String>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, String>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_strict_groups5(pattern, subject, matches, flags, offset)
     }
 
-    pub fn is_match_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Self::match_with_offsets5(pattern, subject, None, 0, 0)
     }
 
     pub fn is_match_with_offsets3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_with_offsets5(pattern, subject, matches, 0, 0)
     }
 
     pub fn is_match_with_offsets4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_with_offsets5(pattern, subject, matches, flags, 0)
     }
 
     pub fn is_match_with_offsets5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, (String, usize)>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, (String, usize)>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Self::match_with_offsets5(pattern, subject, matches, flags, offset)
     }
 
-    pub fn is_match_all(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match_all(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Ok(Self::match_all5(pattern, subject, None, 0, 0)? > 0)
     }
 
     pub fn is_match_with_indexed_captures(
-        _pattern: &str,
-        _subject: &str,
+        pattern: &str,
+        subject: &str,
     ) -> anyhow::Result<Option<Vec<String>>> {
-        todo!()
+        // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
+        // unmatched groups are truncated, interior unmatched groups become "".
+        let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+        let result = preg_match(pattern, subject, Some(&mut internal), 0, 0)
+            .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+
+        if result == 0 {
+            return Ok(None);
+        }
+
+        let max_index = internal
+            .keys()
+            .filter_map(|key| match key {
+                CaptureKey::ByIndex(index) => Some(*index),
+                CaptureKey::ByName(_) => None,
+            })
+            .max()
+            .unwrap_or(0);
+
+        let mut captures = Vec::with_capacity(max_index + 1);
+        for index in 0..=max_index {
+            let value = internal
+                .get(&CaptureKey::ByIndex(index))
+                .and_then(|value| value.clone())
+                .unwrap_or_default();
+            captures.push(value);
+        }
+
+        Ok(Some(captures))
     }
 
     pub fn is_match_all3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all5(pattern, subject, matches, 0, 0)? > 0)
     }
 
     pub fn is_match_all4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all5(pattern, subject, matches, flags, 0)? > 0)
     }
 
     pub fn is_match_all5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all5(pattern, subject, matches, flags, offset)? > 0)
     }
 
-    pub fn is_match_all_strict_groups(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match_all_strict_groups(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Ok(Self::match_all_strict_groups5(pattern, subject, None, 0, 0)? > 0)
     }
 
     pub fn is_match_all_strict_groups3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_strict_groups5(pattern, subject, matches, 0, 0)? > 0)
     }
 
     pub fn is_match_all_strict_groups4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_strict_groups5(pattern, subject, matches, flags, 0)? > 0)
     }
 
     pub fn is_match_all_strict_groups5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<String>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_strict_groups5(pattern, subject, matches, flags, offset)? > 0)
     }
 
-    pub fn is_match_all_with_offsets(_pattern: &str, _subject: &str) -> anyhow::Result<bool> {
-        todo!()
+    pub fn is_match_all_with_offsets(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+        Ok(Self::match_all_with_offsets5(pattern, subject, None, 0, 0)? > 0)
     }
 
     pub fn is_match_all_with_offsets3(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_with_offsets5(pattern, subject, matches, 0, 0)? > 0)
     }
 
     pub fn is_match_all_with_offsets4(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        _flags: i64,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        flags: i64,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_with_offsets5(pattern, subject, matches, flags, 0)? > 0)
     }
 
     pub fn is_match_all_with_offsets5(
-        _pattern: &str,
-        _subject: &str,
-        _matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        _flags: i64,
-        _offset: usize,
+        pattern: &str,
+        subject: &str,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        flags: i64,
+        offset: usize,
     ) -> anyhow::Result<bool> {
-        todo!()
+        Ok(Self::match_all_with_offsets5(pattern, subject, matches, flags, offset)? > 0)
     }
+
+    fn check_offset_capture(flags: i64, use_function_name: &str) {
+        assert!(
+            flags & PREG_OFFSET_CAPTURE == 0,
+            "PREG_OFFSET_CAPTURE is not supported as it changes the type of $matches, use {}() instead",
+            use_function_name
+        );
+    }
+
+    fn check_set_order(flags: i64) {
+        assert!(
+            flags & PREG_SET_ORDER == 0,
+            "PREG_SET_ORDER is not supported as it changes the type of $matches"
+        );
+    }
+
+    fn enforce_non_null_matches(
+        pattern: &str,
+        matches: IndexMap<CaptureKey, Option<String>>,
+        variant_method: &str,
+    ) -> anyhow::Result<IndexMap<CaptureKey, String>> {
+        let mut result = IndexMap::new();
+        for (group, m) in matches {
+            match m {
+                None => {
+                    return Err(UnexpectedNullMatchException::new(format!(
+                        "Pattern \"{}\" had an unexpected unmatched group \"{}\", make sure the pattern always matches or use {}() instead.",
+                        pattern,
+                        capture_key_to_string(&group),
+                        variant_method
+                    ))
+                    .into());
+                }
+                Some(value) => {
+                    result.insert(group, value);
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    fn enforce_non_null_match_all(
+        pattern: &str,
+        matches: IndexMap<CaptureKey, Vec<Option<String>>>,
+        variant_method: &str,
+    ) -> anyhow::Result<IndexMap<CaptureKey, Vec<String>>> {
+        let mut result = IndexMap::new();
+        for (group, group_matches) in matches {
+            let mut converted = Vec::with_capacity(group_matches.len());
+            for m in group_matches {
+                match m {
+                    None => {
+                        return Err(UnexpectedNullMatchException::new(format!(
+                            "Pattern \"{}\" had an unexpected unmatched group \"{}\", make sure the pattern always matches or use {}() instead.",
+                            pattern,
+                            capture_key_to_string(&group),
+                            variant_method
+                        ))
+                        .into());
+                    }
+                    Some(value) => converted.push(value),
+                }
+            }
+            result.insert(group, converted);
+        }
+        Ok(result)
+    }
+}
+
+fn capture_key_to_string(key: &CaptureKey) -> String {
+    match key {
+        CaptureKey::ByIndex(index) => index.to_string(),
+        CaptureKey::ByName(name) => name.clone(),
+    }
+}
+
+// Drops `null` (unmatched) groups, mirroring how the public `string`-valued
+// `matches` map represents PHP's `string|null` entries by their absence.
+fn drop_null_matches(
+    matches: IndexMap<CaptureKey, Option<String>>,
+) -> IndexMap<CaptureKey, String> {
+    matches
+        .into_iter()
+        .filter_map(|(key, value)| value.map(|value| (key, value)))
+        .collect()
+}
+
+fn drop_null_matches_ref(
+    matches: &IndexMap<CaptureKey, Option<String>>,
+) -> IndexMap<CaptureKey, String> {
+    matches
+        .iter()
+        .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
+        .collect()
+}
+
+fn drop_null_offset_matches(
+    matches: IndexMap<CaptureKey, (Option<String>, i64)>,
+) -> IndexMap<CaptureKey, (String, usize)> {
+    matches
+        .into_iter()
+        .filter_map(|(key, (value, offset))| {
+            value.map(|value| (key, (value, offset.max(0) as usize)))
+        })
+        .collect()
+}
+
+// In the `Vec<String>`-valued maps a per-iteration `null` cannot be stored, so
+// unmatched groups collapse to "" (the classic non-PREG_UNMATCHED_AS_NULL form).
+fn null_to_empty_match_all(
+    matches: IndexMap<CaptureKey, Vec<Option<String>>>,
+) -> IndexMap<CaptureKey, Vec<String>> {
+    matches
+        .into_iter()
+        .map(|(key, values)| {
+            (
+                key,
+                values
+                    .into_iter()
+                    .map(|value| value.unwrap_or_default())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+fn null_to_empty_offset_match_all(
+    matches: IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+) -> IndexMap<CaptureKey, Vec<(String, usize)>> {
+    matches
+        .into_iter()
+        .map(|(key, values)| {
+            (
+                key,
+                values
+                    .into_iter()
+                    .map(|(value, offset)| (value.unwrap_or_default(), offset.max(0) as usize))
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum CaptureKey {
     ByIndex(usize),
     ByName(String),
+}
+
+pub fn preg_last_error() -> i64 {
+    todo!()
+}
+
+pub fn preg_last_error_msg() -> String {
+    todo!()
+}
+
+// Returns Some(0|1) on success or None when the underlying preg_match returned
+// false. Unmatched groups are reported as None (PREG_UNMATCHED_AS_NULL).
+pub fn preg_match(
+    _pattern: &str,
+    _subject: &str,
+    _matches: Option<&mut IndexMap<CaptureKey, Option<String>>>,
+    _flags: i64,
+    _offset: usize,
+) -> Option<i64> {
+    todo!()
+}
+
+pub fn preg_match_offset_capture(
+    _pattern: &str,
+    _subject: &str,
+    _matches: Option<&mut IndexMap<CaptureKey, (Option<String>, i64)>>,
+    _flags: i64,
+    _offset: usize,
+) -> Option<i64> {
+    todo!()
+}
+
+pub fn preg_match_all(
+    _pattern: &str,
+    _subject: &str,
+    _matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
+    _flags: i64,
+    _offset: usize,
+) -> Option<i64> {
+    todo!()
+}
+
+pub fn preg_match_all_offset_capture(
+    _pattern: &str,
+    _subject: &str,
+    _matches: Option<&mut IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
+    _flags: i64,
+    _offset: usize,
+) -> Option<i64> {
+    todo!()
+}
+
+pub fn preg_replace(
+    _pattern: &str,
+    _replacement: &str,
+    _subject: &str,
+    _limit: i64,
+    _count: Option<&mut usize>,
+) -> Option<String> {
+    todo!()
+}
+
+pub fn preg_replace_callback<F: FnMut(&IndexMap<CaptureKey, Option<String>>) -> String>(
+    _pattern: &str,
+    _callback: F,
+    _subject: &str,
+    _limit: i64,
+    _count: Option<&mut usize>,
+    _flags: i64,
+) -> Option<String> {
+    todo!()
+}
+
+pub fn preg_split(_pattern: &str, _subject: &str, _limit: i64, _flags: i64) -> Option<Vec<String>> {
+    todo!()
+}
+
+pub fn preg_split_offset_capture(
+    _pattern: &str,
+    _subject: &str,
+    _limit: i64,
+    _flags: i64,
+) -> Option<Vec<(String, usize)>> {
+    todo!()
+}
+
+pub fn preg_grep(_pattern: &str, _array: &[&str], _flags: i64) -> Option<Vec<String>> {
+    todo!()
 }
