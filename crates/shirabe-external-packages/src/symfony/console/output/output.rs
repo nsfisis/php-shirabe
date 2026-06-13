@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Output/Output.php
+
 use crate::symfony::console::formatter::OutputFormatter;
 use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::output_interface::{

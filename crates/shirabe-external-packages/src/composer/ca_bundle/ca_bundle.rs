@@ -1,3 +1,5 @@
+//! ref: composer/vendor/composer/ca-bundle/src/CaBundle.php
+
 #[derive(Debug)]
 pub struct CaBundle;
 

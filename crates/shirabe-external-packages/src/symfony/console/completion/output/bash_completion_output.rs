@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Completion/Output/BashCompletionOutput.php
+
 use crate::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use crate::symfony::console::completion::output::completion_output_interface::CompletionOutputInterface;
 use crate::symfony::console::output::output_interface::OutputInterface;

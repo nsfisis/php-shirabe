@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Input/InputArgument.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::logic_exception::LogicException;
 use shirabe_php_shim::PhpMixed;

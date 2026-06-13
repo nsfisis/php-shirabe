@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Input/InputInterface.php
+
 use crate::symfony::console::input::input_definition::InputDefinition;
 use shirabe_php_shim::PhpMixed;
 

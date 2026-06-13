@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyle.php
+
 use crate::symfony::console::color::Color;
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 

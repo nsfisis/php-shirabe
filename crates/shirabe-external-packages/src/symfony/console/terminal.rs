@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Terminal.php
+
 use shirabe_php_shim::PhpMixed;
 use std::cell::Cell;
 

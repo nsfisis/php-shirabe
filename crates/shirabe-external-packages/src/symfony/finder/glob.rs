@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/finder/Glob.php
+
 #[derive(Debug)]
 pub struct Glob;
 

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php
+
 use crate::symfony::process::process::Process;
 
 #[derive(Debug)]

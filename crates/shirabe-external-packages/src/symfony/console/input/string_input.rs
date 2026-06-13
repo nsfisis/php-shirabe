@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Input/StringInput.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::input::argv_input::ArgvInput;
 use crate::symfony::console::input::input_definition::InputDefinition;

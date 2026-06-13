@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Output/StreamOutput.php
+
 use crate::symfony::console::exception::InvalidArgumentException;
 use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::output::OutputInterface;

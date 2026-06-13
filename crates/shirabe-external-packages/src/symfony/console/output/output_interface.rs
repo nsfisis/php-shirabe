@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Output/OutputInterface.php
+
 use crate::symfony::console::formatter::OutputFormatterInterface;
 
 pub const VERBOSITY_QUIET: i64 = 16;

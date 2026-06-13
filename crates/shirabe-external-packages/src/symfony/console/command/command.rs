@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Command/Command.php
+
 use crate::symfony::console::application::Application;
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::CompletionSuggestions;

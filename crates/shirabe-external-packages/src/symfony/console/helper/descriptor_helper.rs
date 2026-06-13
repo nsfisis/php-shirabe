@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
+
 use crate::symfony::console::descriptor::descriptor_interface::DescriptorInterface;
 use crate::symfony::console::descriptor::json_descriptor::JsonDescriptor;
 use crate::symfony::console::descriptor::markdown_descriptor::MarkdownDescriptor;

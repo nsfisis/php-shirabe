@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Command/SignalableCommandInterface.php
+
 /// Interface for command reacting to signal.
 pub trait SignalableCommandInterface {
     /// Returns the list of signals to subscribe.

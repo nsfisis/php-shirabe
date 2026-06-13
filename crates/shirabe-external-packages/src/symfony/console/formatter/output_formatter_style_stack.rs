@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleStack.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::symfony::console::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Completion/CompletionSuggestions.php
+
 use crate::symfony::console::completion::suggestion::Suggestion;
 use crate::symfony::console::input::input_option::InputOption;
 

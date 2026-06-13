@@ -1,3 +1,5 @@
+//! ref: composer/vendor/composer/semver/src/Intervals.php
+
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 

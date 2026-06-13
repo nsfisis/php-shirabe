@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Input/StreamableInputInterface.php
+
 use crate::symfony::console::input::input_interface::InputInterface;
 use shirabe_php_shim::PhpMixed;
 

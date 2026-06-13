@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Descriptor/TextDescriptor.php
+
 use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;

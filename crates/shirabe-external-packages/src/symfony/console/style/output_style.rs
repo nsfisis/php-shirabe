@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Style/OutputStyle.php
+
 use crate::symfony::console::formatter::OutputFormatterInterface;
 use crate::symfony::console::helper::ProgressBar;
 use crate::symfony::console::output::ConsoleOutputInterface;

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/TableRows.php
+
 use shirabe_php_shim::PhpMixed;
 
 /// @internal

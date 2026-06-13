@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/Table.php
+
 use crate::composer::pcre::preg::Preg;
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::runtime_exception::RuntimeException;

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Completion/Suggestion.php
+
 /// Represents a single suggested value.
 #[derive(Debug)]
 pub struct Suggestion {

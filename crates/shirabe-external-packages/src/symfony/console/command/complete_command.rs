@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
+
 use indexmap::IndexMap;
 use shirabe_php_shim::AsAny;
 use shirabe_php_shim::PhpMixed;

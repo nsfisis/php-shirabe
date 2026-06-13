@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/filesystem/Filesystem.php
+
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug, Clone)]

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Command/HelpCommand.php
+
 use crate::symfony::console::command::command::{BaseCommand, Command, SetDefinitionArg};
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::{

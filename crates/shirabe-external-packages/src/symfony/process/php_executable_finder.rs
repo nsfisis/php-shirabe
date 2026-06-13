@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/process/PhpExecutableFinder.php
+
 #[derive(Debug)]
 pub struct PhpExecutableFinder;
 

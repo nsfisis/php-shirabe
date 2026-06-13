@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Exception/CommandNotFoundException.php
+
 use super::exception_interface::ExceptionInterface;
 use super::invalid_argument_exception::InvalidArgumentException;
 

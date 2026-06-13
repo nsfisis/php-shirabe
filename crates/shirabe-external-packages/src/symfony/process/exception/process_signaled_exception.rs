@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/process/Exception/ProcessSignaledException.php
+
 #[derive(Debug)]
 pub struct ProcessSignaledException {
     pub message: String,

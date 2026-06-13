@@ -1,3 +1,5 @@
+//! ref: composer/src/Composer/Util/ComposerMirror.php
+
 #[derive(Debug)]
 pub struct ComposerMirror;
 

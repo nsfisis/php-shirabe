@@ -1,3 +1,5 @@
+//! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/DuplicateKeyException.php
+
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

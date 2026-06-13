@@ -1,3 +1,5 @@
+//! ref: composer/vendor/psr/log/Psr/Log/LoggerInterface.php
+
 pub trait LoggerInterface {
     fn emergency(&self, message: &str, context: &[(&str, &str)]);
     fn alert(&self, message: &str, context: &[(&str, &str)]);

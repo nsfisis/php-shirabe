@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/finder/SplFileInfo.php
+
 #[derive(Debug)]
 pub struct SplFileInfo;
 

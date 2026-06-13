@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Attribute/AsCommand.php
+
 /// Service tag to autoconfigure commands.
 ///
 /// PHP attribute: #[\Attribute(\Attribute::TARGET_CLASS)]

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/ConsoleEvents.php
+
 /// Contains all events dispatched by an Application.
 #[derive(Debug)]
 pub struct ConsoleEvents;

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Event/ConsoleSignalEvent.php
+
 use super::console_event::ConsoleEvent;
 use crate::symfony::console::command::command::Command;
 use crate::symfony::console::input::input_interface::InputInterface;

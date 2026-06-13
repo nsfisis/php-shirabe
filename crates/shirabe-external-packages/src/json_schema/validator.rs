@@ -1,3 +1,5 @@
+//! ref: composer/vendor/justinrainbow/json-schema/src/JsonSchema/Validator.php
+
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

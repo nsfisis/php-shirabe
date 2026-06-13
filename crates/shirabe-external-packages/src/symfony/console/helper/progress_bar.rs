@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/ProgressBar.php
+
 use crate::symfony::console::cursor::Cursor;
 use crate::symfony::console::exception::logic_exception::LogicException;
 use crate::symfony::console::helper::helper::Helper;

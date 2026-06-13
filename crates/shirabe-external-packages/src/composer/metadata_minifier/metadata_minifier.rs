@@ -1,3 +1,5 @@
+//! ref: composer/vendor/composer/metadata-minifier/src/MetadataMinifier.php
+
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

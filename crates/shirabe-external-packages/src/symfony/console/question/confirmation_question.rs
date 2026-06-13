@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
+
 use crate::symfony::console::question::Question;
 use shirabe_php_shim::PhpMixed;
 

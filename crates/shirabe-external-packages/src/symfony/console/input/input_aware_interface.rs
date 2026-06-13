@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Input/InputAwareInterface.php
+
 use crate::symfony::console::input::input_interface::InputInterface;
 
 pub trait InputAwareInterface {

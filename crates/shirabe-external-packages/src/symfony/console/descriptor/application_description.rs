@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Descriptor/ApplicationDescription.php
+
 use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;
 use crate::symfony::console::exception::command_not_found_exception::CommandNotFoundException;

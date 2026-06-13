@@ -1,3 +1,5 @@
+//! ref: composer/vendor/composer/xdebug-handler/src/XdebugHandler.php
+
 #[derive(Debug)]
 pub struct XdebugHandler;
 

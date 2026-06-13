@@ -1,3 +1,5 @@
+//! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/ParsingException.php
+
 #[derive(Debug, Clone, Default)]
 pub struct ParsingExceptionLoc {
     pub first_line: i64,

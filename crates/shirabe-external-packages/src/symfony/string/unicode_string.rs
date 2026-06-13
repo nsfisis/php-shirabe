@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/string/UnicodeString.php
+
 #[derive(Debug, Clone)]
 pub struct UnicodeString {
     pub(crate) string: String,

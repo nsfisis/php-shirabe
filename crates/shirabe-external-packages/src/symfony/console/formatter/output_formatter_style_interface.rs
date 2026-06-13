@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Formatter/OutputFormatterStyleInterface.php
+
 /// Formatter style interface for defining styles.
 pub trait OutputFormatterStyleInterface: std::fmt::Debug {
     /// Sets style foreground color.

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/seld/signal-handler/src/SignalHandler.php
+
 #[derive(Debug)]
 pub struct SignalHandler;
 

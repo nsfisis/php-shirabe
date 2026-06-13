@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/process/Exception/ProcessTimedOutException.php
+
 #[derive(Debug)]
 pub struct ProcessTimedOutException {
     pub message: String,

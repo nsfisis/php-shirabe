@@ -1,3 +1,5 @@
+//! ref: composer/vendor/composer/spdx-licenses/src/SpdxLicenses.php
+
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

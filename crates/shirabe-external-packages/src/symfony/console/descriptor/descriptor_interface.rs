@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Descriptor/DescriptorInterface.php
+
 use crate::symfony::console::output::output_interface::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

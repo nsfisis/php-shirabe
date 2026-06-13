@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/TableSeparator.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::helper::table_cell::{TableCell, TableCellOption};
 use indexmap::IndexMap;

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/finder/Finder.php
+
 use crate::symfony::finder::SplFileInfo;
 
 /// Helper trait so `Finder::exclude` accepts both single strings and slices

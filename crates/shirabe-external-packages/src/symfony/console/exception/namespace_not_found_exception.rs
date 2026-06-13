@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Exception/NamespaceNotFoundException.php
+
 use super::command_not_found_exception::CommandNotFoundException;
 use super::exception_interface::ExceptionInterface;
 

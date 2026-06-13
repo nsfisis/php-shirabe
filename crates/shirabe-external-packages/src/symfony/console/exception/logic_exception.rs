@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Exception/LogicException.php
+
 use super::exception_interface::ExceptionInterface;
 
 #[derive(Debug)]

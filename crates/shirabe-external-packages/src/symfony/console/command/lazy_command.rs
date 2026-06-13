@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Command/LazyCommand.php
+
 use shirabe_php_shim::PhpMixed;
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};

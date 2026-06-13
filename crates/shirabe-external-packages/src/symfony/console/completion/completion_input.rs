@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
+
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

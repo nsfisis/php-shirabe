@@ -1,3 +1,5 @@
+//! ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogLevel;
 

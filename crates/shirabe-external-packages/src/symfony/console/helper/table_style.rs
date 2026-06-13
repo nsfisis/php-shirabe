@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/TableStyle.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::exception::logic_exception::LogicException;
 

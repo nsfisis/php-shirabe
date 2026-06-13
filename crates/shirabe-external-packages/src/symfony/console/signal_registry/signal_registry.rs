@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/SignalRegistry/SignalRegistry.php
+
 use indexmap::IndexMap;
 
 /// A signal handler receives the signal number and whether a further handler follows.

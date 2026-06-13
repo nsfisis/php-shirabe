@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/string/ByteString.php
+
 use crate::symfony::string::code_point_string::CodePointString;
 
 #[derive(Debug, Clone)]

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Helper/TableCell.php
+
 use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
 use crate::symfony::console::helper::table_cell_style::TableCellStyle;
 use indexmap::IndexMap;

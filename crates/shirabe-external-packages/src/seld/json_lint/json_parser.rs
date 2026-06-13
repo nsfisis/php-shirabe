@@ -1,3 +1,5 @@
+//! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/JsonParser.php
+
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Descriptor/XmlDescriptor.php
+
 use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;
 use crate::symfony::console::descriptor::application_description::ApplicationDescription;

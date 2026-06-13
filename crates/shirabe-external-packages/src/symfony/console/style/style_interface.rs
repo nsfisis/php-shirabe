@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Style/StyleInterface.php
+
 use shirabe_php_shim::PhpMixed;
 
 /// Output style helpers.

@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/console/Formatter/WrappableOutputFormatterInterface.php
+
 use crate::symfony::console::formatter::output_formatter_interface::OutputFormatterInterface;
 
 /// Formatter interface for console output that supports word wrapping.

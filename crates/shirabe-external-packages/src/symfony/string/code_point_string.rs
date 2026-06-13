@@ -1,3 +1,5 @@
+//! ref: composer/vendor/symfony/string/CodePointString.php
+
 #[derive(Debug, Clone)]
 pub struct CodePointString {
     pub(crate) string: String,
