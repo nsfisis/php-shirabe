@@ -1,6 +1,14 @@
 //! ref: composer/vendor/composer/pcre/src/Preg.php
+//!
+//! The following two exception classes are intentionally not ported:
+//!
+//! - `PcreException`: thrown when a `preg_*()` call returns false. Composer never feeds a pattern
+//!   that fails to compile at runtime, so such a failure would be a programming error rather than
+//!   a recoverable condition; they panic instead.
+//! - `UnexpectedNullMatchException`: thrown by the `Preg::*StrictGroups()` variants when a capture
+//!   group did not participate. Those variants were dropped because Rust's `Option` already
+//!   distinguishes participating from non-participating groups.
 
-use super::pcre_exception::PcreException;
 use indexmap::IndexMap;
 
 pub const PREG_PATTERN_ORDER: i64 = 1;
@@ -41,7 +49,7 @@ impl Preg {
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
         )
-        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+        .unwrap_or_else(|| invalid_regex());
 
         if let Some(out) = matches {
             *out = drop_null_matches(internal);
@@ -80,7 +88,7 @@ impl Preg {
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
         )
-        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
+        .unwrap_or_else(|| invalid_regex());
 
         if let Some(out) = matches {
             *out = null_to_empty_match_all(internal);
@@ -106,7 +114,7 @@ impl Preg {
             flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
             offset,
         )
-        .ok_or_else(|| PcreException::from_function("preg_match_all", pattern))?;
+        .unwrap_or_else(|| invalid_regex());
 
         if let Some(out) = matches {
             *out = null_to_empty_offset_match_all(internal);
@@ -148,8 +156,8 @@ impl Preg {
         // `$subject` is statically a string here, so the is_scalar/is_array
         // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
         // unreachable and not reproduced.
-        preg_replace(pattern, replacement, subject, limit, count)
-            .ok_or_else(|| PcreException::from_function("preg_replace", pattern).into())
+        Ok(preg_replace(pattern, replacement, subject, limit, count)
+            .unwrap_or_else(|| invalid_regex()))
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
@@ -172,8 +180,10 @@ impl Preg {
             replacement(&drop_null_matches_ref(internal))
         };
 
-        preg_replace_callback(pattern, adapter, subject, limit, count, flags)
-            .ok_or_else(|| PcreException::from_function("preg_replace_callback", pattern).into())
+        Ok(
+            preg_replace_callback(pattern, adapter, subject, limit, count, flags)
+                .unwrap_or_else(|| invalid_regex()),
+        )
     }
 
     pub fn split(pattern: &str, subject: &str) -> anyhow::Result<Vec<String>> {
@@ -191,8 +201,7 @@ impl Preg {
             "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
         );
 
-        preg_split(pattern, subject, limit, flags)
-            .ok_or_else(|| PcreException::from_function("preg_split", pattern).into())
+        Ok(preg_split(pattern, subject, limit, flags).unwrap_or_else(|| invalid_regex()))
     }
 
     pub fn grep(pattern: &str, array: &[&str]) -> anyhow::Result<Vec<String>> {
@@ -200,8 +209,7 @@ impl Preg {
     }
 
     pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> anyhow::Result<Vec<String>> {
-        preg_grep(pattern, array, flags)
-            .ok_or_else(|| PcreException::from_function("preg_grep", pattern).into())
+        Ok(preg_grep(pattern, array, flags).unwrap_or_else(|| invalid_regex()))
     }
 
     pub fn is_match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
@@ -239,7 +247,7 @@ impl Preg {
             PREG_UNMATCHED_AS_NULL,
             0,
         )
-        .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+        .unwrap_or_else(|| invalid_regex());
 
         matches.clear();
         for (key, value) in internal {
@@ -259,7 +267,7 @@ impl Preg {
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
         let result = preg_match(pattern, subject, Some(&mut internal), 0, 0)
-            .ok_or_else(|| PcreException::from_function("preg_match", pattern))?;
+            .unwrap_or_else(|| invalid_regex());
 
         if result == 0 {
             return Ok(None);
@@ -447,4 +455,10 @@ pub fn preg_split(_pattern: &str, _subject: &str, _limit: i64, _flags: i64) -> O
 
 pub fn preg_grep(_pattern: &str, _array: &[&str], _flags: i64) -> Option<Vec<String>> {
     todo!()
+}
+
+/// Panics if a pattern is invalid instead of throwing a PcreException.
+/// TODO: takes regex::Error and shows its message
+fn invalid_regex() -> ! {
+    panic!("invalid regex");
 }
