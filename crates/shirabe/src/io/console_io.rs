@@ -275,10 +275,6 @@ impl ConsoleIO {
     /// All other control chars (except NULL bytes) as well as ANSI escape sequences are removed.
     ///
     /// Invalid unicode sequences are turned into question marks.
-    ///
-    /// @param string|iterable<string> $messages
-    /// @return string|array<string>
-    /// @phpstan-return ($messages is string ? string : array<string>)
     pub fn sanitize(messages: PhpMixed, allow_newlines: bool) -> PhpMixed {
         // Match ANSI escape sequences:
         // - CSI (Control Sequence Introducer): ESC [ params intermediate final
@@ -286,17 +282,24 @@ impl ConsoleIO {
         // - Other ESC sequences: ESC followed by any character
         let escape_pattern =
             r"\x1B\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]|\x1B\].*?(?:\x1B\\|\x07)|\x1B.";
-        let pattern = if allow_newlines {
-            format!(
-                "{{{}|[\\x01-\\x09\\x0B\\x0C\\x0E-\\x1A]|\\r(?!\\n)}}u",
-                escape_pattern
+        // Regex pattern compatibility:
+        // PCRE's `\r(?!\n)` (non-CRLF CR) uses a negative lookahead, which the regex crate does
+        // not support. Instead we capture `\r\n` and re-emit it via the `$1` backreference. A CRLF
+        // pair is preserved while a lone CR is removed.
+        let (pattern, replacement) = if allow_newlines {
+            (
+                format!(
+                    r#"@{}|[\x01-\x09\x0B\x0C\x0E-\x1A]|(\r\n)|\r@u"#,
+                    escape_pattern
+                ),
+                "$1",
             )
         } else {
-            format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern)
+            (format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern), "")
         };
         if is_string(&messages) {
             let message = Self::ensure_valid_utf8(messages.as_string().unwrap_or(""));
-            return PhpMixed::String(Preg::replace(&pattern, "", &message));
+            return PhpMixed::String(Preg::replace(&pattern, replacement, &message));
         }
 
         // PHP: $sanitized = []; foreach ($messages as $key => $message) { ... }
@@ -307,7 +310,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.to_string(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                        PhpMixed::String(Preg::replace(&pattern, replacement, &s)),
                     );
                 }
             }
@@ -316,7 +319,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.clone(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
+                        PhpMixed::String(Preg::replace(&pattern, replacement, &s)),
                     );
                 }
             }

@@ -5,7 +5,8 @@ pub struct XdebugHandler;
 
 impl XdebugHandler {
     pub fn is_xdebug_active() -> bool {
-        todo!()
+        // TODO(php-runtime)
+        false
     }
 
     pub fn get_skipped_version() -> Option<String> {

@@ -393,12 +393,21 @@ fn compile_php_pattern(pattern: &str) -> anyhow::Result<regex::Regex> {
         .chars()
         .next()
         .ok_or_else(|| anyhow::anyhow!("empty regex pattern"))?;
+    // PCRE allows bracket-style delimiters whose closing character differs from
+    // the opening one: `(...)`, `{...}`, `[...]`, `<...>`.
+    let closing = match delimiter {
+        '(' => ')',
+        '{' => '}',
+        '[' => ']',
+        '<' => '>',
+        c => c,
+    };
     let end = pattern
-        .rfind(delimiter)
-        .filter(|&i| i > 0)
+        .rfind(closing)
+        .filter(|&i| i >= delimiter.len_utf8())
         .ok_or_else(|| anyhow::anyhow!("unterminated regex pattern: {pattern}"))?;
     let inner = &pattern[delimiter.len_utf8()..end];
-    let modifiers = &pattern[end + delimiter.len_utf8()..];
+    let modifiers = &pattern[end + closing.len_utf8()..];
 
     let flags: String = modifiers
         .chars()

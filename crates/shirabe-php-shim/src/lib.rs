@@ -1592,9 +1592,9 @@ pub fn curl_handle_id(_handle: &CurlHandle) -> i64 {
     todo!()
 }
 
-pub fn restore_error_handler() {
-    todo!()
-}
+// TODO(php-runtime): the previous handler should be restored in the PHP runtime.
+// Paired with set_error_handler, which is a no-op in this shim.
+pub fn restore_error_handler() {}
 
 pub fn stream_get_contents_with_max(stream: PhpMixed, max_length: Option<i64>) -> Option<String> {
     let _ = (stream, max_length);
@@ -1610,7 +1610,9 @@ pub fn is_dir(_path: &str) -> bool {
 }
 
 pub fn file_get_contents(_path: &str) -> Option<String> {
-    todo!()
+    std::fs::read(_path)
+        .ok()
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
 pub fn file_get_contents5(
@@ -1795,6 +1797,12 @@ pub fn php_uname(mode: &str) -> String {
             other => other,
         }
         .to_string(),
+        // TODO(phase-c): use libc?
+        // release, as reported by uname(2). On Linux this matches the contents
+        // of /proc/sys/kernel/osrelease.
+        "r" => std::fs::read_to_string("/proc/sys/kernel/osrelease")
+            .map(|s| s.trim_end().to_string())
+            .unwrap_or_default(),
         _ => todo!(),
     }
 }
@@ -1921,8 +1929,44 @@ pub fn strcmp(_s1: &str, _s2: &str) -> i64 {
     _s1.cmp(_s2) as i64
 }
 
-pub fn rtrim(_s: &str, _chars: Option<&str>) -> String {
-    todo!()
+/// PHP's default trim character mask: " \t\n\r\0\x0B".
+const PHP_TRIM_DEFAULT_CHARS: &[u8] = b" \t\n\r\0\x0B";
+
+/// Build the set of bytes to strip from a PHP trim `$characters` argument,
+/// expanding `a..b` range syntax as PHP does.
+fn php_trim_mask(chars: &[u8]) -> [bool; 256] {
+    let mut mask = [false; 256];
+    let mut i = 0;
+    while i < chars.len() {
+        if i + 3 < chars.len() && chars[i + 1] == b'.' && chars[i + 2] == b'.' {
+            let start = chars[i];
+            let end = chars[i + 3];
+            if start <= end {
+                for b in start..=end {
+                    mask[b as usize] = true;
+                }
+                i += 4;
+                continue;
+            }
+        }
+        mask[chars[i] as usize] = true;
+        i += 1;
+    }
+    mask
+}
+
+pub fn rtrim(s: &str, chars: Option<&str>) -> String {
+    let mask = php_trim_mask(
+        chars
+            .map(|c| c.as_bytes())
+            .unwrap_or(PHP_TRIM_DEFAULT_CHARS),
+    );
+    let bytes = s.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 && mask[bytes[end - 1] as usize] {
+        end -= 1;
+    }
+    String::from_utf8_lossy(&bytes[..end]).into_owned()
 }
 
 pub fn rmdir(_dir: &str) -> bool {
@@ -2227,7 +2271,11 @@ pub fn memory_get_usage() -> i64 {
 }
 
 pub fn mb_check_encoding(_value: &str, _encoding: &str) -> bool {
-    todo!()
+    match _encoding.to_ascii_uppercase().replace('-', "").as_str() {
+        // A Rust &str is, by construction, valid UTF-8.
+        "UTF8" => true,
+        _ => todo!(),
+    }
 }
 
 pub fn iconv(_in_charset: &str, _out_charset: &str, _string: &str) -> Option<String> {
@@ -2379,7 +2427,17 @@ pub fn error_get_last() -> Option<IndexMap<String, Box<PhpMixed>>> {
 }
 
 pub fn is_readable(_path: &str) -> bool {
-    todo!()
+    let path = std::path::Path::new(_path);
+    match std::fs::metadata(path) {
+        Ok(meta) => {
+            if meta.is_dir() {
+                std::fs::read_dir(path).is_ok()
+            } else {
+                std::fs::File::open(path).is_ok()
+            }
+        }
+        Err(_) => false,
+    }
 }
 
 pub fn stream_get_wrappers() -> Vec<String> {
