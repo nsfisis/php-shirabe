@@ -660,7 +660,7 @@ impl BaseCommand {
     /// Throws InvalidArgumentException when the name is invalid.
     fn validate_name(&self, name: &str) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         let mut matches: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match(r"/^[^\:]++(\:[^\:]++)*$/", name, &mut matches) == 0 {
+        if !shirabe_php_shim::preg_match(r"/^[^\:]++(\:[^\:]++)*$/", name, &mut matches) {
             return Ok(Err(InvalidArgumentException(
                 shirabe_php_shim::InvalidArgumentException {
                     message: format!("Command name \"{}\" is invalid.", name),

@@ -40,9 +40,9 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     out
 }
 
-// Returns 1 on match, 0 on no match; populates matches[0]=full match, matches[1..]=captures.
+// Returns whether the pattern matched; populates matches[0]=full match, matches[1..]=captures.
 // Optional groups that did not participate in the match are stored as None.
-pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>>) -> i64 {
+pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>>) -> bool {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     matches.clear();
     match re.captures(subject) {
@@ -50,9 +50,9 @@ pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>
             for g in 0..caps.len() {
                 matches.push(caps.get(g).map(|m| m.as_str().to_string()));
             }
-            1
+            true
         }
-        None => 0,
+        None => false,
     }
 }
 

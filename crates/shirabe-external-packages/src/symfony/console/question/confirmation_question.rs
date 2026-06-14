@@ -42,7 +42,7 @@ impl ConfirmationQuestion {
                     &regex,
                     &shirabe_php_shim::strval(&answer),
                     &mut matches,
-                ) != 0
+                )
             };
 
             // false === $default

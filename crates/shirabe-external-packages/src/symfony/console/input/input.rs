@@ -231,7 +231,7 @@ impl Input {
     /// Escapes a token through escapeshellarg if it contains unsafe chars.
     pub fn escape_token(&self, token: &str) -> String {
         let mut matches: Vec<Option<String>> = vec![];
-        if shirabe_php_shim::preg_match("{^[\\w-]+$}", token, &mut matches) != 0 {
+        if shirabe_php_shim::preg_match("{^[\\w-]+$}", token, &mut matches) {
             token.to_string()
         } else {
             shirabe_php_shim::escapeshellarg(token)

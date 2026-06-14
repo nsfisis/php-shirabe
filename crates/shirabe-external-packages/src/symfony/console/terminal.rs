@@ -87,8 +87,7 @@ impl Terminal {
                     "/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/",
                     &shirabe_php_shim::trim(ansicon, None),
                     &mut matches,
-                ) != 0
-                {
+                ) {
                     // extract [w, H] from "wxh (WxH)"
                     // or [w, h] from "wxh"
                     WIDTH.with(|w| {
@@ -145,8 +144,7 @@ impl Terminal {
                 "/rows.(\\d+);.columns.(\\d+);/i",
                 &stty_string,
                 &mut matches,
-            ) != 0
-            {
+            ) {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
@@ -162,8 +160,7 @@ impl Terminal {
                 "/;.(\\d+).rows;.(\\d+).columns/i",
                 &stty_string,
                 &mut matches,
-            ) != 0
-            {
+            ) {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
@@ -187,12 +184,11 @@ impl Terminal {
 
         let info = info?;
         let mut matches: Vec<Option<String>> = Vec::new();
-        if shirabe_php_shim::preg_match(
+        if !shirabe_php_shim::preg_match(
             "/--------+\\r?\\n.+?(\\d+)\\r?\\n.+?(\\d+)\\r?\\n/",
             &info,
             &mut matches,
-        ) == 0
-        {
+        ) {
             return None;
         }
 

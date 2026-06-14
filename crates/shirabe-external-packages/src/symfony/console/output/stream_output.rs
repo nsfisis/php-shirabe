@@ -115,7 +115,7 @@ impl StreamOutput {
             "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/",
             &term,
             &mut matches,
-        ) != 0
+        )
     }
 }
 

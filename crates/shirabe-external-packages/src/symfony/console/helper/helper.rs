@@ -38,7 +38,7 @@ impl Helper {
     /// Returns the width of a string, using mb_strwidth if it is available.
     /// The width is how many characters positions the string will use.
     pub fn width(string: &str) -> i64 {
-        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) != 0 {
+        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) {
             return UnicodeString::new(string).width(false);
         }
 
@@ -54,7 +54,7 @@ impl Helper {
     /// Returns the length of a string, using mb_strlen if it is available.
     /// The length is related to how many bytes the string will use.
     pub fn length(string: &str) -> i64 {
-        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) != 0 {
+        if shirabe_php_shim::preg_match("//u", string, &mut Vec::new()) {
             return UnicodeString::new(string).length();
         }
 

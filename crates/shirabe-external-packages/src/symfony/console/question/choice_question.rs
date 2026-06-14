@@ -113,12 +113,11 @@ impl ChoiceQuestion {
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
                 let mut matches: Vec<Option<String>> = Vec::new();
-                if shirabe_php_shim::preg_match(
+                if !shirabe_php_shim::preg_match(
                     "/^[^,]+(?:,[^,]+)*$/",
                     &shirabe_php_shim::strval(&selected),
                     &mut matches,
-                ) == 0
-                {
+                ) {
                     return Err(InvalidArgumentException(
                         shirabe_php_shim::InvalidArgumentException {
                             message: shirabe_php_shim::sprintf(&error_message, &[selected.clone()]),
