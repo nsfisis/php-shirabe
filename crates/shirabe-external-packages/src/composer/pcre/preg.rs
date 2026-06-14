@@ -88,7 +88,7 @@ impl Preg {
             *out = null_to_empty_match_all(internal);
         }
 
-        result as usize
+        result
     }
 
     pub fn match_all_with_offsets5(
@@ -113,7 +113,7 @@ impl Preg {
             *out = null_to_empty_offset_match_all(internal);
         }
 
-        result as usize
+        result
     }
 
     pub fn replace(pattern: &str, replacement: &str, subject: &str) -> String {

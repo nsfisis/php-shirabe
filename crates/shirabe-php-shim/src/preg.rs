@@ -508,12 +508,12 @@ fn single_match_map(
 
     for i in 0..group_count {
         let m = caps.get(i);
-        if !unmatched_as_null && m.is_none() {
-            if let Some(last) = last_participating {
-                if i > last {
-                    break;
-                }
-            }
+        if !unmatched_as_null
+            && m.is_none()
+            && let Some(last) = last_participating
+            && i > last
+        {
+            break;
         }
         let value = if unmatched_as_null {
             m.map(|m| m.as_str().to_string())

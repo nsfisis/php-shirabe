@@ -57,10 +57,11 @@ impl ArrayInput {
     pub fn get_first_argument(&self) -> Option<PhpMixed> {
         for (param, value) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
-            if let PhpMixed::String(param) = param {
-                if !param.is_empty() && param.as_bytes()[0] == b'-' {
-                    continue;
-                }
+            if let PhpMixed::String(param) = param
+                && !param.is_empty()
+                && param.as_bytes()[0] == b'-'
+            {
+                continue;
             }
 
             return Some(value.clone());
@@ -147,7 +148,7 @@ impl ArrayInput {
                         params.push(format!(
                             "{}{}",
                             param,
-                            if v != "" {
+                            if !v.is_empty() {
                                 format!("{}{}", glue, self.inner.escape_token(&v))
                             } else {
                                 String::new()
@@ -159,7 +160,7 @@ impl ArrayInput {
                     params.push(format!(
                         "{}{}",
                         param,
-                        if val != "" {
+                        if !val.is_empty() {
                             format!("{}{}", glue, self.inner.escape_token(&val))
                         } else {
                             String::new()
@@ -219,12 +220,10 @@ impl ArrayInput {
         }
 
         self.add_long_option(
-            &self
-                .inner
+            self.inner
                 .definition
                 .get_option_for_shortcut(shortcut)?
-                .get_name()
-                .to_string(),
+                .get_name(),
             value,
         )
     }

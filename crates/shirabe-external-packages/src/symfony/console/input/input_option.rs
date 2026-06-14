@@ -68,7 +68,7 @@ impl InputOption {
 
         let mode = match mode {
             None => Self::VALUE_NONE,
-            Some(m) if m >= (Self::VALUE_NEGATABLE << 1) || m < 1 => {
+            Some(m) if !(1..(Self::VALUE_NEGATABLE << 1)).contains(&m) => {
                 return Err(
                     InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
                         message: format!("Option mode \"{}\" is not valid.", m),

@@ -47,18 +47,17 @@ impl TableCell {
             ));
         }
 
-        if let Some(style) = options.get("style") {
-            if !matches!(style, TableCellOption::Style(_))
-                && !matches!(style, TableCellOption::Null)
-            {
-                return Err(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: "The style option must be an instance of \"TableCellStyle\"."
-                            .to_string(),
-                        code: 0,
-                    },
-                ));
-            }
+        if let Some(style) = options.get("style")
+            && !matches!(style, TableCellOption::Style(_))
+            && !matches!(style, TableCellOption::Null)
+        {
+            return Err(InvalidArgumentException(
+                shirabe_php_shim::InvalidArgumentException {
+                    message: "The style option must be an instance of \"TableCellStyle\"."
+                        .to_string(),
+                    code: 0,
+                },
+            ));
         }
 
         for (key, option) in options {

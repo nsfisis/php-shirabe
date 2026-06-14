@@ -81,13 +81,13 @@ impl ConsoleOutput {
     /// Returns true if current environment supports writing console output to
     /// STDOUT.
     fn has_stdout_support() -> bool {
-        false == Self::is_running_os400()
+        !Self::is_running_os400()
     }
 
     /// Returns true if current environment supports writing console output to
     /// STDERR.
     fn has_stderr_support() -> bool {
-        false == Self::is_running_os400()
+        !Self::is_running_os400()
     }
 
     /// Checks if current executing environment is IBM iSeries (OS400), which

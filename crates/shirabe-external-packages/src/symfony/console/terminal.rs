@@ -82,33 +82,33 @@ impl Terminal {
         if shirabe_php_shim::DIRECTORY_SEPARATOR == "\\" {
             let ansicon = shirabe_php_shim::getenv("ANSICON");
             let mut matches: Vec<Option<String>> = Vec::new();
-            if let Some(ansicon) = &ansicon {
-                if shirabe_php_shim::preg_match(
+            if let Some(ansicon) = &ansicon
+                && shirabe_php_shim::preg_match(
                     "/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/",
                     &shirabe_php_shim::trim(ansicon, None),
                     &mut matches,
-                ) {
-                    // extract [w, H] from "wxh (WxH)"
-                    // or [w, h] from "wxh"
-                    WIDTH.with(|w| {
-                        w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                            matches[1].clone().unwrap_or_default(),
-                        ))))
-                    });
-                    HEIGHT.with(|h| {
-                        let value = if matches.get(4).map(|m| m.is_some()).unwrap_or(false) {
-                            shirabe_php_shim::intval(&PhpMixed::String(
-                                matches[4].clone().unwrap_or_default(),
-                            ))
-                        } else {
-                            shirabe_php_shim::intval(&PhpMixed::String(
-                                matches[2].clone().unwrap_or_default(),
-                            ))
-                        };
-                        h.set(Some(value));
-                    });
-                    return;
-                }
+                )
+            {
+                // extract [w, H] from "wxh (WxH)"
+                // or [w, h] from "wxh"
+                WIDTH.with(|w| {
+                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                        matches[1].clone().unwrap_or_default(),
+                    ))))
+                });
+                HEIGHT.with(|h| {
+                    let value = if matches.get(4).map(|m| m.is_some()).unwrap_or(false) {
+                        shirabe_php_shim::intval(&PhpMixed::String(
+                            matches[4].clone().unwrap_or_default(),
+                        ))
+                    } else {
+                        shirabe_php_shim::intval(&PhpMixed::String(
+                            matches[2].clone().unwrap_or_default(),
+                        ))
+                    };
+                    h.set(Some(value));
+                });
+                return;
             }
 
             if !Self::has_vt100_support() && Self::has_stty_available() {

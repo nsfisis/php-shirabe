@@ -270,7 +270,7 @@ impl ClassMapGenerator {
         let mut valid_classes = vec![];
         let mut rejected_classes = vec![];
 
-        let real_sub_path_str = substr(file_path, (strlen(base_path) + 1) as i64, None);
+        let real_sub_path_str = substr(file_path, strlen(base_path) + 1, None);
         let dot_position = strrpos(&real_sub_path_str, ".");
         let real_sub_path = substr(
             &real_sub_path_str,
@@ -298,7 +298,7 @@ impl ClassMapGenerator {
                 }
             } else if namespace_type == "psr-4" {
                 let sub_namespace = if !base_namespace.is_empty() {
-                    substr(&class, strlen(base_namespace) as i64, None)
+                    substr(&class, strlen(base_namespace), None)
                 } else {
                     class.clone()
                 };
@@ -386,7 +386,7 @@ impl ClassMapGenerator {
                 .get(&CaptureKey::ByIndex(1))
                 .cloned()
                 .unwrap_or_default();
-            path = substr(&path, strlen(&prefix) as i64, None);
+            path = substr(&path, strlen(&prefix), None);
         }
 
         if strpos(&path, "/") == Some(0) {

@@ -17,6 +17,12 @@ pub struct CompletionSuggestions {
     option_suggestions: Vec<InputOption>,
 }
 
+impl Default for CompletionSuggestions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompletionSuggestions {
     pub fn new() -> Self {
         Self {

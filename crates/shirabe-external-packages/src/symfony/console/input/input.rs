@@ -79,7 +79,7 @@ impl Input {
             },
         );
 
-        if missing_arguments.len() > 0 {
+        if !missing_arguments.is_empty() {
             return Err(RuntimeException(shirabe_php_shim::RuntimeException {
                 message: format!(
                     "Not enough arguments (missing: \"{}\").",

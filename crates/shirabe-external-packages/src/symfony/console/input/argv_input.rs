@@ -92,7 +92,7 @@ impl ArgvInput {
     }
 
     pub(crate) fn parse_token(&mut self, token: &str, parse_options: bool) -> anyhow::Result<bool> {
-        if parse_options && token == "" {
+        if parse_options && token.is_empty() {
             self.parse_argument(token)?;
         } else if parse_options && token == "--" {
             return Ok(false);
@@ -163,11 +163,11 @@ impl ArgvInput {
                 } else {
                     PhpMixed::String(shirabe_php_shim::substr(name, i + 1, None))
                 };
-                self.add_long_option(&option.get_name().to_string(), value)?;
+                self.add_long_option(option.get_name(), value)?;
 
                 break;
             } else {
-                self.add_long_option(&option.get_name().to_string(), PhpMixed::Null)?;
+                self.add_long_option(option.get_name(), PhpMixed::Null)?;
             }
             i += 1;
         }
@@ -183,7 +183,7 @@ impl ArgvInput {
             Some(pos) => {
                 let pos = pos as i64;
                 let value = shirabe_php_shim::substr(&name, pos + 1, None);
-                if value == "" {
+                if value.is_empty() {
                     self.parsed.insert(0, value.clone());
                 }
                 self.add_long_option(
@@ -236,15 +236,12 @@ impl ArgvInput {
             if let Some(key) = &first_key {
                 let input_argument = &all[key];
                 if input_argument.get_name() == "command" {
-                    symfony_command_name = match self.inner.arguments.get("command") {
-                        Some(v) => Some(v.clone()),
-                        None => None,
-                    };
+                    symfony_command_name = self.inner.arguments.get("command").map(|v| v.clone());
                     all.shift_remove(key);
                 }
             }
 
-            let message = if all.len() > 0 {
+            let message = if !all.is_empty() {
                 let names: Vec<String> = all.keys().cloned().collect();
                 match &symfony_command_name {
                     Some(symfony_command_name)
@@ -300,12 +297,10 @@ impl ArgvInput {
         }
 
         self.add_long_option(
-            &self
-                .inner
+            self.inner
                 .definition
                 .get_option_for_shortcut(shortcut)?
-                .get_name()
-                .to_string(),
+                .get_name(),
             value,
         )
     }
@@ -426,15 +421,15 @@ impl ArgvInput {
                 {
                     // noop
                 } else {
-                    if !self.inner.options.contains_key(&name) {
-                        if let Ok(resolved) = self.inner.definition.shortcut_to_name(&name) {
-                            name = resolved;
-                        }
+                    if !self.inner.options.contains_key(&name)
+                        && let Ok(resolved) = self.inner.definition.shortcut_to_name(&name)
+                    {
+                        name = resolved;
                     }
-                    if let Some(option_value) = self.inner.options.get(&name) {
-                        if self.tokens.get(i + 1).map(|t| t.as_str()) == option_value.as_string() {
-                            is_option = true;
-                        }
+                    if let Some(option_value) = self.inner.options.get(&name)
+                        && self.tokens.get(i + 1).map(|t| t.as_str()) == option_value.as_string()
+                    {
+                        is_option = true;
                     }
                 }
 

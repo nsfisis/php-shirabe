@@ -219,15 +219,15 @@ impl Question {
         &mut self,
         attempts: Option<i64>,
     ) -> Result<&mut Self, InvalidArgumentException> {
-        if let Some(attempts) = attempts {
-            if attempts < 1 {
-                return Err(InvalidArgumentException(
-                    shirabe_php_shim::InvalidArgumentException {
-                        message: "Maximum number of attempts must be a positive value.".to_string(),
-                        code: 0,
-                    },
-                ));
-            }
+        if let Some(attempts) = attempts
+            && attempts < 1
+        {
+            return Err(InvalidArgumentException(
+                shirabe_php_shim::InvalidArgumentException {
+                    message: "Maximum number of attempts must be a positive value.".to_string(),
+                    code: 0,
+                },
+            ));
         }
 
         self.attempts = attempts;

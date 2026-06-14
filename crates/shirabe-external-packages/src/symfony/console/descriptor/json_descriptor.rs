@@ -352,7 +352,7 @@ impl JsonDescriptor {
             data.insert(
                 "definition".to_string(),
                 PhpMixed::Array(
-                    self.get_input_definition_data(&command.get_definition())?
+                    self.get_input_definition_data(command.get_definition())?
                         .into_iter()
                         .map(|(k, v)| (k, Box::new(v)))
                         .collect(),

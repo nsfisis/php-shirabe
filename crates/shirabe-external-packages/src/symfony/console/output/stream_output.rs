@@ -73,7 +73,7 @@ impl StreamOutput {
     /// https://github.com/composer/xdebug-handler
     pub(crate) fn has_color_support(stream: &shirabe_php_shim::PhpResource) -> bool {
         // Follow https://no-color.org/
-        if "" != no_color_first_char() {
+        if !no_color_first_char().is_empty() {
             return false;
         }
 

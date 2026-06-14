@@ -87,10 +87,10 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
             );
         }
 
-        if let Some(href) = &self.href {
-            if self.handles_href_gracefully == Some(true) {
-                text = format!("\x1b]8;;{href}\x1b\\{text}\x1b]8;;\x1b\\");
-            }
+        if let Some(href) = &self.href
+            && self.handles_href_gracefully == Some(true)
+        {
+            text = format!("\x1b]8;;{href}\x1b\\{text}\x1b]8;;\x1b\\");
         }
 
         self.color.apply(&text)

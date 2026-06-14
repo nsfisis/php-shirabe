@@ -340,10 +340,10 @@ impl TextDescriptor {
                 for namespace in namespaces.values() {
                     if let Some(PhpMixed::List(ns_commands)) = namespace.get("commands") {
                         for c in ns_commands {
-                            if let PhpMixed::String(name) = c.as_ref() {
-                                if command_keys.contains(name) {
-                                    merged.push(CommandOrString::String(name.clone()));
-                                }
+                            if let PhpMixed::String(name) = c.as_ref()
+                                && command_keys.contains(name)
+                            {
+                                merged.push(CommandOrString::String(name.clone()));
                             }
                         }
                     }
@@ -466,7 +466,7 @@ impl TextDescriptor {
                 let mut arr = arr.clone();
                 for (_key, value) in arr.iter_mut() {
                     if let PhpMixed::String(s) = value.as_ref() {
-                        *value = Box::new(PhpMixed::String(OutputFormatter::escape(s)?));
+                        **value = PhpMixed::String(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::Array(arr)
@@ -475,7 +475,7 @@ impl TextDescriptor {
                 let mut list = list.clone();
                 for value in list.iter_mut() {
                     if let PhpMixed::String(s) = value.as_ref() {
-                        *value = Box::new(PhpMixed::String(OutputFormatter::escape(s)?));
+                        **value = PhpMixed::String(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::List(list)

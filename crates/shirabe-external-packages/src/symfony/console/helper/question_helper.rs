@@ -527,10 +527,10 @@ impl QuestionHelper {
 
                 let mut temp_ret = ret.clone();
 
-                if let Some(choice_question) = question_as_choice_question(question) {
-                    if choice_question.is_multiselect() {
-                        temp_ret = self.most_recently_entered_value(&full_choice);
-                    }
+                if let Some(choice_question) = question_as_choice_question(question)
+                    && choice_question.is_multiselect()
+                {
+                    temp_ret = self.most_recently_entered_value(&full_choice);
                 }
 
                 num_matches = 0;

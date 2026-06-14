@@ -25,7 +25,7 @@ impl AsCommand {
         let mut name: Vec<String> = this.name.split('|').map(|s| s.to_string()).collect();
         name.extend(aliases);
 
-        if hidden && "" != name[0] {
+        if hidden && !name[0].is_empty() {
             name.insert(0, String::new());
         }
 

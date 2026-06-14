@@ -329,7 +329,7 @@ impl ProgressBar {
         iterable: Vec<(shirabe_php_shim::PhpMixed, shirabe_php_shim::PhpMixed)>,
         max: Option<i64>,
     ) -> anyhow::Result<Vec<(shirabe_php_shim::PhpMixed, shirabe_php_shim::PhpMixed)>> {
-        self.start(Some(max.unwrap_or_else(|| {
+        self.start(Some(max.unwrap_or({
             // is_countable($iterable) ? \count($iterable) : 0
             iterable.len() as i64
         })))?;

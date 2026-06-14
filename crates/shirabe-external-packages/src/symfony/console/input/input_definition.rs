@@ -113,18 +113,18 @@ impl InputDefinition {
             .into());
         }
 
-        if argument.is_required() {
-            if let Some(last_optional_argument) = &self.last_optional_argument {
-                return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: format!(
-                        "Cannot add a required argument \"{}\" after an optional one \"{}\".",
-                        PhpMixed::String(argument.get_name().to_string()),
-                        PhpMixed::String(last_optional_argument.get_name().to_string()),
-                    ),
-                    code: 0,
-                })
-                .into());
-            }
+        if argument.is_required()
+            && let Some(last_optional_argument) = &self.last_optional_argument
+        {
+            return Err(LogicException(shirabe_php_shim::LogicException {
+                message: format!(
+                    "Cannot add a required argument \"{}\" after an optional one \"{}\".",
+                    PhpMixed::String(argument.get_name().to_string()),
+                    PhpMixed::String(last_optional_argument.get_name().to_string()),
+                ),
+                code: 0,
+            })
+            .into());
         }
 
         if argument.is_array() {
@@ -232,17 +232,17 @@ impl InputDefinition {
     pub fn add_option(&mut self, option: InputOption) -> anyhow::Result<()> {
         let option = Rc::new(option);
 
-        if let Some(existing) = self.options.get(option.get_name()) {
-            if !option.equals(existing) {
-                return Err(LogicException(shirabe_php_shim::LogicException {
-                    message: format!(
-                        "An option named \"{}\" already exists.",
-                        PhpMixed::String(option.get_name().to_string()),
-                    ),
-                    code: 0,
-                })
-                .into());
-            }
+        if let Some(existing) = self.options.get(option.get_name())
+            && !option.equals(existing)
+        {
+            return Err(LogicException(shirabe_php_shim::LogicException {
+                message: format!(
+                    "An option named \"{}\" already exists.",
+                    PhpMixed::String(option.get_name().to_string()),
+                ),
+                code: 0,
+            })
+            .into());
         }
         if self.negations.contains_key(option.get_name()) {
             return Err(LogicException(shirabe_php_shim::LogicException {
@@ -257,17 +257,17 @@ impl InputDefinition {
 
         if let Some(shortcut) = option.get_shortcut() {
             for shortcut in shirabe_php_shim::explode("|", shortcut) {
-                if let Some(existing_name) = self.shortcuts.get(&shortcut) {
-                    if !option.equals(&self.options[existing_name]) {
-                        return Err(LogicException(shirabe_php_shim::LogicException {
-                            message: format!(
-                                "An option with shortcut \"{}\" already exists.",
-                                PhpMixed::String(shortcut.clone()),
-                            ),
-                            code: 0,
-                        })
-                        .into());
-                    }
+                if let Some(existing_name) = self.shortcuts.get(&shortcut)
+                    && !option.equals(&self.options[existing_name])
+                {
+                    return Err(LogicException(shirabe_php_shim::LogicException {
+                        message: format!(
+                            "An option with shortcut \"{}\" already exists.",
+                            PhpMixed::String(shortcut.clone()),
+                        ),
+                        code: 0,
+                    })
+                    .into());
                 }
             }
         }
@@ -436,7 +436,7 @@ impl InputDefinition {
             }
         }
 
-        if elements.len() > 0 && !self.get_arguments().is_empty() {
+        if !elements.is_empty() && !self.get_arguments().is_empty() {
             elements.push("[--]".to_string());
         }
 

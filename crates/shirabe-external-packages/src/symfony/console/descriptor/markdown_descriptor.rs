@@ -118,7 +118,7 @@ impl MarkdownDescriptor {
         definition: &InputDefinition,
         _options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let show_arguments = definition.get_arguments().len() > 0;
+        let show_arguments = !definition.get_arguments().is_empty();
         if show_arguments {
             self.write("### Arguments", true);
             for argument in definition.get_arguments().values() {
@@ -128,7 +128,7 @@ impl MarkdownDescriptor {
             }
         }
 
-        if definition.get_options().len() > 0 {
+        if !definition.get_options().is_empty() {
             if show_arguments {
                 self.write("\n\n", true);
             }

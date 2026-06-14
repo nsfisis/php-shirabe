@@ -163,7 +163,7 @@ impl ApplicationDescription {
             } else {
                 namespaced_commands
                     .entry(key)
-                    .or_insert_with(IndexMap::new)
+                    .or_default()
                     .insert(name, command);
             }
         }

@@ -25,7 +25,7 @@ impl InputArgument {
     ) -> anyhow::Result<Self> {
         let mode = match mode {
             None => Self::OPTIONAL,
-            Some(m) if m > 7 || m < 1 => {
+            Some(m) if !(1..=7).contains(&m) => {
                 return Err(
                     InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
                         message: format!("Argument mode \"{}\" is not valid.", m),

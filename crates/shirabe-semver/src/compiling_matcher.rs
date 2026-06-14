@@ -42,7 +42,7 @@ impl CompilingMatcher {
     }
 
     pub fn r#match(constraint: &AnyConstraint, operator: i64, version: String) -> bool {
-        let result_cache_key = format!("{}{};{}", operator, constraint.to_string(), version);
+        let result_cache_key = format!("{}{};{}", operator, constraint, version);
 
         {
             let cache = Self::result_cache().lock().unwrap();

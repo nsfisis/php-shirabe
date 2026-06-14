@@ -76,36 +76,37 @@ impl CompletionInput {
                 return Ok(());
             }
 
-            if let Some(option) = &option {
-                if option.accept_value() {
-                    self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
-                    self.completion_name = Some(option.get_name().to_string());
-                    self.completion_value = if !option_value.is_empty() {
-                        option_value
-                    } else if !shirabe_php_shim::str_starts_with(&option_token, "--") {
-                        shirabe_php_shim::substr(&option_token, 2, None)
-                    } else {
-                        String::new()
-                    };
+            if let Some(option) = &option
+                && option.accept_value()
+            {
+                self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
+                self.completion_name = Some(option.get_name().to_string());
+                self.completion_value = if !option_value.is_empty() {
+                    option_value
+                } else if !shirabe_php_shim::str_starts_with(&option_token, "--") {
+                    shirabe_php_shim::substr(&option_token, 2, None)
+                } else {
+                    String::new()
+                };
 
-                    return Ok(());
-                }
+                return Ok(());
             }
         }
 
         let previous_token = self.tokens[(self.current_index - 1) as usize].clone();
-        if "-" == &previous_token[0..1] && "" != shirabe_php_shim::trim(&previous_token, Some("-"))
+        if "-" == &previous_token[0..1]
+            && !shirabe_php_shim::trim(&previous_token, Some("-")).is_empty()
         {
             // check if previous option accepted a value
             let previous_option = self.get_option_from_token(&previous_token);
-            if let Some(previous_option) = &previous_option {
-                if previous_option.accept_value() {
-                    self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
-                    self.completion_name = Some(previous_option.get_name().to_string());
-                    self.completion_value = relevant_token;
+            if let Some(previous_option) = &previous_option
+                && previous_option.accept_value()
+            {
+                self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
+                self.completion_name = Some(previous_option.get_name().to_string());
+                self.completion_value = relevant_token;
 
-                    return Ok(());
-                }
+                return Ok(());
             }
         }
 

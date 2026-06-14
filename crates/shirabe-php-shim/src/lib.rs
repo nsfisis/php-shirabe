@@ -2103,21 +2103,21 @@ pub fn array_all<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    _array.iter().all(|x| _callback(x))
+    _array.iter().all(_callback)
 }
 
 pub fn array_any<T, F>(_array: &[T], _callback: F) -> bool
 where
     F: Fn(&T) -> bool,
 {
-    _array.iter().any(|x| _callback(x))
+    _array.iter().any(_callback)
 }
 
 pub fn array_reduce<T, U, F>(_array: &[T], _callback: F, _initial: U) -> U
 where
     F: Fn(U, &T) -> U,
 {
-    _array.iter().fold(_initial, |acc, x| _callback(acc, x))
+    _array.iter().fold(_initial, _callback)
 }
 
 pub fn array_intersect<T: Clone + PartialEq>(_array1: &[T], _array2: &[T]) -> Vec<T> {
@@ -2344,7 +2344,7 @@ pub fn array_map<T, U, F>(_callback: F, _array: &[T]) -> Vec<U>
 where
     F: Fn(&T) -> U,
 {
-    _array.iter().map(|x| _callback(x)).collect()
+    _array.iter().map(_callback).collect()
 }
 
 impl Phar {

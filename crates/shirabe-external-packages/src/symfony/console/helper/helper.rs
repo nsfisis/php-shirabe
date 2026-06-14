@@ -93,15 +93,14 @@ impl Helper {
         ];
 
         for (index, format) in time_formats.iter().enumerate() {
-            if secs >= format.0 {
-                if (index + 1 < time_formats.len() && secs < time_formats[index + 1].0)
-                    || index == time_formats.len() - 1
-                {
-                    match format.2 {
-                        None => return Some(format.1.to_string()),
-                        Some(divisor) => {
-                            return Some(format!("{} {}", (secs / divisor).floor(), format.1));
-                        }
+            if secs >= format.0
+                && ((index + 1 < time_formats.len() && secs < time_formats[index + 1].0)
+                    || index == time_formats.len() - 1)
+            {
+                match format.2 {
+                    None => return Some(format.1.to_string()),
+                    Some(divisor) => {
+                        return Some(format!("{} {}", (secs / divisor).floor(), format.1));
                     }
                 }
             }

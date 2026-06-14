@@ -30,7 +30,7 @@ impl SymfonyQuestionHelper {
         output: Rc<RefCell<dyn OutputInterface>>,
         question: &Question,
     ) {
-        let mut text = OutputFormatter::escape_trailing_backslash(&question.get_question());
+        let mut text = OutputFormatter::escape_trailing_backslash(question.get_question());
         let default = question.get_default();
 
         if question.is_multiline() {

@@ -11,7 +11,7 @@ impl MetadataMinifier {
         let mut expanded: Vec<IndexMap<String, PhpMixed>> = Vec::new();
         let mut expanded_version: Option<IndexMap<String, PhpMixed>> = None;
         for version_data in versions {
-            if expanded_version.as_ref().map_or(true, |ev| ev.is_empty()) {
+            if expanded_version.as_ref().is_none_or(|ev| ev.is_empty()) {
                 expanded.push(version_data.clone());
                 expanded_version = Some(version_data);
                 continue;
