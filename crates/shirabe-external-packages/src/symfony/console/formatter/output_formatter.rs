@@ -126,12 +126,10 @@ impl OutputFormatter {
                     .expect("preg_replace failed");
                 style.set_href(&url);
             } else if r#match[0] == "options" {
-                let mut options: Vec<Vec<String>> = vec![];
-                shirabe_php_shim::preg_match_all_simple(
+                let mut options = shirabe_php_shim::preg_match_all(
                     "([^,;]+)",
                     &shirabe_php_shim::strtolower(&r#match[1]),
-                    &mut options,
-                )?;
+                );
                 let options = shirabe_php_shim::array_shift(&mut options).unwrap_or_default();
                 for option in &options {
                     style.set_option(option);

@@ -5,7 +5,7 @@ use crate::symfony::console::input::argv_input::ArgvInput;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_interface::InputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{CaptureKey, PhpMixed};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -54,52 +54,80 @@ impl StringInput {
                 continue;
             }
 
-            let mut m: Vec<String> = vec![];
-            if shirabe_php_shim::preg_match_offset(r"/\s+/A", input, &mut m, 0, cursor) {
+            let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
+            if shirabe_php_shim::preg_match2(r"/\s+/A", input, Some(&mut m), 0, cursor as usize)
+                .expect("invalid regex")
+                == 1
+            {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
-                cursor += shirabe_php_shim::strlen(&m[0]);
-            } else if shirabe_php_shim::preg_match_offset(
+                cursor +=
+                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+            } else if shirabe_php_shim::preg_match2(
                 &format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
-                &mut m,
+                Some(&mut m),
                 0,
-                cursor,
-            ) {
-                let inner = shirabe_php_shim::substr(&m[3], 1, Some(-1));
+                cursor as usize,
+            )
+            .expect("invalid regex")
+                == 1
+            {
+                let inner = shirabe_php_shim::substr(
+                    m[&CaptureKey::ByIndex(3)].as_deref().unwrap_or(""),
+                    1,
+                    Some(-1),
+                );
                 let replaced =
                     shirabe_php_shim::str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
                 token = Some(format!(
                     "{}{}{}{}",
                     token.unwrap_or_default(),
-                    m[1],
-                    m[2],
+                    m[&CaptureKey::ByIndex(1)].as_deref().unwrap_or(""),
+                    m[&CaptureKey::ByIndex(2)].as_deref().unwrap_or(""),
                     shirabe_php_shim::stripcslashes(&replaced)
                 ));
-                cursor += shirabe_php_shim::strlen(&m[0]);
-            } else if shirabe_php_shim::preg_match_offset(
+                cursor +=
+                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+            } else if shirabe_php_shim::preg_match2(
                 &format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
-                &mut m,
+                Some(&mut m),
                 0,
-                cursor,
-            ) {
+                cursor as usize,
+            )
+            .expect("invalid regex")
+                == 1
+            {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    shirabe_php_shim::stripcslashes(&shirabe_php_shim::substr(&m[0], 1, Some(-1)))
+                    shirabe_php_shim::stripcslashes(&shirabe_php_shim::substr(
+                        m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""),
+                        1,
+                        Some(-1)
+                    ))
                 ));
-                cursor += shirabe_php_shim::strlen(&m[0]);
-            } else if shirabe_php_shim::preg_match_offset(
+                cursor +=
+                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+            } else if shirabe_php_shim::preg_match2(
                 &format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
-                &mut m,
+                Some(&mut m),
                 0,
-                cursor,
-            ) {
-                token = Some(format!("{}{}", token.unwrap_or_default(), m[1]));
-                cursor += shirabe_php_shim::strlen(&m[0]);
+                cursor as usize,
+            )
+            .expect("invalid regex")
+                == 1
+            {
+                token = Some(format!(
+                    "{}{}",
+                    token.unwrap_or_default(),
+                    m[&CaptureKey::ByIndex(1)].as_deref().unwrap_or("")
+                ));
+                cursor +=
+                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
             } else {
                 // should never happen
                 return Err(

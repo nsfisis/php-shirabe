@@ -58,23 +58,12 @@ pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>
 
 // Returns Some(result) on success, None on error.
 pub fn preg_replace(pattern: &str, replacement: &str, subject: &str) -> Option<String> {
-    let re = compile_php_pattern(pattern).ok()?;
-    let mut out: Vec<u8> = Vec::new();
-    let mut last = 0;
-    for caps in re.captures_iter(subject) {
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        php_replacement_expand(replacement, &caps, &mut out);
-        last = m.end();
-    }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
-    Some(String::from_utf8_lossy(&out).into_owned())
+    preg_replace2(pattern, replacement, subject, -1, None)
 }
 
 // Returns Some(parts) on success, None on error.
 pub fn preg_split(pattern: &str, subject: &str) -> Option<Vec<String>> {
-    let re = compile_php_pattern(pattern).ok()?;
-    Some(php_split_impl(&re, subject))
+    preg_split2(pattern, subject, -1, 0)
 }
 
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
@@ -95,29 +84,6 @@ pub fn preg_match_all(pattern: &str, subject: &str) -> Vec<Vec<String>> {
     groups
 }
 
-pub fn preg_match_all_simple(
-    pattern: &str,
-    subject: &str,
-    matches: &mut Vec<Vec<String>>,
-) -> anyhow::Result<i64> {
-    let re = compile_php_pattern(pattern)?;
-    let group_count = re.captures_len();
-    let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
-    let mut count = 0i64;
-    for caps in re.captures_iter(subject) {
-        count += 1;
-        for g in 0..group_count {
-            groups[g].push(
-                caps.get(g)
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_default(),
-            );
-        }
-    }
-    *matches = groups;
-    Ok(count)
-}
-
 // PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
 // capture group (a classic `$matches` row).
 pub fn preg_match_all_set_order(
@@ -135,26 +101,6 @@ pub fn preg_match_all_set_order(
     Ok(count)
 }
 
-pub fn preg_match_offset(
-    pattern: &str,
-    subject: &str,
-    matches: &mut Vec<String>,
-    _flags: i64,
-    offset: i64,
-) -> bool {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
-    match re.captures_at(subject, offset as usize) {
-        Some(caps) => {
-            *matches = php_match_row(&caps);
-            true
-        }
-        None => {
-            matches.clear();
-            false
-        }
-    }
-}
-
 pub fn preg_match_groups(pattern: &str, subject: &str) -> Option<Vec<String>> {
     let re = compile_php_pattern(pattern).ok()?;
     let caps = re.captures(subject)?;
@@ -164,11 +110,6 @@ pub fn preg_match_groups(pattern: &str, subject: &str) -> Option<Vec<String>> {
 pub fn preg_grep(pattern: &str, input: &Vec<String>) -> Vec<String> {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     input.iter().filter(|s| re.is_match(s)).cloned().collect()
-}
-
-pub fn preg_split_chars(pattern: &str, subject: &str) -> Vec<String> {
-    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
-    php_split_impl(&re, subject)
 }
 
 pub fn preg_match_all_offset_capture(
@@ -549,21 +490,6 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
         consumed += 1;
     }
     (group, consumed)
-}
-
-// PHP `preg_split($pattern, $subject)` with no flags or limit: the text between
-// successive matches, including the leading and trailing pieces (which may be
-// empty). Zero-width matches split between every position.
-fn php_split_impl(re: &regex::Regex, subject: &str) -> Vec<String> {
-    let mut result = Vec::new();
-    let mut last = 0;
-    for caps in re.captures_iter(subject) {
-        let m = caps.get(0).unwrap();
-        result.push(subject[last..m.start()].to_string());
-        last = m.end();
-    }
-    result.push(subject[last..].to_string());
-    result
 }
 
 // Classic preg_match `$matches` row: index 0 is the full match, trailing

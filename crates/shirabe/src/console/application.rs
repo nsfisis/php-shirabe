@@ -2703,17 +2703,33 @@ impl Application {
         let mut line = String::new();
 
         let mut offset = 0i64;
-        let mut m: Vec<String> = Vec::new();
-        while shirabe_php_shim::preg_match_offset(r"/.{1,10000}/u", &utf8_string, &mut m, 0, offset)
+        let mut m: indexmap::IndexMap<shirabe_php_shim::CaptureKey, Option<String>> =
+            indexmap::IndexMap::new();
+        while shirabe_php_shim::preg_match2(
+            r"/.{1,10000}/u",
+            &utf8_string,
+            Some(&mut m),
+            0,
+            offset as usize,
+        )
+        .expect("invalid regex")
+            == 1
         {
-            offset += shirabe_php_shim::strlen(&m[0]);
+            let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
+                .as_deref()
+                .unwrap_or("");
+            offset += shirabe_php_shim::strlen(m0);
 
-            for char in shirabe_php_shim::preg_split_chars(r"//u", &m[0]) {
+            let chunk = m0;
+            for char in chunk
+                .char_indices()
+                .map(|(i, c)| &chunk[i..i + c.len_utf8()])
+            {
                 // test if $char could be appended to current line
                 if shirabe_php_shim::mb_strwidth(&format!("{}{}", line, char), Some("utf8"))
                     <= width
                 {
-                    line.push_str(&char);
+                    line.push_str(char);
                     continue;
                 }
                 // if not, push current line to array and make new line
@@ -2723,7 +2739,7 @@ impl Application {
                     " ",
                     shirabe_php_shim::STR_PAD_RIGHT,
                 ));
-                line = char;
+                line = char.to_string();
             }
         }
 
