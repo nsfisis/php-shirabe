@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
+use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::BaseExcludeFilterBase;
 use shirabe_external_packages::composer::pcre::Preg;
 use std::path::Path;
@@ -48,5 +49,19 @@ impl GitExcludeFilter {
         }
 
         None
+    }
+}
+
+impl BaseExcludeFilter for GitExcludeFilter {
+    fn source_path(&self) -> &str {
+        &self.inner.source_path
+    }
+
+    fn exclude_patterns(&self) -> &[(String, bool, bool)] {
+        &self.inner.exclude_patterns
+    }
+
+    fn exclude_patterns_mut(&mut self) -> &mut Vec<(String, bool, bool)> {
+        &mut self.inner.exclude_patterns
     }
 }

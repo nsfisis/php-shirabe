@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFinder.php
 
+use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::ComposerExcludeFilter;
 use crate::package::archiver::GitExcludeFilter;
 use crate::util::Filesystem;
@@ -35,7 +36,7 @@ impl ArchivableFilesFinder {
         }
         let sources = fs.normalize_path(&sources_real_path.unwrap());
 
-        let filters: Vec<Box<dyn ArchivableFilesFilter>> = if ignore_filters {
+        let filters: Vec<Box<dyn BaseExcludeFilter>> = if ignore_filters {
             vec![]
         } else {
             vec![
@@ -94,22 +95,6 @@ impl ArchivableFilesFinder {
             Ok(mut iter) => iter.next().is_none(),
             Err(_) => false,
         }
-    }
-}
-
-trait ArchivableFilesFilter {
-    fn filter(&self, relative_path: &str, exclude: bool) -> bool;
-}
-
-impl ArchivableFilesFilter for GitExcludeFilter {
-    fn filter(&self, relative_path: &str, exclude: bool) -> bool {
-        self.filter(relative_path, exclude)
-    }
-}
-
-impl ArchivableFilesFilter for ComposerExcludeFilter {
-    fn filter(&self, relative_path: &str, exclude: bool) -> bool {
-        self.filter(relative_path, exclude)
     }
 }
 
