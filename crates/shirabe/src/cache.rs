@@ -267,7 +267,7 @@ impl Cache {
             return false;
         }
 
-        random_int(0, 50) == 0
+        random_int(0..50) == 0
     }
 
     pub fn remove(&mut self, file: &str) -> bool {

@@ -1,6 +1,8 @@
 mod preg;
+mod random;
 
 pub use preg::*;
+pub use random::*;
 
 use indexmap::IndexMap;
 
@@ -1360,10 +1362,6 @@ pub fn filesize(_path: &str) -> Option<i64> {
     std::fs::metadata(_path).ok().map(|m| m.len() as i64)
 }
 
-pub fn random_int(_min: i64, _max: i64) -> i64 {
-    todo!()
-}
-
 pub fn json_encode_ex<T: serde::Serialize + ?Sized>(_value: &T, _flags: i64) -> Option<String> {
     todo!()
 }
@@ -1605,10 +1603,6 @@ pub fn stream_get_contents_with_max(stream: PhpMixed, max_length: Option<i64>) -
 
 pub fn bin2hex(_data: &[u8]) -> String {
     _data.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
-pub fn random_bytes(_length: usize) -> Vec<u8> {
-    todo!()
 }
 
 pub fn is_dir(_path: &str) -> bool {

@@ -307,7 +307,7 @@ impl ZipDownloader {
                         let stat_index = if inspect_all {
                             i
                         } else {
-                            random_int(0, total_files - 1)
+                            random_int(0..total_files)
                         };
                         if let Some(stat) = zip_archive.stat_index(stat_index) {
                             let size = stat.get("size").and_then(|v| v.as_int()).unwrap_or(0);
