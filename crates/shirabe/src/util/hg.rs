@@ -58,7 +58,7 @@ impl Hg {
             r"(?i)^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?",
             &url,
             &mut matches,
-        )?;
+        );
 
         if matched {
             if self
@@ -151,7 +151,7 @@ impl Hg {
                     (),
                 ) == 0
                 {
-                    if let Ok(Some(matches)) = Preg::is_match_with_indexed_captures(
+                    if let Some(matches) = Preg::is_match_with_indexed_captures(
                         r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/",
                         &output,
                     ) {

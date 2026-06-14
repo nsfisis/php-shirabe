@@ -86,7 +86,7 @@ impl GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?)?;
+        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?);
         let mut args: Vec<String> = vec![];
         for token in &tokens {
             if !token.is_empty() && !token.starts_with('-') {
@@ -150,7 +150,7 @@ impl GlobalCommand {
             "",
             &Self::input_to_string(&*input.borrow())?,
             1,
-        )?;
+        );
         self.get_application()?.reset_composer();
 
         Ok(StringInput::new(&new_input_str)?)

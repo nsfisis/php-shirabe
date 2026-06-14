@@ -282,7 +282,7 @@ impl VersionSelector {
         if let Some(extra) = extra {
             if extra != VersionParser::DEFAULT_BRANCH_ALIAS {
                 let new_extra =
-                    Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", &extra)?;
+                    Preg::replace(r"{^(\d+\.\d+\.\d+)(\.9999999)-dev$}", "$1.0", &extra);
                 if new_extra != extra {
                     let new_extra = new_extra.replace(".9999999", ".0");
                     return self.transform_version(&new_extra, &new_extra, "dev");
@@ -302,7 +302,7 @@ impl VersionSelector {
         let semantic_version_parts: Vec<&str> = version.split('.').collect();
 
         if semantic_version_parts.len() == 4
-            && Preg::is_match(r"{^\d+\D?}", semantic_version_parts[3]).unwrap_or(false)
+            && Preg::is_match(r"{^\d+\D?}", semantic_version_parts[3])
         {
             let mut parts: Vec<String> = semantic_version_parts
                 .iter()

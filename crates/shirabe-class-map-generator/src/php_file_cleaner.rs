@@ -129,9 +129,7 @@ impl PhpFileCleaner {
                                 Some(&mut r#match),
                                 0,
                                 offset,
-                            )
-                            .unwrap_or(false)
-                            {
+                            ) {
                                 return clean
                                     + r#match
                                         .get(&CaptureKey::ByIndex(0))
@@ -268,6 +266,6 @@ impl PhpFileCleaner {
     }
 
     fn r#match(&self, regex: &str, r#match: Option<&mut IndexMap<CaptureKey, String>>) -> bool {
-        Preg::is_match5(regex, &self.contents, r#match, 0, self.index).unwrap_or(false)
+        Preg::is_match5(regex, &self.contents, r#match, 0, self.index)
     }
 }

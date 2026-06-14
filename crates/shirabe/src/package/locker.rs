@@ -874,7 +874,7 @@ impl Locker {
                             ),
                             None,
                         );
-                        if Preg::is_match(r"{^\s*\d+\s*$}", &output_str).unwrap_or(false) {
+                        if Preg::is_match(r"{^\s*\d+\s*$}", &output_str) {
                             let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }
@@ -899,9 +899,7 @@ impl Locker {
                             r"{^\s*(\d+)\s*}",
                             output.as_string().unwrap_or(""),
                             Some(&mut m),
-                        )
-                        .unwrap_or(false)
-                        {
+                        ) {
                             let ts = m
                                 .get(&CaptureKey::ByIndex(1))
                                 .cloned()

@@ -506,7 +506,6 @@ impl Config {
                         r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}",
                         &repo_url,
                     )
-                    .unwrap_or(false)
                 {
                     self.disable_repo_by_name("packagist.org");
                 }
@@ -688,9 +687,7 @@ impl Config {
                     r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i",
                     &raw,
                     Some(&mut matches),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     return Err(RuntimeException {
                         message: format!("Could not parse the value of '{}': {}", key, raw),
                         code: 0,
@@ -1093,7 +1090,7 @@ impl Config {
                 }
             },
             &value_str,
-        )?;
+        );
         if let Some(e) = error {
             return Err(e);
         }
@@ -1104,7 +1101,7 @@ impl Config {
     ///
     /// Since the dirs might not exist yet we can not call realpath or it will fail.
     fn realpath(&self, path: &str) -> String {
-        if Preg::is_match(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i", path).unwrap_or(false) {
+        if Preg::is_match(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i", path) {
             return path.to_string();
         }
 
@@ -1150,9 +1147,7 @@ impl Config {
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
-        if !filter_var(url, FILTER_VALIDATE_URL)
-            && !Preg::is_match(r"{^https?://}", url).unwrap_or(false)
-        {
+        if !filter_var(url, FILTER_VALIDATE_URL) && !Preg::is_match(r"{^https?://}", url) {
             return Ok(());
         }
 

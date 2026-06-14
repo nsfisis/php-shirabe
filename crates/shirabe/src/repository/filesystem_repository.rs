@@ -390,7 +390,7 @@ impl FilesystemRepository {
         let pattern = "{(?(DEFINE)\n   (?<number>  -? \\s*+ \\d++ (?:\\.\\d++)? )\n   (?<boolean> true | false | null )\n   (?<strings> (?&string) (?: \\s*+ \\. \\s*+ (?&string))*+ )\n   (?<string>  (?: \" (?:[^\"\\\\$]*+ | \\\\ [\"\\\\0] )* \" | ' (?:[^'\\\\]*+ | \\\\ ['\\\\] )* ' ) )\n   (?<array>   array\\( \\s*+ (?: (?:(?&number)|(?&strings)) \\s*+ => \\s*+ (?: (?:__DIR__ \\s*+ \\. \\s*+)? (?&strings) | (?&value) ) \\s*+, \\s*+ )*+  \\s*+ \\) )\n   (?<value>   (?: (?&number) | (?&boolean) | (?&strings) | (?&array) ) )\n)\n^<\\?php\\s++return\\s++(?&array)\\s*+;$}ix";
         if let Some(data) = installed_versions_data {
             let mixed = PhpMixed::String(data.clone());
-            if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)).unwrap_or(false) {
+            if is_string(&mixed) && Preg::is_match(pattern, &trim(&data, None)) {
                 let replaced = Preg::replace(
                     r#"{=>\s*+__DIR__\s*+\.\s*+(['\"])}"#,
                     &format!(
@@ -399,10 +399,6 @@ impl FilesystemRepository {
                     ),
                     &data,
                 );
-                let replaced = match replaced {
-                    Ok(s) => s,
-                    Err(_) => return false,
-                };
                 let evaluated = r#eval(&format!("?>{}", replaced));
                 InstalledVersions::reload(
                     evaluated

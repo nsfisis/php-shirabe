@@ -333,7 +333,7 @@ impl CurlDownloader {
         let original_options = options.clone();
 
         // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to $hashed providers as file integrity is verified with sha256
-        if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url).unwrap_or(false)
+        if !Preg::is_match(r"{^http://(repo\.)?packagist\.org/p/}", url)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
@@ -1582,7 +1582,7 @@ impl CurlDownloader {
                         ),
                         &format!("\\1{}", location_header),
                         job_url,
-                    )?;
+                    );
                 } else {
                     // Relative path; e.g. foo
                     // This actually differs from PHP which seems to add duplicate slashes.
@@ -1591,7 +1591,7 @@ impl CurlDownloader {
                         r"{^(.+/)[^/?]*(?:\?.*)?$}",
                         &format!("\\1{}", location_header),
                         job_url,
-                    )?;
+                    );
                 }
             }
         }
@@ -1690,7 +1690,7 @@ impl CurlDownloader {
                     .inner
                     .get_header("content-type")
                     .unwrap_or_default(),
-            )?
+            )
         {
             needs_auth_retry = Some("Bitbucket requires authentication and it was not provided");
         }

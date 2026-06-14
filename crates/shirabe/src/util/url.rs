@@ -21,9 +21,7 @@ impl Url {
                 r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$",
                 &url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -35,9 +33,7 @@ impl Url {
                 r"(?i)^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$",
                 &url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -49,9 +45,7 @@ impl Url {
                 r"(?i)^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$",
                 &url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -66,9 +60,7 @@ impl Url {
                 r"(?i)^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$",
                 &url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -83,9 +75,7 @@ impl Url {
                 r"(?i)^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$",
                 &url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
@@ -102,8 +92,7 @@ impl Url {
                 r"(?i)(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$",
                 &format!("$1/{}", r#ref),
                 &url,
-            )
-            .unwrap_or(url);
+            );
         } else if in_array(
             PhpMixed::String(host.clone()),
             &config.get("gitlab-domains"),
@@ -113,8 +102,7 @@ impl Url {
                 r"(?i)(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$",
                 &format!("${{1}}{}", r#ref),
                 &url,
-            )
-            .unwrap_or(url);
+            );
         }
 
         assert!(!url.is_empty());
@@ -176,7 +164,7 @@ impl Url {
     pub fn sanitize(url: String) -> String {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", &url).unwrap_or(url);
+        let url = Preg::replace(r"([&?]access_token=)[^&]+", "$1***", &url);
 
         let url = Preg::replace_callback(
             r"(?i)^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@",
@@ -190,15 +178,14 @@ impl Url {
                     .cloned()
                     .unwrap_or_default();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, &user).unwrap_or(false) {
+                if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
                     format!("{}***:***@", prefix)
                 } else {
                     format!("{}{}:***@", prefix, user)
                 }
             },
             &url,
-        )
-        .unwrap_or(url);
+        );
 
         url
     }

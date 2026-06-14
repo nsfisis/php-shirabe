@@ -119,7 +119,7 @@ impl LibraryInstaller {
                     "",
                     &install_path,
                 );
-                return replaced.unwrap_or(install_path);
+                return replaced;
             }
         }
 

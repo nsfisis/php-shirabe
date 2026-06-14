@@ -77,7 +77,6 @@ impl PackageRepository {
     pub fn get_repo_name(&self) -> String {
         use crate::repository::RepositoryInterface;
         Preg::replace(r"^array ", "package ", &self.inner.get_repo_name())
-            .unwrap_or_else(|_| self.inner.get_repo_name())
     }
 }
 

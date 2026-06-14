@@ -177,9 +177,7 @@ impl BinaryInstaller {
             r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m",
             &line,
             Some(&mut m),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return trim(
                 m.get(&CaptureKey::ByIndex(1))
                     .map(|s| s.as_str())
@@ -299,8 +297,6 @@ impl BinaryInstaller {
         // which allows calling the proxy with a custom php process
         if let Some(m) =
             Preg::is_match_with_indexed_captures(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}", &bin_contents)
-                .ok()
-                .flatten()
         {
             // carry over the existing shebang if present, otherwise add our own
             let proxy_code = if m.get(1).is_none() {

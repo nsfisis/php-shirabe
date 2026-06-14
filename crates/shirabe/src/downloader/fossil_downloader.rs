@@ -238,11 +238,11 @@ impl VcsDownloader for FossilDownloader {
         let lines: Vec<String> = if trimmed.is_empty() {
             vec![]
         } else {
-            Preg::split(r"{\r?\n}", &trimmed)?
+            Preg::split(r"{\r?\n}", &trimmed)
         };
 
         for line in lines {
-            if Preg::is_match(&match_pattern, &line)? {
+            if Preg::is_match(&match_pattern, &line) {
                 break;
             }
             log.push_str(&line);

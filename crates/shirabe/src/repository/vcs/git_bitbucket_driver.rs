@@ -91,9 +91,7 @@ impl GitBitbucketDriver {
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i",
             &self.inner.url,
             Some(&mut m),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
@@ -799,8 +797,7 @@ impl GitBitbucketDriver {
                         r"/https:\/\/([^@]+@)?/",
                         "https://",
                         m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
-                    )
-                    .unwrap_or_default();
+                    );
                 }
             }
         }
@@ -862,9 +859,7 @@ impl GitBitbucketDriver {
         if !Preg::is_match(
             r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i",
             url,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Ok(false);
         }
 

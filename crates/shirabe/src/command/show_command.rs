@@ -801,7 +801,7 @@ impl ShowCommand {
                         }
                         let matches_filter = match &package_filter_regex {
                             None => true,
-                            Some(r) => Preg::is_match(r, &p.get_name())?,
+                            Some(r) => Preg::is_match(r, &p.get_name()),
                         };
                         if matches_filter {
                             let matches_list = match &package_list_filter {
@@ -882,7 +882,7 @@ impl ShowCommand {
                 if show_latest && *show_version {
                     for package_or_name in type_packages.values() {
                         if let PackageOrName::Pkg(package) = package_or_name {
-                            if !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())?
+                            if !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
                             {
                                 let latest = self.find_latest_package(
                                     package.clone(),
@@ -954,7 +954,7 @@ impl ShowCommand {
                         package_is_up_to_date =
                             package_is_up_to_date || (latest_package.is_none() && show_major_only);
                         let package_is_ignored =
-                            Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())?;
+                            Preg::is_match(&ignored_packages_regex, &package.get_pretty_name());
                         if input.borrow().get_option("outdated")?.as_bool() == Some(true)
                             && (package_is_up_to_date || package_is_ignored)
                         {
@@ -2689,7 +2689,7 @@ impl ShowCommand {
                     r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}",
                     &package.get_version(),
                     Some(&mut groups),
-                )?
+                )
             {
                 let zero_major = groups
                     .get(&CaptureKey::ByName("zero_major".to_string()))
@@ -2713,7 +2713,7 @@ impl ShowCommand {
             }
 
             if patch_only {
-                let trimmed_version = Preg::replace(r"{(\.0)+$}D", "", &package.get_version())?;
+                let trimmed_version = Preg::replace(r"{(\.0)+$}D", "", &package.get_version());
                 let parts_needed = if trimmed_version.starts_with('0') {
                     4
                 } else {

@@ -443,7 +443,7 @@ impl VcsRepository {
                         data.get("version")
                             .and_then(|v| v.as_string())
                             .unwrap_or(""),
-                    )?),
+                    )),
                 );
                 data.insert(
                     "version_normalized".to_string(),
@@ -453,7 +453,7 @@ impl VcsRepository {
                         data.get("version_normalized")
                             .and_then(|v| v.as_string())
                             .unwrap_or(""),
-                    )?),
+                    )),
                 );
 
                 // make sure tag do not contain the default-branch marker
@@ -468,7 +468,7 @@ impl VcsRepository {
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
-                        if Preg::is_match(r"{(^dev-|[.-]?dev$)}i", &parsed_tag).unwrap_or(false) {
+                        if Preg::is_match(r"{(^dev-|[.-]?dev$)}i", &parsed_tag) {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag
@@ -620,7 +620,7 @@ impl VcsRepository {
                 version = format!(
                     "{}{}",
                     prefix,
-                    Preg::replace(r"{(\.9{7})+}", ".x", &parsed_branch)?
+                    Preg::replace(r"{(\.9{7})+}", ".x", &parsed_branch)
                 );
             }
 

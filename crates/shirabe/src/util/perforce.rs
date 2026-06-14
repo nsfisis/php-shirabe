@@ -693,8 +693,7 @@ impl Perforce {
                         r"/[^A-Za-z0-9 ]/",
                         "",
                         &res_bits.get(4).cloned().unwrap_or_default(),
-                    )
-                    .unwrap_or_default();
+                    );
                     possible_branches.insert(branch, res_bits.get(1).cloned().unwrap_or_default());
                 }
             }

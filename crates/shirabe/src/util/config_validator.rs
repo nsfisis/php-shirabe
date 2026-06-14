@@ -134,17 +134,13 @@ impl ConfigValidator {
                         _ => false,
                     };
                     if is_deprecated {
-                        if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?\+$}i", license)
-                            .unwrap_or(false)
-                        {
+                        if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?\+$}i", license) {
                             warnings.push(format!(
                                 "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
                                 license,
                                 license.replace('+', "")
                             ));
-                        } else if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?$}i", license)
-                            .unwrap_or(false)
-                        {
+                        } else if Preg::is_match(r"{^[AL]?GPL-[123](\.[01])?$}i", license) {
                             warnings.push(format!(
                                 "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
                                 license, license, license
@@ -165,13 +161,12 @@ impl ConfigValidator {
         }
 
         if let Some(PhpMixed::String(name)) = manifest.get("name") {
-            if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name).unwrap_or(false) {
+            if !name.is_empty() && Preg::is_match(r"{[A-Z]}", name) {
                 let suggest_name = Preg::replace(
                     r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
                     r"\1\3-\2\4",
                     name,
-                )
-                .unwrap_or_else(|_| name.clone());
+                );
                 let suggest_name = suggest_name.to_lowercase();
 
                 publish_errors.push(format!(
@@ -242,7 +237,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version.as_ref() {
-                if Preg::is_match(r"{#}", version_str).unwrap_or(false) {
+                if Preg::is_match(r"{#}", version_str) {
                     warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
                         package

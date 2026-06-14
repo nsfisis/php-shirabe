@@ -130,7 +130,7 @@ impl ScriptAliasCommand {
         // TODO(phase-c): InputInterface lacks to_string; use a placeholder until it is modeled.
         let input_as_string = String::new();
         let _ = input;
-        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input_as_string, 1)?;
+        let script_alias_input = Preg::replace4(r"{^\S+ ?}", "", &input_as_string, 1);
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),

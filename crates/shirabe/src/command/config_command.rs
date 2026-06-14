@@ -346,9 +346,7 @@ impl ConfigCommand {
                 "/^repos?(?:itories)?(?:\\.(.+))?/",
                 &setting_key,
                 Some(&mut matches),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 if matches.get(&CaptureKey::ByIndex(1)).is_none() {
                     value = data
                         .get("repositories")
@@ -594,9 +592,7 @@ impl ConfigCommand {
             "/^preferred-install\\.(.+)/",
             &setting_key,
             Some(&mut matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -635,9 +631,7 @@ impl ConfigCommand {
             "{^allow-plugins\\.([a-zA-Z0-9/*-]+)}",
             &setting_key,
             Some(&mut matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -707,9 +701,7 @@ impl ConfigCommand {
             "/^repos?(?:itories)?\\.(.+)/",
             &setting_key,
             Some(&mut matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -774,7 +766,7 @@ impl ConfigCommand {
 
         // handle extra
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match3("/^extra\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -833,7 +825,7 @@ impl ConfigCommand {
 
         // handle suggest
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match3("/^suggest\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -868,8 +860,7 @@ impl ConfigCommand {
 
         // handle platform
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false)
-        {
+        if Preg::is_match3("/^platform\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -991,10 +982,20 @@ impl ConfigCommand {
 
         // handle auth
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match3(
+            "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/",
+            &setting_key,
+            Some(&mut matches),
+        ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
-                self.auth_config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
-                self.config_source.as_mut().unwrap().remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&format!("{}.{}", matches[1], matches[2]));
 
                 return Ok(0);
             }
@@ -1003,23 +1004,60 @@ impl ConfigCommand {
             if matches[1] == "bitbucket-oauth" {
                 if 2 != values.len() {
                     return Err(RuntimeException {
-                        message: format!("Expected two arguments (consumer-key, consumer-secret), got {}", values.len()),
+                        message: format!(
+                            "Expected two arguments (consumer-key, consumer-secret), got {}",
+                            values.len()
+                        ),
                         code: 0,
                     }
                     .into());
                 }
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
                 let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert("consumer-key".to_string(), Box::new(PhpMixed::String(values[0].clone())));
-                obj.insert("consumer-secret".to_string(), Box::new(PhpMixed::String(values[1].clone())));
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::Array(obj));
+                obj.insert(
+                    "consumer-key".to_string(),
+                    Box::new(PhpMixed::String(values[0].clone())),
+                );
+                obj.insert(
+                    "consumer-secret".to_string(),
+                    Box::new(PhpMixed::String(values[1].clone())),
+                );
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches[1] == "gitlab-token" && 2 == values.len() {
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
                 let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert("username".to_string(), Box::new(PhpMixed::String(values[0].clone())));
-                obj.insert("token".to_string(), Box::new(PhpMixed::String(values[1].clone())));
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::Array(obj));
-            } else if in_array(matches[1].as_str().into(), &vec!["github-oauth".to_string(), "gitlab-oauth".to_string(), "gitlab-token".to_string(), "bearer".to_string()].into(), true) {
+                obj.insert(
+                    "username".to_string(),
+                    Box::new(PhpMixed::String(values[0].clone())),
+                );
+                obj.insert(
+                    "token".to_string(),
+                    Box::new(PhpMixed::String(values[1].clone())),
+                );
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::Array(obj));
+            } else if in_array(
+                matches[1].as_str().into(),
+                &vec![
+                    "github-oauth".to_string(),
+                    "gitlab-oauth".to_string(),
+                    "gitlab-token".to_string(),
+                    "bearer".to_string(),
+                ]
+                .into(),
+                true,
+            ) {
                 if 1 != values.len() {
                     return Err(RuntimeException {
                         message: "Too many arguments, expected only one token".to_string(),
@@ -1027,21 +1065,42 @@ impl ConfigCommand {
                     }
                     .into());
                 }
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::String(values[0].clone()));
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::String(values[0].clone()));
             } else if matches[1] == "http-basic" {
                 if 2 != values.len() {
                     return Err(RuntimeException {
-                        message: format!("Expected two arguments (username, password), got {}", values.len()),
+                        message: format!(
+                            "Expected two arguments (username, password), got {}",
+                            values.len()
+                        ),
                         code: 0,
                     }
                     .into());
                 }
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
                 let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert("username".to_string(), Box::new(PhpMixed::String(values[0].clone())));
-                obj.insert("password".to_string(), Box::new(PhpMixed::String(values[1].clone())));
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::Array(obj));
+                obj.insert(
+                    "username".to_string(),
+                    Box::new(PhpMixed::String(values[0].clone())),
+                );
+                obj.insert(
+                    "password".to_string(),
+                    Box::new(PhpMixed::String(values[1].clone())),
+                );
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches[1] == "custom-headers" {
                 if values.len() == 0 {
                     return Err(RuntimeException {
@@ -1056,7 +1115,9 @@ impl ConfigCommand {
                 for header in &values {
                     if !is_string(&PhpMixed::String(header.clone())) {
                         return Err(RuntimeException {
-                            message: "Headers must be strings in \"Header-Name: Header-Value\" format".to_string(),
+                            message:
+                                "Headers must be strings in \"Header-Name: Header-Value\" format"
+                                    .to_string(),
                             code: 0,
                         }
                         .into());
@@ -1064,9 +1125,12 @@ impl ConfigCommand {
 
                     // Check if the header is in correct "Name: Value" format
                     let mut header_parts: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if !Preg::is_match3("/^[^:]+:\\s*.+$/", header, Some(&mut header_parts)).unwrap_or(false) {
+                    if !Preg::is_match3("/^[^:]+:\\s*.+$/", header, Some(&mut header_parts)) {
                         return Err(RuntimeException {
-                            message: format!("Header \"{}\" is not in \"Header-Name: Header-Value\" format", header),
+                            message: format!(
+                                "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
+                                header
+                            ),
                             code: 0,
                         }
                         .into());
@@ -1075,21 +1139,42 @@ impl ConfigCommand {
                     formatted_headers.push(Box::new(PhpMixed::String(header.clone())));
                 }
 
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::List(formatted_headers));
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::List(formatted_headers));
             } else if matches[1] == "forgejo-token" {
                 if 2 != values.len() {
                     return Err(RuntimeException {
-                        message: format!("Expected two arguments (username, access token), got {}", values.len()),
+                        message: format!(
+                            "Expected two arguments (username, access token), got {}",
+                            values.len()
+                        ),
                         code: 0,
                     }
                     .into());
                 }
-                self.config_source.as_mut().unwrap().remove_config_setting(&key);
+                self.config_source
+                    .as_mut()
+                    .unwrap()
+                    .remove_config_setting(&key);
                 let mut obj: IndexMap<String, Box<PhpMixed>> = IndexMap::new();
-                obj.insert("username".to_string(), Box::new(PhpMixed::String(values[0].clone())));
-                obj.insert("token".to_string(), Box::new(PhpMixed::String(values[1].clone())));
-                self.auth_config_source.as_mut().unwrap().add_config_setting(&key, PhpMixed::Array(obj));
+                obj.insert(
+                    "username".to_string(),
+                    Box::new(PhpMixed::String(values[0].clone())),
+                );
+                obj.insert(
+                    "token".to_string(),
+                    Box::new(PhpMixed::String(values[1].clone())),
+                );
+                self.auth_config_source
+                    .as_mut()
+                    .unwrap()
+                    .add_config_setting(&key, PhpMixed::Array(obj));
             }
 
             return Ok(0);
@@ -1097,7 +1182,7 @@ impl ConfigCommand {
 
         // handle script
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)).unwrap_or(false) {
+        if Preg::is_match3("/^scripts\\.(.+)/", &setting_key, Some(&mut matches)) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .as_mut()
@@ -1293,9 +1378,7 @@ impl ConfigCommand {
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(
-                    &Preg::replace("{^config\\.}", "", &format!("{}.", key)).unwrap_or_default(),
-                );
+                new_k.push_str(&Preg::replace("{^config\\.}", "", &format!("{}.", key)));
                 k = Some(new_k);
                 self.list_configuration(
                     value_inner,
@@ -1353,14 +1436,13 @@ impl ConfigCommand {
                 } else {
                     k.clone().unwrap()
                 };
-                let id = Preg::replace("{\\..*$}", "", &id_source).unwrap_or_default();
+                let id = Preg::replace("{\\..*$}", "", &id_source);
                 let id = Preg::replace(
                     "{[^a-z0-9]}i",
                     "-",
                     &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
-                )
-                .unwrap_or_default();
-                let id = Preg::replace("{-+}", "-", &id).unwrap_or_default();
+                );
+                let id = Preg::replace("{-+}", "-", &id);
                 link = format!("https://getcomposer.org/doc/06-config.md#{}", id);
             }
             if is_string(&raw_val)
@@ -1594,14 +1676,11 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "cache-files-maxsize".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(
-                    Preg::is_match3(
-                        "/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i",
-                        val.as_string().unwrap_or(""),
-                        None,
-                    )
-                    .unwrap_or(false),
-                )
+                PhpMixed::Bool(Preg::is_match3(
+                    "/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i",
+                    val.as_string().unwrap_or(""),
+                    None,
+                ))
             }),
             Box::new(|val| val.clone()),
         ),

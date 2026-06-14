@@ -42,7 +42,7 @@ impl ForgejoUrl {
             shirabe_external_packages::composer::pcre::CaptureKey,
             String,
         > = indexmap::IndexMap::new();
-        if !Preg::match3(Self::URL_REGEX, repo_url, Some(&mut matches)).unwrap_or(false) {
+        if !Preg::match3(Self::URL_REGEX, repo_url, Some(&mut matches)) {
             return None;
         }
         use shirabe_external_packages::composer::pcre::CaptureKey;

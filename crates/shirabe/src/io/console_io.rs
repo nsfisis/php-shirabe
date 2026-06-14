@@ -296,7 +296,7 @@ impl ConsoleIO {
         };
         if is_string(&messages) {
             let message = Self::ensure_valid_utf8(messages.as_string().unwrap_or(""));
-            return PhpMixed::String(Preg::replace(&pattern, "", &message).unwrap_or_default());
+            return PhpMixed::String(Preg::replace(&pattern, "", &message));
         }
 
         // PHP: $sanitized = []; foreach ($messages as $key => $message) { ... }
@@ -307,7 +307,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.to_string(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s).unwrap_or_default()),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
                     );
                 }
             }
@@ -316,7 +316,7 @@ impl ConsoleIO {
                     let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
                     sanitized.insert(
                         key.clone(),
-                        PhpMixed::String(Preg::replace(&pattern, "", &s).unwrap_or_default()),
+                        PhpMixed::String(Preg::replace(&pattern, "", &s)),
                     );
                 }
             }

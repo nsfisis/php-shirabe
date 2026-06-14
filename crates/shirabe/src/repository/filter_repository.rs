@@ -137,14 +137,14 @@ impl FilterRepository {
         }
 
         if let Some(only) = &self.only {
-            return Preg::is_match(only, name).unwrap_or(false);
+            return Preg::is_match(only, name);
         }
 
         if self.exclude.is_none() {
             return true;
         }
 
-        !Preg::is_match(self.exclude.as_ref().unwrap(), name).unwrap_or(false)
+        !Preg::is_match(self.exclude.as_ref().unwrap(), name)
     }
 }
 

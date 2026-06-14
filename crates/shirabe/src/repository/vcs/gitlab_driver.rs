@@ -84,7 +84,7 @@ impl GitLabDriver {
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> Result<()> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(Self::URL_REGEX, &self.inner.url, Some(&mut match_)).unwrap_or(false) {
+        if !Preg::is_match3(Self::URL_REGEX, &self.inner.url, Some(&mut match_)) {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
@@ -202,8 +202,7 @@ impl GitLabDriver {
                 .get(&CaptureKey::ByName("repo".to_string()))
                 .cloned()
                 .unwrap_or_default(),
-        )
-        .unwrap_or_default();
+        );
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
@@ -429,7 +428,7 @@ impl GitLabDriver {
 
         // Convert the root identifier to a cacheable commit id
         let mut identifier = identifier.to_string();
-        if !Preg::is_match(r"{[a-f0-9]{40}}i", &identifier).unwrap_or(false) {
+        if !Preg::is_match(r"{[a-f0-9]{40}}i", &identifier) {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
                 identifier = sha.clone();
@@ -987,7 +986,7 @@ impl GitLabDriver {
         _deep: bool,
     ) -> anyhow::Result<bool> {
         let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(Self::URL_REGEX, url, Some(&mut match_)).unwrap_or(false) {
+        if !Preg::is_match3(Self::URL_REGEX, url, Some(&mut match_)) {
             return Ok(false);
         }
 
@@ -1055,9 +1054,7 @@ impl GitLabDriver {
         let links = explode(",", &header);
         for link in &links {
             let mut match_: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut match_))
-                .unwrap_or(false)
-            {
+            if Preg::is_match3(r#"{<(.+?)>; *rel="next"}"#, link, Some(&mut match_)) {
                 return Some(
                     match_
                         .get(&CaptureKey::ByIndex(1))
@@ -1117,9 +1114,7 @@ impl GitLabDriver {
                 false,
             ) || (port_number.is_some()
                 && in_array(
-                    PhpMixed::String(
-                        Preg::replace(r"{:\d+}", "", &guessed_domain).unwrap_or_default(),
-                    ),
+                    PhpMixed::String(Preg::replace(r"{:\d+}", "", &guessed_domain)),
                     configured_domains,
                     false,
                 ))

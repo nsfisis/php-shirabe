@@ -58,7 +58,7 @@ impl VcsDriverBase {
     }
 
     pub fn should_cache(&self, identifier: &str) -> bool {
-        self.cache.is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier).unwrap_or(false)
+        self.cache.is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier)
     }
 
     pub fn get_scheme(&self) -> &str {
@@ -207,7 +207,7 @@ pub trait VcsDriver: VcsDriverInterface {
     fn cache_mut(&mut self) -> Option<&mut Cache>;
 
     fn should_cache(&self, identifier: &str) -> bool {
-        self.cache().is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier).unwrap_or(false)
+        self.cache().is_some() && Preg::is_match("{^[a-f0-9]{40}$}iD", identifier)
     }
 
     fn get_composer_information(

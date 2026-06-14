@@ -25,7 +25,7 @@ pub fn get_version() -> String {
     if VERSION == "@package_version@" {
         return SOURCE_VERSION.to_string();
     }
-    if BRANCH_ALIAS_VERSION != "" && Preg::is_match("{^[a-f0-9]{40}$}", VERSION).unwrap_or(false) {
+    if BRANCH_ALIAS_VERSION != "" && Preg::is_match("{^[a-f0-9]{40}$}", VERSION) {
         return format!("{}+{}", BRANCH_ALIAS_VERSION, VERSION);
     }
     VERSION.to_string()

@@ -109,7 +109,7 @@ impl JsonFile {
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> Result<Self> {
-        if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path).unwrap_or(false) {
+        if http_downloader.is_none() && Preg::is_match(r"{^https?://}i", &path) {
             return Err(InvalidArgumentException {
                 message: "http urls require a HttpDownloader instance to be passed".to_string(),
                 code: 0,
@@ -456,8 +456,7 @@ impl JsonFile {
                     str_repeat(&indent_owned, (strlen(whole) / 4) as usize)
                 },
                 &json,
-            )
-            .unwrap_or(json);
+            );
         }
 
         json
@@ -512,8 +511,7 @@ impl JsonFile {
                         json,
                         -1,
                         &mut count,
-                    )
-                    .unwrap_or_else(|_| json.to_string());
+                    );
                     if count == 1 {
                         data = json_decode(&replaced, true)?;
                         if !matches!(data, PhpMixed::Null) {
@@ -575,8 +573,7 @@ impl JsonFile {
 
     pub fn detect_indenting(json: Option<&str>) -> String {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m)).unwrap_or(false)
-        {
+        if Preg::is_match3(r##"#^([ \t]+)"#m"##, json.unwrap_or(""), Some(&mut m)) {
             return m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
         }
 

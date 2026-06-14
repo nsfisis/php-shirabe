@@ -156,14 +156,16 @@ impl LockTransaction {
 
             if package.get_dist_url().is_some()
                 && present_package.get_dist_reference().is_some()
-                && Preg::is_match(r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i", &package.get_dist_url().unwrap()).unwrap_or(false)
+                && Preg::is_match(
+                    r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i",
+                    &package.get_dist_url().unwrap(),
+                )
             {
                 let new_dist_url = Preg::replace(
                     r"{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
                     &present_package.get_dist_reference().unwrap(),
                     &package.get_dist_url().unwrap(),
-                )
-                .unwrap_or_else(|_| package.get_dist_url().unwrap());
+                );
                 present_package.set_dist_url(Some(new_dist_url));
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());

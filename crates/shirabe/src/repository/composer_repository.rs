@@ -160,7 +160,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if !Preg::is_match(r"{^[\w.]+\??://}", &url_str)? {
+        if !Preg::is_match(r"{^[\w.]+\??://}", &url_str) {
             if let Some(local_file_path) = realpath(&url_str) {
                 // it is a local path, add file scheme
                 repo_config.insert(
@@ -252,7 +252,7 @@ impl ComposerRepository {
             r"{^(?P<proto>https?)://packagist\.org/?$}i",
             &url,
             Some(&mut match_packagist),
-        )? {
+        ) {
             let proto = match_packagist
                 .get(&CaptureKey::ByName("proto".to_string()))
                 .cloned()
@@ -260,14 +260,14 @@ impl ComposerRepository {
             url = format!("{}://repo.packagist.org", proto);
         }
 
-        let base_url_trimmed = Preg::replace(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}", "", &url)?;
+        let base_url_trimmed = Preg::replace(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}", "", &url);
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
         let cache_dir = format!(
             "{}/{}",
             config.get("cache-repo-dir").as_string().unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone()))?,
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone())),
         );
         let cache = Cache::new(io.clone(), &cache_dir, Some("a-z0-9.$~"), None, false);
         let version_parser = VersionParser::new();
@@ -436,7 +436,7 @@ impl ComposerRepository {
             match &package_filter_regex {
                 Some(regex) => {
                     let results_refs: Vec<&str> = results.iter().map(|s| s.as_str()).collect();
-                    Ok(Preg::grep(regex, &results_refs)?)
+                    Ok(Preg::grep(regex, &results_refs))
                 }
                 None => Ok(results),
             }
@@ -774,12 +774,12 @@ impl ComposerRepository {
 
         if mode == SEARCH_VENDOR {
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(r"{\s+}", &query)?;
+            let parts = Preg::split(r"{\s+}", &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
             let vendor_names_refs: Vec<&str> = vendor_names.iter().map(|s| s.as_str()).collect();
-            for name in Preg::grep(&regex, &vendor_names_refs)? {
+            for name in Preg::grep(&regex, &vendor_names_refs) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -796,7 +796,7 @@ impl ComposerRepository {
                 r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i",
                 &query,
                 Some(&mut match_groups),
-            )? && self.list_url.is_some()
+            ) && self.list_url.is_some()
             {
                 let q = match_groups
                     .get(&CaptureKey::ByName("query".to_string()))
@@ -839,12 +839,12 @@ impl ComposerRepository {
             }
 
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(r"{\s+}", &query)?;
+            let parts = Preg::split(r"{\s+}", &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;
             let package_names_refs: Vec<&str> = package_names.iter().map(|s| s.as_str()).collect();
-            for name in Preg::grep(&regex, &package_names_refs)? {
+            for name in Preg::grep(&regex, &package_names_refs) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -1737,7 +1737,7 @@ impl ComposerRepository {
         for (name, constraint) in names_iter {
             let name = strtolower(&name);
 
-            let real_name = Preg::replace(r"{~dev$}", "", &name)?;
+            let real_name = Preg::replace(r"{~dev$}", "", &name);
             // skip platform packages, root package and composer-plugin-api
             if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
                 continue;
@@ -2410,7 +2410,7 @@ impl ComposerRepository {
 
         if url.starts_with('/') {
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r"{^[^:]++://[^/]*+}", &self.url, Some(&mut matches))? {
+            if Preg::is_match3(r"{^[^:]++://[^/]*+}", &self.url, Some(&mut matches)) {
                 return Ok(format!(
                     "{}{}",
                     matches
@@ -2722,7 +2722,7 @@ impl ComposerRepository {
 
         // url-encode $ signs in URLs as bad proxies choke on them
         if let Some(pos) = filename.find('$') {
-            if pos > 0 && Preg::is_match(r"{^https?://}i", &filename)? {
+            if pos > 0 && Preg::is_match(r"{^https?://}i", &filename) {
                 filename = format!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
             }
         }
@@ -3367,7 +3367,7 @@ impl ComposerRepository {
 
         if let Some(ref patterns) = self.available_package_patterns {
             for provider_regex in patterns.iter() {
-                if Preg::is_match(provider_regex, name)? {
+                if Preg::is_match(provider_regex, name) {
                     return Ok(true);
                 }
             }

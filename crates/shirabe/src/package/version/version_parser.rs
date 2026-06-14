@@ -45,11 +45,11 @@ impl VersionParser {
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", &pairs[i].trim())?;
+            let mut pair = Preg::replace(r"{^([^=: ]+)[=: ](.*)$}", "$1 $2", &pairs[i].trim());
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')
-                && !Preg::is_match(r"{(?<=[a-z0-9_/-])\*|\*(?=[a-z0-9_/-])}i", &pairs[i + 1])?
+                && !Preg::is_match(r"{(?<=[a-z0-9_/-])\*|\*(?=[a-z0-9_/-])}i", &pairs[i + 1])
                 && !PlatformRepository::is_platform_package(&pairs[i + 1])
             {
                 pair += &format!(" {}", pairs[i + 1]);

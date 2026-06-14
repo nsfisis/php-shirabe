@@ -11,11 +11,11 @@ impl Version {
         *is_fips = false;
 
         let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::match3(r"^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$",
-        openssl_version,
-        Some(&mut matches),)
-        .unwrap_or(false)
-        {
+        if !Preg::match3(
+            r"^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$",
+            openssl_version,
+            Some(&mut matches),
+        ) {
             return None;
         }
 
@@ -59,9 +59,7 @@ impl Version {
             r"^(?P<major>\d+)(?P<minor>[a-z]*)$",
             libjpeg_version,
             Some(&mut matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return None;
         }
 
@@ -86,9 +84,7 @@ impl Version {
             r"^(?P<year>\d{4})(?P<revision>[a-z]*)$",
             zoneinfo_version,
             Some(&mut matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return None;
         }
 

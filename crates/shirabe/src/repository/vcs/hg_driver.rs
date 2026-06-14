@@ -61,7 +61,7 @@ impl HgDriver {
             }
 
             let sanitized =
-                Preg::replace(r"{[^a-z0-9]}i", "-", &Url::sanitize(self.inner.url.clone()))?;
+                Preg::replace(r"{[^a-z0-9]}i", "-", &Url::sanitize(self.inner.url.clone()));
             self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
 
             let mut fs = Filesystem::new(None);
@@ -244,7 +244,7 @@ impl HgDriver {
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match3(r"^([^\s]+)\s+\d+:(.*)$", &tag, Some(&mut m)).unwrap_or(false) {
+                    if Preg::match3(r"^([^\s]+)\s+\d+:(.*)$", &tag, Some(&mut m)) {
                         tags.insert(
                             m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
                             m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
@@ -274,9 +274,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match3(r"^([^\s]+)\s+\d+:([a-f0-9]+)", &branch, Some(&mut m))
-                        .unwrap_or(false)
-                    {
+                    if Preg::match3(r"^([^\s]+)\s+\d+:([a-f0-9]+)", &branch, Some(&mut m)) {
                         let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {
                             branches.insert(
@@ -297,9 +295,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty() {
                     let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                    if Preg::match3(r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$", &branch, Some(&mut m))
-                        .unwrap_or(false)
-                    {
+                    if Preg::match3(r"^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$", &branch, Some(&mut m)) {
                         let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                         if !name.starts_with('-') {
                             bookmarks.insert(
@@ -328,9 +324,7 @@ impl HgDriver {
         if Preg::is_match(
             r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i",
             url,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Ok(true);
         }
 

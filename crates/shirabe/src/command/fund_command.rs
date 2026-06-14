@@ -191,7 +191,7 @@ impl FundCommand {
                 .and_then(|v| v.as_string())
                 .unwrap_or("");
             if r#type == "github" {
-                if let Ok(Some(matches)) =
+                if let Some(matches) =
                     Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
                 {
                     if let Some(sponsor) = matches.into_iter().nth(1) {

@@ -51,8 +51,7 @@ impl GitLab {
 
     pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
         // before composer 1.9, origin URLs had no port number in them
-        let bc_origin_url =
-            Preg::replace("{:\\d+}", "", origin_url).unwrap_or_else(|_| origin_url.to_string());
+        let bc_origin_url = Preg::replace("{:\\d+}", "", origin_url);
 
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let domains = match gitlab_domains.as_array() {

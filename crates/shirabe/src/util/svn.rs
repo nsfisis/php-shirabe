@@ -443,9 +443,7 @@ impl Svn {
                 (),
             ) {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches))
-                    .unwrap_or(false)
-                {
+                if Preg::is_match3(r"{(\d+(?:\.\d+)+)}", &output, Some(&mut matches)) {
                     *cached = Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))

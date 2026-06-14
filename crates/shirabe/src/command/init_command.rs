@@ -154,7 +154,6 @@ impl InitCommand {
                     .and_then(|v| v.as_string())
                     .unwrap_or(""),
             )
-            .unwrap_or(false)
         {
             return Err(InvalidArgumentException {
                 message: format!(
@@ -576,9 +575,7 @@ impl InitCommand {
                     if !Preg::is_match(
                         r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D",
                         value.as_string().unwrap_or(""),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         return Err(InvalidArgumentException {
                             message: format!(
                                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
@@ -903,7 +900,7 @@ impl InitCommand {
                     value_str
                 };
 
-                if !Preg::is_match(r"{^[^/][A-Za-z0-9\-_/]+/$}", &value_or_default).unwrap_or(false)
+                if !Preg::is_match(r"{^[^/][A-Za-z0-9\-_/]+/$}", &value_or_default)
                 {
                     return Err(InvalidArgumentException {
                         message: format!(
@@ -932,9 +929,7 @@ impl InitCommand {
             r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#,
             author,
             Some(&mut m),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
             if let Some(ref email) = email {
                 if !self.is_valid_email(email) {
@@ -995,7 +990,7 @@ impl InitCommand {
 
         let namespace: Vec<String> = array_map(
             |part: &String| {
-                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part).unwrap_or_default();
+                let part = Preg::replace(r"/[^a-z0-9]/i", " ", &part);
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -1022,7 +1017,7 @@ impl InitCommand {
         {
             self.git_config = Some(IndexMap::new());
             let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
-            if Preg::is_match_all3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m)).unwrap_or(false) {
+            if Preg::is_match_all3(r"{^([^=]+)=(.*)$}m", &output, Some(&mut m)) {
                 let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let values: Vec<String> =
                     m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -1062,7 +1057,7 @@ impl InitCommand {
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
-            if Preg::is_match(&pattern, line).unwrap_or(false) {
+            if Preg::is_match(&pattern, line) {
                 return true;
             }
         }
@@ -1159,11 +1154,10 @@ impl InitCommand {
             r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
             "$1$3-$2$4",
             name,
-        )
-        .unwrap_or_default();
+        );
         let name = strtolower(&name);
-        let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", &name).unwrap_or_default();
-        let name = Preg::replace(r"{([_.-]){2,}}u", "$1", &name).unwrap_or_default();
+        let name = Preg::replace(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u", "", &name);
+        let name = Preg::replace(r"{([_.-]){2,}}u", "$1", &name);
 
         name
     }

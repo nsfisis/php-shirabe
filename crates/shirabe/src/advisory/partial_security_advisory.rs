@@ -40,7 +40,7 @@ impl PartialSecurityAdvisory {
             Err(_) => {
                 let affected_version =
                     Preg::replace(r"(^[>=<^~]*[\d.]+).*", "$1", affected_versions_str);
-                match parser.parse_constraints(affected_version.as_deref().unwrap_or("")) {
+                match parser.parse_constraints(&affected_version) {
                     Ok(c) => c,
                     Err(_) => SimpleConstraint::new(
                         "==".to_string(),

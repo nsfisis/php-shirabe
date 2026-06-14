@@ -383,8 +383,7 @@ impl RemoveCommand {
                 let matches_in_type = Preg::grep(
                     &base_package::package_name_to_regexp(package),
                     &type_keys_refs,
-                )
-                .unwrap_or_default();
+                );
 
                 let alt_type_keys: Vec<String> = composer_data
                     .as_array()
@@ -397,8 +396,7 @@ impl RemoveCommand {
                 let matches_in_alt_type = Preg::grep(
                     &base_package::package_name_to_regexp(package),
                     &alt_type_keys_refs,
-                )
-                .unwrap_or_default();
+                );
 
                 if !type_keys.is_empty() && !matches_in_type.is_empty() {
                     for matched_package in &matches_in_type {

@@ -314,9 +314,7 @@ impl HttpDownloader {
             r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i",
             &request.url,
             Some(&mut m),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(
@@ -664,7 +662,11 @@ impl HttpDownloader {
     ) -> Result<()> {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
-                return Preg::replace(&format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"), "", msg);
+                return Ok(Preg::replace(
+                    &format!("{{{}{}}}u", chr(27), "\\[[;\\d]*m"),
+                    "",
+                    msg,
+                ));
             }
 
             Ok(msg.to_string())
@@ -804,7 +806,7 @@ impl HttpDownloader {
             return false;
         }
 
-        if !Preg::is_match(r"{^https?://}i", &job.request.url).unwrap_or(false) {
+        if !Preg::is_match(r"{^https?://}i", &job.request.url) {
             return false;
         }
 

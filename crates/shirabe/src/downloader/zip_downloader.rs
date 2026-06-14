@@ -116,9 +116,7 @@ impl ZipDownloader {
                 == 0
             {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output, Some(&mut m))
-                    .unwrap_or(false)
-                {
+                if Preg::is_match3(r"^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)", &output, Some(&mut m)) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     if version_compare(&m1, "21.01", "<") {
                         self.inner.io.write_error(&format!(

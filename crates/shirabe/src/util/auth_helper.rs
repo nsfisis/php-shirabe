@@ -529,7 +529,7 @@ impl AuthHelper {
                 }
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
-                if Preg::is_match(r"{^https?://api\.github\.com/}", url)? {
+                if Preg::is_match(r"{^https?://api\.github\.com/}", url) {
                     headers.push(PhpMixed::String(format!(
                         "Authorization: token {}",
                         username,

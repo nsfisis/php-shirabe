@@ -55,7 +55,7 @@ impl MarkdownDescriptor {
                 if !argument.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())?
+                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
                     )
                 } else {
                     String::new()
@@ -93,7 +93,7 @@ impl MarkdownDescriptor {
                 if !option.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())?
+                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())
                     )
                 } else {
                     String::new()

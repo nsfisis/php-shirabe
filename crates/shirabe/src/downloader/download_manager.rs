@@ -459,7 +459,7 @@ impl DownloadManager {
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", &preg_quote(pattern, None)),
             );
-            if Preg::is_match(&pattern_regex, &package.get_name()).unwrap_or(false) {
+            if Preg::is_match(&pattern_regex, &package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
                     return "dist".to_string();
                 }

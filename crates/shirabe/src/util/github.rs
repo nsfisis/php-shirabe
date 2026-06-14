@@ -333,7 +333,7 @@ impl GitHub {
                 continue;
             }
             let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::match3(r"{\burl=(?P<url>[^\s;]+)}", header, Some(&mut caps)).unwrap_or(false) {
+            if Preg::match3(r"{\burl=(?P<url>[^\s;]+)}", header, Some(&mut caps)) {
                 return caps.get(&CaptureKey::ByName("url".to_string())).cloned();
             }
         }
@@ -343,7 +343,7 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-ratelimit-remaining: *0$}i", header.trim()).unwrap_or(false) {
+            if Preg::is_match(r"{^x-ratelimit-remaining: *0$}i", header.trim()) {
                 return true;
             }
         }
@@ -353,7 +353,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(r"{^x-github-sso: required}i", header.trim()).unwrap_or(false) {
+            if Preg::is_match(r"{^x-github-sso: required}i", header.trim()) {
                 return true;
             }
         }

@@ -15,7 +15,7 @@ impl ComposerMirror {
         pretty_version: Option<&str>,
     ) -> String {
         let reference = reference.map(|r| {
-            if Preg::is_match(r"^([a-f0-9]*|%reference%)$", r).unwrap_or(false) {
+            if Preg::is_match(r"^([a-f0-9]*|%reference%)$", r) {
                 r.to_string()
             } else {
                 hash("md5", r)
@@ -59,9 +59,7 @@ impl ComposerMirror {
             r"^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$",
             url,
             Some(&mut gh_matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             format!(
                 "gh-{}/{}",
                 gh_matches
@@ -77,9 +75,7 @@ impl ComposerMirror {
             r"^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$",
             url,
             Some(&mut bb_matches),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             format!(
                 "bb-{}/{}",
                 bb_matches
@@ -92,7 +88,7 @@ impl ComposerMirror {
                     .unwrap_or_default(),
             )
         } else {
-            Preg::replace(r"[^a-z0-9_.-]", "-", url.trim_matches('/')).unwrap_or_default()
+            Preg::replace(r"[^a-z0-9_.-]", "-", url.trim_matches('/'))
         };
 
         ["%package%", "%normalizedUrl%", "%type%"]

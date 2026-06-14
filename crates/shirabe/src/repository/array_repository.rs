@@ -321,11 +321,11 @@ impl RepositoryInterface for ArrayRepository {
         r#type: Option<String>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
-            let parts = Preg::split("{\\s+}", &preg_quote(&query, None)).unwrap_or_default();
+            let parts = Preg::split("{\\s+}", &preg_quote(&query, None));
             format!("{{(?:{})}}i", implode("|", &parts))
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
-            let parts = Preg::split("{\\s+}", &query).unwrap_or_default();
+            let parts = Preg::split("{\\s+}", &query);
             format!("{{(?:{})}}i", implode("|", &parts))
         };
 
@@ -361,10 +361,9 @@ impl RepositoryInterface for ArrayRepository {
                             .get_description()
                             .unwrap_or_default()
                     ),
-                )
-                .unwrap_or(false);
+                );
 
-            if Preg::is_match(&regex, &name).unwrap_or(false) || fulltext_match {
+            if Preg::is_match(&regex, &name) || fulltext_match {
                 if mode == crate::repository::SEARCH_VENDOR {
                     matches.insert(
                         name.clone(),

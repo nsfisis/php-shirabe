@@ -145,8 +145,7 @@ impl Package {
             "{ (?:^|[\\\\/]+) \\.\\.? (?:[\\\\/]+|$) (?:\\.\\.? (?:[\\\\/]+|$) )*}x",
             "/",
             target_dir,
-        )
-        .unwrap_or_else(|_| target_dir.clone());
+        );
         Some(replaced.trim_start_matches('/').to_string())
     }
 
@@ -423,17 +422,13 @@ impl Package {
                 "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i",
                 self.get_dist_url().unwrap_or(""),
             )
-            .unwrap_or(false)
         {
             self.set_dist_reference(Some(reference.clone()));
-            self.set_dist_url(Some(
-                Preg::replace(
-                    "{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
-                    &reference,
-                    self.get_dist_url().unwrap_or(""),
-                )
-                .unwrap_or_default(),
-            ));
+            self.set_dist_url(Some(Preg::replace(
+                "{(?<=/|sha=)[a-f0-9]{40}(?=/|$)}i",
+                &reference,
+                self.get_dist_url().unwrap_or(""),
+            )));
         } else if self.get_dist_reference().is_some() {
             // update the dist reference if there was one, but if none was provided ignore it
             self.set_dist_reference(Some(reference));

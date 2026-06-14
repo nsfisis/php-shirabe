@@ -281,7 +281,6 @@ impl VcsDownloader for SvnDownloader {
 
         let changes_str = changes.unwrap();
         let changes: Vec<String> = Preg::split(r"{\s*\r?\n\s*}", &changes_str)
-            .unwrap_or_default()
             .into_iter()
             .map(|elem| format!("    {}", elem))
             .collect();
@@ -367,8 +366,8 @@ impl VcsDownloader for SvnDownloader {
         to_reference: &str,
         path: &str,
     ) -> anyhow::Result<String> {
-        if Preg::is_match(r"{@(\d+)$}", from_reference).unwrap_or(false)
-            && Preg::is_match(r"{@(\d+)$}", to_reference).unwrap_or(false)
+        if Preg::is_match(r"{@(\d+)$}", from_reference)
+            && Preg::is_match(r"{@(\d+)$}", to_reference)
         {
             // retrieve the svn base url from the checkout folder
             let command = vec![
@@ -399,25 +398,22 @@ impl VcsDownloader for SvnDownloader {
 
             let url_pattern = "#<url>(.*)</url>#";
             let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-            let base_url =
-                if Preg::match3(url_pattern, &output, Some(&mut matches)).unwrap_or(false) {
-                    matches
-                        .get(&CaptureKey::ByIndex(1))
-                        .cloned()
-                        .unwrap_or_default()
-                } else {
-                    return Err(RuntimeException {
-                        message: format!("Unable to determine svn url for path {}", path),
-                        code: 0,
-                    }
-                    .into());
-                };
+            let base_url = if Preg::match3(url_pattern, &output, Some(&mut matches)) {
+                matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .unwrap_or_default()
+            } else {
+                return Err(RuntimeException {
+                    message: format!("Unable to determine svn url for path {}", path),
+                    code: 0,
+                }
+                .into());
+            };
 
             // strip paths from references and only keep the actual revision
-            let from_revision =
-                Preg::replace(r"{.*@(\d+)$}", "$1", &from_reference).unwrap_or_default();
-            let to_revision =
-                Preg::replace(r"{.*@(\d+)$}", "$1", &to_reference).unwrap_or_default();
+            let from_revision = Preg::replace(r"{.*@(\d+)$}", "$1", &from_reference);
+            let to_revision = Preg::replace(r"{.*@(\d+)$}", "$1", &to_reference);
 
             let command = vec![
                 "svn".to_string(),
@@ -474,13 +470,11 @@ impl ChangeReportInterface for SvnDownloader {
             Some(path.to_string()),
         );
 
-        Ok(
-            if Preg::is_match("{^ *[^X ] +}m", &output).unwrap_or(false) {
-                Some(output)
-            } else {
-                None
-            },
-        )
+        Ok(if Preg::is_match("{^ *[^X ] +}m", &output) {
+            Some(output)
+        } else {
+            None
+        })
     }
 }
 

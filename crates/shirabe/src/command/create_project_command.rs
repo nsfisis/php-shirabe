@@ -705,8 +705,7 @@ impl CreateProjectCommand {
                     ),
                     package_version.as_deref().unwrap_or(""),
                     Some(&mut matched),
-                )
-                .unwrap_or(false);
+                );
                 if ok {
                     stability = Some(
                         matched

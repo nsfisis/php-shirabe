@@ -517,9 +517,7 @@ impl AutoloadGenerator {
                     "{ComposerAutoloaderInit([^:\\s]+)::}",
                     &content,
                     Some(&mut matches),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     suffix = matches.get(&CaptureKey::ByIndex(1)).cloned();
                 }
             }
@@ -702,8 +700,7 @@ impl AutoloadGenerator {
                     "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}",
                     "$1",
                     pattern,
-                )
-                .unwrap_or_default();
+                );
                 // if the pattern is not a subset or superset of $dir, it is unrelated and we skip it
                 let unrelated = (!str_starts_with(&pattern_processed, &dir_match)
                     && !str_starts_with(&dir_match, &pattern_processed))
@@ -1069,7 +1066,7 @@ impl AutoloadGenerator {
             }
         }
 
-        if Preg::is_match("{\\.phar([\\\\/]|$)}", &path).unwrap_or(false) {
+        if Preg::is_match("{\\.phar([\\\\/]|$)}", &path) {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
@@ -1095,9 +1092,7 @@ impl AutoloadGenerator {
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
-                    .unwrap_or(false)
-                {
+                if Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches)) {
                     if let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned() {
                         extension_providers
                             .entry(ext)
@@ -1141,7 +1136,6 @@ impl AutoloadGenerator {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
                 if check_platform.as_bool() == Some(true)
                     && Preg::match3("{^ext-(.+)$}iD", link.get_target(), Some(&mut matches))
-                        .unwrap_or(false)
                 {
                     let ext_key = matches
                         .get(&CaptureKey::ByIndex(1))
@@ -1591,11 +1585,8 @@ impl AutoloadGenerator {
                 );
                 m
             });
-            let value = shirabe_php_shim::ltrim(
-                &Preg::replace("/^ */m", "    $0$0", &value).unwrap_or_default(),
-                None,
-            );
-            let value = Preg::replace("/ +$/m", "", &value).unwrap_or_default();
+            let value = shirabe_php_shim::ltrim(&Preg::replace("/^ */m", "    $0$0", &value), None);
+            let value = Preg::replace("/ +$/m", "", &value);
 
             file.push_str(&format!(
                 "    public static ${} = {};\n\n",
@@ -1712,8 +1703,7 @@ impl AutoloadGenerator {
                                     &format!("{{^{}}}", target_dir),
                                     "",
                                     &ltrim(&path_str, Some("\\/")),
-                                )
-                                .unwrap_or_default(),
+                                ),
                                 Some("\\/"),
                             );
                         } else {
@@ -1732,8 +1722,7 @@ impl AutoloadGenerator {
                             "{/+}",
                             "/",
                             &preg_quote(&trim(&strtr(&path_str, "\\", "/"), Some("/")), None),
-                        )
-                        .unwrap_or_default();
+                        );
 
                         // add support for wildcards * and **
                         let p = shirabe_php_shim::strtr_array(&p, &{
@@ -1762,8 +1751,7 @@ impl AutoloadGenerator {
                                 String::new()
                             },
                             &p,
-                        )
-                        .unwrap_or_default();
+                        );
                         let updir: Option<String> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
                             strtr(&Platform::get_cwd(false).unwrap_or_default(), "\\", "/")

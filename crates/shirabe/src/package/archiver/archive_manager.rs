@@ -62,7 +62,7 @@ impl ArchiveManager {
     ) -> anyhow::Result<IndexMap<String, String>> {
         let base_name = match package.get_archive_name() {
             Some(name) => name.to_string(),
-            None => Preg::replace("#[^a-z0-9-_]#i", "-", &package.get_name())?,
+            None => Preg::replace("#[^a-z0-9-_]#i", "-", &package.get_name()),
         };
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
@@ -70,7 +70,7 @@ impl ArchiveManager {
 
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
-            if Preg::is_match("{^[a-f0-9]{40}$}", dist_ref).unwrap_or(false) {
+            if Preg::is_match("{^[a-f0-9]{40}$}", dist_ref) {
                 parts.insert("dist_reference".to_string(), dist_ref.to_string());
                 if let Some(dist_type) = package.get_dist_type() {
                     parts.insert("dist_type".to_string(), dist_type.to_string());

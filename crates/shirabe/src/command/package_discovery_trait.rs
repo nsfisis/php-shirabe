@@ -175,7 +175,6 @@ pub trait PackageDiscoveryTrait {
                         r"{^\d+(\.\d+)?$}",
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                     )
-                    .unwrap_or(false)
                 {
                     io.write_error3(
                         &format!(
@@ -379,9 +378,7 @@ pub trait PackageDiscoveryTrait {
                                 r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}",
                                 &selection,
                                 Some(&mut m),
-                            )
-                            .unwrap_or(false)
-                            {
+                            ) {
                                 if let Some(v) =
                                     m.get(&CaptureKey::ByName("version".to_string())).cloned()
                                 {

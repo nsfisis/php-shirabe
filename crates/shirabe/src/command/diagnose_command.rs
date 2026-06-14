@@ -1183,7 +1183,6 @@ impl DiagnoseCommand {
                 phpinfo_str.as_ref().unwrap(),
                 Some(&mut phpinfo_match),
             )
-            .unwrap_or(false)
         {
             let configure = phpinfo_match
                 .get(&CaptureKey::ByIndex(1))

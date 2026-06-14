@@ -46,12 +46,11 @@ impl VersionBumper {
             return Ok(pretty_constraint);
         }
 
-        let major = Preg::replace(r"{^([1-9][0-9]*|0\.\d+).*}", "$1", &version)?;
-        let version_without_suffix =
-            Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", &version)?;
+        let major = Preg::replace(r"{^([1-9][0-9]*|0\.\d+).*}", "$1", &version);
+        let version_without_suffix = Preg::replace(r"{(?:\.(?:0|9999999))+(-dev)?$}", "", &version);
         let new_pretty_constraint = format!("^{}", version_without_suffix);
 
-        if !Preg::is_match(r"{^\^\d+(\.\d+)*$}", &new_pretty_constraint)? {
+        if !Preg::is_match(r"{^\^\d+(\.\d+)*$}", &new_pretty_constraint) {
             return Ok(pretty_constraint);
         }
 
@@ -71,7 +70,7 @@ impl VersionBumper {
         );
 
         let mut matches: IndexMap<CaptureKey, Vec<(String, usize)>> = IndexMap::new();
-        if Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint, Some(&mut matches))? {
+        if Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint, Some(&mut matches)) {
             let mut modified = pretty_constraint.clone();
             let constraint_matches = matches
                 .get(&CaptureKey::ByName("constraint".to_string()))

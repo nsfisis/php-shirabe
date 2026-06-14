@@ -120,9 +120,9 @@ impl PathRepository {
         let url_matches = self.get_url_matches()?;
 
         if url_matches.is_empty() {
-            if Preg::is_match(r"{[*{}]}", &self.url).unwrap_or(false) {
+            if Preg::is_match(r"{[*{}]}", &self.url) {
                 let mut url = self.url.clone();
-                while Preg::is_match(r"{[*{}]}", &url).unwrap_or(false) {
+                while Preg::is_match(r"{[*{}]}", &url) {
                     url = shirabe_php_shim::dirname(&url);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty

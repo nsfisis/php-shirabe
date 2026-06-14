@@ -169,14 +169,12 @@ impl ClassMapGenerator {
                 continue;
             }
 
-            let is_stream_wrapper_path =
-                Preg::is_match(&self.stream_wrappers_regex, &file_path).unwrap_or(false);
+            let is_stream_wrapper_path = Preg::is_match(&self.stream_wrappers_regex, &file_path);
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
             } else {
-                file_path =
-                    Preg::replace(r"{(?<!:)[\\/]{2,}}", "/", &file_path).unwrap_or(file_path);
+                file_path = Preg::replace(r"{(?<!:)[\\/]{2,}}", "/", &file_path);
             }
 
             if file_path.is_empty() {
@@ -213,11 +211,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if Preg::is_match(excluded, &strtr(&real_path, "\\", "/")).unwrap_or(false) {
+                if Preg::is_match(excluded, &strtr(&real_path, "\\", "/")) {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if Preg::is_match(excluded, &strtr(&file_path, "\\", "/")).unwrap_or(false) {
+                if Preg::is_match(excluded, &strtr(&file_path, "\\", "/")) {
                     continue;
                 }
             }
@@ -332,14 +330,12 @@ impl ClassMapGenerator {
                 &format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(file_path),
-            )
-            .unwrap_or_else(|_| Self::normalize_path(file_path));
+            );
             let short_base_path = Preg::replace(
                 &format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(base_path),
-            )
-            .unwrap_or_else(|_| Self::normalize_path(base_path));
+            );
 
             for class in rejected_classes {
                 self.class_map.add_psr_violation(
@@ -385,9 +381,7 @@ impl ClassMapGenerator {
             r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
             Some(&mut r#match),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             prefix = r#match
                 .get(&CaptureKey::ByIndex(1))
                 .cloned()
@@ -421,8 +415,7 @@ impl ClassMapGenerator {
                     .to_uppercase()
             },
             &prefix,
-        )
-        .unwrap_or(prefix);
+        );
 
         format!("{}{}{}", prefix, absolute, parts.join("/"))
     }

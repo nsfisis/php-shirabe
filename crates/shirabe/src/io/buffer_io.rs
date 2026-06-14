@@ -107,9 +107,7 @@ impl BufferIO {
             &output,
         );
 
-        // TODO(phase-c): Preg::replace_callback returns Result<String>; PHP getOutput returns the
-        // string directly, so this is gated on the get_stream PhpResource model above.
-        output.unwrap_or_default()
+        output
     }
 
     pub fn set_user_inputs(&mut self, inputs: Vec<String>) -> Result<()> {

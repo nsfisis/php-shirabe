@@ -59,8 +59,7 @@ impl ArchivableFilesFinder {
                 &format!("^{}", preg_quote(&sources_clone, Some('#'))),
                 "",
                 &fs.normalize_path(&realpath.to_string_lossy()),
-            )
-            .unwrap_or_default();
+            );
 
             let mut exclude = false;
             for f in &filters {

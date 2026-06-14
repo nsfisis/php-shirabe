@@ -677,8 +677,7 @@ impl Table {
             let is_not_styled_by_tag = !Preg::is_match(
                 "/^<(\\w+|(\\w+=[\\w,]+;?)*)>.+<\\/(\\w+|(\\w+=\\w+;?)*)?>$/",
                 &cell_str,
-            )
-            .unwrap();
+            );
             if is_not_styled_by_tag {
                 let cell_style = Self::cell_get_style(&cell).unwrap();
                 match cell_style.get_cell_format() {

@@ -136,7 +136,7 @@ impl UpdateCommand {
         if packages.len() > 0 {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    Preg::is_match(r"{\S+[ =:]\S+}", pkg).unwrap_or(false)
+                    Preg::is_match(r"{\S+[ =:]\S+}", pkg)
                 });
             for (package, constraint) in
                 self.format_requirements(allowlist_packages_with_requirements.clone())?
@@ -146,7 +146,7 @@ impl UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name = Preg::replace(r"{^([^ =:]+)[ =:].*$}", "$1", package)?;
+                let package_name = Preg::replace(r"{^([^ =:]+)[ =:].*$}", "$1", package);
                 if let Some(idx) = array_search_in_vec(package, &packages) {
                     packages[idx] = package_name;
                 }
@@ -220,7 +220,7 @@ impl UpdateCommand {
                 let matches = Preg::is_match_with_indexed_captures(
                     r"{^(\d+\.\d+\.\d+)}",
                     &package.get_version(),
-                )?;
+                );
                 let Some(matches) = matches else {
                     continue;
                 };
@@ -575,7 +575,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter {
-                if !Preg::is_match(filter, &package.get_name()).unwrap_or(false) {
+                if !Preg::is_match(filter, &package.get_name()) {
                     continue;
                 }
             }

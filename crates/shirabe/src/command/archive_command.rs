@@ -284,9 +284,7 @@ impl ArchiveCommand {
                 r"{@(stable|RC|beta|alpha|dev)$}i",
                 version_str,
                 Some(&mut matches),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let m1 = matches
                     .get(&CaptureKey::ByIndex(1))
                     .cloned()

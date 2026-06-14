@@ -901,7 +901,7 @@ impl ValidatingArrayLoader {
                     }
                     if let Some(err) = Self::has_package_naming_error(&package, true) {
                         self.warnings.push(format!("{}.{}", link_type, err));
-                    } else if !Preg::is_match("{^[A-Za-z0-9_./-]+$}", &package).unwrap_or(false) {
+                    } else if !Preg::is_match("{^[A-Za-z0-9_./-]+$}", &package) {
                         self.errors.push(format!(
                             "{}.{} : invalid key, package names must be strings containing only [A-Za-z0-9_./-]",
                             link_type, package
@@ -1161,7 +1161,7 @@ impl ValidatingArrayLoader {
                 }
                 if let Some(ref_val) = section.get("reference") {
                     let ref_str = php_to_string(&**ref_val);
-                    if Preg::is_match("{^\\s*-}", &ref_str).unwrap_or(false) {
+                    if Preg::is_match("{^\\s*-}", &ref_str) {
                         self.errors.push(format!(
                             "{}.reference : must not start with a \"-\", \"{}\" given",
                             src_type, ref_str
@@ -1170,7 +1170,7 @@ impl ValidatingArrayLoader {
                 }
                 if let Some(url_val) = section.get("url") {
                     let url_str = php_to_string(&**url_val);
-                    if Preg::is_match("{^\\s*-}", &url_str).unwrap_or(false) {
+                    if Preg::is_match("{^\\s*-}", &url_str) {
                         self.errors.push(format!(
                             "{}.url : must not start with a \"-\", \"{}\" given",
                             src_type, url_str
@@ -1332,9 +1332,7 @@ impl ValidatingArrayLoader {
         if !Preg::is_match(
             "{^[a-z0-9](?:[_.-]?[a-z0-9]++)*+/[a-z0-9](?:(?:[_.]|-{1,2})?[a-z0-9]++)*+$}iD",
             name,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Some(format!(
                 "{} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\".",
                 name
@@ -1355,14 +1353,14 @@ impl ValidatingArrayLoader {
             ));
         }
 
-        if Preg::is_match("{\\.json$}", name).unwrap_or(false) {
+        if Preg::is_match("{\\.json$}", name) {
             return Some(format!(
                 "{} is invalid, package names can not end in .json, consider renaming it or perhaps using a -json suffix instead.",
                 name
             ));
         }
 
-        if Preg::is_match("{[A-Z]}", name).unwrap_or(false) {
+        if Preg::is_match("{[A-Z]}", name) {
             if is_link {
                 return Some(format!(
                     "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
@@ -1375,8 +1373,7 @@ impl ValidatingArrayLoader {
                 "{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}",
                 "\\1\\3-\\2\\4",
                 name,
-            )
-            .unwrap_or_else(|_| name.to_string());
+            );
             let suggest_name = strtolower(&suggest_name);
 
             return Some(format!(
@@ -1394,7 +1391,7 @@ impl ValidatingArrayLoader {
         }
 
         let value = self.config[property].as_string().unwrap_or("").to_string();
-        if !Preg::is_match(&format!("{{^{}$}}u", regex), &value).unwrap_or(false) {
+        if !Preg::is_match(&format!("{{^{}$}}u", regex), &value) {
             let message = format!(
                 "{} : invalid value ({}), must match {}",
                 property, value, regex
@@ -1508,7 +1505,7 @@ impl ValidatingArrayLoader {
 
             if let Some(regex_str) = regex {
                 let value_str = php_to_string(&*value);
-                if !Preg::is_match(&format!("{{^{}$}}u", regex_str), &value_str).unwrap_or(false) {
+                if !Preg::is_match(&format!("{{^{}$}}u", regex_str), &value_str) {
                     self.warnings.push(format!(
                         "{}.{} : invalid value ({}), must match {}",
                         property, key, value_str, regex_str

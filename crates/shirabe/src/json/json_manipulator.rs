@@ -4,11 +4,10 @@ use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    ArrayObject, InvalidArgumentException, LogicException, PREG_BACKTRACK_LIMIT_ERROR, PhpMixed,
-    RuntimeException, StdClass, addcslashes, array_key_exists, array_keys, array_reverse, count,
-    empty, explode, implode, in_array, is_array, is_int, is_numeric, json_decode, max_i64,
-    preg_quote, rtrim, str_contains, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
-    trim, uksort,
+    ArrayObject, InvalidArgumentException, LogicException, PhpMixed, StdClass, addcslashes,
+    array_key_exists, array_keys, array_reverse, count, empty, explode, implode, in_array,
+    is_array, is_int, is_numeric, json_decode, max_i64, preg_quote, rtrim, str_contains,
+    str_repeat, str_replace, strlen, strnatcmp, strpos, substr, trim, uksort,
 };
 
 use crate::json::JsonFile;
@@ -37,7 +36,7 @@ impl JsonManipulator {
         if contents == "" {
             contents = "{}".to_string();
         }
-        if !Preg::is_match3("#^\\{(.*)\\}$#s", &contents, None).unwrap_or(false) {
+        if !Preg::is_match3("#^\\{(.*)\\}$#s", &contents, None) {
             return Err(InvalidArgumentException {
                 message: "The json file must be an object ({})".to_string(),
                 code: 0,
@@ -91,7 +90,7 @@ impl JsonManipulator {
             preg_quote(&JsonFile::encode(r#type), None),
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
-        if !Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false) {
+        if !Preg::is_match_named(&regex, &self.contents, &mut matches) {
             return Ok(false);
         }
         let start = matches.get("start").cloned().unwrap_or_default();
@@ -108,7 +107,7 @@ impl JsonManipulator {
             package_regex
         );
         let mut package_matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &links, &mut package_matches).unwrap_or(false) {
+        if Preg::is_match_named(&regex, &links, &mut package_matches) {
             // update existing link
             let existing_package = package_matches.get("package").cloned().unwrap_or_default();
             let package_regex = str_replace("/", "\\\\?/", &preg_quote(&existing_package, None));
@@ -131,16 +130,14 @@ impl JsonManipulator {
                     )
                 },
                 &links,
-            )?;
+            );
         } else {
             let mut groups: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(
                 "#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s",
                 &links,
                 Some(&mut groups),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let groups_1 = groups
                     .get(&CaptureKey::ByIndex(1))
                     .cloned()
@@ -162,7 +159,7 @@ impl JsonManipulator {
                         "\\$",
                     ),
                     &links,
-                )?;
+                );
             } else {
                 // links empty
                 links = format!(
@@ -197,7 +194,7 @@ impl JsonManipulator {
                 let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
                 let mut result = requirement.to_string();
                 for (p, r) in patterns.iter().zip(replacements.iter()) {
-                    result = Preg::replace(p, r, &result).unwrap_or(result);
+                    result = Preg::replace(p, r, &result);
                 }
                 result
             } else {
@@ -369,11 +366,9 @@ impl JsonManipulator {
         let mut matches: IndexMap<String, String> = IndexMap::new();
 
         let list_match = list_regex.as_ref().map_or(false, |r| {
-            Preg::is_match_named(r, &self.contents, &mut matches).unwrap_or(false)
+            Preg::is_match_named(r, &self.contents, &mut matches)
         });
-        if list_match
-            || Preg::is_match_named(&object_regex, &self.contents, &mut matches).unwrap_or(false)
-        {
+        if list_match || Preg::is_match_named(&object_regex, &self.contents, &mut matches) {
             // invalid match due to un-regexable content, abort
             let raw_repo = matches.get("repository").cloned().unwrap_or_default();
             if json_decode(&raw_repo, false)?.as_bool() == Some(false) {
@@ -406,7 +401,7 @@ impl JsonManipulator {
                         )
                     },
                     &raw_repo,
-                )?,
+                ),
                 matches.get("end").cloned().unwrap_or_default()
             );
 
@@ -678,18 +673,7 @@ impl JsonManipulator {
         );
 
         let mut match_map: IndexMap<String, String> = IndexMap::new();
-        let match_result = match Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                if let Some(re) = e.downcast_ref::<RuntimeException>() {
-                    if re.code == PREG_BACKTRACK_LIMIT_ERROR {
-                        return Ok(false);
-                    }
-                }
-                Err(e)
-            }
-        }?;
-        if !match_result {
+        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
             return Ok(false);
         }
 
@@ -708,7 +692,7 @@ impl JsonManipulator {
             preg_quote(&name_owned, None)
         );
         let mut child_match_map: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&child_regex, &children, &mut child_match_map).unwrap_or(false) {
+        if Preg::is_match_named(&child_regex, &children, &mut child_match_map) {
             let value_capture = value.clone();
             let sub_name_capture = sub_name.clone();
             let formatter = ManipulatorFormatter {
@@ -745,16 +729,14 @@ impl JsonManipulator {
                     )
                 },
                 &children,
-            )?;
+            );
         } else {
             let mut leading_match: IndexMap<String, String> = IndexMap::new();
             if Preg::is_match_named(
                 "#^\\{(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s",
                 &children,
                 &mut leading_match,
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let mut whitespace = leading_match
                     .get("trailingspace")
                     .cloned()
@@ -789,7 +771,7 @@ impl JsonManipulator {
                                 "\\$",
                             ),
                             &children,
-                        )?;
+                        );
                     } else {
                         whitespace = leading_space.clone();
                         children = Preg::replace(
@@ -807,7 +789,7 @@ impl JsonManipulator {
                                 "\\$",
                             ),
                             &children,
-                        )?;
+                        );
                     }
                 } else {
                     let mut value_local = value.clone();
@@ -853,7 +835,7 @@ impl JsonManipulator {
                 )
             },
             &self.contents,
-        )?;
+        );
 
         Ok(true)
     }
@@ -874,18 +856,7 @@ impl JsonManipulator {
             preg_quote(&JsonFile::encode(main_node), None)
         );
         let mut match_map: IndexMap<String, String> = IndexMap::new();
-        let match_result = match Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                if let Some(re) = e.downcast_ref::<RuntimeException>() {
-                    if re.code == PREG_BACKTRACK_LIMIT_ERROR {
-                        return Ok(false);
-                    }
-                }
-                Err(e)
-            }
-        }?;
-        if !match_result {
+        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
             return Ok(false);
         }
 
@@ -936,9 +907,7 @@ impl JsonManipulator {
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
         let mut children_clean: Option<String> = None;
-        if Preg::is_match3(&format!("{{\"{}\"\\s*:}}i", key_regex), &children, None)
-            .unwrap_or(false)
-        {
+        if Preg::is_match3(&format!("{{\"{}\"\\s*:}}i", key_regex), &children, None) {
             // find best match for the value of "name"
             let mut all_matches: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
             if Preg::is_match_all3(
@@ -949,9 +918,7 @@ impl JsonManipulator {
                 ),
                 &children,
                 Some(&mut all_matches),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let mut best_match: String = String::new();
                 let first_group = all_matches
                     .get(&CaptureKey::ByIndex(0))
@@ -969,7 +936,7 @@ impl JsonManipulator {
                     &children,
                     -1,
                     &mut count_out,
-                )?;
+                );
                 if 1 != count_out {
                     let cleaned2 = Preg::replace5(
                         &format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
@@ -977,7 +944,7 @@ impl JsonManipulator {
                         &cleaned,
                         -1,
                         &mut count_out,
-                    )?;
+                    );
                     if 1 != count_out {
                         return Ok(false);
                     }
@@ -1001,9 +968,7 @@ impl JsonManipulator {
             "#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s",
             &children_clean,
             &mut empty_match,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             if empty_match.get("content").is_none() {
                 let newline = self.newline.clone();
                 let indent = self.indent.clone();
@@ -1026,7 +991,7 @@ impl JsonManipulator {
                         )
                     },
                     &self.contents,
-                )?;
+                );
 
                 // we have a subname, so we restore the rest of $name
                 if let Some(sub) = sub_name {
@@ -1109,7 +1074,7 @@ impl JsonManipulator {
                 )
             },
             &self.contents,
-        )?;
+        );
 
         Ok(true)
     }
@@ -1137,18 +1102,7 @@ impl JsonManipulator {
         );
 
         let mut match_map: IndexMap<String, String> = IndexMap::new();
-        let match_result = match Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                if let Some(re) = e.downcast_ref::<RuntimeException>() {
-                    if re.code == PREG_BACKTRACK_LIMIT_ERROR {
-                        return Ok(false);
-                    }
-                }
-                Err(e)
-            }
-        }?;
-        if !match_result {
+        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
             return Ok(false);
         }
 
@@ -1163,9 +1117,7 @@ impl JsonManipulator {
             "#^\\[(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\]$#s",
             &children,
             &mut leading_match,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             let leading_whitespace = leading_match
                 .get("leadingspace")
                 .cloned()
@@ -1201,7 +1153,7 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    )?;
+                    );
                 } else {
                     whitespace = leading_whitespace.clone();
                     children = Preg::replace(
@@ -1216,7 +1168,7 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    )?;
+                    );
                 }
             } else {
                 // children present but empty
@@ -1251,7 +1203,7 @@ impl JsonManipulator {
                 )
             },
             &self.contents,
-        )?;
+        );
 
         Ok(true)
     }
@@ -1301,18 +1253,7 @@ impl JsonManipulator {
         );
 
         let mut match_map: IndexMap<String, String> = IndexMap::new();
-        let match_result = match Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                if let Some(re) = e.downcast_ref::<RuntimeException>() {
-                    if re.code == PREG_BACKTRACK_LIMIT_ERROR {
-                        return Ok(false);
-                    }
-                }
-                Err(e)
-            }
-        }?;
-        if !match_result {
+        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
             return Ok(false);
         }
 
@@ -1356,7 +1297,7 @@ impl JsonManipulator {
                 )
             },
             &children,
-        )?;
+        );
 
         let children_owned = children;
         self.contents = Preg::replace_callback(
@@ -1374,7 +1315,7 @@ impl JsonManipulator {
                 )
             },
             &self.contents,
-        )?;
+        );
 
         Ok(true)
     }
@@ -1400,18 +1341,7 @@ impl JsonManipulator {
             preg_quote(&JsonFile::encode(main_node), None)
         );
         let mut match_map: IndexMap<String, String> = IndexMap::new();
-        let match_result = match Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
-            Ok(b) => Ok(b),
-            Err(e) => {
-                if let Some(re) = e.downcast_ref::<RuntimeException>() {
-                    if re.code == PREG_BACKTRACK_LIMIT_ERROR {
-                        return Ok(false);
-                    }
-                }
-                Err(e)
-            }
-        }?;
-        if !match_result {
+        if !Preg::is_match_named(&node_regex, &self.contents, &mut match_map) {
             return Ok(false);
         }
 
@@ -1463,9 +1393,7 @@ impl JsonManipulator {
             ),
             &children,
             &mut child_match,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             self.contents = format!(
                 "{}{}{}{}",
                 match_map.get("start").cloned().unwrap_or_default(),
@@ -1492,7 +1420,7 @@ impl JsonManipulator {
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
         if decoded.as_array().and_then(|a| a.get(key)).is_some()
-            && Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false)
+            && Preg::is_match_named(&regex, &self.contents, &mut matches)
         {
             // invalid match due to un-regexable content, abort
             let key_match = matches.get("key").cloned().unwrap_or_default();
@@ -1513,9 +1441,7 @@ impl JsonManipulator {
 
         // append at the end of the file and keep whitespace
         let mut tail_match: IndexMap<CaptureKey, String> = IndexMap::new();
-        if Preg::is_match3("#[^{\\s](\\s*)\\}$#", &self.contents, Some(&mut tail_match))
-            .unwrap_or(false)
-        {
+        if Preg::is_match3("#[^{\\s](\\s*)\\}$#", &self.contents, Some(&mut tail_match)) {
             let tail_match_1 = tail_match
                 .get(&CaptureKey::ByIndex(1))
                 .cloned()
@@ -1534,7 +1460,7 @@ impl JsonManipulator {
                     "\\$",
                 ),
                 &self.contents,
-            )?;
+            );
 
             return Ok(true);
         }
@@ -1553,7 +1479,7 @@ impl JsonManipulator {
                 "\\$",
             ),
             &self.contents,
-        )?;
+        );
 
         Ok(true)
     }
@@ -1573,7 +1499,7 @@ impl JsonManipulator {
             preg_quote(&JsonFile::encode(key), None)
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false) {
+        if Preg::is_match_named(&regex, &self.contents, &mut matches) {
             // invalid match due to un-regexable content, abort
             let removal = matches.get("removal").cloned().unwrap_or_default();
             if json_decode(&format!("{{{}}}", removal), false)?.is_null() {
@@ -1583,17 +1509,15 @@ impl JsonManipulator {
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
             let mut start = matches.get("start").cloned().unwrap_or_default();
             let end = matches.get("end").cloned().unwrap_or_default();
-            if Preg::is_match3("#,\\s*$#", &start, None).unwrap_or(false)
-                && Preg::is_match3("#^\\}$#", &end, None).unwrap_or(false)
-            {
+            if Preg::is_match3("#,\\s*$#", &start, None) && Preg::is_match3("#^\\}$#", &end, None) {
                 start = rtrim(
-                    &Preg::replace("#,(\\s*)$#", "$1", &start)?,
+                    &Preg::replace("#,(\\s*)$#", "$1", &start),
                     Some(&self.indent),
                 );
             }
 
             self.contents = format!("{}{}", start, end);
-            if Preg::is_match3("#^\\{\\s*\\}\\s*$#", &self.contents, None).unwrap_or(false) {
+            if Preg::is_match3("#^\\{\\s*\\}\\s*$#", &self.contents, None) {
                 self.contents = "{\n}".to_string();
             }
 
@@ -1617,7 +1541,7 @@ impl JsonManipulator {
             preg_quote(&JsonFile::encode(key), None)
         );
         let mut matches: IndexMap<String, String> = IndexMap::new();
-        if Preg::is_match_named(&regex, &self.contents, &mut matches).unwrap_or(false) {
+        if Preg::is_match_named(&regex, &self.contents, &mut matches) {
             // invalid match due to un-regexable content, abort
             let removal = matches.get("removal").cloned().unwrap_or_default();
             if json_decode(&removal, false)?.as_bool() == Some(false) {

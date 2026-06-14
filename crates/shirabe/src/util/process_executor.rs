@@ -206,8 +206,7 @@ impl ProcessExecutor {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^([^:/\\]++) }", &command_str, Some(&mut m)).unwrap_or(false)
-                {
+                if Preg::is_match3(r"{^([^:/\\]++) }", &command_str, Some(&mut m)) {
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     command_str = substr_replace(
                         &command_str,
@@ -647,7 +646,7 @@ impl ProcessExecutor {
         if output.is_empty() {
             vec![]
         } else {
-            Preg::split(r"{\r?\n}", &output).unwrap_or_default()
+            Preg::split(r"{\r?\n}", &output)
         }
     }
 
@@ -696,31 +695,25 @@ impl ProcessExecutor {
                 if Preg::is_match(
                     GitHub::GITHUB_TOKEN_REGEX,
                     m.get(&user_key).cloned().unwrap_or_default().as_str(),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     return "://***:***@".to_string();
                 }
                 if Preg::is_match(
                     r"{^[a-f0-9]{12,}$}",
                     m.get(&user_key).cloned().unwrap_or_default().as_str(),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     return "://***:***@".to_string();
                 }
 
                 format!("://{}:***@", m.get(&user_key).cloned().unwrap_or_default())
             },
             &command_string,
-        )
-        .unwrap_or_default();
+        );
         let safe_command = Preg::replace(
             r"{--password (.*[^\\]') }",
             "--password '***' ",
             &safe_command,
-        )
-        .unwrap_or_default();
+        );
         self.io.as_ref().unwrap().write_error(&format!(
             "Executing{} command ({}): {}",
             if r#async { " async" } else { "" },
@@ -763,24 +756,20 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = Preg::replace5(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes)
-            .unwrap_or_default();
-        let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument).unwrap_or(false);
+        argument = Preg::replace5(r#"/(\\*)"/"#, r#"$1$1\""#, &argument, -1, &mut dquotes);
+        let meta = dquotes > 0 || Preg::is_match(r"/%[^%]+%|![^!]+!/", &argument);
 
         if !meta && !quote {
             quote = strpbrk(&argument, "^&|<>()").is_some();
         }
 
         if quote {
-            argument = format!(
-                "\"{}\"",
-                Preg::replace(r"/(\\*)$/", "$1$1", &argument).unwrap_or_default()
-            );
+            argument = format!("\"{}\"", Preg::replace(r"/(\\*)$/", "$1$1", &argument));
         }
 
         if meta {
-            argument = Preg::replace(r#"/(["^&|<>()%])/"#, "^$1", &argument).unwrap_or_default();
-            argument = Preg::replace(r"/(!)/", "^^$1", &argument).unwrap_or_default();
+            argument = Preg::replace(r#"/(["^&|<>()%])/"#, "^$1", &argument);
+            argument = Preg::replace(r"/(!)/", "^^$1", &argument);
         }
 
         argument

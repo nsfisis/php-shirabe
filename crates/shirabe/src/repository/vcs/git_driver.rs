@@ -51,7 +51,7 @@ impl GitDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", &self.inner.url)?;
+            self.inner.url = Preg::replace(r"{[\\/]\.git/?$}", "", &self.inner.url);
             if !is_dir(&self.inner.url) {
                 return Err(RuntimeException {
                     message: format!(
@@ -88,7 +88,7 @@ impl GitDriver {
                     r"{[^a-z0-9.]}i",
                     "-",
                     &Url::sanitize(self.inner.url.clone())
-                )?
+                )
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -108,7 +108,7 @@ impl GitDriver {
                 .into());
             }
 
-            if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", &self.inner.url).unwrap_or(false) {
+            if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", &self.inner.url) {
                 return Err(InvalidArgumentException {
                     message: format!(
                         "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
@@ -161,7 +161,7 @@ impl GitDriver {
             &format!(
                 "{}/{}",
                 cache_repo_dir,
-                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(cache_url))?
+                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(cache_url))
             ),
             None,
             None,
@@ -215,7 +215,7 @@ impl GitDriver {
                 for branch in &branches {
                     if !branch.is_empty() {
                         let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps)).unwrap_or(false) {
+                        if Preg::match3(r"{^\* +(\S+)}", branch, Some(&mut caps)) {
                             if let Some(name) = caps.get(&CaptureKey::ByIndex(1)) {
                                 self.root_identifier = Some(name.clone());
                                 break;
@@ -338,9 +338,7 @@ impl GitDriver {
                         r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}",
                         &tag,
                         Some(&mut caps),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         if let (Some(hash), Some(name)) = (
                             caps.get(&CaptureKey::ByIndex(1)),
                             caps.get(&CaptureKey::ByIndex(2)),
@@ -375,17 +373,13 @@ impl GitDriver {
                 Some(self.repo_dir.clone()),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                if !branch.is_empty()
-                    && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch).unwrap_or(false)
-                {
+                if !branch.is_empty() && !Preg::is_match(r"{^ *[^/]+/HEAD }", &branch) {
                     let mut caps: IndexMap<CaptureKey, String> = IndexMap::new();
                     if Preg::match3(
                         r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}",
                         &branch,
                         Some(&mut caps),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         if let (Some(name), Some(hash)) = (
                             caps.get(&CaptureKey::ByIndex(1)),
                             caps.get(&CaptureKey::ByIndex(2)),
@@ -413,9 +407,7 @@ impl GitDriver {
         if Preg::is_match(
             r"#(^git://|\.git/?$|git(?:olite)?@|//git\.|//github.com/)#i",
             url,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Ok(true);
         }
 

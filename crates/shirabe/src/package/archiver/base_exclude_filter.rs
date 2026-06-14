@@ -86,11 +86,8 @@ pub trait BaseExcludeFilter {
                 relative_path
             };
 
-            // suppressed RuntimeException, equivalent to PHP try-catch
-            if let Ok(matched) = Preg::is_match(pattern, path) {
-                if matched {
-                    exclude = !negate;
-                }
+            if Preg::is_match(pattern, path) {
+                exclude = !negate;
             }
         }
 

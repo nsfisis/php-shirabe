@@ -99,9 +99,7 @@ impl GitDownloader {
 
         let mut refs = trim(&output, None);
         let mut head_match: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match))
-            .unwrap_or(false)
-        {
+        if !Preg::is_match3(r"{^([a-f0-9]+) HEAD$}mi", &refs, Some(&mut head_match)) {
             // could not match the HEAD for some reason
             return Ok(None);
         }
@@ -115,9 +113,7 @@ impl GitDownloader {
             &format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
             Some(&mut branches_match),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
             return Ok(None);
         }
@@ -145,9 +141,7 @@ impl GitDownloader {
                     ),
                     &refs,
                     Some(&mut m),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     let matches: Vec<String> =
                         m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for match_ in matches {
@@ -284,7 +278,7 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version)?;
+        let mut branch = Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version);
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -304,13 +298,12 @@ impl GitDownloader {
 
         // check whether non-commitish are branches or tags, and fetch branches with the remote name
         let git_ref = reference.to_string();
-        if !Preg::is_match(r"{^[a-f0-9]{40}$}", reference).unwrap_or(false)
+        if !Preg::is_match(r"{^[a-f0-9]{40}$}", reference)
             && branches.is_some()
             && Preg::is_match(
                 &format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().unwrap_or(""),
             )
-            .unwrap_or(false)
         {
             let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
             command1.extend(force.clone());
@@ -350,19 +343,17 @@ impl GitDownloader {
         }
 
         // try to checkout branch by name and then reset it so it's on the proper branch name
-        if Preg::is_match(r"{^[a-f0-9]{40}$}", reference).unwrap_or(false) {
+        if Preg::is_match(r"{^[a-f0-9]{40}$}", reference) {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
                 && !Preg::is_match(
                     &format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
-                .unwrap_or(false)
                 && Preg::is_match(
                     &format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
-                .unwrap_or(false)
             {
                 branch = format!("v{}", branch);
             }
@@ -516,9 +507,7 @@ impl GitDownloader {
             ),
             url,
             Some(&mut match_),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
             let m1 = match_
                 .get(&CaptureKey::ByIndex(1))
@@ -672,9 +661,7 @@ impl GitDownloader {
     }
 
     pub(crate) fn get_short_hash(&self, reference: &str) -> String {
-        if !self.inner.io.is_verbose()
-            && Preg::is_match(r"{^[0-9a-f]{40}$}", reference).unwrap_or(false)
-        {
+        if !self.inner.io.is_verbose() && Preg::is_match(r"{^[0-9a-f]{40}$}", reference) {
             return substr(reference, 0, Some(10));
         }
 
@@ -804,7 +791,7 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let git_version = GitUtil::get_version(&self.inner.process);
 
@@ -872,7 +859,7 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
@@ -1036,7 +1023,7 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string()))?,
+            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
@@ -1142,15 +1129,11 @@ impl VcsDownloader for GitDownloader {
                 r"{^origin\s+(?P<url>\S+)}m",
                 &output,
                 Some(&mut origin_match),
-            )
-            .unwrap_or(false)
-                && Preg::is_match3(
-                    r"{^composer\s+(?P<url>\S+)}m",
-                    &output,
-                    Some(&mut composer_match),
-                )
-                .unwrap_or(false)
-            {
+            ) && Preg::is_match3(
+                r"{^composer\s+(?P<url>\S+)}m",
+                &output,
+                Some(&mut composer_match),
+            ) {
                 let origin_url = origin_match
                     .get(&CaptureKey::ByName("url".to_string()))
                     .cloned()
@@ -1229,7 +1212,7 @@ impl VcsDownloader for GitDownloader {
 
         let changes: Vec<String> = array_map(
             |elem: &String| format!("    {}", elem),
-            &Preg::split(r"{\s*\r?\n\s*}", &changes)?,
+            &Preg::split(r"{\s*\r?\n\s*}", &changes),
         );
         self.inner.io.write_error3(
             &format!(

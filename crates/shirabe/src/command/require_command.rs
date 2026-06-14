@@ -1099,9 +1099,7 @@ impl RequireCommand {
                     .get(package_name)
                     .map(|s| s.as_str())
                     .unwrap_or(""),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 self.get_io().warning(
                     &format!(
                         "Version {} looks like it may be a feature branch which is unlikely to keep working in the long run and may be in an unstable state",

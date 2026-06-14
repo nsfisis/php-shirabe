@@ -48,11 +48,11 @@ impl IgnoreListPlatformRequirementFilter {
             return Ok(constraint);
         }
 
-        if !allow_upper_bound_override || !Preg::is_match(&self.ignore_upper_bound_regex, req)? {
+        if !allow_upper_bound_override || !Preg::is_match(&self.ignore_upper_bound_regex, req) {
             return Ok(constraint);
         }
 
-        if Preg::is_match(&self.ignore_regex, req)? {
+        if Preg::is_match(&self.ignore_regex, req) {
             return Ok(MatchAllConstraint::new(None).into());
         }
 
@@ -86,14 +86,14 @@ impl PlatformRequirementFilterInterface for IgnoreListPlatformRequirementFilter 
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }
-        Preg::is_match(&self.ignore_regex, req).unwrap_or(false)
+        Preg::is_match(&self.ignore_regex, req)
     }
 
     fn is_upper_bound_ignored(&self, req: &str) -> bool {
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }
-        self.is_ignored(req) || Preg::is_match(&self.ignore_upper_bound_regex, req).unwrap_or(false)
+        self.is_ignored(req) || Preg::is_match(&self.ignore_upper_bound_regex, req)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

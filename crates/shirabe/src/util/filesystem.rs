@@ -193,7 +193,7 @@ impl Filesystem {
             return Ok(Some(true));
         }
 
-        if Preg::is_match3("{^(?:[a-z]:)?[/\\\\]+$}i", directory, None).unwrap_or(false) {
+        if Preg::is_match3("{^(?:[a-z]:)?[/\\\\]+$}i", directory, None) {
             return Err(RuntimeException {
                 message: format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory),
                 code: 0,
@@ -541,7 +541,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
+            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None)
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
         }
@@ -602,7 +602,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None).unwrap_or(false)
+            && !Preg::is_match3("{^[A-Z]:/?$}i", &common_path, None)
             && "." != common_path
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
@@ -705,9 +705,7 @@ impl Filesystem {
             "{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix",
             &path,
             Some(&mut prefix_match),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             prefix = prefix_match
                 .get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
                 .cloned()
@@ -746,8 +744,7 @@ impl Filesystem {
                 strtoupper(&s)
             },
             &prefix,
-        )
-        .unwrap_or_default();
+        );
 
         format!("{}{}{}", prefix, absolute, implode("/", &parts))
     }
@@ -757,7 +754,7 @@ impl Filesystem {
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
     pub fn trim_trailing_slash(path: &str) -> String {
         let mut path = path.to_string();
-        if !Preg::is_match3("{^[/\\\\]+$}", &path, None).unwrap_or(false) {
+        if !Preg::is_match3("{^[/\\\\]+$}", &path, None) {
             path = rtrim(&path, Some("/\\"));
         }
 
@@ -773,8 +770,7 @@ impl Filesystem {
                 "{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i",
                 path,
                 None,
-            )
-            .unwrap_or(false);
+            );
         }
 
         Preg::is_match3(
@@ -782,17 +778,15 @@ impl Filesystem {
             path,
             None,
         )
-        .unwrap_or(false)
     }
 
     pub fn get_platform_path(path: &str) -> String {
         let mut path = path.to_string();
         if Platform::is_windows() {
-            path = Preg::replace("{^(?:file:///([a-z]):?/)}i", "file://$1:/", &path)
-                .unwrap_or_default();
+            path = Preg::replace("{^(?:file:///([a-z]):?/)}i", "file://$1:/", &path);
         }
 
-        Preg::replace("{^file://}i", "", &path).unwrap_or_default()
+        Preg::replace("{^file://}i", "", &path)
     }
 
     /// Cross-platform safe version of is_readable()

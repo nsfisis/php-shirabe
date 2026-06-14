@@ -85,7 +85,7 @@ impl FossilDriver {
                 .into());
             }
 
-            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", &self.inner.url)?;
+            let local_name = Preg::replace(r"{[^a-z0-9]}i", "-", &self.inner.url);
             self.repo_file = Some(format!("{}/{}.fossil", cache_repo_dir, local_name));
             self.checkout_dir = format!("{}/{}/", cache_vcs_dir, local_name);
 
@@ -304,7 +304,7 @@ impl FossilDriver {
                 Some(self.checkout_dir.clone()),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                let branch = Preg::replace(r"/^\*/", "", &branch.trim())?;
+                let branch = Preg::replace(r"/^\*/", "", &branch.trim());
                 let branch = branch.trim().to_string();
                 branches.insert(branch.clone(), branch);
             }
@@ -322,13 +322,11 @@ impl FossilDriver {
         if Preg::is_match(
             r"#(^(?:https?|ssh)://(?:[^@]@)?(?:chiselapp\.com|fossil\.))#i",
             url,
-        )
-        .unwrap_or(false)
-        {
+        ) {
             return Ok(true);
         }
 
-        if Preg::is_match(r"!/fossil/|\.fossil!", url).unwrap_or(false) {
+        if Preg::is_match(r"!/fossil/|\.fossil!", url) {
             return Ok(true);
         }
 

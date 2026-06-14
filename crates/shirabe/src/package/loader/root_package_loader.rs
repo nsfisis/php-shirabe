@@ -278,9 +278,7 @@ impl RootPackageLoader {
                 r"(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)",
                 req_version,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let mut alias = IndexMap::new();
@@ -331,13 +329,12 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let mut constraints: Vec<String> = vec![];
 
-            let or_split = Preg::split(r"\s*\|\|?\s*", req_version.trim()).unwrap_or_default();
+            let or_split = Preg::split(r"\s*\|\|?\s*", req_version.trim());
             for or_constraint in &or_split {
                 let and_split = Preg::split(
                     r"(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)",
                     or_constraint,
-                )
-                .unwrap_or_default();
+                );
                 for and_constraint in and_split {
                     constraints.push(and_constraint);
                 }
@@ -349,7 +346,7 @@ impl RootPackageLoader {
             let mut matched = false;
             for constraint in &constraints {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(&pattern, constraint, Some(&mut m)).unwrap_or(false) {
+                if Preg::is_match3(&pattern, constraint, Some(&mut m)) {
                     let name = strtolower(req_name);
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
@@ -368,9 +365,8 @@ impl RootPackageLoader {
             }
 
             for constraint in &constraints {
-                let req_version_stripped =
-                    Preg::replace(r"^([^,\s@]+) as .+$", "$1", constraint).unwrap_or_default();
-                if Preg::is_match(r"^[^,\s@]+$", &req_version_stripped).unwrap_or(false) {
+                let req_version_stripped = Preg::replace(r"^([^,\s@]+) as .+$", "$1", constraint);
+                if Preg::is_match(r"^[^,\s@]+$", &req_version_stripped) {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
                         let name = strtolower(req_name);
@@ -394,12 +390,9 @@ impl RootPackageLoader {
         mut references: IndexMap<String, String>,
     ) -> IndexMap<String, String> {
         for (req_name, req_version) in requires {
-            let req_version =
-                Preg::replace(r"^([^,\s@]+) as .+$", "$1", req_version).unwrap_or_default();
+            let req_version = Preg::replace(r"^([^,\s@]+) as .+$", "$1", req_version);
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version, Some(&mut m))
-                .unwrap_or(false)
-            {
+            if Preg::is_match3(r"^[^,\s@]+?#([a-f0-9]+)$", &req_version, Some(&mut m)) {
                 if VersionParser::parse_stability(&req_version) == "dev" {
                     let name = strtolower(req_name);
                     references.insert(

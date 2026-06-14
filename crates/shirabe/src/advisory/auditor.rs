@@ -282,7 +282,7 @@ impl Auditor {
                 continue;
             };
             if pkg.is_abandoned()
-                && (filter.is_none() || !Preg::is_match(filter.as_ref().unwrap(), &pkg.get_name())?)
+                && (filter.is_none() || !Preg::is_match(filter.as_ref().unwrap(), &pkg.get_name()))
             {
                 result.push(pkg);
             }

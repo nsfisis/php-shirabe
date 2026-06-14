@@ -118,7 +118,7 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url).unwrap_or_default(),
+                    Preg::replace(r"{://([^@]+?):(.+?)@}", "://", &url),
                 );
 
                 array_map(
@@ -207,7 +207,7 @@ impl Git {
             status
         };
 
-        if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", url).unwrap_or(false) {
+        if Preg::is_match(r"{^ssh://[^@]+@[^:]+:[^0-9]+}", url) {
             return Err(InvalidArgumentException {
                 message: format!(
                     "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
@@ -231,9 +231,7 @@ impl Git {
                 r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im",
                 &output,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m3) {
                     self.io.borrow_mut().set_authentication(
@@ -258,9 +256,7 @@ impl Git {
             ),
             url,
             Some(&mut m),
-        )
-        .unwrap_or(false)
-        {
+        ) {
             let mut messages: Vec<String> = vec![];
             let protocols_list: Vec<String> = match &protocols {
                 PhpMixed::List(l) => l
@@ -295,7 +291,6 @@ impl Git {
                         "  ",
                         &self.process.borrow().get_error_output().to_string()
                     )
-                    .unwrap_or_default()
                 ));
 
                 if initial_clone {
@@ -334,18 +329,16 @@ impl Git {
                 Self::get_github_domains_regex(&*self.config.borrow())
             ),
             url,
-        )
-        .unwrap_or(false)
-            && !in_array(
-                PhpMixed::String("ssh".to_string()),
-                &PhpMixed::List(
-                    protocols_list
-                        .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                ),
-                true,
-            );
+        ) && !in_array(
+            PhpMixed::String("ssh".to_string()),
+            &PhpMixed::List(
+                protocols_list
+                    .iter()
+                    .map(|s| Box::new(PhpMixed::String(s.clone())))
+                    .collect(),
+            ),
+            true,
+        );
 
         let mut auth: Option<IndexMap<String, Option<String>>> = None;
         let mut credentials: Vec<String> = vec![];
@@ -368,17 +361,14 @@ impl Git {
                 ),
                 url,
                 Some(&mut m),
-            )
-            .unwrap_or(false)
-                || Preg::is_match3(
-                    &format!(
-                        "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                        Self::get_github_domains_regex(&*self.config.borrow())
-                    ),
-                    url,
-                    Some(&mut m),
-                )
-                .unwrap_or(false);
+            ) || Preg::is_match3(
+                &format!(
+                    "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
+                    Self::get_github_domains_regex(&*self.config.borrow())
+                ),
+                url,
+                Some(&mut m),
+            );
             if github_matched {
                 let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -434,14 +424,11 @@ impl Git {
                     r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i",
                     url,
                     Some(&mut m),
-                )
-                .unwrap_or(false)
-                    || Preg::is_match3(
-                        r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
-                        url,
-                        Some(&mut m),
-                    )
-                    .unwrap_or(false);
+                ) || Preg::is_match3(
+                    r"{^(git)@(bitbucket\.org):(.+?\.git)$}i",
+                    url,
+                    Some(&mut m),
+                );
                 bb_matched
             } {
                 // bitbucket either through oauth or app password, with fallback to ssh.
@@ -589,17 +576,14 @@ impl Git {
                     ),
                     url,
                     Some(&mut m),
-                )
-                .unwrap_or(false)
-                    || Preg::is_match3(
-                        &format!(
-                            "{{^(https?)://{}/(.*)}}i",
-                            Self::get_gitlab_domains_regex(&*self.config.borrow())
-                        ),
-                        url,
-                        Some(&mut m),
-                    )
-                    .unwrap_or(false);
+                ) || Preg::is_match3(
+                    &format!(
+                        "{{^(https?)://{}/(.*)}}i",
+                        Self::get_gitlab_domains_regex(&*self.config.borrow())
+                    ),
+                    url,
+                    Some(&mut m),
+                );
                 gl_matched
             } {
                 let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
@@ -947,11 +931,9 @@ impl Git {
         pretty_version: Option<&str>,
     ) -> Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
-            if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref).unwrap_or(false)
-                && pretty_version.is_some()
-            {
+            if Preg::is_match(r"{^[a-f0-9]{40}$}", r#ref) && pretty_version.is_some() {
                 let branch =
-                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap())?;
+                    Preg::replace(r"{(?:^dev-|(?:\.x)?-dev$)}i", "", &pretty_version.unwrap());
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
@@ -982,13 +964,11 @@ impl Git {
                         &format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
                         branches.as_deref().unwrap_or(""),
                     )
-                    .unwrap_or(false)
                     && tags.is_some()
                     && !Preg::is_match(
                         &format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
                         tags.as_deref().unwrap_or(""),
                     )
-                    .unwrap_or(false)
                 {
                     self.sync_mirror(url, dir)?;
                 }
@@ -1076,7 +1056,7 @@ impl Git {
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output).unwrap_or_default()
+        Preg::replace(r"{^commit [a-f0-9]{40}\n?}m", "", output)
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> Result<bool> {
@@ -1117,7 +1097,7 @@ impl Git {
     /// @return array<int, string>|null
     fn get_authentication_failure(&self, url: &str) -> Option<IndexMap<CaptureKey, String>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-        if !Preg::is_match3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m)).unwrap_or(false) {
+        if !Preg::is_match3(r"{^(https?://)([^/]+)(.*)$}i", url, Some(&mut m)) {
             return None;
         }
 
@@ -1202,9 +1182,7 @@ impl Git {
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
                 let mut matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^\s*HEAD branch:\s(.+)\s*$}m", &line, Some(&mut matches))
-                    .unwrap_or(false)
-                {
+                if Preg::is_match3(r"{^\s*HEAD branch:\s(.+)\s*$}m", &line, Some(&mut matches)) {
                     return Ok(Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))
@@ -1345,9 +1323,7 @@ impl Git {
                     r"/^git version (\d+(?:\.\d+)+)/m",
                     &output,
                     Some(&mut matches),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     *version = Some(matches.get(&CaptureKey::ByIndex(1)).cloned());
                 }
             }

@@ -117,7 +117,7 @@ impl SvnDriver {
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or(""),
-                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(self.base_url.clone()))?,
+                Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(self.base_url.clone())),
             ),
             None,
             None,
@@ -160,7 +160,7 @@ impl SvnDriver {
     }
 
     pub(crate) fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some() && Preg::is_match(r"{@\d+$}", identifier).unwrap_or(false)
+        self.inner.cache.is_some() && Preg::is_match(r"{@\d+$}", identifier)
     }
 
     pub fn get_composer_information(
@@ -263,7 +263,7 @@ impl SvnDriver {
     pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Result<Option<String>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
-        let (path, rev) = if let Ok(Some(m)) =
+        let (path, rev) = if let Some(m) =
             Preg::is_match_with_indexed_captures(r"{^(.+?)(@\d+)?/$}", &identifier)
         {
             if m.get(2).is_some() {
@@ -300,7 +300,7 @@ impl SvnDriver {
     pub fn get_change_date(&mut self, identifier: &str) -> Result<Option<DateTime<FixedOffset>>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
-        let (path, rev) = if let Ok(Some(m)) =
+        let (path, rev) = if let Some(m) =
             Preg::is_match_with_indexed_captures(r"{^(.+?)(@\d+)?/$}", &identifier)
         {
             if m.get(2).is_some() {
@@ -322,9 +322,7 @@ impl SvnDriver {
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty() {
                 let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                if Preg::is_match3(r"{^Last Changed Date: ([^(]+)}", &line, Some(&mut m))
-                    .unwrap_or(false)
-                {
+                if Preg::is_match3(r"{^Last Changed Date: ([^(]+)}", &line, Some(&mut m)) {
                     let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
                         .ok()
@@ -354,9 +352,7 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
-                                .unwrap_or(false)
-                            {
+                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))
                                     .and_then(|s| s.parse().ok())
@@ -405,9 +401,7 @@ impl SvnDriver {
                     let line = trim(&line, None);
                     if !line.is_empty() {
                         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
-                            .unwrap_or(false)
-                        {
+                        if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
                             let rev: i64 = m
                                 .get(&CaptureKey::ByIndex(1))
                                 .and_then(|s| s.parse().ok())
@@ -447,9 +441,7 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty() {
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m))
-                                .unwrap_or(false)
-                            {
+                            if Preg::is_match3(r"{^\s*(\S+).*?(\S+)\s*$}", &line, Some(&mut m)) {
                                 let rev: i64 = m
                                     .get(&CaptureKey::ByIndex(1))
                                     .and_then(|s| s.parse().ok())
@@ -485,7 +477,7 @@ impl SvnDriver {
         deep: bool,
     ) -> Result<bool> {
         let url = Self::normalize_url(url);
-        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url).unwrap_or(false) {
+        if Preg::is_match(r"#(^svn://|^svn\+ssh://|svn\.)#i", &url) {
             return Ok(true);
         }
 

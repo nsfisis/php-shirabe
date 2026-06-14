@@ -222,10 +222,7 @@ impl BumpCommand {
         let packages_filter = if !packages_filter.is_empty() {
             let packages_filter: Vec<String> = packages_filter
                 .iter()
-                .map(|constraint| {
-                    Preg::replace(r"{[:= ].+}", "", constraint)
-                        .unwrap_or_else(|_| constraint.clone())
-                })
+                .map(|constraint| Preg::replace(r"{[:= ].+}", "", constraint))
                 .collect();
             let mut unique_lower: Vec<String> = packages_filter
                 .iter()
@@ -235,7 +232,7 @@ impl BumpCommand {
                 .collect();
             let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
             for (key, reqs) in tasks.iter_mut() {
-                reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name).unwrap_or(false));
+                reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name));
             }
             packages_filter
         } else {

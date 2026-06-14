@@ -176,7 +176,7 @@ impl JsonDescriptor {
                 "/\\s*[\\r\\n]\\s*/",
                 " ",
                 argument.get_description(),
-            )?),
+            )),
         );
         data.insert(
             "default".to_string(),
@@ -237,7 +237,7 @@ impl JsonDescriptor {
                     "/\\s*[\\r\\n]\\s*/",
                     " ",
                     option.get_description(),
-                )?),
+                )),
             );
             data.insert(
                 "default".to_string(),

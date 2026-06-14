@@ -236,14 +236,12 @@ impl Problem {
                     &message,
                     Some(&mut m),
                 )
-                .unwrap_or(false)
             } else {
                 false
             };
             if matched {
                 message = str_replace("%", "%%", &message);
-                let template =
-                    Preg::replace(r"{^\S+ \S+ }", "%s%s ", &message).unwrap_or(message.clone());
+                let template = Preg::replace(r"{^\S+ \S+ }", "%s%s ", &message);
                 messages.push(template.clone());
                 let pkg_key = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -311,8 +309,7 @@ impl Problem {
                     if versions_list.len() > 1 {
                         // remove the s from requires/conflicts to correct grammar
                         let message_var =
-                            Preg::replace(r"{^(%s%s (?:require|conflict))s}", "$1", message)
-                                .unwrap_or(message.clone());
+                            Preg::replace(r"{^(%s%s (?:require|conflict))s}", "$1", message);
                         result.push(sprintf(
                             &message_var,
                             &[
@@ -568,11 +565,10 @@ impl Problem {
         if let Some(c) = constraint {
             if c.is_constraint()
                 && c.get_operator() == SimpleConstraint::STR_OP_EQ
-                && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None).unwrap_or(false)
+                && Preg::is_match3(r"{^dev-.*#.*}", &c.get_pretty_string(), None)
             {
                 let new_constraint =
-                    Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string())
-                        .unwrap_or_else(|_| c.get_pretty_string());
+                    Preg::replace(r"{ +as +([^,\s|]+)$}", "", &c.get_pretty_string());
                 let packages = repository_set.find_packages(
                     package_name,
                     Some(
@@ -983,9 +979,8 @@ impl Problem {
             ));
         }
 
-        if !Preg::is_match3(r"{^[A-Za-z0-9_./-]+$}", package_name, None).unwrap_or(false) {
-            let illegal_chars =
-                Preg::replace(r"{[A-Za-z0-9_./-]+}", "", package_name).unwrap_or_default();
+        if !Preg::is_match3(r"{^[A-Za-z0-9_./-]+$}", package_name, None) {
+            let illegal_chars = Preg::replace(r"{[A-Za-z0-9_./-]+}", "", package_name);
 
             return Ok((
                 format!("- Root composer.json requires {}, it ", package_name),
@@ -1196,8 +1191,7 @@ impl Problem {
                     .or_insert_with(Vec::new)
                     .push(pretty.clone());
             } else {
-                let key = Preg::replace(r"{^(\d+)\..*}", "$1", version)
-                    .unwrap_or_else(|_| version.clone());
+                let key = Preg::replace(r"{^(\d+)\..*}", "$1", version);
                 by_major
                     .entry(key)
                     .or_insert_with(Vec::new)
@@ -1377,9 +1371,7 @@ impl Problem {
                 && c.get_operator() == SimpleConstraint::STR_OP_EQ
                 && !str_starts_with(&c.get_version(), "dev-")
             {
-                if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None)
-                    .unwrap_or(false)
-                {
+                if !Preg::is_match3(r"{^\d+(?:\.\d+)*$}", &c.get_pretty_string(), None) {
                     return format!(" {} (exact version match)", c.get_pretty_string());
                 }
 

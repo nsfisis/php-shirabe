@@ -67,9 +67,7 @@ impl ClassMap {
         for (class, paths) in &self.ambiguous_classes {
             let paths: Vec<String> = paths
                 .iter()
-                .filter(|path| {
-                    !Preg::is_match(duplicates_filter, &strtr(path, "\\", "/")).unwrap_or(false)
-                })
+                .filter(|path| !Preg::is_match(duplicates_filter, &strtr(path, "\\", "/")))
                 .cloned()
                 .collect();
             if !paths.is_empty() {

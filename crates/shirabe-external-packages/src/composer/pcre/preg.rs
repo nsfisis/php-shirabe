@@ -11,14 +11,14 @@
 
 use indexmap::IndexMap;
 
-pub const PREG_PATTERN_ORDER: i64 = 1;
-pub const PREG_SET_ORDER: i64 = 2;
-pub const PREG_OFFSET_CAPTURE: i64 = 256;
-pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
-pub const PREG_SPLIT_NO_EMPTY: i64 = 1;
-pub const PREG_SPLIT_DELIM_CAPTURE: i64 = 2;
-pub const PREG_SPLIT_OFFSET_CAPTURE: i64 = 4;
-pub const PREG_GREP_INVERT: i64 = 1;
+const PREG_PATTERN_ORDER: i64 = 1;
+const PREG_SET_ORDER: i64 = 2;
+const PREG_OFFSET_CAPTURE: i64 = 256;
+const PREG_UNMATCHED_AS_NULL: i64 = 512;
+const PREG_SPLIT_NO_EMPTY: i64 = 1;
+const PREG_SPLIT_DELIM_CAPTURE: i64 = 2;
+const PREG_SPLIT_OFFSET_CAPTURE: i64 = 4;
+const PREG_GREP_INVERT: i64 = 1;
 
 #[derive(Debug)]
 pub struct Preg;
@@ -28,7 +28,7 @@ impl Preg {
         pattern: &str,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         Self::match5(pattern, subject, matches, 0, 0)
     }
 
@@ -38,7 +38,7 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, String>>,
         flags: i64,
         offset: usize,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         Self::check_offset_capture(flags, "matchWithOffsets");
 
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
@@ -55,10 +55,10 @@ impl Preg {
             *out = drop_null_matches(internal);
         }
 
-        Ok(result == 1)
+        result == 1
     }
 
-    pub fn match_all(pattern: &str, subject: &str) -> anyhow::Result<usize> {
+    pub fn match_all(pattern: &str, subject: &str) -> usize {
         Self::match_all5(pattern, subject, None, 0, 0)
     }
 
@@ -66,7 +66,7 @@ impl Preg {
         pattern: &str,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
-    ) -> anyhow::Result<usize> {
+    ) -> usize {
         Self::match_all5(pattern, subject, matches, 0, 0)
     }
 
@@ -76,7 +76,7 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
         flags: i64,
         offset: usize,
-    ) -> anyhow::Result<usize> {
+    ) -> usize {
         Self::check_offset_capture(flags, "matchAllWithOffsets");
         Self::check_set_order(flags);
 
@@ -94,7 +94,7 @@ impl Preg {
             *out = null_to_empty_match_all(internal);
         }
 
-        Ok(result as usize)
+        result as usize
     }
 
     pub fn match_all_with_offsets5(
@@ -103,7 +103,7 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
         flags: i64,
         offset: usize,
-    ) -> anyhow::Result<usize> {
+    ) -> usize {
         Self::check_set_order(flags);
 
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
@@ -120,19 +120,14 @@ impl Preg {
             *out = null_to_empty_offset_match_all(internal);
         }
 
-        Ok(result as usize)
+        result as usize
     }
 
-    pub fn replace(pattern: &str, replacement: &str, subject: &str) -> anyhow::Result<String> {
+    pub fn replace(pattern: &str, replacement: &str, subject: &str) -> String {
         Self::replace_impl(pattern, replacement, subject, -1, None)
     }
 
-    pub fn replace4(
-        pattern: &str,
-        replacement: &str,
-        subject: &str,
-        limit: i64,
-    ) -> anyhow::Result<String> {
+    pub fn replace4(pattern: &str, replacement: &str, subject: &str, limit: i64) -> String {
         Self::replace_impl(pattern, replacement, subject, limit, None)
     }
 
@@ -142,7 +137,7 @@ impl Preg {
         subject: &str,
         limit: i64,
         count: &mut usize,
-    ) -> anyhow::Result<String> {
+    ) -> String {
         Self::replace_impl(pattern, replacement, subject, limit, Some(count))
     }
 
@@ -152,19 +147,18 @@ impl Preg {
         subject: &str,
         limit: i64,
         count: Option<&mut usize>,
-    ) -> anyhow::Result<String> {
+    ) -> String {
         // `$subject` is statically a string here, so the is_scalar/is_array
         // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
         // unreachable and not reproduced.
-        Ok(preg_replace(pattern, replacement, subject, limit, count)
-            .unwrap_or_else(|| invalid_regex()))
+        preg_replace(pattern, replacement, subject, limit, count).unwrap_or_else(|| invalid_regex())
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
         pattern: &str,
         replacement: F,
         subject: &str,
-    ) -> anyhow::Result<String> {
+    ) -> String {
         Self::replace_callback6(pattern, replacement, subject, -1, None, 0)
     }
 
@@ -175,44 +169,37 @@ impl Preg {
         limit: i64,
         count: Option<&mut usize>,
         flags: i64,
-    ) -> anyhow::Result<String> {
+    ) -> String {
         let adapter = |internal: &IndexMap<CaptureKey, Option<String>>| -> String {
             replacement(&drop_null_matches_ref(internal))
         };
 
-        Ok(
-            preg_replace_callback(pattern, adapter, subject, limit, count, flags)
-                .unwrap_or_else(|| invalid_regex()),
-        )
+        preg_replace_callback(pattern, adapter, subject, limit, count, flags)
+            .unwrap_or_else(|| invalid_regex())
     }
 
-    pub fn split(pattern: &str, subject: &str) -> anyhow::Result<Vec<String>> {
+    pub fn split(pattern: &str, subject: &str) -> Vec<String> {
         Self::split4(pattern, subject, -1, 0)
     }
 
-    pub fn split4(
-        pattern: &str,
-        subject: &str,
-        limit: i64,
-        flags: i64,
-    ) -> anyhow::Result<Vec<String>> {
+    pub fn split4(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<String> {
         assert!(
             flags & PREG_SPLIT_OFFSET_CAPTURE == 0,
             "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
         );
 
-        Ok(preg_split(pattern, subject, limit, flags).unwrap_or_else(|| invalid_regex()))
+        preg_split(pattern, subject, limit, flags).unwrap_or_else(|| invalid_regex())
     }
 
-    pub fn grep(pattern: &str, array: &[&str]) -> anyhow::Result<Vec<String>> {
+    pub fn grep(pattern: &str, array: &[&str]) -> Vec<String> {
         Self::grep3(pattern, array, 0)
     }
 
-    pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> anyhow::Result<Vec<String>> {
-        Ok(preg_grep(pattern, array, flags).unwrap_or_else(|| invalid_regex()))
+    pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
+        preg_grep(pattern, array, flags).unwrap_or_else(|| invalid_regex())
     }
 
-    pub fn is_match(pattern: &str, subject: &str) -> anyhow::Result<bool> {
+    pub fn is_match(pattern: &str, subject: &str) -> bool {
         Self::match5(pattern, subject, None, 0, 0)
     }
 
@@ -220,7 +207,7 @@ impl Preg {
         pattern: &str,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         Self::match5(pattern, subject, matches, 0, 0)
     }
 
@@ -230,7 +217,7 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, String>>,
         flags: i64,
         offset: usize,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         Self::match5(pattern, subject, matches, flags, offset)
     }
 
@@ -238,7 +225,7 @@ impl Preg {
         pattern: &str,
         subject: &str,
         matches: &mut IndexMap<String, String>,
-    ) -> anyhow::Result<bool> {
+    ) -> bool {
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
         let result = preg_match(
             pattern,
@@ -256,13 +243,10 @@ impl Preg {
             }
         }
 
-        Ok(result == 1)
+        result == 1
     }
 
-    pub fn is_match_with_indexed_captures(
-        pattern: &str,
-        subject: &str,
-    ) -> anyhow::Result<Option<Vec<String>>> {
+    pub fn is_match_with_indexed_captures(pattern: &str, subject: &str) -> Option<Vec<String>> {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
@@ -270,7 +254,7 @@ impl Preg {
             .unwrap_or_else(|| invalid_regex());
 
         if result == 0 {
-            return Ok(None);
+            return None;
         }
 
         let max_index = internal
@@ -291,23 +275,23 @@ impl Preg {
             captures.push(value);
         }
 
-        Ok(Some(captures))
+        Some(captures)
     }
 
     pub fn is_match_all3(
         pattern: &str,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
-    ) -> anyhow::Result<bool> {
-        Ok(Self::match_all5(pattern, subject, matches, 0, 0)? > 0)
+    ) -> bool {
+        Self::match_all5(pattern, subject, matches, 0, 0) > 0
     }
 
     pub fn is_match_all_with_offsets3(
         pattern: &str,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
-    ) -> anyhow::Result<bool> {
-        Ok(Self::match_all_with_offsets5(pattern, subject, matches, 0, 0)? > 0)
+    ) -> bool {
+        Self::match_all_with_offsets5(pattern, subject, matches, 0, 0) > 0
     }
 
     fn check_offset_capture(flags: i64, use_function_name: &str) {

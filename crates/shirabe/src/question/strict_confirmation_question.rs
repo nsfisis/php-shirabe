@@ -48,10 +48,10 @@ impl StrictConfirmationQuestion {
                 return default.clone();
             }
             if let PhpMixed::String(s) = &answer {
-                if Preg::is_match(&true_regex, s).unwrap_or(false) {
+                if Preg::is_match(&true_regex, s) {
                     return PhpMixed::Bool(true);
                 }
-                if Preg::is_match(&false_regex, s).unwrap_or(false) {
+                if Preg::is_match(&false_regex, s) {
                     return PhpMixed::Bool(false);
                 }
             }

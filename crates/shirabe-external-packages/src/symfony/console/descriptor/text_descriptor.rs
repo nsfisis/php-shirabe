@@ -70,7 +70,7 @@ impl TextDescriptor {
                         shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
                     ),
                     argument.get_description(),
-                )?),
+                )),
                 PhpMixed::String(default),
             ),
             &options,
@@ -148,7 +148,7 @@ impl TextDescriptor {
                         shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
                     ),
                     option.get_description(),
-                )?),
+                )),
                 PhpMixed::String(default),
                 PhpMixed::String(if option.is_array() {
                     "<comment> (multiple values allowed)</comment>".to_string()

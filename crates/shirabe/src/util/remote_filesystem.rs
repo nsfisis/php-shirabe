@@ -145,7 +145,7 @@ impl RemoteFilesystem {
         let mut value: Option<i64> = None;
         for header in headers {
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
-            if Preg::is_match3("{^HTTP/\\S+ (\\d+)}i", header, Some(&mut m)).unwrap_or(false) {
+            if Preg::is_match3("{^HTTP/\\S+ (\\d+)}i", header, Some(&mut m)) {
                 value = m
                     .get(&CaptureKey::ByIndex(1))
                     .and_then(|s| s.parse().ok())
@@ -159,7 +159,7 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[String]) -> Option<String> {
         let mut value: Option<String> = None;
         for header in headers {
-            if Preg::is_match("{^HTTP/\\S+ \\d+}i", header).unwrap_or(false) {
+            if Preg::is_match("{^HTTP/\\S+ \\d+}i", header) {
                 value = Some(header.clone());
             }
         }
@@ -283,7 +283,7 @@ impl RemoteFilesystem {
             crate::io::DEBUG,
         );
 
-        if (!Preg::is_match("{^http://(repo\\.)?packagist\\.org/p/}", &file_url).unwrap_or(false)
+        if (!Preg::is_match("{^http://(repo\\.)?packagist\\.org/p/}", &file_url)
             || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
             && !degraded_packagist
         {
@@ -473,8 +473,7 @@ impl RemoteFilesystem {
                     None,
                 ) != ".zip")
             && content_type.is_some()
-            && Preg::is_match("{^text/html\\b}i", content_type.as_deref().unwrap_or(""))
-                .unwrap_or(false);
+            && Preg::is_match("{^text/html\\b}i", content_type.as_deref().unwrap_or(""));
         if bitbucket_login_match {
             result = None;
             if retry_auth_failure {
@@ -941,26 +940,20 @@ impl RemoteFilesystem {
                     .unwrap_or("")
                     .to_string();
 
-                target_url = Some(
-                    Preg::replace(
-                        &format!(
-                            "{{^(.+(?://|@){}(?::\\d+)?)(?:[/\\?].*)?$}}",
-                            preg_quote(&url_host, None)
-                        ),
-                        &format!("\\1{}", location_header),
-                        &self.file_url,
-                    )
-                    .unwrap_or_else(|_| self.file_url.clone()),
-                );
+                target_url = Some(Preg::replace(
+                    &format!(
+                        "{{^(.+(?://|@){}(?::\\d+)?)(?:[/\\?].*)?$}}",
+                        preg_quote(&url_host, None)
+                    ),
+                    &format!("\\1{}", location_header),
+                    &self.file_url,
+                ));
             } else {
-                target_url = Some(
-                    Preg::replace(
-                        "{^(.+/)[^/?]*(?:\\?.*)?$}",
-                        &format!("\\1{}", location_header),
-                        &self.file_url,
-                    )
-                    .unwrap_or_else(|_| self.file_url.clone()),
-                );
+                target_url = Some(Preg::replace(
+                    "{^(.+/)[^/?]*(?:\\?.*)?$}",
+                    &format!("\\1{}", location_header),
+                    &self.file_url,
+                ));
             }
         }
 

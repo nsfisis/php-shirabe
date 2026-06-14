@@ -66,7 +66,7 @@ impl HtmlOutputFormatter {
             &pattern,
             |matches| self.format_html(matches),
             &formatted,
-        )?))
+        )))
     }
 
     fn format_html(&self, matches: &IndexMap<CaptureKey, String>) -> String {

@@ -68,7 +68,7 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = Preg::match_all(&pattern, &contents)?;
+        let max_matches = Preg::match_all(&pattern, &contents);
         if max_matches == 0 {
             return Ok(vec![]);
         }
@@ -86,7 +86,7 @@ impl PhpFileParser {
             et = extra_types
         );
         let mut matches: IndexMap<_, _> = IndexMap::new();
-        Preg::match_all3(&pattern2, &contents, Some(&mut matches))?;
+        Preg::match_all3(&pattern2, &contents, Some(&mut matches));
 
         let mut classes = vec![];
         let mut namespace = String::new();

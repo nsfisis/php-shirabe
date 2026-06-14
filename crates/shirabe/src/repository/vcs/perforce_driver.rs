@@ -188,7 +188,7 @@ impl PerforceDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if deep || Preg::is_match(r"#\b(perforce|p4)\b#i", url).unwrap_or(false) {
+        if deep || Preg::is_match(r"#\b(perforce|p4)\b#i", url) {
             return Ok(Perforce::check_server_exists(
                 url,
                 &mut ProcessExecutor::new(Some(io)),

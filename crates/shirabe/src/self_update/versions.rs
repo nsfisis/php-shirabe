@@ -94,7 +94,7 @@ impl Versions {
         self.channel = Some(channel.clone());
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned
-        let stored_channel = if Preg::is_match(r"^\d+$", &channel)? {
+        let stored_channel = if Preg::is_match(r"^\d+$", &channel) {
             "stable".to_string()
         } else {
             channel.clone()

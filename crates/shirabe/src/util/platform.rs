@@ -93,7 +93,7 @@ impl Platform {
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
         use shirabe_external_packages::composer::pcre::CaptureKey;
-        if Preg::is_match(r"#^~[\\/]#", path).unwrap_or(false) {
+        if Preg::is_match(r"#^~[\\/]#", path) {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),
@@ -137,7 +137,6 @@ impl Platform {
             },
             path,
         )
-        .unwrap_or_default()
     }
 
     /// @throws \RuntimeException If the user home could not reliably be determined

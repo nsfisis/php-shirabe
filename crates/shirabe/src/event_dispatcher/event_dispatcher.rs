@@ -291,8 +291,7 @@ impl EventDispatcher {
             let mut callable = callable;
             if let Callable::String(ref s) = callable {
                 if str_contains(s, "@no_additional_args") {
-                    let replaced = Preg::replace("{ ?@no_additional_args}", "", s)
-                        .unwrap_or_else(|_| s.clone());
+                    let replaced = Preg::replace("{ ?@no_additional_args}", "", s);
                     callable = Callable::String(replaced);
                     additional_args = Vec::new();
                 }
@@ -647,17 +646,14 @@ impl EventDispatcher {
                                 if Preg::is_match(
                                     &format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
-                                )
-                                .unwrap_or(false)
-                                {
+                                ) {
                                     let caller =
                                         BinaryInstaller::determine_binary_caller(local_exec);
                                     exec = Preg::replace(
                                         &format!("{{^{}}}", preg_quote(&callable_str, None)),
                                         &format!("{} {}", caller, local_exec),
                                         &exec,
-                                    )
-                                    .unwrap_or(exec);
+                                    );
                                     break;
                                 }
                             }
@@ -683,14 +679,12 @@ impl EventDispatcher {
                                     "{^\\S+}",
                                     |m| str_replace("/", "\\", &m[0]),
                                     &path_and_args,
-                                )
-                                .unwrap_or(path_and_args);
+                                );
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
                             if Preg::is_match3("{^[^\\'\"\\s/\\\\]+}", &path_and_args, Some(&mut m))
-                                .unwrap_or(false)
                             {
                                 let m0 =
                                     m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
@@ -703,8 +697,7 @@ impl EventDispatcher {
                                                 "{\\.(exe|bat|cmd|com)$}i",
                                                 "",
                                                 &path_to_exec,
-                                            )
-                                            .unwrap_or(path_to_exec.clone());
+                                            );
                                             // prefer non-extension file if it exists when executing with PHP
                                             if file_exists(&exec_without_ext) {
                                                 path_to_exec = exec_without_ext;
@@ -731,8 +724,7 @@ impl EventDispatcher {
                                     "{^\\S+}",
                                     |m| str_replace("/", "\\", &m[0]),
                                     &exec,
-                                )
-                                .unwrap_or(exec);
+                                );
                             }
                         }
 
@@ -1088,9 +1080,7 @@ impl EventDispatcher {
                     PATH_SEPARATOR
                 ),
                 &path_value,
-            )
-            .unwrap_or(false)
-            {
+            ) {
                 Platform::put_env(
                     path_env,
                     &format!("{}{}{}", bin_dir, PATH_SEPARATOR, path_value),

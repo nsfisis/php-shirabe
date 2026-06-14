@@ -332,7 +332,7 @@ impl RepositoryFactory {
         let mut name = match index {
             PhpMixed::Int(_) => {
                 if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-                    Preg::replace("{^https?://}i", "", url).unwrap_or_else(|_| url.to_string())
+                    Preg::replace("{^https?://}i", "", url)
                 } else {
                     index.as_string().unwrap_or("").to_string()
                 }
@@ -351,7 +351,7 @@ impl RepositoryFactory {
         existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-            Preg::replace("{^https?://}i", "", url).unwrap_or_else(|_| url.to_string())
+            Preg::replace("{^https?://}i", "", url)
         } else {
             index.to_string()
         };

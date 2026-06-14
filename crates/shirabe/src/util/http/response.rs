@@ -29,7 +29,7 @@ impl Response {
     pub fn get_status_message(&self) -> Option<String> {
         let mut value = None;
         for header in &self.headers {
-            if Preg::is_match(r"(?i)^HTTP/\S+ \d+", header).unwrap_or(false) {
+            if Preg::is_match(r"(?i)^HTTP/\S+ \d+", header) {
                 // In case of redirects, headers contain the headers of all responses
                 // so we can not return directly and need to keep iterating
                 value = Some(header.clone());
@@ -69,7 +69,7 @@ impl Response {
                 shirabe_external_packages::composer::pcre::CaptureKey,
                 String,
             > = indexmap::IndexMap::new();
-            if Preg::match3(&pattern, header, Some(&mut matches)).unwrap_or(false) {
+            if Preg::match3(&pattern, header, Some(&mut matches)) {
                 if let Some(s) =
                     matches.get(&shirabe_external_packages::composer::pcre::CaptureKey::ByIndex(1))
                 {

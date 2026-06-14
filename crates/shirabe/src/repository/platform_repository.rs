@@ -218,8 +218,7 @@ impl PlatformRepository {
                 version = v;
             }
             Err(_) => {
-                pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &php_version_str)
-                    .unwrap_or(php_version_str);
+                pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &php_version_str);
                 version = self
                     .version_parser
                     .as_ref()
@@ -352,9 +351,7 @@ impl PlatformRepository {
                         "/^librabbitmq version => (?<version>.+)$/im",
                         &info,
                         Some(&mut librabbitmq_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-librabbitmq", name),
@@ -373,9 +370,7 @@ impl PlatformRepository {
                         "/^AMQP protocol version => (?<version>.+)$/im",
                         &info,
                         Some(&mut protocol_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let version_str = protocol_matches
                             .get(&CaptureKey::ByName("version".to_string()))
                             .cloned()
@@ -400,9 +395,7 @@ impl PlatformRepository {
                         "/^BZip2 Version => (?<version>.*),/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             name,
@@ -438,9 +431,7 @@ impl PlatformRepository {
                         "{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im",
                         &info,
                         Some(&mut ssl_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let ssl_library_raw = ssl_matches
                             .get(&CaptureKey::ByName("library".to_string()))
                             .cloned()
@@ -476,9 +467,7 @@ impl PlatformRepository {
                                     "{^\\(securetransport\\) ([a-z0-9]+)}",
                                     &library,
                                     Some(&mut securetransport_matches),
-                                )
-                                .unwrap_or(false)
-                                {
+                                ) {
                                     shortlib = "securetransport".to_string();
                                     let m1 = securetransport_matches
                                         .get(&CaptureKey::ByIndex(1))
@@ -510,9 +499,7 @@ impl PlatformRepository {
                         "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im",
                         &info,
                         Some(&mut ssh_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let ssh_library = ssh_matches
                             .get(&CaptureKey::ByName("library".to_string()))
                             .cloned()
@@ -537,9 +524,7 @@ impl PlatformRepository {
                         "{^ZLib Version => (?<version>.+)$}im",
                         &info,
                         Some(&mut zlib_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-zlib", name),
@@ -562,9 +547,7 @@ impl PlatformRepository {
                         "/^timelib version => (?<version>.+)$/im",
                         &info,
                         Some(&mut timelib_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-timelib", name),
@@ -583,19 +566,17 @@ impl PlatformRepository {
                         "/^Timezone Database => (?<source>internal|external)$/im",
                         &info,
                         Some(&mut zoneinfo_source_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let external = zoneinfo_source_matches
                             .get(&CaptureKey::ByName("source".to_string()))
                             .map(|s| s == "external")
                             .unwrap_or(false);
                         let mut zoneinfo_matches: IndexMap<CaptureKey, String> = IndexMap::new();
-                        if Preg::is_match3("/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im",
-                        &info,
-                        Some(&mut zoneinfo_matches),)
-                        .unwrap_or(false)
-                        {
+                        if Preg::is_match3(
+                            "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im",
+                            &info,
+                            Some(&mut zoneinfo_matches),
+                        ) {
                             let zoneinfo_version = zoneinfo_matches
                                 .get(&CaptureKey::ByName("version".to_string()))
                                 .cloned()
@@ -635,9 +616,7 @@ impl PlatformRepository {
                         "/^libmagic => (?<version>.+)$/im",
                         &info,
                         Some(&mut magic_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmagic", name),
@@ -673,9 +652,7 @@ impl PlatformRepository {
                         "/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im",
                         &info,
                         Some(&mut libjpeg_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let libjpeg_version = libjpeg_matches
                             .get(&CaptureKey::ByName("version".to_string()))
                             .cloned()
@@ -696,9 +673,7 @@ impl PlatformRepository {
                         "/^libPNG Version => (?<version>.+)$/im",
                         &info,
                         Some(&mut libpng_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpng", name),
@@ -716,9 +691,7 @@ impl PlatformRepository {
                         "/^FreeType Version => (?<version>.+)$/im",
                         &info,
                         Some(&mut freetype_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-freetype", name),
@@ -736,9 +709,7 @@ impl PlatformRepository {
                         "/^libXpm Version => (?<versionId>\\d+)$/im",
                         &info,
                         Some(&mut libxpm_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let version_id: i64 = libxpm_matches
                             .get(&CaptureKey::ByName("versionId".to_string()))
                             .and_then(|s| s.parse().ok())
@@ -812,9 +783,7 @@ impl PlatformRepository {
                             "/^ICU version => (?<version>.+)$/im",
                             &info,
                             Some(&mut matches),
-                        )
-                        .unwrap_or(false)
-                        {
+                        ) {
                             self.add_library(
                                 &mut libraries,
                                 "icu",
@@ -834,9 +803,7 @@ impl PlatformRepository {
                         "/^ICU TZData version => (?<version>.*)$/im",
                         &info,
                         Some(&mut zoneinfo_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let zi_version = zoneinfo_matches
                             .get(&CaptureKey::ByName("version".to_string()))
                             .cloned()
@@ -922,9 +889,7 @@ impl PlatformRepository {
                         "/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/",
                         &image_magick_version_str,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let mut version_built = matches
                             .get(&CaptureKey::ByName("version".to_string()))
                             .cloned()
@@ -953,15 +918,11 @@ impl PlatformRepository {
                         "/^Vendor Version => (?<versionId>\\d+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                        && Preg::is_match3(
-                            "/^Vendor Name => (?<vendor>.+)$/im",
-                            &info,
-                            Some(&mut vendor_matches),
-                        )
-                        .unwrap_or(false)
-                    {
+                    ) && Preg::is_match3(
+                        "/^Vendor Name => (?<vendor>.+)$/im",
+                        &info,
+                        Some(&mut vendor_matches),
+                    ) {
                         let version_id: i64 = matches
                             .get(&CaptureKey::ByName("versionId".to_string()))
                             .and_then(|s| s.parse().ok())
@@ -1016,9 +977,7 @@ impl PlatformRepository {
                         "/^libmbfl version => (?<version>.+)$/im",
                         &info,
                         Some(&mut libmbfl_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmbfl", name),
@@ -1054,9 +1013,7 @@ impl PlatformRepository {
                             "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im",
                             &info,
                             Some(&mut oniguruma_matches),
-                        )
-                        .unwrap_or(false)
-                        {
+                        ) {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-oniguruma", name),
@@ -1080,9 +1037,7 @@ impl PlatformRepository {
                         "/^libmemcached version => (?<version>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmemcached", name),
@@ -1108,9 +1063,7 @@ impl PlatformRepository {
                         "{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i",
                         &openssl_text_str,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         let version = matches
                             .get(&CaptureKey::ByName("version".to_string()))
                             .cloned()
@@ -1139,8 +1092,7 @@ impl PlatformRepository {
                         PhpMixed::String(s) => s.clone(),
                         _ => "".to_string(),
                     };
-                    let stripped = Preg::replace("{^(\\S+).*}", "$1", &pcre_version_str)
-                        .unwrap_or(pcre_version_str);
+                    let stripped = Preg::replace("{^(\\S+).*}", "$1", &pcre_version_str);
                     self.add_library(&mut libraries, name, Some(&stripped), None, &[], &[])?;
 
                     let info = self.runtime.get_extension_info(name)?;
@@ -1151,9 +1103,7 @@ impl PlatformRepository {
                         "/^PCRE Unicode Version => (?<version>.+)$/im",
                         &info,
                         Some(&mut pcre_unicode_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-unicode", name),
@@ -1175,9 +1125,7 @@ impl PlatformRepository {
                         "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-mysqlnd", name),
@@ -1199,9 +1147,7 @@ impl PlatformRepository {
                         "/^libmongoc bundled version => (?<version>.+)$/im",
                         &info,
                         Some(&mut libmongoc_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmongoc", name),
@@ -1219,9 +1165,7 @@ impl PlatformRepository {
                         "/^libbson bundled version => (?<version>.+)$/im",
                         &info,
                         Some(&mut libbson_matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libbson", name),
@@ -1259,9 +1203,7 @@ impl PlatformRepository {
                             "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
                             &info,
                             Some(&mut matches),
-                        )
-                        .unwrap_or(false)
-                        {
+                        ) {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-libpq", name),
@@ -1284,9 +1226,7 @@ impl PlatformRepository {
                         "/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
@@ -1310,9 +1250,7 @@ impl PlatformRepository {
                         "/^libpq => (?<compiled>.+) => (?<linked>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
@@ -1391,9 +1329,7 @@ impl PlatformRepository {
                         "/^SQLite Library => (?<version>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-sqlite", name),
@@ -1415,9 +1351,7 @@ impl PlatformRepository {
                         "/^libssh2 version => (?<version>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libssh2", name),
@@ -1452,9 +1386,7 @@ impl PlatformRepository {
                         "/^libxslt compiled against libxml Version => (?<version>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             "libxslt-libxml",
@@ -1476,9 +1408,7 @@ impl PlatformRepository {
                         "/^LibYAML Version => (?<version>.+)$/im",
                         &info,
                         Some(&mut matches),
-                    )
-                    .unwrap_or(false)
-                    {
+                    ) {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libyaml", name),
@@ -1539,9 +1469,7 @@ impl PlatformRepository {
                             "/^Linked Version => (?<version>.+)$/im",
                             &info,
                             Some(&mut matches),
-                        )
-                        .unwrap_or(false)
-                        {
+                        ) {
                             self.add_library(
                                 &mut libraries,
                                 name,
@@ -1574,8 +1502,7 @@ impl PlatformRepository {
                     version = v;
                 }
                 Err(_) => {
-                    pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &hhvm_version)
-                        .unwrap_or(hhvm_version);
+                    pretty_version = Preg::replace("#^([^~+-]+).*$#", "$1", &hhvm_version);
                     version = self
                         .version_parser
                         .as_ref()
@@ -1739,9 +1666,7 @@ impl PlatformRepository {
                     "{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}",
                     &pretty_version,
                     Some(&mut m),
-                )
-                .unwrap_or(false)
-                {
+                ) {
                     pretty_version = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 } else {
                     pretty_version = "0".to_string();
@@ -1869,7 +1794,7 @@ impl PlatformRepository {
             return cached;
         }
 
-        let result = Preg::is_match(Self::PLATFORM_PACKAGE_REGEX, name).unwrap_or(false);
+        let result = Preg::is_match(Self::PLATFORM_PACKAGE_REGEX, name);
         cache.insert(name.to_string(), result);
         result
     }

@@ -133,7 +133,7 @@ pub trait BaseIO: IOInterface {
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
-                if !Preg::is_match(r"^[.A-Za-z0-9_]+$", &token_str).unwrap_or(false) {
+                if !Preg::is_match(r"^[.A-Za-z0-9_]+$", &token_str) {
                     return Err(anyhow::anyhow!(UnexpectedValueException {
                         message: format!(
                             "Your github oauth token for {} contains invalid characters: \"{}\"",
