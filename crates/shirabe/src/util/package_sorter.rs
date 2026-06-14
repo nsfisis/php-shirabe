@@ -112,7 +112,7 @@ impl ComputeImportanceHelper<'_> {
                 weight -= 1 - self.compute(user);
             }
         }
-        self.computing.remove(name);
+        self.computing.shift_remove(name);
         self.computed.insert(name.to_string(), weight);
         weight
     }

@@ -118,10 +118,10 @@ pub struct ComposerRepository {
     security_advisory_config: Option<SecurityAdvisoryConfig>,
     /// list of package names which are fresh and can be loaded from the cache directly in case loadPackage is called several times
     /// useful for v2 metadata repositories with lazy providers
-    freshMetadataUrls: IndexMap<String, bool>,
+    fresh_metadata_urls: IndexMap<String, bool>,
     /// list of package names which returned a 404 and should not be re-fetched in case loadPackage is called several times
     /// useful for v2 metadata repositories with lazy providers
-    packagesNotFoundCache: IndexMap<String, bool>,
+    packages_not_found_cache: IndexMap<String, bool>,
     version_parser: VersionParser,
 }
 
@@ -311,8 +311,8 @@ impl ComposerRepository {
             partial_packages_by_name: None,
             displayed_warning_about_non_matching_package_index: false,
             security_advisory_config: None,
-            freshMetadataUrls: IndexMap::new(),
-            packagesNotFoundCache: IndexMap::new(),
+            fresh_metadata_urls: IndexMap::new(),
+            packages_not_found_cache: IndexMap::new(),
             version_parser,
         };
         this.cache
@@ -3094,7 +3094,7 @@ impl ComposerRepository {
             .into());
         }
 
-        if self.packagesNotFoundCache.contains_key(filename) {
+        if self.packages_not_found_cache.contains_key(filename) {
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
             empty.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
             return Ok(PhpMixed::Array(
@@ -3102,7 +3102,7 @@ impl ComposerRepository {
             ));
         }
 
-        if self.freshMetadataUrls.contains_key(filename) && last_modified_time.is_some() {
+        if self.fresh_metadata_urls.contains_key(filename) && last_modified_time.is_some() {
             // make it look like we got a 304 response
             return Ok(PhpMixed::Bool(true));
         }
@@ -3190,7 +3190,7 @@ impl ComposerRepository {
     ) -> anyhow::Result<PhpMixed> {
         // package not found is acceptable for a v2 protocol repository
         if response.get_status_code() == 404 {
-            self.packagesNotFoundCache
+            self.packages_not_found_cache
                 .insert(filename.to_string(), true);
 
             let mut empty: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -3202,7 +3202,7 @@ impl ComposerRepository {
 
         let mut json = response.get_body().unwrap_or("").to_string();
         if json.is_empty() && response.get_status_code() == 304 {
-            self.freshMetadataUrls.insert(filename.to_string(), true);
+            self.fresh_metadata_urls.insert(filename.to_string(), true);
 
             return Ok(PhpMixed::Bool(true));
         }
@@ -3236,7 +3236,7 @@ impl ComposerRepository {
         if !self.cache.is_read_only() {
             self.cache.write(cache_key, &json);
         }
-        self.freshMetadataUrls.insert(filename.to_string(), true);
+        self.fresh_metadata_urls.insert(filename.to_string(), true);
 
         Ok(PhpMixed::Array(
             data.into_iter().map(|(k, v)| (k, Box::new(v))).collect(),
@@ -3254,7 +3254,7 @@ impl ComposerRepository {
     ) -> anyhow::Result<PhpMixed> {
         if let Some(te) = e.downcast_ref::<TransportException>() {
             if te.get_status_code() == Some(404) {
-                self.packagesNotFoundCache
+                self.packages_not_found_cache
                     .insert(filename.to_string(), true);
 
                 return Ok(PhpMixed::Bool(false));

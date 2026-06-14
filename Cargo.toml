@@ -27,4 +27,5 @@ url = "2.5.8"
 zip = "8.6.0"
 
 [workspace.lints.rust]
-warnings = "allow"
+async_fn_in_trait = "allow"
+unused = "allow"

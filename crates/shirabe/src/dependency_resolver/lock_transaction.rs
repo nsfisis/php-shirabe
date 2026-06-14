@@ -75,11 +75,14 @@ impl LockTransaction {
     pub fn set_non_dev_packages(&mut self, extraction_result: &LockTransaction) {
         let packages = extraction_result.get_new_lock_packages(false, false);
 
-        let non_dev = self.result_packages.remove("non-dev").unwrap_or_default();
+        let non_dev = self
+            .result_packages
+            .shift_remove("non-dev")
+            .unwrap_or_default();
         self.result_packages.insert("dev".to_string(), non_dev);
         self.result_packages.insert("non-dev".to_string(), vec![]);
 
-        let mut remaining_dev = self.result_packages.remove("dev").unwrap_or_default();
+        let mut remaining_dev = self.result_packages.shift_remove("dev").unwrap_or_default();
         for package in &packages {
             let mut i = 0;
             while i < remaining_dev.len() {

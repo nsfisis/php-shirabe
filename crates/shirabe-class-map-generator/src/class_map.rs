@@ -84,7 +84,7 @@ impl ClassMap {
     }
 
     pub fn add_class(&mut self, class_name: String, path: String) {
-        self.psr_violations.remove(&strtr(&path, "\\", "/"));
+        self.psr_violations.shift_remove(&strtr(&path, "\\", "/"));
 
         self.map.insert(class_name, path);
     }

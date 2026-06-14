@@ -651,7 +651,7 @@ impl Table {
                 - shirabe_php_shim::mb_strwidth(&cell_str, Some(&encoding));
         }
 
-        let style = self.get_column_style(column).clone();
+        let style = self.get_column_style(column);
 
         if shirabe_php_shim::instance_of::<TableSeparator>(&cell) {
             return shirabe_php_shim::sprintf(

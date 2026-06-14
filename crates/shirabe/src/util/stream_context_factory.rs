@@ -45,7 +45,7 @@ impl StreamContextFactory {
         let default_options = {
             let mut o = default_options;
             if let Some(PhpMixed::Array(http)) = o.get_mut("http") {
-                http.remove("header");
+                http.shift_remove("header");
             }
             o
         };

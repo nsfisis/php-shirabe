@@ -56,6 +56,8 @@ impl Semver {
             .enumerate()
             .map(|(key, version)| -> anyhow::Result<(String, usize)> {
                 let normalized_version = version_parser.normalize(version, None)?;
+                // The original PHP code still uses this deprecated function internally.
+                #[allow(deprecated)]
                 let normalized_version =
                     version_parser.normalize_default_branch(&normalized_version);
                 Ok((normalized_version, key))

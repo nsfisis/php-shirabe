@@ -37,7 +37,8 @@ pub trait ArchiveDownloader {
         path: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> Result<Option<PhpMixed>> {
-        self.cleanup_executed_mut().remove(&package.get_name());
+        self.cleanup_executed_mut()
+            .shift_remove(&package.get_name());
         self.inner_mut()
             .prepare(r#type, package, path, prev_package)
             .await

@@ -478,12 +478,12 @@ impl RemoveCommand {
             for (link_type, names) in &to_remove {
                 for name in names {
                     if let Some(section) = links.get_mut(link_type.as_str()) {
-                        section.remove(name.as_str());
+                        section.shift_remove(name.as_str());
                     }
                 }
             }
-            root_package.set_requires(links.remove("require").unwrap_or_default());
-            root_package.set_dev_requires(links.remove("require-dev").unwrap_or_default());
+            root_package.set_requires(links.shift_remove("require").unwrap_or_default());
+            root_package.set_dev_requires(links.shift_remove("require-dev").unwrap_or_default());
         }
 
         let mut command_event = crate::plugin::CommandEvent::new(

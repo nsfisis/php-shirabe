@@ -131,9 +131,9 @@ impl RepositoryManager {
         };
 
         let mut cleaned_config = config;
-        cleaned_config.remove("only");
-        cleaned_config.remove("exclude");
-        cleaned_config.remove("canonical");
+        cleaned_config.shift_remove("only");
+        cleaned_config.shift_remove("exclude");
+        cleaned_config.shift_remove("canonical");
 
         // Phase B: implement dynamic class instantiation by class name
         let repository = self.create_repository_by_class(&class, cleaned_config)?;

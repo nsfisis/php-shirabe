@@ -127,7 +127,8 @@ impl Request {
     }
 
     pub fn unlock_package(&mut self, package: BasePackageHandle) {
-        self.locked_packages.remove(&package.ptr_id().to_string());
+        self.locked_packages
+            .shift_remove(&package.ptr_id().to_string());
     }
 
     pub fn set_update_allow_list(
