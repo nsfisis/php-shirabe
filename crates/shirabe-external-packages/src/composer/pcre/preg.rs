@@ -8,6 +8,8 @@
 //! - `UnexpectedNullMatchException`: thrown by the `Preg::*StrictGroups()` variants when a capture
 //!   group did not participate. Those variants were dropped because Rust's `Option` already
 //!   distinguishes participating from non-participating groups.
+//!
+//! See docs/dev/regex-porting.md for more detailed regex porting rules.
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
