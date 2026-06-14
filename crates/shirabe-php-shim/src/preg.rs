@@ -88,13 +88,13 @@ pub fn preg_match_all_set_order(
     pattern: &str,
     subject: &str,
     matches: &mut Vec<Vec<String>>,
-) -> i64 {
+) -> usize {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let mut rows: Vec<Vec<String>> = Vec::new();
     for caps in re.captures_iter(subject) {
         rows.push(php_match_row(&caps));
     }
-    let count = rows.len() as i64;
+    let count = rows.len();
     *matches = rows;
     count
 }
@@ -108,7 +108,7 @@ pub fn preg_match_all_offset_capture(
     pattern: &str,
     subject: &str,
     matches: &mut PregOffsetCaptureMatches,
-) -> i64 {
+) -> usize {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let group_count = re.captures_len();
     matches.groups = vec![Vec::new(); group_count];
@@ -130,6 +130,7 @@ pub fn preg_match_all_offset_capture(
 
     count
 }
+
 pub fn preg_replace_callback<F>(
     pattern: &str,
     mut callback: F,
@@ -155,14 +156,15 @@ where
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-// Returns 0|1. Unmatched groups are reported as None (PREG_UNMATCHED_AS_NULL).
+// Returns whether the pattern matched. Unmatched groups are reported as None
+// (PREG_UNMATCHED_AS_NULL).
 pub fn preg_match2(
     pattern: &str,
     subject: &str,
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Option<String>>>,
     flags: i64,
     offset: usize,
-) -> i64 {
+) -> bool {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let caps = re.captures_at(subject, offset);
@@ -175,7 +177,7 @@ pub fn preg_match2(
         }
     }
 
-    if caps.is_some() { 1 } else { 0 }
+    caps.is_some()
 }
 
 pub fn preg_match_all2(
@@ -184,7 +186,7 @@ pub fn preg_match_all2(
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>>,
     flags: i64,
     offset: usize,
-) -> i64 {
+) -> usize {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
@@ -192,7 +194,7 @@ pub fn preg_match_all2(
 
     // PREG_PATTERN_ORDER: one column per group, one row per match occurrence.
     let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
-    let mut count = 0i64;
+    let mut count = 0;
     for caps in re.captures_iter(&subject[offset..]) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
@@ -224,14 +226,14 @@ pub fn preg_match_all_offset_capture2(
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     flags: i64,
     offset: usize,
-) -> i64 {
+) -> usize {
     let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
     let mut groups: Vec<Vec<(Option<String>, i64)>> = vec![Vec::new(); group_count];
-    let mut count = 0i64;
+    let mut count = 0;
     for caps in re.captures_iter(&subject[offset..]) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {

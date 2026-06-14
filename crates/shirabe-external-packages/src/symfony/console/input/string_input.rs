@@ -55,9 +55,7 @@ impl StringInput {
             }
 
             let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-            if shirabe_php_shim::preg_match2(r"/\s+/A", input, Some(&mut m), 0, cursor as usize)
-                == 1
-            {
+            if shirabe_php_shim::preg_match2(r"/\s+/A", input, Some(&mut m), 0, cursor as usize) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
@@ -69,8 +67,7 @@ impl StringInput {
                 Some(&mut m),
                 0,
                 cursor as usize,
-            ) == 1
-            {
+            ) {
                 let inner = shirabe_php_shim::substr(
                     m[&CaptureKey::ByIndex(3)].as_deref().unwrap_or(""),
                     1,
@@ -93,8 +90,7 @@ impl StringInput {
                 Some(&mut m),
                 0,
                 cursor as usize,
-            ) == 1
-            {
+            ) {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
@@ -112,8 +108,7 @@ impl StringInput {
                 Some(&mut m),
                 0,
                 cursor as usize,
-            ) == 1
-            {
+            ) {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),

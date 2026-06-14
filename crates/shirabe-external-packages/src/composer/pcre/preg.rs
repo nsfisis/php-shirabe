@@ -50,7 +50,7 @@ impl Preg {
             *out = drop_null_matches(internal);
         }
 
-        result == 1
+        result
     }
 
     pub fn match_all(pattern: &str, subject: &str) -> usize {
@@ -234,7 +234,7 @@ impl Preg {
             }
         }
 
-        result == 1
+        result
     }
 
     pub fn is_match_with_indexed_captures(pattern: &str, subject: &str) -> Option<Vec<String>> {
@@ -243,7 +243,7 @@ impl Preg {
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
         let result = shirabe_php_shim::preg_match2(pattern, subject, Some(&mut internal), 0, 0);
 
-        if result == 0 {
+        if !result {
             return None;
         }
 
