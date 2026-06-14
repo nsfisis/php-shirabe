@@ -2708,7 +2708,7 @@ impl Application {
         while shirabe_php_shim::preg_match2(
             r"/.{1,10000}/u",
             &utf8_string,
-            Some(&mut m),
+            &mut m,
             0,
             offset as usize,
         ) {

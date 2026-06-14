@@ -41,7 +41,7 @@ impl Preg {
         let result = shirabe_php_shim::preg_match2(
             pattern,
             subject,
-            Some(&mut internal),
+            &mut internal,
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
         );
@@ -79,7 +79,7 @@ impl Preg {
         let result = shirabe_php_shim::preg_match_all2(
             pattern,
             subject,
-            Some(&mut internal),
+            &mut internal,
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
         );
@@ -104,7 +104,7 @@ impl Preg {
         let result = shirabe_php_shim::preg_match_all_offset_capture2(
             pattern,
             subject,
-            Some(&mut internal),
+            &mut internal,
             flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
             offset,
         );
@@ -222,7 +222,7 @@ impl Preg {
         let result = shirabe_php_shim::preg_match2(
             pattern,
             subject,
-            Some(&mut internal),
+            &mut internal,
             PREG_UNMATCHED_AS_NULL,
             0,
         );
@@ -241,7 +241,7 @@ impl Preg {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match2(pattern, subject, Some(&mut internal), 0, 0);
+        let result = shirabe_php_shim::preg_match2(pattern, subject, &mut internal, 0, 0);
 
         if !result {
             return None;

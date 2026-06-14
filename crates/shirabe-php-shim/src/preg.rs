@@ -161,7 +161,7 @@ where
 pub fn preg_match2(
     pattern: &str,
     subject: &str,
-    matches: Option<&mut indexmap::IndexMap<CaptureKey, Option<String>>>,
+    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
     flags: i64,
     offset: usize,
 ) -> bool {
@@ -169,12 +169,10 @@ pub fn preg_match2(
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let caps = re.captures_at(subject, offset);
 
-    if let Some(out) = matches {
-        out.clear();
-        if let Some(caps) = &caps {
-            let names: Vec<Option<&str>> = re.capture_names().collect();
-            *out = single_match_map(caps, &names, unmatched_as_null);
-        }
+    matches.clear();
+    if let Some(caps) = &caps {
+        let names: Vec<Option<&str>> = re.capture_names().collect();
+        *matches = single_match_map(caps, &names, unmatched_as_null);
     }
 
     caps.is_some()
@@ -183,7 +181,7 @@ pub fn preg_match2(
 pub fn preg_match_all2(
     pattern: &str,
     subject: &str,
-    matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>>,
+    matches: &mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>,
     flags: i64,
     offset: usize,
 ) -> usize {
@@ -207,14 +205,12 @@ pub fn preg_match_all2(
         }
     }
 
-    if let Some(out) = matches {
-        out.clear();
-        for (g, column) in groups.into_iter().enumerate() {
-            if let Some(Some(name)) = names.get(g) {
-                out.insert(CaptureKey::ByName((*name).to_string()), column.clone());
-            }
-            out.insert(CaptureKey::ByIndex(g), column);
+    matches.clear();
+    for (g, column) in groups.into_iter().enumerate() {
+        if let Some(Some(name)) = names.get(g) {
+            matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
         }
+        matches.insert(CaptureKey::ByIndex(g), column);
     }
 
     count
@@ -223,7 +219,7 @@ pub fn preg_match_all2(
 pub fn preg_match_all_offset_capture2(
     pattern: &str,
     subject: &str,
-    matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
+    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
     flags: i64,
     offset: usize,
 ) -> usize {
@@ -246,14 +242,12 @@ pub fn preg_match_all_offset_capture2(
         }
     }
 
-    if let Some(out) = matches {
-        out.clear();
-        for (g, column) in groups.into_iter().enumerate() {
-            if let Some(Some(name)) = names.get(g) {
-                out.insert(CaptureKey::ByName((*name).to_string()), column.clone());
-            }
-            out.insert(CaptureKey::ByIndex(g), column);
+    matches.clear();
+    for (g, column) in groups.into_iter().enumerate() {
+        if let Some(Some(name)) = names.get(g) {
+            matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
         }
+        matches.insert(CaptureKey::ByIndex(g), column);
     }
 
     count
