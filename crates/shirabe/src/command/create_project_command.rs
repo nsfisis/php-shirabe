@@ -995,26 +995,6 @@ impl CreateProjectCommand {
 
         Ok(installed_from_vcs)
     }
-
-    // helpers reachable via $this in PHP, defined on BaseCommand here
-    fn create_composer_instance(
-        &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: Option<indexmap::IndexMap<String, PhpMixed>>,
-        disable_plugins: bool,
-        disable_scripts: Option<bool>,
-    ) -> Result<PartialComposerHandle> {
-        self.create_composer_instance(input, io, config, disable_plugins, disable_scripts)
-    }
-
-    fn create_audit_config(
-        &self,
-        config: &Config,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Result<crate::advisory::AuditConfig> {
-        self.create_audit_config(config, input)
-    }
 }
 
 impl HasBaseCommandData for CreateProjectCommand {

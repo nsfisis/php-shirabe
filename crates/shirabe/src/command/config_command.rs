@@ -123,7 +123,7 @@ impl ConfigCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        self.initialize(input.clone(), output)?;
+        BaseCommand::initialize(self, input.clone(), output)?;
 
         let auth_config_file =
             self.get_auth_config_file(input.clone(), &*self.config.as_ref().unwrap().borrow())?;

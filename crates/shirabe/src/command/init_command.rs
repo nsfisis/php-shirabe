@@ -421,7 +421,7 @@ impl InitCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        self.initialize(input.clone(), output)?;
+        BaseCommand::initialize(self, input.clone(), output)?;
 
         if !input.borrow().is_interactive() {
             if input.borrow().get_option("name")?.is_null() {
