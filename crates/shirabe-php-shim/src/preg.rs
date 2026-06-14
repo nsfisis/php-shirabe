@@ -56,13 +56,11 @@ pub fn preg_match(pattern: &str, subject: &str, matches: &mut Vec<Option<String>
     }
 }
 
-// Returns Some(result) on success, None on error.
-pub fn preg_replace(pattern: &str, replacement: &str, subject: &str) -> Option<String> {
+pub fn preg_replace(pattern: &str, replacement: &str, subject: &str) -> String {
     preg_replace2(pattern, replacement, subject, -1, None)
 }
 
-// Returns Some(parts) on success, None on error.
-pub fn preg_split(pattern: &str, subject: &str) -> Option<Vec<String>> {
+pub fn preg_split(pattern: &str, subject: &str) -> Vec<String> {
     preg_split2(pattern, subject, -1, 0)
 }
 
@@ -90,21 +88,15 @@ pub fn preg_match_all_set_order(
     pattern: &str,
     subject: &str,
     matches: &mut Vec<Vec<String>>,
-) -> anyhow::Result<i64> {
-    let re = compile_php_pattern(pattern)?;
+) -> i64 {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let mut rows: Vec<Vec<String>> = Vec::new();
     for caps in re.captures_iter(subject) {
         rows.push(php_match_row(&caps));
     }
     let count = rows.len() as i64;
     *matches = rows;
-    Ok(count)
-}
-
-pub fn preg_match_groups(pattern: &str, subject: &str) -> Option<Vec<String>> {
-    let re = compile_php_pattern(pattern).ok()?;
-    let caps = re.captures(subject)?;
-    Some(php_match_row(&caps))
+    count
 }
 
 pub fn preg_grep(pattern: &str, input: &Vec<String>) -> Vec<String> {
@@ -116,8 +108,8 @@ pub fn preg_match_all_offset_capture(
     pattern: &str,
     subject: &str,
     matches: &mut PregOffsetCaptureMatches,
-) -> anyhow::Result<i64> {
-    let re = compile_php_pattern(pattern)?;
+) -> i64 {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let group_count = re.captures_len();
     matches.groups = vec![Vec::new(); group_count];
 
@@ -136,7 +128,7 @@ pub fn preg_match_all_offset_capture(
         }
     }
 
-    Ok(count)
+    count
 }
 pub fn preg_replace_callback<F>(
     pattern: &str,
@@ -146,7 +138,7 @@ pub fn preg_replace_callback<F>(
 where
     F: FnMut(&[Option<String>]) -> anyhow::Result<String>,
 {
-    let re = compile_php_pattern(pattern)?;
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0;
     for caps in re.captures_iter(subject) {
@@ -163,16 +155,15 @@ where
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
-// Returns Some(0|1) on success or None when the underlying preg_match returned
-// false. Unmatched groups are reported as None (PREG_UNMATCHED_AS_NULL).
+// Returns 0|1. Unmatched groups are reported as None (PREG_UNMATCHED_AS_NULL).
 pub fn preg_match2(
     pattern: &str,
     subject: &str,
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Option<String>>>,
     flags: i64,
     offset: usize,
-) -> Option<i64> {
-    let re = compile_php_pattern(pattern).ok()?;
+) -> i64 {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let caps = re.captures_at(subject, offset);
 
@@ -184,7 +175,7 @@ pub fn preg_match2(
         }
     }
 
-    Some(if caps.is_some() { 1 } else { 0 })
+    if caps.is_some() { 1 } else { 0 }
 }
 
 pub fn preg_match_all2(
@@ -193,8 +184,8 @@ pub fn preg_match_all2(
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<Option<String>>>>,
     flags: i64,
     offset: usize,
-) -> Option<i64> {
-    let re = compile_php_pattern(pattern).ok()?;
+) -> i64 {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
@@ -224,7 +215,7 @@ pub fn preg_match_all2(
         }
     }
 
-    Some(count)
+    count
 }
 
 pub fn preg_match_all_offset_capture2(
@@ -233,8 +224,8 @@ pub fn preg_match_all_offset_capture2(
     matches: Option<&mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     flags: i64,
     offset: usize,
-) -> Option<i64> {
-    let re = compile_php_pattern(pattern).ok()?;
+) -> i64 {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
@@ -263,7 +254,7 @@ pub fn preg_match_all_offset_capture2(
         }
     }
 
-    Some(count)
+    count
 }
 
 pub fn preg_replace2(
@@ -272,8 +263,8 @@ pub fn preg_replace2(
     subject: &str,
     limit: i64,
     count: Option<&mut usize>,
-) -> Option<String> {
-    let re = compile_php_pattern(pattern).ok()?;
+) -> String {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let limit = if limit < 0 {
         usize::MAX
     } else {
@@ -298,7 +289,7 @@ pub fn preg_replace2(
     if let Some(count) = count {
         *count = n;
     }
-    Some(String::from_utf8_lossy(&out).into_owned())
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 pub fn preg_replace_callback2<
@@ -310,8 +301,8 @@ pub fn preg_replace_callback2<
     limit: i64,
     count: Option<&mut usize>,
     flags: i64,
-) -> Option<String> {
-    let re = compile_php_pattern(pattern).ok()?;
+) -> String {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let names: Vec<Option<&str>> = re.capture_names().collect();
     let limit = if limit < 0 {
@@ -339,11 +330,11 @@ pub fn preg_replace_callback2<
     if let Some(count) = count {
         *count = n;
     }
-    Some(String::from_utf8_lossy(&out).into_owned())
+    String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Option<Vec<String>> {
-    let re = compile_php_pattern(pattern).ok()?;
+pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Vec<String> {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let no_empty = flags & PREG_SPLIT_NO_EMPTY != 0;
     let delim_capture = flags & PREG_SPLIT_DELIM_CAPTURE != 0;
     // `limit` counts the resulting pieces; a non-positive value means no limit.
@@ -382,19 +373,17 @@ pub fn preg_split2(pattern: &str, subject: &str, limit: i64, flags: i64) -> Opti
     }
     push(&subject[last..], &mut result);
 
-    Some(result)
+    result
 }
 
-pub fn preg_grep2(pattern: &str, array: &[&str], flags: i64) -> Option<Vec<String>> {
-    let re = compile_php_pattern(pattern).ok()?;
+pub fn preg_grep2(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
+    let re = compile_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"));
     let invert = flags & PREG_GREP_INVERT != 0;
-    Some(
-        array
-            .iter()
-            .filter(|s| re.is_match(s) != invert)
-            .map(|s| s.to_string())
-            .collect(),
-    )
+    array
+        .iter()
+        .filter(|s| re.is_match(s) != invert)
+        .map(|s| s.to_string())
+        .collect()
 }
 
 // Translates a PHP PCRE pattern (delimiters + trailing modifiers) into a regex

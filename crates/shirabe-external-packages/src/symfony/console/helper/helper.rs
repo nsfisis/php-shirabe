@@ -147,12 +147,10 @@ impl Helper {
         // remove <...> formatting
         let string = formatter.format(Some(string)).unwrap().unwrap_or_default();
         // remove already formatted characters
-        let string =
-            shirabe_php_shim::preg_replace("/\u{1b}\\[[^m]*m/", "", &string).unwrap_or_default();
+        let string = shirabe_php_shim::preg_replace("/\u{1b}\\[[^m]*m/", "", &string);
         // remove terminal hyperlinks
         let string =
-            shirabe_php_shim::preg_replace("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/", "", &string)
-                .unwrap_or_default();
+            shirabe_php_shim::preg_replace("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/", "", &string);
         formatter.set_decorated(is_decorated);
 
         string

@@ -44,8 +44,7 @@ impl Preg {
             Some(&mut internal),
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
-        )
-        .unwrap_or_else(|| invalid_regex());
+        );
 
         if let Some(out) = matches {
             *out = drop_null_matches(internal);
@@ -83,8 +82,7 @@ impl Preg {
             Some(&mut internal),
             flags | PREG_UNMATCHED_AS_NULL,
             offset,
-        )
-        .unwrap_or_else(|| invalid_regex());
+        );
 
         if let Some(out) = matches {
             *out = null_to_empty_match_all(internal);
@@ -109,8 +107,7 @@ impl Preg {
             Some(&mut internal),
             flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
             offset,
-        )
-        .unwrap_or_else(|| invalid_regex());
+        );
 
         if let Some(out) = matches {
             *out = null_to_empty_offset_match_all(internal);
@@ -148,7 +145,6 @@ impl Preg {
         // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
         // unreachable and not reproduced.
         shirabe_php_shim::preg_replace2(pattern, replacement, subject, limit, count)
-            .unwrap_or_else(|| invalid_regex())
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
@@ -172,7 +168,6 @@ impl Preg {
         };
 
         shirabe_php_shim::preg_replace_callback2(pattern, adapter, subject, limit, count, flags)
-            .unwrap_or_else(|| invalid_regex())
     }
 
     pub fn split(pattern: &str, subject: &str) -> Vec<String> {
@@ -186,7 +181,6 @@ impl Preg {
         );
 
         shirabe_php_shim::preg_split2(pattern, subject, limit, flags)
-            .unwrap_or_else(|| invalid_regex())
     }
 
     pub fn grep(pattern: &str, array: &[&str]) -> Vec<String> {
@@ -194,7 +188,7 @@ impl Preg {
     }
 
     pub fn grep3(pattern: &str, array: &[&str], flags: i64) -> Vec<String> {
-        shirabe_php_shim::preg_grep2(pattern, array, flags).unwrap_or_else(|| invalid_regex())
+        shirabe_php_shim::preg_grep2(pattern, array, flags)
     }
 
     pub fn is_match(pattern: &str, subject: &str) -> bool {
@@ -231,8 +225,7 @@ impl Preg {
             Some(&mut internal),
             PREG_UNMATCHED_AS_NULL,
             0,
-        )
-        .unwrap_or_else(|| invalid_regex());
+        );
 
         matches.clear();
         for (key, value) in internal {
@@ -248,8 +241,7 @@ impl Preg {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match2(pattern, subject, Some(&mut internal), 0, 0)
-            .unwrap_or_else(|| invalid_regex());
+        let result = shirabe_php_shim::preg_match2(pattern, subject, Some(&mut internal), 0, 0);
 
         if result == 0 {
             return None;
@@ -362,10 +354,4 @@ fn null_to_empty_offset_match_all(
             )
         })
         .collect()
-}
-
-/// Panics if a pattern is invalid instead of throwing a PcreException.
-/// TODO: takes regex::Error and shows its message
-fn invalid_regex() -> ! {
-    panic!("invalid regex");
 }

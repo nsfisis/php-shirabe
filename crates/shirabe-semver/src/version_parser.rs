@@ -25,7 +25,7 @@ pub struct VersionParser;
 
 impl VersionParser {
     pub fn parse_stability(version: &str) -> String {
-        let version = php::preg_replace("{#.+$}", "", version).unwrap_or_default();
+        let version = php::preg_replace("{#.+$}", "", version);
 
         if version.starts_with("dev-") || version.ends_with("-dev") {
             return "dev".to_string();
@@ -143,8 +143,7 @@ impl VersionParser {
                 MODIFIER_REGEX
             );
             if php::preg_match(&datetime_pattern, &version, &mut matches) > 0 {
-                version = php::preg_replace("{\\D}", ".", matches[1].as_deref().unwrap_or(""))
-                    .unwrap_or_default();
+                version = php::preg_replace("{\\D}", ".", matches[1].as_deref().unwrap_or(""));
                 index = Some(2);
             }
         }
@@ -297,8 +296,7 @@ impl VersionParser {
     pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
         let pretty_constraint = constraints.to_string();
 
-        let or_constraints = php::preg_split("{\\s*\\|\\|?\\s*}", &php::trim(constraints, None))
-            .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", constraints))?;
+        let or_constraints = php::preg_split("{\\s*\\|\\|?\\s*}", &php::trim(constraints, None));
 
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
@@ -306,8 +304,7 @@ impl VersionParser {
             let and_constraints = php::preg_split(
                 "{(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)}",
                 or_constraint,
-            )
-            .ok_or_else(|| anyhow::anyhow!("Failed to preg_split string: {}", or_constraint))?;
+            );
 
             let constraint_objects: Vec<AnyConstraint> = if and_constraints.len() > 1 {
                 let mut objs: Vec<AnyConstraint> = Vec::new();

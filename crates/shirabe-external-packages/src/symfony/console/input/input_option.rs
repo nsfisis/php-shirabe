@@ -110,7 +110,7 @@ impl InputOption {
 
     fn normalize_shortcut(s: String) -> anyhow::Result<Option<String>> {
         let stripped = shirabe_php_shim::ltrim(&s, Some("-"));
-        let parts = shirabe_php_shim::preg_split(r"\|(-?)", &stripped).unwrap_or_default();
+        let parts = shirabe_php_shim::preg_split(r"\|(-?)", &stripped);
         let filtered: Vec<String> =
             shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
         let result = shirabe_php_shim::implode("|", &filtered);

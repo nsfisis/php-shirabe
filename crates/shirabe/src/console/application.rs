@@ -2711,9 +2711,7 @@ impl Application {
             Some(&mut m),
             0,
             offset as usize,
-        )
-        .expect("invalid regex")
-            == 1
+        ) == 1
         {
             let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
                 .as_deref()

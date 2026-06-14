@@ -19,8 +19,7 @@ pub struct OutputFormatter {
 impl OutputFormatter {
     /// Escapes "<" and ">" special chars in given text.
     pub fn escape(text: &str) -> anyhow::Result<String> {
-        let text = shirabe_php_shim::preg_replace("/([^\\\\]|^)([<>])/", "$1\\\\$2", text)
-            .expect("preg_replace failed");
+        let text = shirabe_php_shim::preg_replace("/([^\\\\]|^)([<>])/", "$1\\\\$2", text);
 
         Ok(Self::escape_trailing_backslash(&text))
     }
@@ -106,7 +105,7 @@ impl OutputFormatter {
             "/([^=]+)=([^;]+)(;|$)/",
             string,
             &mut matches,
-        )? == 0
+        ) == 0
         {
             return Ok(None);
         }
@@ -122,8 +121,7 @@ impl OutputFormatter {
             } else if r#match[0] == "bg" {
                 style.set_background(Some(&shirabe_php_shim::strtolower(&r#match[1])));
             } else if r#match[0] == "href" {
-                let url = shirabe_php_shim::preg_replace("{\\\\([<>])}", "$1", &r#match[1])
-                    .expect("preg_replace failed");
+                let url = shirabe_php_shim::preg_replace("{\\\\([<>])}", "$1", &r#match[1]);
                 style.set_href(&url);
             } else if r#match[0] == "options" {
                 let mut options = shirabe_php_shim::preg_match_all(
@@ -292,7 +290,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             &format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
             &mut matches,
-        )?;
+        );
         let count = matches.group(0).len();
         for i in 0..count {
             let (text, pos) = matches.group(0)[i].clone();

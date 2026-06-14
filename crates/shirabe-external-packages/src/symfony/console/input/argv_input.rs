@@ -528,8 +528,13 @@ impl ArgvInput {
             .tokens
             .iter()
             .map(|token| {
-                if let Some(m) = shirabe_php_shim::preg_match_groups("{^(-[^=]+=)(.+)}", token) {
-                    return format!("{}{}", m[1], self.inner.escape_token(&m[2]));
+                let mut r#match: Vec<Option<String>> = Vec::new();
+                if shirabe_php_shim::preg_match("{^(-[^=]+=)(.+)}", token, &mut r#match) != 0 {
+                    return format!(
+                        "{}{}",
+                        r#match[1].as_deref().unwrap_or(""),
+                        self.inner.escape_token(r#match[2].as_deref().unwrap_or(""))
+                    );
                 }
 
                 if !token.is_empty() && token.as_bytes()[0] != b'-' {
