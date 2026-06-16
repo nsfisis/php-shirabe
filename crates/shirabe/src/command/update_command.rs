@@ -5,6 +5,7 @@ use crate::package::base_package;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
@@ -14,14 +15,20 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_semver::intervals::Intervals;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::BumpCommand;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::request::{self, Request, UpdateAllowTransitiveDeps};
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -43,40 +50,52 @@ pub struct UpdateCommand {
 }
 
 impl UpdateCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = UpdateCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("UpdateCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for UpdateCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_installed_package(false, true) / suggest_prefer_install
-        self
-            .set_name("update")
-            .set_aliases(&["u".to_string(), "upgrade".to_string()])
-            .set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file")
-            // TODO(phase-c): populate with InputArgument/InputOption entries (see PHP UpdateCommand);
-            // blocked on the symfony InputDefinition entry modeling.
-            .set_definition(&[])
-            .set_help(
-                "The <info>update</info> command reads the composer.json file from the\n\
-                current directory, processes it, and updates, removes or installs all the\n\
-                dependencies.\n\n\
-                <info>php composer.phar update</info>\n\n\
-                To limit the update operation to a few packages, you can list the package(s)\n\
-                you want to update as such:\n\n\
-                <info>php composer.phar update vendor/package1 foo/mypackage [...]</info>\n\n\
-                You may also use an asterisk (*) pattern to limit the update operation to package(s)\n\
-                from a specific vendor:\n\n\
-                <info>php composer.phar update vendor/package1 foo/* [...]</info>\n\n\
-                To run an update with more restrictive constraints you can use:\n\n\
-                <info>php composer.phar update --with vendor/package:1.0.*</info>\n\n\
-                To run a partial update with more restrictive constraints you can use the shorthand:\n\n\
-                <info>php composer.phar update vendor/package:1.0.*</info>\n\n\
-                To select packages names interactively with auto-completion use <info>-i</info>.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n",
-            );
+        self.set_name("update")?;
+        self.set_aliases(vec!["u".to_string(), "upgrade".to_string()])?;
+        self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file");
+        // TODO(phase-c): populate with InputArgument/InputOption entries (see PHP UpdateCommand);
+        // blocked on the symfony InputDefinition entry modeling.
+        self.set_definition(&[]);
+        self.set_help(
+            "The <info>update</info> command reads the composer.json file from the\n\
+            current directory, processes it, and updates, removes or installs all the\n\
+            dependencies.\n\n\
+            <info>php composer.phar update</info>\n\n\
+            To limit the update operation to a few packages, you can list the package(s)\n\
+            you want to update as such:\n\n\
+            <info>php composer.phar update vendor/package1 foo/mypackage [...]</info>\n\n\
+            You may also use an asterisk (*) pattern to limit the update operation to package(s)\n\
+            from a specific vendor:\n\n\
+            <info>php composer.phar update vendor/package1 foo/* [...]</info>\n\n\
+            To run an update with more restrictive constraints you can use:\n\n\
+            <info>php composer.phar update --with vendor/package:1.0.*</info>\n\n\
+            To run a partial update with more restrictive constraints you can use the shorthand:\n\n\
+            <info>php composer.phar update vendor/package:1.0.*</info>\n\n\
+            To select packages names interactively with auto-completion use <info>-i</info>.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let io = self.get_io().clone();
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
             io.write_error3(
@@ -491,7 +510,7 @@ impl UpdateCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let mut bump_command = BumpCommand::new(None);
+                let mut bump_command = BumpCommand::new();
                 bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(
                     io.clone(),
@@ -520,6 +539,28 @@ impl UpdateCommand {
         Ok(result)
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for UpdateCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl UpdateCommand {
     /// @param array<string> $packages
     /// @return array<string>
     fn get_packages_interactively(
@@ -715,15 +756,5 @@ impl UpdateCommand {
             std::rc::Rc::new(std::cell::RefCell::new(repository_set)),
             None,
         )
-    }
-}
-
-impl HasBaseCommandData for UpdateCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

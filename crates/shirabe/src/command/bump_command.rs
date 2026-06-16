@@ -3,15 +3,24 @@
 use crate::io::io_interface;
 use crate::package::base_package;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, file_get_contents, file_put_contents, is_writable, strtolower};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -32,69 +41,14 @@ impl BumpCommand {
     const ERROR_GENERIC: i64 = 1;
     const ERROR_LOCK_OUTDATED: i64 = 2;
 
-    pub fn configure(&mut self) {
-        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
-        self
-            .set_name("bump")
-            .set_description("Increases the lower limit of your composer.json requirements to the currently installed versions")
-            .set_definition (&[
-                InputArgument::new("packages",Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),"Optional package name(s) to restrict which packages are bumped.",None,).unwrap().into(),InputOption::new("dev-only", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require-dev\".", None).unwrap().into(),
-                    InputOption::new("no-dev-only", Some(PhpMixed::String("R".to_string())), Some(InputOption::VALUE_NONE), "Only bump requirements in \"require\".", None).unwrap().into(),
-        InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the packages to bump, but will not execute anything.", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>bump</info> command increases the lower limit of your composer.json requirements\n\
-                to the currently installed versions. This helps to ensure your dependencies do not\n\
-                accidentally get downgraded due to some other conflict, and can slightly improve\n\
-                dependency resolution performance as it limits the amount of package versions\n\
-                Composer has to look at.\n\n\
-                Running this blindly on libraries is **NOT** recommended as it will narrow down\n\
-                your allowed dependencies, which may cause dependency hell for your users.\n\
-                Running it with <info>--dev-only</info> on libraries may be fine however as dev requirements\n\
-                are local to the library and do not affect consumers of the package.\n"
-            );
-    }
-
-    pub fn execute(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
-        let packages_filter: Vec<String> = input
-            .borrow()
-            .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let dev_only = input
-            .borrow()
-            .get_option("dev-only")?
-            .as_bool()
-            .unwrap_or(false);
-        let no_dev_only = input
-            .borrow()
-            .get_option("no-dev-only")?
-            .as_bool()
-            .unwrap_or(false);
-        let dry_run = input
-            .borrow()
-            .get_option("dry-run")?
-            .as_bool()
-            .unwrap_or(false);
-        let io = self.get_io().clone();
-        self.do_bump(
-            io,
-            dev_only,
-            no_dev_only,
-            dry_run,
-            packages_filter,
-            "--dev-only".to_string(),
-        )
+    pub fn new() -> Self {
+        let mut command = BumpCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("BumpCommand::configure uses static, valid metadata");
+        command
     }
 
     pub fn do_bump(
@@ -379,12 +333,121 @@ impl BumpCommand {
     }
 }
 
-impl HasBaseCommandData for BumpCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl Command for BumpCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        // TODO(cli-completion): suggest_root_requirement() for `packages` argument
+        self.set_name("bump")?;
+        self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions");
+        self.set_definition(&[
+            InputArgument::new(
+                "packages",
+                Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                "Optional package name(s) to restrict which packages are bumped.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "dev-only",
+                Some(PhpMixed::String("D".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Only bump requirements in \"require-dev\".",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-dev-only",
+                Some(PhpMixed::String("R".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Only bump requirements in \"require\".",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "dry-run",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Outputs the packages to bump, but will not execute anything.",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+                "The <info>bump</info> command increases the lower limit of your composer.json requirements\n\
+                to the currently installed versions. This helps to ensure your dependencies do not\n\
+                accidentally get downgraded due to some other conflict, and can slightly improve\n\
+                dependency resolution performance as it limits the amount of package versions\n\
+                Composer has to look at.\n\n\
+                Running this blindly on libraries is **NOT** recommended as it will narrow down\n\
+                your allowed dependencies, which may cause dependency hell for your users.\n\
+                Running it with <info>--dev-only</info> on libraries may be fine however as dev requirements\n\
+                are local to the library and do not affect consumers of the package.\n"
+            );
+        Ok(())
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
+    fn execute(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let packages_filter: Vec<String> = input
+            .borrow()
+            .get_argument("packages")?
+            .as_list()
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let dev_only = input
+            .borrow()
+            .get_option("dev-only")?
+            .as_bool()
+            .unwrap_or(false);
+        let no_dev_only = input
+            .borrow()
+            .get_option("no-dev-only")?
+            .as_bool()
+            .unwrap_or(false);
+        let dry_run = input
+            .borrow()
+            .get_option("dry-run")?
+            .as_bool()
+            .unwrap_or(false);
+        let io = self.get_io().clone();
+        self.do_bump(
+            io,
+            dev_only,
+            no_dev_only,
+            dry_run,
+            packages_filter,
+            "--dev-only".to_string(),
+        )
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for BumpCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

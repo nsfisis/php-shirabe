@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Command/DiagnoseCommand.php
 
+use anyhow::Result;
 use indexmap::IndexMap;
 
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::process::ExecutableFinder;
@@ -17,14 +19,20 @@ use shirabe_php_shim::{
     is_array, is_string, key, max_i64, ob_get_clean, ob_start, phpinfo, reset, rtrim, sprintf,
     str_contains, str_replace, str_starts_with, strpos, strstr, strtolower, trim, version_compare,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer;
 use crate::composer::ComposerHandle;
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::BufferIO;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -62,18 +70,33 @@ pub struct DiagnoseCommand {
 }
 
 impl DiagnoseCommand {
-    pub(crate) fn configure(&mut self) {
-        self
-            .set_name("diagnose")
-            .set_description("Diagnoses the system to identify common errors")
-            .set_help(
-                "The <info>diagnose</info> command checks common errors to help debugging problems.\n\n\
-                 The process exit code will be 1 in case of warnings and 2 for errors.\n\n\
-                 Read more at https://getcomposer.org/doc/03-cli.md#diagnose",
-            );
+    pub fn new() -> Self {
+        let mut command = DiagnoseCommand {
+            base_command_data: BaseCommandData::new(None),
+            http_downloader: None,
+            process: None,
+            exit_code: 0,
+        };
+        command
+            .configure()
+            .expect("DiagnoseCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for DiagnoseCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("diagnose")?;
+        self.set_description("Diagnoses the system to identify common errors");
+        self.set_help(
+            "The <info>diagnose</info> command checks common errors to help debugging problems.\n\n\
+             The process exit code will be 1 in case of warnings and 2 for errors.\n\n\
+             Read more at https://getcomposer.org/doc/03-cli.md#diagnose",
+        );
+        Ok(())
     }
 
-    pub(crate) fn execute(
+    fn execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -424,6 +447,28 @@ impl DiagnoseCommand {
         Ok(self.exit_code)
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for DiagnoseCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl DiagnoseCommand {
     fn check_composer_schema(&mut self) -> anyhow::Result<PhpMixed> {
         let validator = ConfigValidator::new(self.get_io().clone());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
@@ -1446,15 +1491,5 @@ impl DiagnoseCommand {
         }
 
         PhpMixed::Bool(true)
-    }
-}
-
-impl HasBaseCommandData for DiagnoseCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

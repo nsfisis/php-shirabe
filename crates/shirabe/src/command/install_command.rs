@@ -1,14 +1,24 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -22,51 +32,63 @@ pub struct InstallCommand {
 }
 
 impl InstallCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = InstallCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("InstallCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for InstallCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_prefer_install() for `prefer-install` option
-        self
-            .set_name("install")
-            .set_aliases(&["i".to_string()])
-            .set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json")
-            .set_definition(&[
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
-                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
-                InputOption::new("download-only", None, Some(InputOption::VALUE_NONE), "Download only, do not install packages.", None).unwrap().into(),
-                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
-                InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
-                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var). Only applies when no lock file is present.", None).unwrap().into(),
-                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
-                InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
-                InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
-                InputOption::new("verbose", Some(PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-                InputOption::new("optimize-autoloader", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-                InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Should not be provided, use composer require instead to add a given package to composer.json.", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>install</info> command reads the composer.lock file from\n\
-                the current directory, processes it, and downloads and installs all the\n\
-                libraries and dependencies outlined in that file. If the file does not\n\
-                exist it will look for composer.json and do the same.\n\n\
-                <info>php composer.phar install</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#install-i"
-            );
+        self.set_name("install")?;
+        self.set_aliases(vec!["i".to_string()])?;
+        self.set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json");
+        self.set_definition(&[
+            InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
+            InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
+            InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+            InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
+            InputOption::new("download-only", None, Some(InputOption::VALUE_NONE), "Download only, do not install packages.", None).unwrap().into(),
+            InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "DEPRECATED: Enables installation of require-dev packages (enabled by default, only present for BC).", None).unwrap().into(),
+            InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
+            InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables installation of require-dev packages.", None).unwrap().into(),
+            InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var). Only applies when no lock file is present.", None).unwrap().into(),
+            InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
+            InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+            InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
+            InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
+            InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
+            InputOption::new("verbose", Some(PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
+            InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+            InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+            InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Should not be provided, use composer require instead to add a given package to composer.json.", None).unwrap().into(),
+        ]);
+        self.set_help(
+            "The <info>install</info> command reads the composer.lock file from\n\
+            the current directory, processes it, and downloads and installs all the\n\
+            libraries and dependencies outlined in that file. If the file does not\n\
+            exist it will look for composer.json and do the same.\n\n\
+            <info>php composer.phar install</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#install-i",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let io = self.get_io().clone();
 
         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
@@ -242,14 +264,24 @@ impl InstallCommand {
 
         install.run()
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for InstallCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for InstallCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

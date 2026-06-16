@@ -3,16 +3,22 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{LogicException, get_debug_type};
+use shirabe_php_shim::{LogicException, PhpMixed, get_debug_type};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::archiver::ArchiveManager;
@@ -37,33 +43,45 @@ pub struct ArchiveCommand {
 impl ArchiveCommand {
     const FORMATS: &'static [&'static str] = &["tar", "tar.gz", "tar.bz2", "zip"];
 
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = ArchiveCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("ArchiveCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for ArchiveCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package(99) for `package` argument
-        self
-            .set_name("archive")
-            .set_description("Creates an archive of this composer package")
-            .set_definition(&[
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None).unwrap().into(),
-                InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None).unwrap().into(),
-                InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
-                InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
-                InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>archive</info> command creates an archive of the specified format\n\
-                containing the files and directories of the Composer project or the specified\n\
-                package in the specified version and writes it to the specified directory.\n\n\
-                <info>php composer.phar archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#archive"
-            );
+        self.set_name("archive")?;
+        self.set_description("Creates an archive of this composer package");
+        self.set_definition(&[
+            InputArgument::new("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None).unwrap().into(),
+            InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
+            InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the resulting archive: tar, tar.gz, tar.bz2 or zip (default tar)", None).unwrap().into(),
+            InputOption::new("dir", None, Some(InputOption::VALUE_REQUIRED), "Write the archive to this directory", None).unwrap().into(),
+            InputOption::new("file", None, Some(InputOption::VALUE_REQUIRED), "Write the archive with the given file name. Note that the format will be appended.", None).unwrap().into(),
+            InputOption::new("ignore-filters", None, Some(InputOption::VALUE_NONE), "Ignore filters when saving package", None).unwrap().into(),
+        ]);
+        self.set_help(
+            "The <info>archive</info> command creates an archive of the specified format\n\
+            containing the files and directories of the Composer project or the specified\n\
+            package in the specified version and writes it to the specified directory.\n\n\
+            <info>php composer.phar archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#archive"
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.try_composer(None, None);
 
         let config = if let Some(ref composer) = composer {
@@ -161,6 +179,28 @@ impl ArchiveCommand {
         Ok(return_code)
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ArchiveCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl ArchiveCommand {
     pub fn archive(
         &mut self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -365,15 +405,5 @@ impl ArchiveCommand {
         };
 
         Ok(Some(complete))
-    }
-}
-
-impl HasBaseCommandData for ArchiveCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

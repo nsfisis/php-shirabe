@@ -4,6 +4,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::finder::Finder;
@@ -12,9 +13,13 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_pop, chdir, explode_with_limit, file_exists, getcwd, implode,
     is_dir, is_file, mkdir, realpath, rtrim, strtolower, unlink,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
@@ -57,12 +62,24 @@ pub struct CreateProjectCommand {
 }
 
 impl CreateProjectCommand {
-    fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = CreateProjectCommand {
+            base_command_data: BaseCommandData::new(None),
+            suggested_packages_reporter: None,
+        };
+        command
+            .configure()
+            .expect("CreateProjectCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for CreateProjectCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_prefer_install / suggest_available_package
-        self
-            .set_name("create-project")
-            .set_description("Creates new project from a package into given directory")
-            .set_definition(&[
+        self.set_name("create-project")?;
+        self.set_description("Creates new project from a package into given directory");
+        self.set_definition(&[
                 InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
@@ -88,8 +105,8 @@ impl CreateProjectCommand {
                 InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
                 InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
                 InputOption::new("ask", None, Some(InputOption::VALUE_NONE), "Whether to ask for project directory.", None).unwrap().into(),
-            ])
-            .set_help(
+            ]);
+        self.set_help(
                 "The <info>create-project</info> command creates a new project from a given\n\
                 package into a new directory. If executed without params and in a directory\n\
                 with a composer.json file it installs the packages for the current project.\n\n\
@@ -106,13 +123,14 @@ impl CreateProjectCommand {
                 can pass the <info>'--repository=https://myrepository.org'</info> flag.\n\n\
                 Read more at https://getcomposer.org/doc/03-cli.md#create-project"
             );
+        Ok(())
     }
 
     fn execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+    ) -> anyhow::Result<i64> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?));
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = self.get_io();
 
@@ -234,6 +252,28 @@ impl CreateProjectCommand {
         )
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for CreateProjectCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl CreateProjectCommand {
     /// @param string|array<string>|null $repositories
     ///
     /// @throws \Exception
@@ -994,15 +1034,5 @@ impl CreateProjectCommand {
         }
 
         Ok(installed_from_vcs)
-    }
-}
-
-impl HasBaseCommandData for CreateProjectCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

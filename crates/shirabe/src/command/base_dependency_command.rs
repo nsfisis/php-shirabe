@@ -9,7 +9,7 @@ use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueExcept
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::Bound;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterface;

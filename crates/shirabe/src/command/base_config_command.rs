@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Command/BaseConfigCommand.php
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::Config;
 use crate::config::JsonConfigSource;
 use crate::factory::Factory;

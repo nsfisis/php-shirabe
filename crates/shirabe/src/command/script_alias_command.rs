@@ -1,15 +1,26 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::io::IOInterface;
-use crate::util::Platform;
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, LogicException, PhpMixed, is_string};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
+use crate::util::Platform;
 
 #[derive(Debug)]
 pub struct ScriptAliasCommand {
@@ -43,64 +54,67 @@ impl ScriptAliasCommand {
         // the command's name/definition/application state and ignoreValidationErrors() flips a flag
         // on it. Composer's BaseCommand carries no such Symfony Command state yet (the Symfony
         // Command base is an intentional todo!() stub), so there is nothing to initialize here.
-        Ok(Self {
-            base_command_data: BaseCommandData {
-                composer: None,
-                io: None,
-            },
+        let mut command = Self {
+            base_command_data: BaseCommandData::new(None),
             script,
             description,
             aliases,
-        })
+        };
+        command
+            .configure()
+            .expect("ScriptAliasCommand::configure uses constructor-provided metadata");
+        Ok(command)
     }
+}
 
-    pub fn configure(&mut self) {
-        let script = self.script.clone();
+impl Command for ScriptAliasCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        let name = self.script.clone();
+        self.set_name(&name)?;
         let description = self.description.clone();
-        let aliases = self.aliases.clone();
-        self.set_name(&script)
-            .set_description(&description)
-            .set_aliases(&aliases)
-            .set_definition(&[
-                InputOption::new(
-                    "dev",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Sets the dev mode.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "no-dev",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Disables the dev mode.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputArgument::new(
-                    "args",
-                    Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-                    "",
-                    None,
-                )
-                .unwrap()
-                .into(),
-            ])
-            .set_help(
-                "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
-                <info>php composer.phar run-script post-update-cmd</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
-            );
+        self.set_description(&description);
+        self.set_aliases(self.aliases.clone())?;
+        self.set_definition(&[
+            InputOption::new(
+                "dev",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Sets the dev mode.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-dev",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Disables the dev mode.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "args",
+                Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                "",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
+            <info>php composer.phar run-script post-update-cmd</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let dispatcher = crate::command::composer_full(&composer)
             .get_event_dispatcher()
@@ -151,14 +165,24 @@ impl ScriptAliasCommand {
             .borrow_mut()
             .dispatch_script(&self.script, dev_mode, args_value, flags)?)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for ScriptAliasCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for ScriptAliasCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

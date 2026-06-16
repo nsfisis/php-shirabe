@@ -9,6 +9,21 @@ pub enum InputDefinitionItem {
     Option(input_option::InputOption),
 }
 
+impl InputDefinitionItem {
+    /// Converts to the Symfony-typed definition item accepted by `CommandData::set_definition`.
+    pub(crate) fn to_definition_item(
+        &self,
+    ) -> shirabe_external_packages::symfony::console::input::input_definition::DefinitionItem {
+        use shirabe_external_packages::symfony::console::input::input_definition::DefinitionItem;
+        match self {
+            InputDefinitionItem::Argument(argument) => {
+                DefinitionItem::InputArgument(argument.to_base())
+            }
+            InputDefinitionItem::Option(option) => DefinitionItem::InputOption(option.to_base()),
+        }
+    }
+}
+
 impl From<input_argument::InputArgument> for InputDefinitionItem {
     fn from(value: input_argument::InputArgument) -> Self {
         Self::Argument(value)

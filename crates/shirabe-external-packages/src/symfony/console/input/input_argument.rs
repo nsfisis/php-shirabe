@@ -4,7 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::exception::logic_exception::LogicException;
 use shirabe_php_shim::PhpMixed;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InputArgument {
     name: String,
     mode: i64,

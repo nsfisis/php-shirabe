@@ -5,15 +5,23 @@ use std::any::Any;
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -31,25 +39,76 @@ pub struct FundCommand {
 }
 
 impl FundCommand {
-    pub fn configure(&mut self) {
-        self.set_name("fund")
-            .set_description("Discover how to help fund the maintenance of your dependencies")
-            .set_definition(&[InputOption::new(
-                "format",
-                Some(PhpMixed::String("f".to_string())),
-                Some(InputOption::VALUE_REQUIRED),
-                "Format of the output: text or json",
-                Some(PhpMixed::String("text".to_string())),
-            )
-            .unwrap()
-            .into()]);
+    pub fn new() -> Self {
+        let mut command = FundCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("FundCommand::configure uses static, valid metadata");
+        command
     }
 
-    pub fn execute(
+    fn insert_funding_data(
+        fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
+        package: &crate::package::CompletePackageInterfaceHandle,
+    ) -> Result<()> {
+        let pretty_name = package.get_pretty_name();
+        let (vendor, package_name) = pretty_name
+            .split_once('/')
+            .unwrap_or(("", pretty_name.as_str()));
+
+        for funding_option in package.get_funding() {
+            let url_val = funding_option.get("url").and_then(|v| v.as_string());
+            if url_val.map_or(true, |s| s.is_empty()) {
+                continue;
+            }
+            let mut url = url_val.unwrap().to_string();
+            let r#type = funding_option
+                .get("type")
+                .and_then(|v| v.as_string())
+                .unwrap_or("");
+            if r#type == "github" {
+                if let Some(matches) =
+                    Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
+                {
+                    if let Some(sponsor) = matches.into_iter().nth(1) {
+                        url = format!("https://github.com/sponsors/{}", sponsor);
+                    }
+                }
+            }
+            fundings
+                .entry(vendor.to_string())
+                .or_default()
+                .entry(url)
+                .or_default()
+                .push(package_name.to_string());
+        }
+        Ok(())
+    }
+}
+
+impl Command for FundCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("fund")?;
+        self.set_description("Discover how to help fund the maintenance of your dependencies");
+        self.set_definition(&[InputOption::new(
+            "format",
+            Some(PhpMixed::String("f".to_string())),
+            Some(InputOption::VALUE_REQUIRED),
+            "Format of the output: text or json",
+            Some(PhpMixed::String("text".to_string())),
+        )
+        .unwrap()
+        .into()]);
+        Ok(())
+    }
+
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::command::composer_full(&composer);
 
@@ -171,51 +230,23 @@ impl FundCommand {
         Ok(0)
     }
 
-    fn insert_funding_data(
-        fundings: &mut IndexMap<String, IndexMap<String, Vec<String>>>,
-        package: &crate::package::CompletePackageInterfaceHandle,
-    ) -> Result<()> {
-        let pretty_name = package.get_pretty_name();
-        let (vendor, package_name) = pretty_name
-            .split_once('/')
-            .unwrap_or(("", pretty_name.as_str()));
-
-        for funding_option in package.get_funding() {
-            let url_val = funding_option.get("url").and_then(|v| v.as_string());
-            if url_val.map_or(true, |s| s.is_empty()) {
-                continue;
-            }
-            let mut url = url_val.unwrap().to_string();
-            let r#type = funding_option
-                .get("type")
-                .and_then(|v| v.as_string())
-                .unwrap_or("");
-            if r#type == "github" {
-                if let Some(matches) =
-                    Preg::is_match_with_indexed_captures(r"^https://github.com/([^/]+)$", &url)
-                {
-                    if let Some(sponsor) = matches.into_iter().nth(1) {
-                        url = format!("https://github.com/sponsors/{}", sponsor);
-                    }
-                }
-            }
-            fundings
-                .entry(vendor.to_string())
-                .or_default()
-                .entry(url)
-                .or_default()
-                .push(package_name.to_string());
-        }
-        Ok(())
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
     }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for FundCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for FundCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

@@ -2,14 +2,22 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, array_merge_map, strip_tags};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -33,27 +41,160 @@ pub struct CheckPlatformReqsCommand {
 }
 
 impl CheckPlatformReqsCommand {
-    pub fn configure(&mut self) {
-        self
-            .set_name("check-platform-reqs")
-            .set_description("Check that platform requirements are satisfied")
-            .set_definition(&[
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables checking of require-dev packages requirements.", None).unwrap().into(),
-                InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Checks requirements only from the lock file, not from installed packages.", None).unwrap().into(),
-                InputOption::new("format", Some(shirabe_php_shim::PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(shirabe_php_shim::PhpMixed::String("text".to_string()))).unwrap().into(),
-            ])
-            .set_help(
-                "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
-                Unlike update/install, this command will ignore config.platform settings and check the real platform packages so you can be certain you have the required platform dependencies.\n\n\
-                <info>php composer.phar check-platform-reqs</info>\n\n"
-            );
+    pub fn new() -> Self {
+        let mut command = CheckPlatformReqsCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("CheckPlatformReqsCommand::configure uses static, valid metadata");
+        command
     }
 
-    pub fn execute(
+    fn print_table(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        results: &[CheckResult],
+        format: &str,
+    ) {
+        let io = self.get_io();
+
+        if format == "json" {
+            let rows: Vec<PhpMixed> = results
+                .iter()
+                .map(|result| {
+                    let mut row = IndexMap::new();
+                    row.insert(
+                        "name".to_string(),
+                        Box::new(PhpMixed::String(result.platform_package.clone())),
+                    );
+                    row.insert(
+                        "version".to_string(),
+                        Box::new(PhpMixed::String(result.version.clone())),
+                    );
+                    row.insert(
+                        "status".to_string(),
+                        Box::new(PhpMixed::String(strip_tags(&result.status))),
+                    );
+                    if let Some(link) = &result.link {
+                        let mut failed_req = IndexMap::new();
+                        failed_req.insert(
+                            "source".to_string(),
+                            Box::new(PhpMixed::String(link.get_source().to_string())),
+                        );
+                        failed_req.insert(
+                            "type".to_string(),
+                            Box::new(PhpMixed::String(link.get_description().to_string())),
+                        );
+                        failed_req.insert(
+                            "target".to_string(),
+                            Box::new(PhpMixed::String(link.get_target().to_string())),
+                        );
+                        failed_req.insert(
+                            "constraint".to_string(),
+                            Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
+                        );
+                        row.insert(
+                            "failed_requirement".to_string(),
+                            Box::new(PhpMixed::Array(failed_req)),
+                        );
+                    } else {
+                        row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Null));
+                    }
+                    let provider_str = strip_tags(&result.provider);
+                    row.insert(
+                        "provider".to_string(),
+                        Box::new(if provider_str.is_empty() {
+                            PhpMixed::Null
+                        } else {
+                            PhpMixed::String(provider_str)
+                        }),
+                    );
+                    PhpMixed::Array(row)
+                })
+                .collect();
+
+            io.write(&JsonFile::encode(&PhpMixed::List(
+                rows.into_iter().map(Box::new).collect(),
+            )));
+        } else {
+            let rows: Vec<PhpMixed> = results
+                .iter()
+                .map(|result| {
+                    PhpMixed::List(vec![
+                        Box::new(PhpMixed::String(result.platform_package.clone())),
+                        Box::new(PhpMixed::String(result.version.clone())),
+                        Box::new(if let Some(link) = &result.link {
+                            PhpMixed::String(format!(
+                                "{} {} {} ({})",
+                                link.get_source(),
+                                link.get_description(),
+                                link.get_target(),
+                                link.get_pretty_constraint(),
+                            ))
+                        } else {
+                            PhpMixed::String(String::new())
+                        }),
+                        Box::new(PhpMixed::String(
+                            format!("{} {}", result.status, result.provider)
+                                .trim_end()
+                                .to_string(),
+                        )),
+                    ])
+                })
+                .collect();
+
+            self.render_table(rows, output);
+        }
+    }
+}
+
+impl Command for CheckPlatformReqsCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("check-platform-reqs")?;
+        self.set_description("Check that platform requirements are satisfied");
+        self.set_definition(&[
+            InputOption::new(
+                "no-dev",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Disables checking of require-dev packages requirements.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "lock",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Checks requirements only from the lock file, not from installed packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "format",
+                Some(shirabe_php_shim::PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text or json",
+                Some(shirabe_php_shim::PhpMixed::String("text".to_string())),
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
+            Unlike update/install, this command will ignore config.platform settings and check the real platform packages so you can be certain you have the required platform dependencies.\n\n\
+            <info>php composer.phar check-platform-reqs</info>\n\n"
+        );
+        Ok(())
+    }
+
+    fn execute(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
         let io = self.get_io();
@@ -257,110 +398,23 @@ impl CheckPlatformReqsCommand {
         Ok(exit_code)
     }
 
-    fn print_table(
+    fn initialize(
         &mut self,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        results: &[CheckResult],
-        format: &str,
-    ) {
-        let io = self.get_io();
-
-        if format == "json" {
-            let rows: Vec<PhpMixed> = results
-                .iter()
-                .map(|result| {
-                    let mut row = IndexMap::new();
-                    row.insert(
-                        "name".to_string(),
-                        Box::new(PhpMixed::String(result.platform_package.clone())),
-                    );
-                    row.insert(
-                        "version".to_string(),
-                        Box::new(PhpMixed::String(result.version.clone())),
-                    );
-                    row.insert(
-                        "status".to_string(),
-                        Box::new(PhpMixed::String(strip_tags(&result.status))),
-                    );
-                    if let Some(link) = &result.link {
-                        let mut failed_req = IndexMap::new();
-                        failed_req.insert(
-                            "source".to_string(),
-                            Box::new(PhpMixed::String(link.get_source().to_string())),
-                        );
-                        failed_req.insert(
-                            "type".to_string(),
-                            Box::new(PhpMixed::String(link.get_description().to_string())),
-                        );
-                        failed_req.insert(
-                            "target".to_string(),
-                            Box::new(PhpMixed::String(link.get_target().to_string())),
-                        );
-                        failed_req.insert(
-                            "constraint".to_string(),
-                            Box::new(PhpMixed::String(link.get_pretty_constraint().to_string())),
-                        );
-                        row.insert(
-                            "failed_requirement".to_string(),
-                            Box::new(PhpMixed::Array(failed_req)),
-                        );
-                    } else {
-                        row.insert("failed_requirement".to_string(), Box::new(PhpMixed::Null));
-                    }
-                    let provider_str = strip_tags(&result.provider);
-                    row.insert(
-                        "provider".to_string(),
-                        Box::new(if provider_str.is_empty() {
-                            PhpMixed::Null
-                        } else {
-                            PhpMixed::String(provider_str)
-                        }),
-                    );
-                    PhpMixed::Array(row)
-                })
-                .collect();
-
-            io.write(&JsonFile::encode(&PhpMixed::List(
-                rows.into_iter().map(Box::new).collect(),
-            )));
-        } else {
-            let rows: Vec<PhpMixed> = results
-                .iter()
-                .map(|result| {
-                    PhpMixed::List(vec![
-                        Box::new(PhpMixed::String(result.platform_package.clone())),
-                        Box::new(PhpMixed::String(result.version.clone())),
-                        Box::new(if let Some(link) = &result.link {
-                            PhpMixed::String(format!(
-                                "{} {} {} ({})",
-                                link.get_source(),
-                                link.get_description(),
-                                link.get_target(),
-                                link.get_pretty_constraint(),
-                            ))
-                        } else {
-                            PhpMixed::String(String::new())
-                        }),
-                        Box::new(PhpMixed::String(
-                            format!("{} {}", result.status, result.provider)
-                                .trim_end()
-                                .to_string(),
-                        )),
-                    ])
-                })
-                .collect();
-
-            self.render_table(rows, output);
-        }
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
     }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for CheckPlatformReqsCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for CheckPlatformReqsCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

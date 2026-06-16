@@ -29,4 +29,10 @@ impl InputArgument {
         )?;
         Ok(Self { inner })
     }
+
+    /// Unwraps to the underlying Symfony `InputArgument` (used when forwarding a Composer-typed
+    /// definition to the Symfony command state).
+    pub(crate) fn to_base(&self) -> BaseInputArgument {
+        self.inner.clone()
+    }
 }

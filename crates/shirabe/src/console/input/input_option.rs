@@ -30,4 +30,10 @@ impl InputOption {
             BaseInputOption::new(name, shortcut, mode, description.to_string(), default_mixed)?;
         Ok(Self { inner })
     }
+
+    /// Unwraps to the underlying Symfony `InputOption` (used when forwarding a Composer-typed
+    /// definition to the Symfony command state).
+    pub(crate) fn to_base(&self) -> BaseInputOption {
+        self.inner.clone()
+    }
 }

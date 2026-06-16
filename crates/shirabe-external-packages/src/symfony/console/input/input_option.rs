@@ -4,7 +4,7 @@ use crate::symfony::console::exception::invalid_argument_exception::InvalidArgum
 use crate::symfony::console::exception::logic_exception::LogicException;
 use shirabe_php_shim::PhpMixed;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InputOption {
     name: String,
     shortcut: Option<String>,
@@ -168,7 +168,8 @@ impl InputOption {
         let default = if self.is_array() {
             match default {
                 PhpMixed::Null => PhpMixed::List(vec![]),
-                PhpMixed::List(_) => default,
+                // PHP `is_array()` accepts both list-style and associative arrays.
+                PhpMixed::List(_) | PhpMixed::Array(_) => default,
                 _ => {
                     return Err(LogicException(shirabe_php_shim::LogicException {
                         message: "A default value for an array option must be an array."

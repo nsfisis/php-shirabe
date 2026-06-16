@@ -1,13 +1,24 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::loader::ValidatingArrayLoader;
@@ -22,97 +33,110 @@ pub struct ValidateCommand {
 }
 
 impl ValidateCommand {
-    pub fn configure(&mut self) {
-        self.set_name("validate")
-            .set_description("Validates a composer.json and composer.lock")
-            .set_definition(&[
-                InputOption::new(
-                    "no-check-all",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Do not validate requires for overly strict/loose constraints",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "check-lock",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Check if lock file is up to date (even when config.lock is false)",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "no-check-lock",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Do not check if lock file is up to date",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "no-check-publish",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Do not check for publish errors",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "no-check-version",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Do not report a warning if the version field is present",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "with-dependencies",
-                    Some(shirabe_php_shim::PhpMixed::String("A".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Also validate the composer.json of all installed dependencies",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "strict",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Return a non-zero exit code for warnings as well as errors",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputArgument::new(
-                    "file",
-                    Some(InputArgument::OPTIONAL),
-                    "path to composer.json file",
-                    None,
-                )
-                .unwrap()
-                .into(),
-            ])
-            .set_help(
-                "The validate command validates a given composer.json and composer.lock\n\n\
-                Exit codes in case of errors are:\n\
-                1 validation warning(s), only when --strict is given\n\
-                2 validation error(s)\n\
-                3 file unreadable or missing\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#validate",
-            );
+    pub fn new() -> Self {
+        let mut command = ValidateCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("ValidateCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for ValidateCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("validate")?;
+        self.set_description("Validates a composer.json and composer.lock");
+        self.set_definition(&[
+            InputOption::new(
+                "no-check-all",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Do not validate requires for overly strict/loose constraints",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "check-lock",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Check if lock file is up to date (even when config.lock is false)",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-check-lock",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Do not check if lock file is up to date",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-check-publish",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Do not check for publish errors",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-check-version",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Do not report a warning if the version field is present",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "with-dependencies",
+                Some(shirabe_php_shim::PhpMixed::String("A".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Also validate the composer.json of all installed dependencies",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "strict",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Return a non-zero exit code for warnings as well as errors",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "file",
+                Some(InputArgument::OPTIONAL),
+                "path to composer.json file",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The validate command validates a given composer.json and composer.lock\n\n\
+            Exit codes in case of errors are:\n\
+            1 validation warning(s), only when --strict is given\n\
+            2 validation error(s)\n\
+            3 file unreadable or missing\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#validate",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let file = input
             .borrow()
             .get_argument("file")?
@@ -279,6 +303,28 @@ impl ValidateCommand {
         Ok(exit_code.max(event_code))
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ValidateCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl ValidateCommand {
     fn output_result(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -370,15 +416,5 @@ impl ValidateCommand {
                 io.write_error(msg);
             }
         }
-    }
-}
-
-impl HasBaseCommandData for ValidateCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

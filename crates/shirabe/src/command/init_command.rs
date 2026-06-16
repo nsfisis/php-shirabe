@@ -5,6 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::helper::FormatBlockMessages;
 use shirabe_external_packages::symfony::console::helper::FormatterHelper;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
@@ -17,12 +18,18 @@ use shirabe_php_shim::{
     function_exists, get_current_user, implode, is_dir, is_string, preg_quote, realpath,
     server_get, sprintf, str_replace, strpos, strtolower, trim, ucwords,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::command::PackageDiscoveryTrait;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -87,12 +94,24 @@ impl PackageDiscoveryTrait for InitCommand {
 }
 
 impl InitCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = InitCommand {
+            base_command_data: BaseCommandData::new(None),
+            git_config: None,
+        };
+        command
+            .configure()
+            .expect("InitCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for InitCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package_incl_platform() for `require` / `require-dev`
-        self
-            .set_name("init")
-            .set_description("Creates a basic composer.json file in current directory")
-            .set_definition(&[
+        self.set_name("init")?;
+        self.set_description("Creates a basic composer.json file in current directory");
+        self.set_definition(&[
                 InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None).unwrap().into(),
         InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None).unwrap().into(),
         InputOption::new("author", None, Some(InputOption::VALUE_REQUIRED), "Author name of package", None).unwrap().into(),
@@ -104,23 +123,24 @@ impl InitCommand {
         InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>init</info> command creates a basic composer.json file\n\
+            ]);
+        self.set_help(
+            "The <info>init</info> command creates a basic composer.json file\n\
                 in the current directory.\n\
                 \n\
                 <info>php composer.phar init</info>\n\
                 \n\
-                Read more at https://getcomposer.org/doc/03-cli.md#init"
-            );
+                Read more at https://getcomposer.org/doc/03-cli.md#init",
+        );
+        Ok(())
     }
 
     /// @throws \Seld\JsonLint\ParsingException
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let io = PackageDiscoveryTrait::get_io(self);
 
         let allowlist: Vec<String> = vec![
@@ -416,12 +436,12 @@ impl InitCommand {
         Ok(0)
     }
 
-    pub(crate) fn initialize(
+    fn initialize(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        BaseCommand::initialize(self, input.clone(), output)?;
+        base_command_initialize(self, input.clone(), output.clone())?;
 
         if !input.borrow().is_interactive() {
             if input.borrow().get_option("name")?.is_null() {
@@ -444,124 +464,126 @@ impl InitCommand {
         Ok(())
     }
 
-    pub(crate) fn interact(
+    fn interact(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<()> {
-        let io = self.get_io();
-        // @var FormatterHelper $formatter — PHP: $this->getHelperSet()->get('formatter')
-        // TODO(phase-c): get_helper_set returns PhpMixed and HelperSet::get is a todo!() stub (per
-        // the "Symfony stays todo!()" policy), so the typed FormatterHelper cannot be retrieved
-        // until the Helper trait + typed HelperSet are modelled.
-        let formatter: FormatterHelper = todo!();
-        let _ = &formatter;
-        let _ = self.get_helper_set();
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) {
+        let _ = (|| -> anyhow::Result<()> {
+            let io = self.get_io();
+            // @var FormatterHelper $formatter — PHP: $this->getHelperSet()->get('formatter')
+            // TODO(phase-c): get_helper_set returns PhpMixed and HelperSet::get is a todo!() stub (per
+            // the "Symfony stays todo!()" policy), so the typed FormatterHelper cannot be retrieved
+            // until the Helper trait + typed HelperSet are modelled.
+            let formatter: FormatterHelper = todo!();
+            let _ = &formatter;
+            let _ = self.get_helper_set();
 
-        // initialize repos if configured
-        let repositories: Vec<String> = input
-            .borrow()
-            .get_option("repository")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        if (repositories.len() as i64) > 0 {
-            let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
-                Some(io.clone()),
-                None,
-            )?));
-            io.borrow_mut()
-                .load_configuration(&mut *config.borrow_mut())?;
-            let mut repo_manager =
-                RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
+            // initialize repos if configured
+            let repositories: Vec<String> = input
+                .borrow()
+                .get_option("repository")?
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if (repositories.len() as i64) > 0 {
+                let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
+                    Some(io.clone()),
+                    None,
+                )?));
+                io.borrow_mut()
+                    .load_configuration(&mut *config.borrow_mut())?;
+                let mut repo_manager =
+                    RepositoryFactory::manager(io.clone(), &config, None, None, None)?;
 
-            let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
-                vec![crate::repository::RepositoryInterfaceHandle::new(
-                    PlatformRepository::new(vec![], IndexMap::new())?,
-                )];
-            let mut create_default_packagist_repo = true;
-            for repo in &repositories {
-                let repo_config =
-                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
-                let is_packagist_false = repo_config
-                    .get("packagist")
-                    .map(|v| v.as_bool() == Some(false))
-                    .unwrap_or(false)
-                    && repo_config.len() == 1;
-                let is_packagist_org_false = repo_config
-                    .get("packagist.org")
-                    .map(|v| v.as_bool() == Some(false))
-                    .unwrap_or(false)
-                    && repo_config.len() == 1;
-                if is_packagist_false || is_packagist_org_false {
-                    create_default_packagist_repo = false;
-                    continue;
+                let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
+                    vec![crate::repository::RepositoryInterfaceHandle::new(
+                        PlatformRepository::new(vec![], IndexMap::new())?,
+                    )];
+                let mut create_default_packagist_repo = true;
+                for repo in &repositories {
+                    let repo_config =
+                        RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
+                    let is_packagist_false = repo_config
+                        .get("packagist")
+                        .map(|v| v.as_bool() == Some(false))
+                        .unwrap_or(false)
+                        && repo_config.len() == 1;
+                    let is_packagist_org_false = repo_config
+                        .get("packagist.org")
+                        .map(|v| v.as_bool() == Some(false))
+                        .unwrap_or(false)
+                        && repo_config.len() == 1;
+                    if is_packagist_false || is_packagist_org_false {
+                        create_default_packagist_repo = false;
+                        continue;
+                    }
+                    repos.push(RepositoryFactory::create_repo(
+                        io.clone(),
+                        &config,
+                        repo_config,
+                        Some(&mut repo_manager),
+                    )?);
                 }
-                repos.push(RepositoryFactory::create_repo(
-                    io.clone(),
-                    &config,
-                    repo_config,
-                    Some(&mut repo_manager),
-                )?);
+
+                if create_default_packagist_repo {
+                    let mut default_config: IndexMap<String, PhpMixed> = IndexMap::new();
+                    default_config
+                        .insert("type".to_string(), PhpMixed::String("composer".to_string()));
+                    default_config.insert(
+                        "url".to_string(),
+                        PhpMixed::String("https://repo.packagist.org".to_string()),
+                    );
+                    repos.push(RepositoryFactory::create_repo(
+                        io.clone(),
+                        &config,
+                        default_config,
+                        Some(&mut repo_manager),
+                    )?);
+                }
+
+                *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
+                    CompositeRepository::new(repos),
+                ));
+                // unset($repos, $config, $repositories);
             }
 
-            if create_default_packagist_repo {
-                let mut default_config: IndexMap<String, PhpMixed> = IndexMap::new();
-                default_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
-                default_config.insert(
-                    "url".to_string(),
-                    PhpMixed::String("https://repo.packagist.org".to_string()),
-                );
-                repos.push(RepositoryFactory::create_repo(
-                    io.clone(),
-                    &config,
-                    default_config,
-                    Some(&mut repo_manager),
-                )?);
-            }
+            io.write_error3(
+                &format!(
+                    "\n{}\n",
+                    formatter.format_block(
+                        FormatBlockMessages::String(
+                            "Welcome to the Composer config generator".to_string(),
+                        ),
+                        "bg=blue;fg=white",
+                        true,
+                    )
+                ),
+                true,
+                io_interface::NORMAL,
+            );
 
-            *self.get_repos_mut() = Some(crate::repository::RepositoryInterfaceHandle::new(
-                CompositeRepository::new(repos),
-            ));
-            // unset($repos, $config, $repositories);
-        }
+            // namespace
+            io.write_error3(
+                "\nThis command will guide you through creating your composer.json config.\n",
+                true,
+                io_interface::NORMAL,
+            );
 
-        io.write_error3(
-            &format!(
-                "\n{}\n",
-                formatter.format_block(
-                    FormatBlockMessages::String(
-                        "Welcome to the Composer config generator".to_string(),
-                    ),
-                    "bg=blue;fg=white",
-                    true,
-                )
-            ),
-            true,
-            io_interface::NORMAL,
-        );
+            let mut name = input
+                .borrow()
+                .get_option("name")?
+                .as_string()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| self.get_default_package_name());
 
-        // namespace
-        io.write_error3(
-            "\nThis command will guide you through creating your composer.json config.\n",
-            true,
-            io_interface::NORMAL,
-        );
-
-        let mut name = input
-            .borrow()
-            .get_option("name")?
-            .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| self.get_default_package_name());
-
-        let name_default = name.clone();
-        let name_for_validate = name.clone();
-        name = io
+            let name_default = name.clone();
+            let name_for_validate = name.clone();
+            name = io
             .ask_and_validate(
                 format!(
                     "Package name (<vendor>/<name>) [<comment>{}</comment>]: ",
@@ -594,168 +616,168 @@ impl InitCommand {
             .as_string()
             .unwrap_or("")
             .to_string();
-        input
-            .borrow_mut()
-            .set_option("name", PhpMixed::String(name));
+            input
+                .borrow_mut()
+                .set_option("name", PhpMixed::String(name));
 
-        let description = input
-            .borrow()
-            .get_option("description")?
-            .as_string()
-            .map(|s| s.to_string());
-        let description_default = description.clone();
-        let description = io.ask(
-            format!(
-                "Description [<comment>{}</comment>]: ",
-                description.clone().unwrap_or_default()
-            ),
-            description_default
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        );
-        input.borrow_mut().set_option("description", description);
+            let description = input
+                .borrow()
+                .get_option("description")?
+                .as_string()
+                .map(|s| s.to_string());
+            let description_default = description.clone();
+            let description = io.ask(
+                format!(
+                    "Description [<comment>{}</comment>]: ",
+                    description.clone().unwrap_or_default()
+                ),
+                description_default
+                    .map(PhpMixed::String)
+                    .unwrap_or(PhpMixed::Null),
+            );
+            input.borrow_mut().set_option("description", description);
 
-        let author = input
-            .borrow()
-            .get_option("author")?
-            .as_string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| self.get_default_author().unwrap_or_default());
+            let author = input
+                .borrow()
+                .get_option("author")?
+                .as_string()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| self.get_default_author().unwrap_or_default());
 
-        let author_for_validate = author.clone();
-        let author_default = author.clone();
-        // PHP: $this->parseAuthorString is called inside a closure. We approximate by binding.
-        let author_value = io.ask_and_validate(
-            format!(
-                "Author [{} n to skip]: ",
-                if is_string(&PhpMixed::String(author.clone())) {
-                    format!("<comment>{}</comment>, ", author)
-                } else {
-                    String::new()
-                }
-            ),
-            // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
-            // TODO(phase-c): IOInterface::ask_and_validate takes a `Box<dyn Fn> + 'static`
-            // validator, so it cannot borrow &self to call self.parse_author_string; and
-            // ask_and_validate itself is a deferred QuestionHelper todo!() (see console_io). The
-            // validator body below therefore stays a placeholder. (parse_author_string and
-            // is_valid_email are stateless, so a future fix can make them associated functions and
-            // call them from the closure once the helper interaction is modelled.)
-            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                let value_str = value.as_string().unwrap_or("").to_string();
-                if value_str == "n" || value_str == "no" {
-                    return Ok(PhpMixed::Null);
-                }
-                let value_or_default = if value_str.is_empty() {
-                    author_for_validate.clone()
-                } else {
-                    value_str
-                };
-                // PHP: $author = $self->parseAuthorString($value); return $author['email'] === null
-                //   ? $author['name'] : sprintf('%s <%s>', $author['name'], $author['email']);
-                // TODO(phase-c): see the closure note above — cannot reach parse_author_string from
-                // this 'static validator yet.
-                let _ = value_or_default;
-                Ok(PhpMixed::Null)
-            }),
-            None,
-            PhpMixed::String(author_default),
-        )?;
-        input.borrow_mut().set_option("author", author_value);
-
-        let minimum_stability = input
-            .borrow()
-            .get_option("stability")?
-            .as_string()
-            .map(|s| s.to_string());
-        let minimum_stability_default = minimum_stability.clone();
-        let minimum_stability_for_validate = minimum_stability.clone();
-        let minimum_stability_value = io.ask_and_validate(
-            format!(
-                "Minimum Stability [<comment>{}</comment>]: ",
-                minimum_stability.clone().unwrap_or_default()
-            ),
-            Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                if value.is_null() {
-                    return Ok(minimum_stability_for_validate
-                        .clone()
-                        .map(PhpMixed::String)
-                        .unwrap_or(PhpMixed::Null));
-                }
-
-                if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
-                    return Err(InvalidArgumentException {
-                        message: format!(
-                            "Invalid minimum stability \"{}\". Must be empty or one of: {}",
-                            value.as_string().unwrap_or(""),
-                            implode(
-                                ", ",
-                                &base_package::STABILITIES
-                                    .keys()
-                                    .map(|k| k.to_string())
-                                    .collect::<Vec<_>>()
-                            )
-                        ),
-                        code: 0,
+            let author_for_validate = author.clone();
+            let author_default = author.clone();
+            // PHP: $this->parseAuthorString is called inside a closure. We approximate by binding.
+            let author_value = io.ask_and_validate(
+                format!(
+                    "Author [{} n to skip]: ",
+                    if is_string(&PhpMixed::String(author.clone())) {
+                        format!("<comment>{}</comment>, ", author)
+                    } else {
+                        String::new()
                     }
-                    .into());
-                }
+                ),
+                // PHP: function ($value) use ($self, $author) { ... $author = $self->parseAuthorString($value); ... }
+                // TODO(phase-c): IOInterface::ask_and_validate takes a `Box<dyn Fn> + 'static`
+                // validator, so it cannot borrow &self to call self.parse_author_string; and
+                // ask_and_validate itself is a deferred QuestionHelper todo!() (see console_io). The
+                // validator body below therefore stays a placeholder. (parse_author_string and
+                // is_valid_email are stateless, so a future fix can make them associated functions and
+                // call them from the closure once the helper interaction is modelled.)
+                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                    let value_str = value.as_string().unwrap_or("").to_string();
+                    if value_str == "n" || value_str == "no" {
+                        return Ok(PhpMixed::Null);
+                    }
+                    let value_or_default = if value_str.is_empty() {
+                        author_for_validate.clone()
+                    } else {
+                        value_str
+                    };
+                    // PHP: $author = $self->parseAuthorString($value); return $author['email'] === null
+                    //   ? $author['name'] : sprintf('%s <%s>', $author['name'], $author['email']);
+                    // TODO(phase-c): see the closure note above — cannot reach parse_author_string from
+                    // this 'static validator yet.
+                    let _ = value_or_default;
+                    Ok(PhpMixed::Null)
+                }),
+                None,
+                PhpMixed::String(author_default),
+            )?;
+            input.borrow_mut().set_option("author", author_value);
 
-                Ok(value)
-            }),
-            None,
-            minimum_stability_default
-                .map(PhpMixed::String)
-                .unwrap_or(PhpMixed::Null),
-        )?;
-        input
-            .borrow_mut()
-            .set_option("stability", minimum_stability_value);
+            let minimum_stability = input
+                .borrow()
+                .get_option("stability")?
+                .as_string()
+                .map(|s| s.to_string());
+            let minimum_stability_default = minimum_stability.clone();
+            let minimum_stability_for_validate = minimum_stability.clone();
+            let minimum_stability_value = io.ask_and_validate(
+                format!(
+                    "Minimum Stability [<comment>{}</comment>]: ",
+                    minimum_stability.clone().unwrap_or_default()
+                ),
+                Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
+                    if value.is_null() {
+                        return Ok(minimum_stability_for_validate
+                            .clone()
+                            .map(PhpMixed::String)
+                            .unwrap_or(PhpMixed::Null));
+                    }
 
-        let type_val = input.borrow().get_option("type")?;
-        let type_str = type_val.as_string().unwrap_or("").to_string();
-        let mut type_value = io.ask(
+                    if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
+                        return Err(InvalidArgumentException {
+                            message: format!(
+                                "Invalid minimum stability \"{}\". Must be empty or one of: {}",
+                                value.as_string().unwrap_or(""),
+                                implode(
+                                    ", ",
+                                    &base_package::STABILITIES
+                                        .keys()
+                                        .map(|k| k.to_string())
+                                        .collect::<Vec<_>>()
+                                )
+                            ),
+                            code: 0,
+                        }
+                        .into());
+                    }
+
+                    Ok(value)
+                }),
+                None,
+                minimum_stability_default
+                    .map(PhpMixed::String)
+                    .unwrap_or(PhpMixed::Null),
+            )?;
+            input
+                .borrow_mut()
+                .set_option("stability", minimum_stability_value);
+
+            let type_val = input.borrow().get_option("type")?;
+            let type_str = type_val.as_string().unwrap_or("").to_string();
+            let mut type_value = io.ask(
             format!(
                 "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
                 type_str
             ),
             type_val,
         );
-        if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
-            type_value = PhpMixed::Null;
-        }
-        input.borrow_mut().set_option("type", type_value);
-
-        let mut license = input
-            .borrow()
-            .get_option("license")?
-            .as_string()
-            .map(|s| s.to_string());
-        if license.is_none() {
-            let default_license = server_get("COMPOSER_DEFAULT_LICENSE");
-            if !empty(
-                &default_license
-                    .clone()
-                    .map(PhpMixed::String)
-                    .unwrap_or(PhpMixed::Null),
-            ) {
-                license = default_license;
+            if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
+                type_value = PhpMixed::Null;
             }
-        }
+            input.borrow_mut().set_option("type", type_value);
 
-        let license = io.ask(
-            format!(
-                "License [<comment>{}</comment>]: ",
-                license.clone().unwrap_or_default()
-            ),
-            license.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
-        );
-        let spdx = SpdxLicenses::new();
-        if !license.is_null()
-            && !spdx.validate(license.as_string().unwrap_or(""))
-            && license.as_string() != Some("proprietary")
-        {
-            return Err(InvalidArgumentException {
+            let mut license = input
+                .borrow()
+                .get_option("license")?
+                .as_string()
+                .map(|s| s.to_string());
+            if license.is_none() {
+                let default_license = server_get("COMPOSER_DEFAULT_LICENSE");
+                if !empty(
+                    &default_license
+                        .clone()
+                        .map(PhpMixed::String)
+                        .unwrap_or(PhpMixed::Null),
+                ) {
+                    license = default_license;
+                }
+            }
+
+            let license = io.ask(
+                format!(
+                    "License [<comment>{}</comment>]: ",
+                    license.clone().unwrap_or_default()
+                ),
+                license.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
+            );
+            let spdx = SpdxLicenses::new();
+            if !license.is_null()
+                && !spdx.validate(license.as_string().unwrap_or(""))
+                && license.as_string() != Some("proprietary")
+            {
+                return Err(InvalidArgumentException {
                 message: format!(
                     "Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.",
                     license.as_string().unwrap_or("")
@@ -763,85 +785,52 @@ impl InitCommand {
                 code: 0,
             }
             .into());
-        }
-        input.borrow_mut().set_option("license", license);
+            }
+            input.borrow_mut().set_option("license", license);
 
-        io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
+            io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
-        // prepare to resolve dependencies
-        let repos = self.get_repos();
-        let preferred_stability =
-            if let Some(s) = minimum_stability_default.clone().filter(|s| !s.is_empty()) {
-                s
-            } else {
-                "stable".to_string()
-            };
-        let platform_repo: Option<PlatformRepositoryHandle> = if repos.is::<CompositeRepository>() {
-            let borrowed = repos.borrow();
-            let composite = borrowed
-                .as_any()
-                .downcast_ref::<CompositeRepository>()
-                .expect("is::<CompositeRepository>() checked above");
-            composite
-                .get_repositories()
-                .iter()
-                .find(|candidate| candidate.is::<PlatformRepository>())
-                .and_then(|candidate| candidate.as_platform_repository())
-        } else {
-            None
-        };
+            // prepare to resolve dependencies
+            let repos = self.get_repos();
+            let preferred_stability =
+                if let Some(s) = minimum_stability_default.clone().filter(|s| !s.is_empty()) {
+                    s
+                } else {
+                    "stable".to_string()
+                };
+            let platform_repo: Option<PlatformRepositoryHandle> =
+                if repos.is::<CompositeRepository>() {
+                    let borrowed = repos.borrow();
+                    let composite = borrowed
+                        .as_any()
+                        .downcast_ref::<CompositeRepository>()
+                        .expect("is::<CompositeRepository>() checked above");
+                    composite
+                        .get_repositories()
+                        .iter()
+                        .find(|candidate| candidate.is::<PlatformRepository>())
+                        .and_then(|candidate| candidate.as_platform_repository())
+                } else {
+                    None
+                };
 
-        let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
-        let require: Vec<String> = input
-            .borrow()
-            .get_option("require")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let requirements = if (require.len() as i64) > 0 || io.ask_confirmation(question, true) {
-            self.determine_requirements(
-                input,
-                _output,
-                require,
-                platform_repo.as_ref(),
-                &preferred_stability,
-                false,
-                false,
-            )?
-        } else {
-            vec![]
-        };
-        input.borrow_mut().set_option(
-            "require",
-            PhpMixed::List(
-                requirements
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            ),
-        );
-
-        let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
-        let require_dev: Vec<String> = input
-            .borrow()
-            .get_option("require-dev")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let dev_requirements =
-            if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true) {
+            let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
+            let require: Vec<String> = input
+                .borrow()
+                .get_option("require")?
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let requirements = if (require.len() as i64) > 0 || io.ask_confirmation(question, true)
+            {
                 self.determine_requirements(
                     input,
                     _output,
-                    require_dev,
+                    require,
                     platform_repo.as_ref(),
                     &preferred_stability,
                     false,
@@ -850,36 +839,71 @@ impl InitCommand {
             } else {
                 vec![]
             };
-        input.borrow_mut().set_option(
-            "require-dev",
-            PhpMixed::List(
-                dev_requirements
-                    .into_iter()
-                    .map(|s| Box::new(PhpMixed::String(s)))
-                    .collect(),
-            ),
-        );
+            input.borrow_mut().set_option(
+                "require",
+                PhpMixed::List(
+                    requirements
+                        .into_iter()
+                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .collect(),
+                ),
+            );
 
-        // --autoload - input and validation
-        let mut autoload = input
-            .borrow()
-            .get_option("autoload")?
-            .as_string()
-            .map(|s| s.to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "src/".to_string());
-        let name_str = input
-            .borrow()
-            .get_option("name")?
-            .as_string()
-            .unwrap_or("")
-            .to_string();
-        let namespace = self
-            .namespace_from_package_name(&name_str)
-            .unwrap_or_default();
-        let autoload_for_validate = autoload.clone();
-        let autoload_default = autoload.clone();
-        let autoload_value = io.ask_and_validate(
+            let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
+            let require_dev: Vec<String> = input
+                .borrow()
+                .get_option("require-dev")?
+                .as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let dev_requirements =
+                if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true) {
+                    self.determine_requirements(
+                        input,
+                        _output,
+                        require_dev,
+                        platform_repo.as_ref(),
+                        &preferred_stability,
+                        false,
+                        false,
+                    )?
+                } else {
+                    vec![]
+                };
+            input.borrow_mut().set_option(
+                "require-dev",
+                PhpMixed::List(
+                    dev_requirements
+                        .into_iter()
+                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .collect(),
+                ),
+            );
+
+            // --autoload - input and validation
+            let mut autoload = input
+                .borrow()
+                .get_option("autoload")?
+                .as_string()
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "src/".to_string());
+            let name_str = input
+                .borrow()
+                .get_option("name")?
+                .as_string()
+                .unwrap_or("")
+                .to_string();
+            let namespace = self
+                .namespace_from_package_name(&name_str)
+                .unwrap_or_default();
+            let autoload_for_validate = autoload.clone();
+            let autoload_default = autoload.clone();
+            let autoload_value = io.ask_and_validate(
             format!(
                 "Add PSR-4 autoload mapping? Maps namespace \"{}\" to the entered relative path. [<comment>{}</comment>, n to skip]: ",
                 namespace, autoload
@@ -917,11 +941,26 @@ impl InitCommand {
             None,
             PhpMixed::String(autoload_default),
         )?;
-        input.borrow_mut().set_option("autoload", autoload_value);
+            input.borrow_mut().set_option("autoload", autoload_value);
 
-        Ok(())
+            Ok(())
+        })();
     }
 
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for InitCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl InitCommand {
     /// @return array{name: string, email: string|null}
     fn parse_author_string(&self, author: &str) -> Result<IndexMap<String, Option<String>>> {
         let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
@@ -1088,45 +1127,24 @@ impl InitCommand {
     }
 
     fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
-        // PHP try/catch: catch \Exception
-        let result = self.get_application().and_then(|mut app| {
-            let _update_command = app.find("update")?;
-            app.reset_composer();
-            // PHP: $updateCommand->run(new ArrayInput([]), $output);
-            // TODO(phase-c): Application::find returns PhpMixed (the Symfony command registry is a
-            // todo!() stub), so the resolved command's run() cannot be invoked until the typed
-            // command registry is modelled.
-            let _ = ArrayInput::new(vec![], None);
-            let _ = output;
-            Ok(())
-        });
-        if let Err(_e) = result {
-            self.get_io().write_error3(
-                "Could not update dependencies. Run `composer update` to see more information.",
-                true,
-                io_interface::NORMAL,
-            );
-        }
+        // PHP: try { $this->getApplication()->find('update')->run(new ArrayInput([]), $output); }
+        //      catch (\Exception $e) { $this->getIO()->writeError('Could not update dependencies...'); }
+        // TODO(phase-c): needs the shared shirabe Application handle and the typed command registry
+        // (deferred with the Application shared-ownership work). Until then this is a no-op.
+        let _ = ArrayInput::new(vec![], None);
+        let _ = output;
     }
 
     fn run_dump_autoload_command(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        let result = self.get_application().and_then(|mut app| {
-            let _command = app.find("dump-autoload")?;
-            app.reset_composer();
-            // PHP: $command->run(new ArrayInput([]), $output);
-            // TODO(phase-c): same blocker as update_dependencies — Application::find returns
-            // PhpMixed (Symfony command registry todo!() stub), so run() cannot be invoked.
-            let _ = ArrayInput::new(vec![], None);
-            let _ = output;
-            Ok(())
-        });
-        if let Err(_e) = result {
-            self.get_io()
-                .write_error3("Could not run dump-autoload.", true, io_interface::NORMAL);
-        }
+        // PHP: try { $this->getApplication()->find('dump-autoload')->run(new ArrayInput([]), $output); }
+        //      catch (\Exception $e) { $this->getIO()->writeError('Could not run dump-autoload.'); }
+        // TODO(phase-c): same deferral as update_dependencies — needs the shared shirabe
+        // Application handle and the typed command registry.
+        let _ = ArrayInput::new(vec![], None);
+        let _ = output;
     }
 
     /// @param array<string, string|array<string>> $options
@@ -1240,15 +1258,5 @@ impl InitCommand {
         }
 
         None
-    }
-}
-
-impl HasBaseCommandData for InitCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

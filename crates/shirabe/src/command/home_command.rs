@@ -1,13 +1,24 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{FILTER_VALIDATE_URL, PhpMixed, filter_var};
+use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{FILTER_VALIDATE_URL, filter_var};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterfaceHandle;
@@ -25,124 +36,14 @@ pub struct HomeCommand {
 }
 
 impl HomeCommand {
-    pub fn configure(&mut self) {
-        // TODO(cli-completion): suggest_installed_package() for `packages` argument
-        self.set_name("browse")
-            .set_aliases(&["home".to_string()])
-            .set_description("Opens the package's repository URL or homepage in your browser")
-            .set_definition(&[
-                InputArgument::new(
-                    "packages",
-                    Some(InputArgument::IS_ARRAY),
-                    "Package(s) to browse to.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "homepage",
-                    Some(shirabe_php_shim::PhpMixed::String("H".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Open the homepage instead of the repository URL.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "show",
-                    Some(shirabe_php_shim::PhpMixed::String("s".to_string())),
-                    Some(InputOption::VALUE_NONE),
-                    "Only show the homepage or repository URL.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-            ])
-            .set_help(
-                "The home command opens or shows a package's repository URL or\n\
-                homepage in your default browser.\n\n\
-                To open the homepage by default, use -H or --homepage.\n\
-                To show instead of open the repository or homepage URL, use -s or --show.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#browse-home",
-            );
-    }
-
-    pub fn execute(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
-        let repos = self.initialize_repos()?;
-        let io = self.get_io().clone();
-        let mut return_code: i64 = 0;
-
-        let packages: Vec<String> = input
-            .borrow()
-            .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let packages = if packages.is_empty() {
-            io.write_error("No package specified, opening homepage for the root package");
-            let composer_rc = self.require_composer(None, None)?;
-            let composer_ref = crate::command::composer_full(&composer_rc);
-            vec![composer_ref.get_package().get_name().to_string()]
-        } else {
-            packages
+    pub fn new() -> Self {
+        let mut command = HomeCommand {
+            base_command_data: BaseCommandData::new(None),
         };
-
-        let show_homepage = input
-            .borrow()
-            .get_option("homepage")?
-            .as_bool()
-            .unwrap_or(false);
-        let show_only = input
-            .borrow()
-            .get_option("show")?
-            .as_bool()
-            .unwrap_or(false);
-
-        for package_name in &packages {
-            let mut handled = false;
-            let mut package_exists = false;
-
-            'repos: for repo in &repos {
-                for package in repo.find_packages(&package_name, None)? {
-                    package_exists = true;
-                    if let Some(complete_pkg) = package.as_complete() {
-                        if self.handle_package(complete_pkg, show_homepage, show_only) {
-                            handled = true;
-                            break 'repos;
-                        }
-                    }
-                }
-            }
-
-            if !package_exists {
-                return_code = 1;
-                io.write_error(&format!(
-                    "<warning>Package {} not found</warning>",
-                    package_name
-                ));
-            }
-
-            if !handled {
-                return_code = 1;
-                let msg = if show_homepage {
-                    "Invalid or missing homepage"
-                } else {
-                    "Invalid or missing repository URL"
-                };
-                io.write_error(&format!("<warning>{} for {}</warning>", msg, package_name));
-            }
-        }
-
-        Ok(return_code)
+        command
+            .configure()
+            .expect("HomeCommand::configure uses static, valid metadata");
+        command
     }
 
     fn handle_package(
@@ -234,12 +135,145 @@ impl HomeCommand {
     }
 }
 
-impl HasBaseCommandData for HomeCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl Command for HomeCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        // TODO(cli-completion): suggest_installed_package() for `packages` argument
+        self.set_name("browse")?;
+        self.set_aliases(vec!["home".to_string()])?;
+        self.set_description("Opens the package's repository URL or homepage in your browser");
+        self.set_definition(&[
+            InputArgument::new(
+                "packages",
+                Some(InputArgument::IS_ARRAY),
+                "Package(s) to browse to.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "homepage",
+                Some(shirabe_php_shim::PhpMixed::String("H".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Open the homepage instead of the repository URL.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "show",
+                Some(shirabe_php_shim::PhpMixed::String("s".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Only show the homepage or repository URL.",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The home command opens or shows a package's repository URL or\n\
+            homepage in your default browser.\n\n\
+            To open the homepage by default, use -H or --homepage.\n\
+            To show instead of open the repository or homepage URL, use -s or --show.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#browse-home",
+        );
+        Ok(())
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
+    fn execute(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let repos = self.initialize_repos()?;
+        let io = self.get_io().clone();
+        let mut return_code: i64 = 0;
+
+        let packages: Vec<String> = input
+            .borrow()
+            .get_argument("packages")?
+            .as_list()
+            .map(|l| {
+                l.iter()
+                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let packages = if packages.is_empty() {
+            io.write_error("No package specified, opening homepage for the root package");
+            let composer_rc = self.require_composer(None, None)?;
+            let composer_ref = crate::command::composer_full(&composer_rc);
+            vec![composer_ref.get_package().get_name().to_string()]
+        } else {
+            packages
+        };
+
+        let show_homepage = input
+            .borrow()
+            .get_option("homepage")?
+            .as_bool()
+            .unwrap_or(false);
+        let show_only = input
+            .borrow()
+            .get_option("show")?
+            .as_bool()
+            .unwrap_or(false);
+
+        for package_name in &packages {
+            let mut handled = false;
+            let mut package_exists = false;
+
+            'repos: for repo in &repos {
+                for package in repo.find_packages(&package_name, None)? {
+                    package_exists = true;
+                    if let Some(complete_pkg) = package.as_complete() {
+                        if self.handle_package(complete_pkg, show_homepage, show_only) {
+                            handled = true;
+                            break 'repos;
+                        }
+                    }
+                }
+            }
+
+            if !package_exists {
+                return_code = 1;
+                io.write_error(&format!(
+                    "<warning>Package {} not found</warning>",
+                    package_name
+                ));
+            }
+
+            if !handled {
+                return_code = 1;
+                let msg = if show_homepage {
+                    "Invalid or missing homepage"
+                } else {
+                    "Invalid or missing repository URL"
+                };
+                io.write_error(&format!("<warning>{} for {}</warning>", msg, package_name));
+            }
+        }
+
+        Ok(return_code)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for HomeCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

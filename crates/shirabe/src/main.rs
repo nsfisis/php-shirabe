@@ -14,8 +14,14 @@ fn main() {
     );
 
     // run the command application
-    let mut application = Application::new("Composer".to_string(), String::new());
-    let result = application.run(None, None);
+    let application = match Application::new_shared("Composer".to_string(), String::new()) {
+        Ok(application) => application,
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+    };
+    let result = Application::run(&application, None, None);
     run_shutdown_functions();
     if let Err(e) = result {
         eprintln!("{}", e);

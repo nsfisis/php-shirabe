@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
+use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
 use shirabe_external_packages::composer::semver::Semver;
 use shirabe_external_packages::composer::spdx_licenses::SpdxLicenses;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatterStyle;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -13,11 +15,16 @@ use shirabe_php_shim::{
     array_search, date, date_format_to_strftime, extension_loaded, in_array, realpath, strtolower,
     version_compare,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use shirabe_semver::constraint::AnyConstraint;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::PolicyInterface;
@@ -63,26 +70,40 @@ pub struct ShowCommand {
 }
 
 impl ShowCommand {
-    pub fn configure(&mut self) {
-        self.set_name("show")
-            .set_aliases(&["info".to_string()])
-            .set_description("Shows information about packages")
-            .set_definition(&[
-                // TODO(cli-completion): wire up suggest_package_based_on_mode / suggest_installed_package closures here.
-            ])
-            .set_help(
-                "The show command displays detailed information about a package, or\n\
-                 lists all packages available.\n\n\
-                 Read more at https://getcomposer.org/doc/03-cli.md#show-info",
-            );
+    pub fn new() -> Self {
+        let mut command = ShowCommand {
+            base_command_data: BaseCommandData::new(None),
+            version_parser: VersionParser::new(),
+            colors: Vec::new(),
+            repository_set: None,
+        };
+        command
+            .configure()
+            .expect("ShowCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for ShowCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("show")?;
+        self.set_aliases(vec!["info".to_string()])?;
+        self.set_description("Shows information about packages");
+        self.set_definition(&[
+            // TODO(cli-completion): wire up suggest_package_based_on_mode / suggest_installed_package closures here.
+        ]);
+        self.set_help(
+            "The show command displays detailed information about a package, or\n\
+             lists all packages available.\n\n\
+             Read more at https://getcomposer.org/doc/03-cli.md#show-info",
+        );
+        Ok(())
     }
 
-    // TODO(cli-completion): pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
-
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         self.version_parser = VersionParser::new();
         if input.borrow().get_option("tree")?.as_bool() == Some(true) {
@@ -1344,6 +1365,30 @@ impl ShowCommand {
 
         Ok(exit_code)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ShowCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl ShowCommand {
+    // TODO(cli-completion): pub fn suggest_package_based_on_mode(&self) -> Box<dyn Fn(&CompletionInput) -> Vec<String>>
 
     fn print_packages(
         &mut self,
@@ -2858,14 +2903,4 @@ struct ViewMetaData {
     release_date_length: usize,
     write_latest: bool,
     write_release_date: bool,
-}
-
-impl HasBaseCommandData for ShowCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
 }

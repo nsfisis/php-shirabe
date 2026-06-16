@@ -1,10 +1,12 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php
 
 use crate::io::io_interface;
+use anyhow::Result;
 use indexmap::IndexMap;
 
 use crate::console::input::InputOption;
 use shirabe_external_packages::composer::pcre::{CaptureKey, Preg};
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
@@ -14,15 +16,20 @@ use shirabe_php_shim::{
     is_bool, is_dir, is_numeric, is_object, is_string, json_encode, key, sort, sprintf,
     str_replace, str_starts_with, strpos, strtolower, system, touch, var_export,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonEncodeOptions;
@@ -61,12 +68,31 @@ impl ConfigCommand {
         "suggest",
         "extra",
     ];
+}
 
-    pub(crate) fn configure(&mut self) {
+impl ConfigCommand {
+    pub fn new() -> Self {
+        let mut command = ConfigCommand {
+            base_command_data: BaseCommandData::new(None),
+            config: None,
+            config_file: None,
+            config_source: None,
+            auth_config_file: None,
+            auth_config_source: None,
+        };
+        command
+            .configure()
+            .expect("ConfigCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for ConfigCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_setting_keys() for `setting-key` argument
-        self.set_name("config")
-            .set_description("Sets config options")
-            .set_definition(&[
+        self.set_name("config")?;
+        self.set_description("Sets config options");
+        self.set_definition(&[
                 InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
         InputOption::new("editor", Some(PhpMixed::String("e".to_string())), Some(InputOption::VALUE_NONE), "Open editor", None).unwrap().into(),
         InputOption::new("auth", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Affect auth config file (only used for --editor)", None).unwrap().into(),
@@ -80,8 +106,8 @@ impl ConfigCommand {
         InputOption::new("source", None, Some(InputOption::VALUE_NONE), "Display where the config value is loaded from", None).unwrap().into(),
         InputArgument::new("setting-key", None, "Setting key", None).unwrap().into(),
         InputArgument::new("setting-value", Some(InputArgument::IS_ARRAY), "Setting value", None).unwrap().into(),
-            ])
-            .set_help(
+            ]);
+        self.set_help(
                 "This command allows you to edit composer config settings and repositories\n\
                  in either the local composer.json file or the global config.json file.\n\n\
                  Additionally it lets you edit most properties in the local composer.json.\n\n\
@@ -116,14 +142,19 @@ impl ConfigCommand {
                  \t<comment>%command.full_name% --editor --global</comment>\n\n\
                  Read more at https://getcomposer.org/doc/03-cli.md#config",
             );
+        Ok(())
     }
 
-    pub(crate) fn initialize(
+    fn initialize(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        BaseCommand::initialize(self, input.clone(), output)?;
+        <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
+            self,
+            input.clone(),
+            output,
+        )?;
 
         let auth_config_file =
             self.get_auth_config_file(input.clone(), &*self.config.as_ref().unwrap().borrow())?;
@@ -176,7 +207,7 @@ impl ConfigCommand {
         Ok(())
     }
 
-    pub(crate) fn execute(
+    fn execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -1230,6 +1261,20 @@ impl ConfigCommand {
         .into())
     }
 
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for ConfigCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl ConfigCommand {
     pub(crate) fn handle_single_value(
         &mut self,
         key: &str,
@@ -2186,15 +2231,5 @@ impl BaseConfigCommand for ConfigCommand {
 
     fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
         self.config_source = source;
-    }
-}
-
-impl HasBaseCommandData for ConfigCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

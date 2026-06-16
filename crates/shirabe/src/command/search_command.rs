@@ -1,8 +1,23 @@
 //! ref: composer/src/Composer/Command/SearchCommand.php
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -12,12 +27,6 @@ use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::repository_interface::{self, RepositoryInterface};
-use anyhow::Result;
-use indexmap::IndexMap;
-use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, implode, in_array, preg_quote};
 
 #[derive(Debug)]
 pub struct SearchCommand {
@@ -25,29 +34,80 @@ pub struct SearchCommand {
 }
 
 impl SearchCommand {
-    pub fn configure(&mut self) {
-        self
-            .set_name("search")
-            .set_description("Searches for packages")
-            .set_definition(&[
-                InputOption::new("only-name", Some(PhpMixed::String("N".to_string())), Some(InputOption::VALUE_NONE), "Search only in package names", None).unwrap().into(),
-                InputOption::new("only-vendor", Some(PhpMixed::String("O".to_string())), Some(InputOption::VALUE_NONE), "Search only for vendor / organization names, returns only \"vendor\" as result", None).unwrap().into(),
-                InputOption::new("type", Some(PhpMixed::String("t".to_string())), Some(InputOption::VALUE_REQUIRED), "Search for a specific package type", None).unwrap().into(),
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string()))).unwrap().into(),
-                InputArgument::new("tokens", Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED), "tokens to search for", None).unwrap().into(),
-            ])
-            .set_help(
-                "The search command searches for packages by its name\n\
-                <info>php composer.phar search symfony composer</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#search"
-            );
+    pub fn new() -> Self {
+        let mut command = SearchCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("SearchCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for SearchCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("search")?;
+        self.set_description("Searches for packages");
+        self.set_definition(&[
+            InputOption::new(
+                "only-name",
+                Some(PhpMixed::String("N".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Search only in package names",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "only-vendor",
+                Some(PhpMixed::String("O".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Search only for vendor / organization names, returns only \"vendor\" as result",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "type",
+                Some(PhpMixed::String("t".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Search for a specific package type",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text or json",
+                Some(PhpMixed::String("text".to_string())),
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "tokens",
+                Some(InputArgument::IS_ARRAY | InputArgument::REQUIRED),
+                "tokens to search for",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The search command searches for packages by its name\n\
+            <info>php composer.phar search symfony composer</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#search",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let platform_repo = PlatformRepository::new4(vec![], IndexMap::new(), None, None)?;
         let io = self.get_io();
 
@@ -209,14 +269,24 @@ impl SearchCommand {
 
         Ok(0)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for SearchCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for SearchCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

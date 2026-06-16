@@ -1,10 +1,26 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
+use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
+use shirabe_external_packages::symfony::console::input::InputInterface;
+use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
+    implode, in_array,
+};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
 use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::repository::CanonicalPackagesTrait;
@@ -12,13 +28,6 @@ use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
-use anyhow::Result;
-use shirabe_external_packages::symfony::console::input::InputInterface;
-use shirabe_external_packages::symfony::console::output::OutputInterface;
-use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, UnexpectedValueException, array_fill_keys, array_merge,
-    implode, in_array,
-};
 
 #[derive(Debug)]
 pub struct AuditCommand {
@@ -26,31 +35,91 @@ pub struct AuditCommand {
 }
 
 impl AuditCommand {
-    pub fn configure(&mut self) {
-        self
-            .set_name("audit")
-            .set_description("Checks for security vulnerability advisories for installed packages")
-            .set_definition(&[
-                InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables auditing of require-dev packages.", None).unwrap().into(),
-                InputOption::new("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_TABLE.to_string()))).unwrap().into(),
-                InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Audit based on the lock file instead of the installed packages.", None).unwrap().into(),
-                InputOption::new("abandoned", None, Some(InputOption::VALUE_REQUIRED), "Behavior on abandoned packages. Must be \"ignore\", \"report\", or \"fail\".", None).unwrap().into(),
-                InputOption::new("ignore-severity", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Ignore advisories of a certain severity level.", Some(PhpMixed::Array(indexmap::IndexMap::new()))).unwrap().into(),
-                InputOption::new("ignore-unreachable", None, Some(InputOption::VALUE_NONE), "Ignore repositories that are unreachable or return a non-200 status code.", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>audit</info> command checks for security vulnerability advisories for installed packages.\n\n\
-                If you do not want to include dev dependencies in the audit you can omit them with --no-dev\n\n\
-                If you want to ignore repositories that are unreachable or return a non-200 status code, use --ignore-unreachable\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#audit"
-            );
+    pub fn new() -> Self {
+        let mut command = AuditCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("AuditCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for AuditCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("audit")?;
+        self.set_description("Checks for security vulnerability advisories for installed packages");
+        self.set_definition(&[
+            InputOption::new(
+                "no-dev",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Disables auditing of require-dev packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
+                Some(PhpMixed::String(Auditor::FORMAT_TABLE.to_string())),
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "locked",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Audit based on the lock file instead of the installed packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "abandoned",
+                None,
+                Some(InputOption::VALUE_REQUIRED),
+                "Behavior on abandoned packages. Must be \"ignore\", \"report\", or \"fail\".",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "ignore-severity",
+                None,
+                Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED),
+                "Ignore advisories of a certain severity level.",
+                Some(PhpMixed::Array(indexmap::IndexMap::new())),
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "ignore-unreachable",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Ignore repositories that are unreachable or return a non-200 status code.",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The <info>audit</info> command checks for security vulnerability advisories for installed packages.\n\n\
+            If you do not want to include dev dependencies in the audit you can omit them with --no-dev\n\n\
+            If you want to ignore repositories that are unreachable or return a non-200 status code, use --ignore-unreachable\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#audit"
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let packages = self.get_packages(&composer, input.clone())?;
 
@@ -150,6 +219,28 @@ impl AuditCommand {
             .min(255))
     }
 
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for AuditCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl AuditCommand {
     fn get_packages(
         &self,
         composer: &PartialComposerHandle,
@@ -186,15 +277,5 @@ impl AuditCommand {
         // either cloning into a Box or restructuring InstalledRepository constructor.
         let _ = RepositoryUtils::filter_required_packages;
         todo!("audit get_packages non-locked branch needs installed-repo conversion")
-    }
-}
-
-impl HasBaseCommandData for AuditCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

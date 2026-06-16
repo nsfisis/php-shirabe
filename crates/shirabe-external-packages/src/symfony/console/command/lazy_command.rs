@@ -6,7 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::symfony::console::application::Application;
-use crate::symfony::console::command::command::{BaseCommand, Command, SetDefinitionArg};
+use crate::symfony::console::command::command::{Command, CommandData, SetDefinitionArg};
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::CompletionSuggestions;
 use crate::symfony::console::helper::helper_set::HelperSet;
@@ -33,13 +33,13 @@ impl std::fmt::Debug for LazyCommandInner {
 
 #[derive(Debug)]
 pub struct LazyCommand {
-    inner: BaseCommand,
+    inner: CommandData,
     command: LazyCommandInner,
     is_enabled: Option<bool>,
 }
 
 impl Deref for LazyCommand {
-    type Target = BaseCommand;
+    type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -62,25 +62,24 @@ impl LazyCommand {
         is_enabled: Option<bool>,
     ) -> anyhow::Result<Self> {
         let mut this = Self {
-            inner: BaseCommand::__construct(None)?,
+            inner: CommandData::new(None),
             command: LazyCommandInner::Factory(command_factory),
             is_enabled,
         };
 
-        this.inner
-            .set_name(name)?
-            .set_aliases(aliases)?
-            .set_hidden(is_hidden)
-            .set_description(description);
+        this.inner.set_name(name)?;
+        this.inner.set_aliases(aliases)?;
+        this.inner.set_hidden(is_hidden);
+        this.inner.set_description(description);
 
         Ok(this)
     }
 
-    pub fn ignore_validation_errors(&mut self) {
+    pub fn ignore_validation_errors_impl(&mut self) {
         self.get_command().ignore_validation_errors();
     }
 
-    pub fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
+    pub fn set_application_impl(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
         // if ($this->command instanceof parent)
         if let LazyCommandInner::Command(command) = &mut self.command {
             command.set_application(application.clone());
@@ -90,7 +89,7 @@ impl LazyCommand {
         self.inner.set_application(application);
     }
 
-    pub fn set_helper_set(&mut self, helper_set: Rc<RefCell<HelperSet>>) {
+    pub fn set_helper_set_impl(&mut self, helper_set: Rc<RefCell<HelperSet>>) {
         // if ($this->command instanceof parent)
         if let LazyCommandInner::Command(command) = &mut self.command {
             command.set_helper_set(helper_set.clone());
@@ -100,7 +99,7 @@ impl LazyCommand {
         self.inner.set_helper_set(helper_set);
     }
 
-    pub fn is_enabled(&mut self) -> bool {
+    pub fn is_enabled_impl(&mut self) -> bool {
         // $this->isEnabled ?? $this->getCommand()->isEnabled()
         match self.is_enabled {
             Some(is_enabled) => is_enabled,
@@ -108,113 +107,58 @@ impl LazyCommand {
         }
     }
 
-    pub fn run(
+    pub fn run_impl(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         self.get_command().run(input, output)
     }
 
-    pub fn complete(&mut self, input: &CompletionInput, suggestions: &mut CompletionSuggestions) {
+    pub fn complete_impl(
+        &mut self,
+        input: &CompletionInput,
+        suggestions: &mut CompletionSuggestions,
+    ) {
         self.get_command().complete(input, suggestions);
     }
 
-    pub fn set_code(
-        &mut self,
-        code: Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>,
-    ) -> &mut Self {
-        // TODO: Command::set_code() lives on BaseCommand's inherent API and is not part of
-        // the polymorphic `Command` trait, so it cannot be forwarded through `get_command()`
-        // (a `&mut Box<dyn Command>`). Resolving this needs `set_code` on the trait (Phase C).
-        let _ = code;
-        todo!()
-    }
-
     /// @internal
-    pub fn merge_application_definition(&mut self, merge_args: bool) {
+    pub fn merge_application_definition_impl(&mut self, merge_args: bool) {
         self.get_command().merge_application_definition(merge_args);
     }
 
-    pub fn set_definition(&mut self, definition: SetDefinitionArg) -> &mut Self {
-        // TODO: Command::set_definition() is not part of the polymorphic `Command` trait;
-        // it cannot be forwarded through `get_command()` (Phase C).
-        let _ = definition;
-        todo!()
-    }
-
-    pub fn get_definition(&mut self) -> &InputDefinition {
+    pub fn get_definition_impl(&mut self) -> &InputDefinition {
         self.get_command().get_definition()
     }
 
-    pub fn get_native_definition(&mut self) -> &InputDefinition {
+    pub fn get_native_definition_impl(&mut self) -> &InputDefinition {
         self.get_command().get_native_definition()
     }
 
-    pub fn add_argument(
-        &mut self,
-        name: &str,
-        mode: Option<i64>,
-        description: &str,
-        default: PhpMixed,
-    ) -> &mut Self {
-        // TODO: Command::add_argument() is not part of the polymorphic `Command` trait;
-        // it cannot be forwarded through `get_command()` (Phase C).
-        let _ = (name, mode, description, default);
-        todo!()
-    }
-
-    pub fn add_option(
-        &mut self,
-        name: &str,
-        shortcut: PhpMixed,
-        mode: Option<i64>,
-        description: &str,
-        default: PhpMixed,
-    ) -> &mut Self {
-        // TODO: Command::add_option() is not part of the polymorphic `Command` trait;
-        // it cannot be forwarded through `get_command()` (Phase C).
-        let _ = (name, shortcut, mode, description, default);
-        todo!()
-    }
-
-    pub fn set_process_title(&mut self, title: &str) -> &mut Self {
-        // TODO: Command::set_process_title() is not part of the polymorphic `Command` trait;
-        // it cannot be forwarded through `get_command()` (Phase C).
-        let _ = title;
-        todo!()
-    }
-
-    pub fn set_help(&mut self, help: &str) -> &mut Self {
+    pub fn set_help_impl(&mut self, help: &str) -> &mut Self {
         self.get_command().set_help(help);
 
         self
     }
 
-    pub fn get_help(&mut self) -> String {
+    pub fn get_help_impl(&mut self) -> String {
         self.get_command().get_help()
     }
 
-    pub fn get_processed_help(&mut self) -> String {
+    pub fn get_processed_help_impl(&mut self) -> String {
         self.get_command().get_processed_help()
     }
 
-    pub fn get_synopsis(&mut self, short: bool) -> String {
+    pub fn get_synopsis_impl(&mut self, short: bool) -> String {
         self.get_command().get_synopsis(short)
     }
 
-    pub fn add_usage(&mut self, usage: &str) -> &mut Self {
-        // TODO: Command::add_usage() is not part of the polymorphic `Command` trait;
-        // it cannot be forwarded through `get_command()` (Phase C).
-        let _ = usage;
-        todo!()
-    }
-
-    pub fn get_usages(&mut self) -> Vec<String> {
+    pub fn get_usages_impl(&mut self) -> Vec<String> {
         self.get_command().get_usages()
     }
 
-    pub fn get_helper(
+    pub fn get_helper_impl(
         &mut self,
         name: &str,
     ) -> anyhow::Result<
@@ -265,16 +209,17 @@ impl LazyCommand {
 }
 
 impl Command for LazyCommand {
-    fn configure(&mut self) {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // LazyCommand has no configure() of its own; nothing to do.
+        Ok(())
     }
 
     fn run(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        LazyCommand::run(self, input, output)
+        LazyCommand::run_impl(self, input, output)
     }
 
     fn complete(&self, _input: &CompletionInput, _suggestions: &mut CompletionSuggestions) {
@@ -291,7 +236,7 @@ impl Command for LazyCommand {
     }
 
     fn set_application(&mut self, application: Option<Rc<RefCell<dyn Application>>>) {
-        LazyCommand::set_application(self, application);
+        LazyCommand::set_application_impl(self, application);
     }
 
     fn get_application(&self) -> Option<Rc<RefCell<dyn Application>>> {
@@ -299,7 +244,7 @@ impl Command for LazyCommand {
     }
 
     fn set_helper_set(&mut self, helper_set: Rc<RefCell<HelperSet>>) {
-        LazyCommand::set_helper_set(self, helper_set);
+        LazyCommand::set_helper_set_impl(self, helper_set);
     }
 
     fn get_helper_set(&self) -> Option<Rc<RefCell<HelperSet>>> {
@@ -307,7 +252,7 @@ impl Command for LazyCommand {
     }
 
     fn merge_application_definition(&mut self, merge_args: bool) {
-        LazyCommand::merge_application_definition(self, merge_args);
+        LazyCommand::merge_application_definition_impl(self, merge_args);
     }
 
     fn get_definition(&self) -> &InputDefinition {
@@ -322,12 +267,22 @@ impl Command for LazyCommand {
     }
 
     fn set_name(&mut self, name: &str) -> anyhow::Result<()> {
-        self.inner.set_name(name)?;
-        Ok(())
+        self.inner.set_name(name)
     }
 
     fn get_name(&self) -> Option<String> {
         self.inner.get_name()
+    }
+
+    fn set_process_title(&mut self, title: &str) {
+        // TODO: Command::set_process_title() forwards to the wrapped command, which needs lazy
+        // materialization (Phase C).
+        let _ = title;
+        todo!()
+    }
+
+    fn get_process_title(&self) -> Option<String> {
+        self.inner.get_process_title()
     }
 
     fn set_hidden(&mut self, hidden: bool) {
@@ -347,7 +302,7 @@ impl Command for LazyCommand {
     }
 
     fn set_help(&mut self, help: &str) {
-        LazyCommand::set_help(self, help);
+        LazyCommand::set_help_impl(self, help);
     }
 
     fn get_help(&self) -> String {
@@ -362,8 +317,7 @@ impl Command for LazyCommand {
     }
 
     fn set_aliases(&mut self, aliases: Vec<String>) -> anyhow::Result<()> {
-        self.inner.set_aliases(aliases)?;
-        Ok(())
+        self.inner.set_aliases(aliases)
     }
 
     fn get_aliases(&self) -> Vec<String> {
@@ -371,7 +325,13 @@ impl Command for LazyCommand {
     }
 
     fn get_synopsis(&mut self, short: bool) -> String {
-        LazyCommand::get_synopsis(self, short)
+        LazyCommand::get_synopsis_impl(self, short)
+    }
+
+    fn add_usage(&mut self, usage: &str) {
+        // TODO: Command::add_usage() forwards to the wrapped command (Phase C).
+        let _ = usage;
+        todo!()
     }
 
     fn get_usages(&self) -> Vec<String> {
@@ -391,7 +351,62 @@ impl Command for LazyCommand {
         todo!()
     }
 
+    fn set_code(
+        &mut self,
+        code: Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>,
+    ) {
+        // TODO: Command::set_code() forwards to the wrapped command (Phase C).
+        let _ = code;
+        todo!()
+    }
+
+    fn get_code(
+        &self,
+    ) -> Option<&Box<dyn Fn(&mut dyn InputInterface, &mut dyn OutputInterface) -> PhpMixed>> {
+        self.inner.get_code()
+    }
+
     fn ignore_validation_errors(&mut self) {
-        LazyCommand::ignore_validation_errors(self);
+        LazyCommand::ignore_validation_errors_impl(self);
+    }
+
+    fn get_ignore_validation_errors(&self) -> bool {
+        self.inner.get_ignore_validation_errors()
+    }
+}
+
+/// `set_definition`/`add_argument`/`add_option` are not part of the polymorphic `Command`
+/// trait (they take Composer-typed definition entries via `BaseCommand`), so the lazy proxy
+/// exposes the Symfony-typed forms as inherent methods mirroring the PHP overrides.
+impl LazyCommand {
+    pub fn set_definition(&mut self, definition: SetDefinitionArg) -> &mut Self {
+        // TODO: forwards to the wrapped command, which needs lazy materialization (Phase C).
+        let _ = definition;
+        todo!()
+    }
+
+    pub fn add_argument(
+        &mut self,
+        name: &str,
+        mode: Option<i64>,
+        description: &str,
+        default: PhpMixed,
+    ) -> &mut Self {
+        // TODO: forwards to the wrapped command, which needs lazy materialization (Phase C).
+        let _ = (name, mode, description, default);
+        todo!()
+    }
+
+    pub fn add_option(
+        &mut self,
+        name: &str,
+        shortcut: PhpMixed,
+        mode: Option<i64>,
+        description: &str,
+        default: PhpMixed,
+    ) -> &mut Self {
+        // TODO: forwards to the wrapped command, which needs lazy materialization (Phase C).
+        let _ = (name, shortcut, mode, description, default);
+        todo!()
     }
 }

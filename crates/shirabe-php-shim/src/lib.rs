@@ -1424,8 +1424,13 @@ pub fn glob(_pattern: &str) -> Vec<String> {
     todo!()
 }
 
-pub fn basename(_path: &str) -> String {
-    todo!()
+pub fn basename(path: &str) -> String {
+    // PHP basename(): the trailing name component, after stripping trailing directory separators.
+    let trimmed = path.trim_end_matches(|c| matches!(c, '/' | '\\'));
+    match trimmed.rfind(|c| matches!(c, '/' | '\\')) {
+        Some(index) => trimmed[index + 1..].to_string(),
+        None => trimmed.to_string(),
+    }
 }
 
 pub fn explode(delimiter: &str, string: &str) -> Vec<String> {
@@ -2915,11 +2920,32 @@ pub fn wordwrap(_s: &str, _width: i64, _break_str: &str, _cut: bool) -> String {
 pub fn ctype_digit(_s: &str) -> bool {
     todo!()
 }
-pub fn is_numeric_string(_s: &str) -> bool {
-    todo!()
+pub fn is_numeric_string(s: &str) -> bool {
+    // PHP is_numeric() on a string: optional leading whitespace, an integer or float literal
+    // (decimal/scientific). PHP does not treat "inf"/"nan" as numeric.
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.contains("inf") || lower.contains("nan") {
+        return false;
+    }
+    trimmed.parse::<i64>().is_ok() || trimmed.parse::<f64>().is_ok()
 }
-pub fn is_numeric_to_int(_value: &PhpMixed) -> i64 {
-    todo!()
+pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
+    // PHP: is_numeric($value) ? (int) $value : 0.
+    match value {
+        PhpMixed::Int(n) => *n,
+        PhpMixed::Float(f) => *f as i64,
+        PhpMixed::String(s) if is_numeric_string(s) => {
+            let trimmed = s.trim();
+            trimmed
+                .parse::<i64>()
+                .unwrap_or_else(|_| trimmed.parse::<f64>().map(|f| f as i64).unwrap_or(0))
+        }
+        _ => 0,
+    }
 }
 pub fn explode_limit(_delimiter: &str, _string: &str, _limit: i64) -> Vec<String> {
     todo!()
@@ -2928,7 +2954,9 @@ pub fn sort_natural_flag_case(_values: &mut Vec<String>) {
     todo!()
 }
 pub fn get_debug_type_obj<T>(_value: &T) -> String {
-    todo!()
+    // PHP get_debug_type() returns the class name for an object. Rust has no runtime class names;
+    // the static type name is the closest faithful diagnostic available here.
+    std::any::type_name::<T>().to_string()
 }
 pub fn dir() -> String {
     todo!()
@@ -3093,14 +3121,18 @@ pub fn spl_object_hash_process<T>(_object: &T) -> String {
     todo!()
 }
 
-pub fn server(_key: &str) -> String {
-    todo!()
+pub fn server(key: &str) -> String {
+    if key == "PHP_SELF" {
+        return server_php_self();
+    }
+    server_get(key).unwrap_or_default()
 }
 pub fn server_argv() -> Vec<String> {
-    todo!()
+    std::env::args().collect()
 }
 pub fn server_php_self() -> String {
-    todo!()
+    // CLI SAPI: $_SERVER['PHP_SELF'] is the path of the executed script, i.e. argv[0].
+    std::env::args().next().unwrap_or_default()
 }
 pub fn server_shell() -> Option<String> {
     todo!()

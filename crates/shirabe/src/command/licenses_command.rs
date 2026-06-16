@@ -4,6 +4,7 @@ use std::any::Any;
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::formatter::OutputFormatter;
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::input::InputInterface;
@@ -11,9 +12,16 @@ use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_external_packages::symfony::console::style::StyleInterface;
 use shirabe_external_packages::symfony::console::style::SymfonyStyle;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -34,52 +42,65 @@ pub struct LicensesCommand {
 }
 
 impl LicensesCommand {
-    pub fn configure(&mut self) {
-        self.set_name("licenses")
-            .set_description("Shows information about licenses of dependencies")
-            .set_definition(&[
-                InputOption::new(
-                    "format",
-                    Some(PhpMixed::String("f".to_string())),
-                    Some(InputOption::VALUE_REQUIRED),
-                    "Format of the output: text, json or summary",
-                    Some(PhpMixed::String("text".to_string())),
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "no-dev",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Disables search in require-dev packages.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-                InputOption::new(
-                    "locked",
-                    None,
-                    Some(InputOption::VALUE_NONE),
-                    "Shows licenses from the lock file instead of installed packages.",
-                    None,
-                )
-                .unwrap()
-                .into(),
-            ])
-            .set_help(
-                "The license command displays detailed information about the licenses of\n\
-                the installed dependencies.\n\n\
-                Use --locked to show licenses from composer.lock instead of what's currently\n\
-                installed in the vendor directory.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#licenses",
-            );
+    pub fn new() -> Self {
+        let mut command = LicensesCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("LicensesCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for LicensesCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("licenses")?;
+        self.set_description("Shows information about licenses of dependencies");
+        self.set_definition(&[
+            InputOption::new(
+                "format",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "Format of the output: text, json or summary",
+                Some(PhpMixed::String("text".to_string())),
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "no-dev",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Disables search in require-dev packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "locked",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "Shows licenses from the lock file instead of installed packages.",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "The license command displays detailed information about the licenses of\n\
+            the installed dependencies.\n\n\
+            Use --locked to show licenses from composer.lock instead of what's currently\n\
+            installed in the vendor directory.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#licenses",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
@@ -339,14 +360,24 @@ impl LicensesCommand {
 
         Ok(0)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for LicensesCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for LicensesCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

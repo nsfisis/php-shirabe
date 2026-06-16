@@ -1,21 +1,28 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php
 
+use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, parse_url, strtolower,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
@@ -30,43 +37,201 @@ pub struct RepositoryCommand {
 }
 
 impl RepositoryCommand {
-    pub fn configure(&mut self) {
-        // TODO(cli-completion): suggest_repo_names() / suggest_type_for_add()
-        self
-            .set_name("repository")
-            .set_aliases(&["repo".to_string()])
-            .set_description("Manages repositories")
-            .set_definition(&[
-                InputOption::new("global", Some(PhpMixed::String("g".to_string())), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
-                InputOption::new("file", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "If you want to choose a different composer.json or config.json", None).unwrap().into(),
-                InputOption::new("append", None, Some(InputOption::VALUE_NONE), "When adding a repository, append it (lower priority) instead of prepending it", None).unwrap().into(),
-                InputOption::new("before", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it before the given repository name", None).unwrap().into(),
-                InputOption::new("after", None, Some(InputOption::VALUE_REQUIRED), "When adding a repository, insert it after the given repository name", None).unwrap().into(),
-                InputArgument::new("action", Some(InputArgument::OPTIONAL), "Action to perform: list, add, remove, set-url, get-url, enable, disable", Some(PhpMixed::String("list".to_string()))).unwrap().into(),
-                InputArgument::new("name", Some(InputArgument::OPTIONAL), "Repository name (or special name packagist.org for enable/disable)", None).unwrap().into(),
-                InputArgument::new("arg1", Some(InputArgument::OPTIONAL), "Type for add, or new URL for set-url, or JSON config for add", None).unwrap().into(),
-                InputArgument::new("arg2", Some(InputArgument::OPTIONAL), "URL for add (if not using JSON)", None).unwrap().into(),
-            ])
-            .set_help(
-                "This command lets you manage repositories in your composer.json.\n\n\
-                Examples:\n  \
-                composer repo list\n  \
-                composer repo add foo vcs https://github.com/acme/foo\n  \
-                composer repo add bar composer https://repo.packagist.com/bar\n  \
-                composer repo add zips '{\"type\":\"artifact\",\"url\":\"/path/to/dir/with/zips\"}'\n  \
-                composer repo add baz vcs https://example.org --before foo\n  \
-                composer repo add qux vcs https://example.org --after bar\n  \
-                composer repo remove foo\n  \
-                composer repo set-url foo https://git.example.org/acme/foo\n  \
-                composer repo get-url foo\n  \
-                composer repo disable packagist.org\n  \
-                composer repo enable packagist.org\n\n\
-                Use --global/-g to alter the global config.json instead.\n\
-                Use --file to alter a specific file."
-            );
+    pub fn new() -> Self {
+        let mut command = RepositoryCommand {
+            base_command_data: BaseCommandData::new(None),
+            config: None,
+            config_file: None,
+            config_source: None,
+        };
+        command
+            .configure()
+            .expect("RepositoryCommand::configure uses static, valid metadata");
+        command
     }
 
-    pub fn execute(
+    fn list_repositories(&mut self, mut repos: IndexMap<String, PhpMixed>) {
+        let io = self.get_io();
+
+        let mut packagist_present = false;
+        for (_key, repo) in &repos {
+            if let PhpMixed::Array(ref repo_map) = *repo {
+                let has_type_and_url =
+                    repo_map.contains_key("type") && repo_map.contains_key("url");
+                let is_composer_type =
+                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer");
+                let url_host_ends_with_packagist = repo_map
+                    .get("url")
+                    .and_then(|v| v.as_string())
+                    .map(|url| {
+                        parse_url(url, PHP_URL_HOST)
+                            .as_string()
+                            .unwrap_or("")
+                            .ends_with("packagist.org")
+                    })
+                    .unwrap_or(false);
+                if has_type_and_url && is_composer_type && url_host_ends_with_packagist {
+                    packagist_present = true;
+                    break;
+                }
+            }
+        }
+        if !packagist_present {
+            let mut packagist_entry = IndexMap::new();
+            packagist_entry.insert("packagist.org".to_string(), Box::new(PhpMixed::Bool(false)));
+            repos.insert(repos.len().to_string(), PhpMixed::Array(packagist_entry));
+        }
+
+        if repos.is_empty() {
+            io.write("No repositories configured");
+            return;
+        }
+
+        for (key, repo) in &repos {
+            if matches!(*repo, PhpMixed::Bool(false)) {
+                io.write(&format!("[{}] <info>disabled</info>", key));
+                continue;
+            }
+
+            if let PhpMixed::Array(ref repo_map) = *repo {
+                if repo_map.len() == 1 {
+                    if let Some(first_val) = repo_map.values().next() {
+                        if matches!(**first_val, PhpMixed::Bool(false)) {
+                            let first_key = repo_map.keys().next().unwrap();
+                            io.write(&format!("[{}] <info>disabled</info>", first_key));
+                            continue;
+                        }
+                    }
+                }
+
+                let name = repo_map
+                    .get("name")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or(key.as_str());
+                let r#type = repo_map
+                    .get("type")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("unknown");
+                let url = repo_map
+                    .get("url")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| JsonFile::encode(repo));
+                io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
+            }
+        }
+    }
+
+    // TODO(cli-completion): fn suggest_type_for_add()
+    // TODO(cli-completion): fn suggest_repo_names(&self)
+}
+
+impl Command for RepositoryCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        // TODO(cli-completion): suggest_repo_names() / suggest_type_for_add()
+        self.set_name("repository")?;
+        self.set_aliases(vec!["repo".to_string()])?;
+        self.set_description("Manages repositories");
+        self.set_definition(&[
+            InputOption::new(
+                "global",
+                Some(PhpMixed::String("g".to_string())),
+                Some(InputOption::VALUE_NONE),
+                "Apply command to the global config file",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "file",
+                Some(PhpMixed::String("f".to_string())),
+                Some(InputOption::VALUE_REQUIRED),
+                "If you want to choose a different composer.json or config.json",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "append",
+                None,
+                Some(InputOption::VALUE_NONE),
+                "When adding a repository, append it (lower priority) instead of prepending it",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "before",
+                None,
+                Some(InputOption::VALUE_REQUIRED),
+                "When adding a repository, insert it before the given repository name",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputOption::new(
+                "after",
+                None,
+                Some(InputOption::VALUE_REQUIRED),
+                "When adding a repository, insert it after the given repository name",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "action",
+                Some(InputArgument::OPTIONAL),
+                "Action to perform: list, add, remove, set-url, get-url, enable, disable",
+                Some(PhpMixed::String("list".to_string())),
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "name",
+                Some(InputArgument::OPTIONAL),
+                "Repository name (or special name packagist.org for enable/disable)",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "arg1",
+                Some(InputArgument::OPTIONAL),
+                "Type for add, or new URL for set-url, or JSON config for add",
+                None,
+            )
+            .unwrap()
+            .into(),
+            InputArgument::new(
+                "arg2",
+                Some(InputArgument::OPTIONAL),
+                "URL for add (if not using JSON)",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "This command lets you manage repositories in your composer.json.\n\n\
+            Examples:\n  \
+            composer repo list\n  \
+            composer repo add foo vcs https://github.com/acme/foo\n  \
+            composer repo add bar composer https://repo.packagist.com/bar\n  \
+            composer repo add zips '{\"type\":\"artifact\",\"url\":\"/path/to/dir/with/zips\"}'\n  \
+            composer repo add baz vcs https://example.org --before foo\n  \
+            composer repo add qux vcs https://example.org --after bar\n  \
+            composer repo remove foo\n  \
+            composer repo set-url foo https://git.example.org/acme/foo\n  \
+            composer repo get-url foo\n  \
+            composer repo disable packagist.org\n  \
+            composer repo enable packagist.org\n\n\
+            Use --global/-g to alter the global config.json instead.\n\
+            Use --file to alter a specific file.",
+        );
+        Ok(())
+    }
+
+    fn execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -336,80 +501,27 @@ impl RepositoryCommand {
         }
     }
 
-    fn list_repositories(&mut self, mut repos: IndexMap<String, PhpMixed>) {
-        let io = self.get_io();
-
-        let mut packagist_present = false;
-        for (_key, repo) in &repos {
-            if let PhpMixed::Array(ref repo_map) = *repo {
-                let has_type_and_url =
-                    repo_map.contains_key("type") && repo_map.contains_key("url");
-                let is_composer_type =
-                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer");
-                let url_host_ends_with_packagist = repo_map
-                    .get("url")
-                    .and_then(|v| v.as_string())
-                    .map(|url| {
-                        parse_url(url, PHP_URL_HOST)
-                            .as_string()
-                            .unwrap_or("")
-                            .ends_with("packagist.org")
-                    })
-                    .unwrap_or(false);
-                if has_type_and_url && is_composer_type && url_host_ends_with_packagist {
-                    packagist_present = true;
-                    break;
-                }
-            }
-        }
-        if !packagist_present {
-            let mut packagist_entry = IndexMap::new();
-            packagist_entry.insert("packagist.org".to_string(), Box::new(PhpMixed::Bool(false)));
-            repos.insert(repos.len().to_string(), PhpMixed::Array(packagist_entry));
-        }
-
-        if repos.is_empty() {
-            io.write("No repositories configured");
-            return;
-        }
-
-        for (key, repo) in &repos {
-            if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(&format!("[{}] <info>disabled</info>", key));
-                continue;
-            }
-
-            if let PhpMixed::Array(ref repo_map) = *repo {
-                if repo_map.len() == 1 {
-                    if let Some(first_val) = repo_map.values().next() {
-                        if matches!(**first_val, PhpMixed::Bool(false)) {
-                            let first_key = repo_map.keys().next().unwrap();
-                            io.write(&format!("[{}] <info>disabled</info>", first_key));
-                            continue;
-                        }
-                    }
-                }
-
-                let name = repo_map
-                    .get("name")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or(key.as_str());
-                let r#type = repo_map
-                    .get("type")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or("unknown");
-                let url = repo_map
-                    .get("url")
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| JsonFile::encode(repo));
-                io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
-            }
-        }
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        <Self as crate::command::base_config_command::BaseConfigCommand>::initialize(
+            self, input, output,
+        )
     }
 
-    // TODO(cli-completion): fn suggest_type_for_add()
-    // TODO(cli-completion): fn suggest_repo_names(&self)
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for RepositoryCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
 
 impl BaseConfigCommand for RepositoryCommand {
@@ -439,15 +551,5 @@ impl BaseConfigCommand for RepositoryCommand {
 
     fn set_config_source(&mut self, source: Option<JsonConfigSource>) {
         self.config_source = source;
-    }
-}
-
-impl HasBaseCommandData for RepositoryCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

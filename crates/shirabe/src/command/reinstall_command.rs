@@ -3,18 +3,29 @@
 use std::any::Any;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputDefinitionItem;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::dependency_resolver::operation::UninstallOperation;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::base_package;
@@ -29,41 +40,53 @@ pub struct ReinstallCommand {
 }
 
 impl ReinstallCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = ReinstallCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("ReinstallCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for ReinstallCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_prefer_install / suggest_installed_package_types / suggest_installed_package
-        self
-            .set_name("reinstall")
-            .set_description("Uninstalls and reinstalls the given package names")
-            .set_definition(&[
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
-                InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-                InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-                InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None).unwrap().into(),
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None).unwrap().into(),
-            ])
-            .set_help(
-                "The <info>reinstall</info> command looks up installed packages by name,\n\
-                uninstalls them and reinstalls them. This lets you do a clean install\n\
-                of a package if you messed with its files, or if you wish to change\n\
-                the installation type using --prefer-install.\n\n\
-                <info>php composer.phar reinstall acme/foo \"acme/bar-*\"</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#reinstall"
-            );
+        self.set_name("reinstall")?;
+        self.set_description("Uninstalls and reinstalls the given package names");
+        self.set_definition(&[
+            InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
+            InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
+            InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+            InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
+            InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
+            InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+            InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+            InputOption::new("type", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Filter packages to reinstall by type(s)", None).unwrap().into(),
+            InputArgument::new("packages", Some(InputArgument::IS_ARRAY), "List of package names to reinstall, can include a wildcard (*) to match any substring.", None).unwrap().into(),
+        ]);
+        self.set_help(
+            "The <info>reinstall</info> command looks up installed packages by name,\n\
+            uninstalls them and reinstalls them. This lets you do a clean install\n\
+            of a package if you messed with its files, or if you wish to change\n\
+            the installation type using --prefer-install.\n\n\
+            <info>php composer.phar reinstall acme/foo \"acme/bar-*\"</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#reinstall",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let composer = crate::command::composer_full(&composer);
         let io = self.get_io();
@@ -319,14 +342,24 @@ impl ReinstallCommand {
 
         Ok(0)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for ReinstallCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for ReinstallCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

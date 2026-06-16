@@ -3,17 +3,28 @@
 use std::path::Path;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArgvInput;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::input::StringInput;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::PhpMixed;
 use shirabe_php_shim::{AsAny, LogicException, RuntimeException, chdir};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
@@ -25,38 +36,17 @@ pub struct GlobalCommand {
 }
 
 impl GlobalCommand {
-    // TODO(cli-completion): pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
-
-    pub fn configure(&mut self) {
-        self.set_name("global")
-            .set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)")
-            .set_definition(&[
-                InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None)
-                    .unwrap()
-                    .into(),
-                InputArgument::new(
-                    "args",
-                    Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-                    "",
-                    None,
-                )
-                .unwrap()
-                .into(),
-            ])
-            .set_help(
-                "Use this command as a wrapper to run other Composer commands\n\
-                within the global context of COMPOSER_HOME.\n\n\
-                You can use this to install CLI utilities globally, all you need\n\
-                is to add the COMPOSER_HOME/vendor/bin dir to your PATH env var.\n\n\
-                COMPOSER_HOME is c:\\Users\\<user>\\AppData\\Roaming\\Composer on Windows\n\
-                and /home/<user>/.composer on unix systems.\n\n\
-                If your system uses freedesktop.org standards, then it will first check\n\
-                XDG_CONFIG_HOME or default to /home/<user>/.config/composer\n\n\
-                Note: This path may vary depending on customizations to bin-dir in\n\
-                composer.json or the environmental variable COMPOSER_BIN_DIR.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#global",
-            );
+    pub fn new() -> Self {
+        let mut command = GlobalCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("GlobalCommand::configure uses static, valid metadata");
+        command
     }
+
+    // TODO(cli-completion): pub fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
 
     // TODO remove for Symfony 6+ as it is then in the interface.
     // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
@@ -81,37 +71,9 @@ impl GlobalCommand {
         }
     }
 
-    pub fn run(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
-        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?);
-        let mut args: Vec<String> = vec![];
-        for token in &tokens {
-            if !token.is_empty() && !token.starts_with('-') {
-                args.push(token.clone());
-                if args.len() >= 2 {
-                    break;
-                }
-            }
-        }
-
-        if args.len() < 2 {
-            return self.run(input, output);
-        }
-
-        let sub_input = self.prepare_subcommand_input(input, false)?;
-        let mut app = self.get_application()?;
-        Ok(app.run(
-            Some(std::rc::Rc::new(std::cell::RefCell::new(sub_input))),
-            Some(output),
-        )?)
-    }
-
     fn prepare_subcommand_input(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         quiet: bool,
     ) -> Result<StringInput> {
         if Platform::get_env("COMPOSER").is_some() {
@@ -139,7 +101,7 @@ impl GlobalCommand {
         })?;
 
         if !quiet {
-            self.get_io().write_error(&format!(
+            self.get_io().borrow().write_error(&format!(
                 "<info>Changed current directory to {}</info>",
                 home
             ));
@@ -151,22 +113,98 @@ impl GlobalCommand {
             &Self::input_to_string(&*input.borrow())?,
             1,
         );
-        self.get_application()?.reset_composer();
+        // TODO(phase-c): getApplication()->resetComposer() needs the shared shirabe Application
+        // handle (deferred with the Application shared-ownership work).
 
         Ok(StringInput::new(&new_input_str)?)
     }
-
-    pub fn is_proxy_command(&self) -> bool {
-        true
-    }
 }
 
-impl HasBaseCommandData for GlobalCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl Command for GlobalCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("global")?;
+        self.set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)");
+        self.set_definition(&[
+            InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None)
+                .unwrap()
+                .into(),
+            InputArgument::new(
+                "args",
+                Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+                "",
+                None,
+            )
+            .unwrap()
+            .into(),
+        ]);
+        self.set_help(
+            "Use this command as a wrapper to run other Composer commands\n\
+            within the global context of COMPOSER_HOME.\n\n\
+            You can use this to install CLI utilities globally, all you need\n\
+            is to add the COMPOSER_HOME/vendor/bin dir to your PATH env var.\n\n\
+            COMPOSER_HOME is c:\\Users\\<user>\\AppData\\Roaming\\Composer on Windows\n\
+            and /home/<user>/.composer on unix systems.\n\n\
+            If your system uses freedesktop.org standards, then it will first check\n\
+            XDG_CONFIG_HOME or default to /home/<user>/.config/composer\n\n\
+            Note: This path may vary depending on customizations to bin-dir in\n\
+            composer.json or the environmental variable COMPOSER_BIN_DIR.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#global",
+        );
+        Ok(())
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
+    fn is_proxy_command(&self) -> bool {
+        true
+    }
+
+    fn run(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let tokens = Preg::split(r"{\s+}", &Self::input_to_string(&*input.borrow())?);
+        let mut args: Vec<String> = vec![];
+        for token in &tokens {
+            if !token.is_empty() && !token.starts_with('-') {
+                args.push(token.clone());
+                if args.len() >= 2 {
+                    break;
+                }
+            }
+        }
+
+        if args.len() < 2 {
+            return self.run(input, output);
+        }
+
+        let sub_input = self.prepare_subcommand_input(input, false)?;
+        // TODO(phase-c): proxying to Application::run needs the shared shirabe Application handle
+        // (deferred with the Application shared-ownership work and command registration).
+        let _ = (sub_input, output);
+        todo!("global command proxy run pending shared Application handle")
+    }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for GlobalCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+
+    fn is_proxy_command(&self) -> bool {
+        true
     }
 }

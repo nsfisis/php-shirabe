@@ -4,21 +4,22 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::symfony::console::Terminal;
+use shirabe_external_packages::symfony::console::command::command::{
+    Command, CommandData, SetDefinitionArg,
+};
 use shirabe_external_packages::symfony::console::helper::Table;
 use shirabe_external_packages::symfony::console::helper::TableSeparator;
-use shirabe_external_packages::symfony::console::input::InputDefinition;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, UnexpectedValueException,
-    count, explode, in_array, is_string, max,
+    AsAny, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
+    UnexpectedValueException, count, explode, in_array, is_string, max,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::SelfUpdateCommand;
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::Application;
@@ -40,122 +41,99 @@ pub const SUCCESS: i64 = 0;
 pub const FAILURE: i64 = 1;
 pub const INVALID: i64 = 2;
 
-/// \Composer\Composer\Command\BaseCommand + \Symfony\Component\Console\Command\Command
-pub trait BaseCommand {
-    fn new(_name: Option<&str>) -> Self
+/// The base-class state shared by all Composer commands: the embedded Symfony command
+/// state plus the lazily-resolved Composer instance and IO.
+#[derive(Debug)]
+pub struct BaseCommandData {
+    inner: CommandData,
+    pub(crate) composer: Option<PartialComposerHandle>,
+    pub(crate) io: Option<Rc<RefCell<dyn IOInterface>>>,
+}
+
+impl BaseCommandData {
+    pub fn new(name: Option<String>) -> Self {
+        BaseCommandData {
+            inner: CommandData::new(name),
+            composer: None,
+            io: None,
+        }
+    }
+
+    /// Mutable access to the embedded Symfony command state, used by the Composer-typed definition
+    /// builders to forward to `CommandData`'s Symfony-typed entry points.
+    pub(crate) fn command_data_mut(&mut self) -> &mut CommandData {
+        &mut self.inner
+    }
+}
+
+/// \Composer\Composer\Command\BaseCommand — the Composer additions on top of the Symfony
+/// `Command` trait. The Symfony state methods are inherited from the [`Command`] supertrait;
+/// only the Composer-specific behavior and the Composer-typed definition builders live here.
+pub trait BaseCommand: Command {
+    /// Mutable access to the embedded Symfony command state. Each command returns
+    /// `self.base_command_data.command_data_mut()`; this lets the Composer-typed definition
+    /// builders below forward to `CommandData`'s Symfony-typed entry points.
+    fn command_data_mut(&mut self) -> &mut CommandData;
+
+    /// Sets the definition from Composer-typed argument/option instances.
+    fn set_definition(&mut self, definition: &[InputDefinitionItem]) -> &mut Self
     where
         Self: Sized,
     {
-        todo!()
-    }
-
-    fn get_name(&self) -> Option<String> {
-        todo!()
-    }
-
-    fn set_name(&mut self, _name: &str) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
-    fn get_description(&self) -> String {
-        todo!()
-    }
-
-    fn set_description(&mut self, _description: &str) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
-    fn set_help(&mut self, _help: &str) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
-    fn set_definition(&mut self, _definition: &[InputDefinitionItem]) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
-    fn get_definition(&self) -> &InputDefinition {
-        todo!()
+        let items = definition
+            .iter()
+            .map(|item| item.to_definition_item())
+            .collect();
+        self.command_data_mut()
+            .set_definition(SetDefinitionArg::Array(items));
+        self
     }
 
     fn add_argument(
         &mut self,
-        _name: &str,
-        _mode: Option<i64>,
-        _description: &str,
-        _default: PhpMixed,
+        name: &str,
+        mode: Option<i64>,
+        description: &str,
+        default: PhpMixed,
     ) -> &mut Self
     where
         Self: Sized,
     {
-        todo!()
+        self.command_data_mut()
+            .add_argument(name, mode, description, default)
+            .expect("command argument definitions in configure() are statically valid");
+        self
     }
 
     fn add_option(
         &mut self,
-        _name: &str,
-        _shortcut: Option<&str>,
-        _mode: Option<i64>,
-        _description: &str,
-        _default: PhpMixed,
+        name: &str,
+        shortcut: Option<&str>,
+        mode: Option<i64>,
+        description: &str,
+        default: PhpMixed,
     ) -> &mut Self
     where
         Self: Sized,
     {
-        todo!()
+        let shortcut = shortcut
+            .map(|s| PhpMixed::from(s.to_string()))
+            .unwrap_or(PhpMixed::Null);
+        self.command_data_mut()
+            .add_option(name, shortcut, mode, description, default)
+            .expect("command option definitions in configure() are statically valid");
+        self
     }
 
-    fn set_aliases(&mut self, _aliases: &[String]) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
+    /// Whether this command is the self-update command (disables plugins/scripts).
+    fn is_self_update_command(&self) -> bool {
+        false
     }
 
-    fn get_aliases(&self) -> Vec<String> {
-        todo!()
+    /// Whether or not this command is meant to call another command.
+    fn is_proxy_command(&self) -> bool {
+        false
     }
-
-    fn set_hidden(&mut self, _hidden: bool) -> &mut Self
-    where
-        Self: Sized,
-    {
-        todo!()
-    }
-
-    fn is_hidden(&self) -> bool {
-        todo!()
-    }
-
-    fn run(
-        &mut self,
-        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
-        todo!()
-    }
-
-    fn get_helper(&self, _name: &str) -> PhpMixed {
-        todo!()
-    }
-
-    fn get_helper_set(&self) -> PhpMixed {
-        todo!()
-    }
-
-    /// Gets the application instance for this command.
-    fn get_application(&self) -> Result<Application>;
 
     /// Retrieves the default Composer\Composer instance or throws
     fn require_composer(
@@ -176,27 +154,15 @@ pub trait BaseCommand {
     /// Removes the cached composer instance
     fn reset_composer(&mut self) -> Result<()>;
 
-    /// Whether or not this command is meant to call another command.
-    fn is_proxy_command(&self) -> bool;
-
     fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>>;
 
     fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>);
 
-    // TODO(cli-completion): fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions);
-
-    /// @inheritDoc
-    fn initialize(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<()>;
-
     /// Calls {@see Factory::create()} with the given arguments, taking into account flags and default states for disabling scripts and plugins
     fn create_composer_instance(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
+        io: Rc<RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -206,14 +172,14 @@ pub trait BaseCommand {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> Result<(bool, bool)>;
 
     fn get_platform_requirement_filter(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>>;
+        input: Rc<RefCell<dyn InputInterface>>,
+    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>>;
 
     /// @param array<string> $requirements
     ///
@@ -229,11 +195,7 @@ pub trait BaseCommand {
     ) -> Result<Vec<IndexMap<String, String>>>;
 
     /// @param array<TableSeparator|mixed[]> $table
-    fn render_table(
-        &self,
-        table: Vec<PhpMixed>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    );
+    fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>);
 
     fn get_terminal_width(&self) -> i64;
 
@@ -242,7 +204,7 @@ pub trait BaseCommand {
     /// @return Auditor::FORMAT_*
     fn get_audit_format(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         opt_name: &str,
     ) -> Result<String>;
 
@@ -250,270 +212,151 @@ pub trait BaseCommand {
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
     ) -> Result<AuditConfig>;
 }
 
-#[derive(Debug)]
-pub struct BaseCommandData {
-    pub(crate) composer: Option<PartialComposerHandle>,
-    pub(crate) io: Option<Rc<RefCell<dyn IOInterface>>>,
+/// Forwards every Composer-specific `BaseCommand` method that no command overrides to an
+/// embedded field. Each command invokes this once inside its `impl BaseCommand` block,
+/// alongside its hand-written `command_data_mut` (and any overridden behavior hooks). The
+/// single argument names the field to forward to (always `base_command_data`).
+#[macro_export]
+macro_rules! delegate_base_command_trait_impls_to_inner {
+    ($field:ident) => {
+        shirabe_external_packages::delegate_to_inner!($field, fn require_composer(&mut self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_external_packages::delegate_to_inner!($field, fn try_composer(&mut self, disable_plugins: Option<bool>, disable_scripts: Option<bool>) -> Option<$crate::composer::PartialComposerHandle>);
+        shirabe_external_packages::delegate_to_inner!($field, fn set_composer(&mut self, composer: $crate::composer::PartialComposerHandle));
+        shirabe_external_packages::delegate_to_inner!($field, fn reset_composer(&mut self) -> anyhow::Result<()>);
+        shirabe_external_packages::delegate_to_inner!($field, fn get_io(&mut self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
+        shirabe_external_packages::delegate_to_inner!($field, fn set_io(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
+        shirabe_external_packages::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_external_packages::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
+        shirabe_external_packages::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
+        shirabe_external_packages::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
+        shirabe_external_packages::delegate_to_inner!($field, fn normalize_requirements(&self, requirements: Vec<String>) -> anyhow::Result<Vec<indexmap::IndexMap<String, String>>>);
+        shirabe_external_packages::delegate_to_inner!($field, fn render_table(&self, table: Vec<shirabe_php_shim::PhpMixed>, output: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::output::OutputInterface>>));
+        shirabe_external_packages::delegate_to_inner!($field, fn get_terminal_width(&self) -> i64);
+        shirabe_external_packages::delegate_to_inner!($field, fn get_audit_format(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>, opt_name: &str) -> anyhow::Result<String>);
+        shirabe_external_packages::delegate_to_inner!($field, fn create_audit_config(&self, config: &mut $crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_external_packages::symfony::console::input::InputInterface>>) -> anyhow::Result<$crate::advisory::AuditConfig>);
+    };
 }
 
-pub trait HasBaseCommandData {
-    fn base_command_data(&self) -> &BaseCommandData;
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData;
-
-    fn composer(&self) -> Option<PartialComposerHandle> {
-        self.base_command_data().composer.clone()
-    }
-
-    fn composer_mut(&mut self) -> &mut Option<PartialComposerHandle> {
-        &mut self.base_command_data_mut().composer
-    }
-
-    fn io(&self) -> Option<Rc<RefCell<dyn IOInterface>>> {
-        self.base_command_data().io.clone()
-    }
-
-    fn io_mut(&mut self) -> &mut Option<Rc<RefCell<dyn IOInterface>>> {
-        &mut self.base_command_data_mut().io
-    }
-
-    fn is_self_update_command(&self) -> bool {
-        false
-    }
+impl Command for BaseCommandData {
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(inner);
 }
 
-impl<C: HasBaseCommandData> BaseCommand for C {
-    fn get_application(&self) -> Result<Application> {
-        // PHP: parent::getApplication() returns Symfony Command::$application, the back-reference
-        // set by Application::add() -> $command->setApplication($this) when the command is
-        // registered.
-        // TODO(phase-c): the command holds no Application back-reference. Establishing it requires
-        // (1) modelling the Symfony command registry (add/find/run), which is an intentional
-        // todo!() stub, and (2) making Application shared (Rc<RefCell<Application>>) with a Weak
-        // back-edge to break the Application<->command cycle. Until command registration runs,
-        // there is no application to return.
-        todo!()
+impl BaseCommand for BaseCommandData {
+    fn command_data_mut(&mut self) -> &mut CommandData {
+        &mut self.inner
     }
 
     fn require_composer(
         &mut self,
-        _disable_plugins: Option<bool>,
-        _disable_scripts: Option<bool>,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
     ) -> Result<PartialComposerHandle> {
-        // PHP: $this->composer ??= $this->getApplication()->getComposer(true, ...).
-        // TODO(phase-c): blocked on get_application() (see above) — it currently returns an owned
-        // `Application` by value, which a command cannot hold; a shared Application handle is the
-        // prerequisite. Application::getComposer itself is already implemented.
-        let _ = RuntimeException {
-            message: String::new(),
-            code: 0,
-        };
-        todo!("require_composer pending get_application() shared-handle support")
+        if self.composer.is_none() {
+            let application = self.get_application();
+            let Some(application) = application else {
+                return Err(RuntimeException {
+                    message: "Could not create a Composer\\Composer instance, you must inject one if this command is not used with a Composer\\Console\\Application instance".to_string(),
+                    code: 0,
+                }
+                .into());
+            };
+            let composer = {
+                let mut app_ref = application.borrow_mut();
+                let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+                let app = app_dyn
+                    .as_any_mut()
+                    .downcast_mut::<Application>()
+                    .expect("a Composer command's application is a shirabe Application");
+                app.get_composer(true, disable_plugins, disable_scripts)?
+            };
+            self.composer = composer;
+        }
+
+        Ok(self
+            .composer
+            .clone()
+            .expect("requireComposer always yields a Composer or errors"))
     }
 
     fn try_composer(
         &mut self,
-        _disable_plugins: Option<bool>,
-        _disable_scripts: Option<bool>,
+        disable_plugins: Option<bool>,
+        disable_scripts: Option<bool>,
     ) -> Option<PartialComposerHandle> {
-        // PHP: try { return $this->requireComposer(...); } catch (\RuntimeException $e) { return null; }
-        // TODO(phase-c): blocked on get_application() / require_composer (see above) — needs a
-        // shared Application handle the command can reach.
-        todo!("try_composer pending get_application() shared-handle support")
-    }
-
-    fn set_composer(&mut self, composer: PartialComposerHandle) {
-        *self.composer_mut() = Some(composer);
-    }
-
-    fn reset_composer(&mut self) -> Result<()> {
-        *self.composer_mut() = None;
-        self.get_application()?.reset_composer();
-        Ok(())
-    }
-
-    fn is_proxy_command(&self) -> bool {
-        false
-    }
-
-    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>> {
-        if self.io().is_none() {
-            // PHP: $this->io = $this->getApplication() instanceof Application
-            //          ? $this->getApplication()->getIO() : new NullIO();
-            // TODO(phase-c): the application-IO branch needs get_application() (see above); until
-            // a shared Application handle exists we take the NullIO fallback (PHP's else branch).
-            *self.io_mut() = Some(Rc::new(RefCell::new(NullIO::new())));
-        }
-
-        self.io().unwrap()
-    }
-
-    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>) {
-        *self.io_mut() = Some(io);
-    }
-
-    // TODO(cli-completion): fn complete(&self, input: &CompletionInput, suggestions: &mut CompletionSuggestions)
-
-    fn initialize(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<()> {
-        // initialize a plugin-enabled Composer instance, either local or global
-        // PHP also ORs in $this->getApplication()->getDisablePluginsByDefault() /
-        // getDisableScriptsByDefault().
-        // TODO(phase-c): the application-default OR-terms need get_application() (see above); a
-        // shared Application handle is the prerequisite, so only the input flags are honoured here.
-        let mut disable_plugins = input
-            .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
-        let mut disable_scripts = input
-            .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
-
-        if self.is_self_update_command() {
-            disable_plugins = true;
-            disable_scripts = true;
-        }
-
-        let composer = self.try_composer(Some(disable_plugins), Some(disable_scripts));
-        let io = self.get_io();
-
-        let disable_plugins_kind = if disable_plugins {
-            crate::factory::DisablePlugins::All
-        } else {
-            crate::factory::DisablePlugins::None
-        };
-        let composer = if composer.is_none() {
-            Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)
-        } else {
-            composer
-        };
-        if let Some(composer) = composer.as_ref() {
-            // PHP: $this->getName() — the Symfony Command's configured name.
-            // TODO(phase-c): the command name lives in Symfony Command state (set via configure()
-            // -> setName()), which this port does not yet carry on BaseCommandData; it requires
-            // the Symfony Command base-class model (intentional todo!() stub).
-            let command_name: String = todo!();
-            let mut pre_command_run_event = PreCommandRunEvent::new(
-                PluginEvents::PRE_COMMAND_RUN.to_string(),
-                input,
-                command_name,
-            );
-            let pre_command_run_event_name = pre_command_run_event.get_name().to_string();
-            let dispatcher = composer.borrow_partial().get_event_dispatcher();
-            dispatcher.borrow_mut().dispatch(
-                Some(&pre_command_run_event_name),
-                Some(&mut pre_command_run_event),
-            )?;
-        }
-
-        if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-ansi"]), false)
-            && input.borrow().has_option("no-progress")
-        {
-            input
-                .borrow_mut()
-                .set_option("no-progress", PhpMixed::Bool(true));
-        }
-
-        let env_options: IndexMap<&str, Vec<&str>> = [
-            ("COMPOSER_NO_AUDIT", vec!["no-audit"]),
-            ("COMPOSER_NO_DEV", vec!["no-dev", "update-no-dev"]),
-            ("COMPOSER_PREFER_STABLE", vec!["prefer-stable"]),
-            ("COMPOSER_PREFER_LOWEST", vec!["prefer-lowest"]),
-            ("COMPOSER_MINIMAL_CHANGES", vec!["minimal-changes"]),
-            ("COMPOSER_WITH_DEPENDENCIES", vec!["with-dependencies"]),
-            (
-                "COMPOSER_WITH_ALL_DEPENDENCIES",
-                vec!["with-all-dependencies"],
-            ),
-            (
-                "COMPOSER_NO_SECURITY_BLOCKING",
-                vec!["no-security-blocking"],
-            ),
-        ]
-        .into_iter()
-        .collect();
-        for (env_name, option_names) in &env_options {
-            for option_name in option_names {
-                if true == input.borrow().has_option(option_name) {
-                    if false
-                        == input
-                            .borrow()
-                            .get_option(option_name)?
-                            .as_bool()
-                            .unwrap_or(false)
-                        && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
-                    {
-                        input
-                            .borrow_mut()
-                            .set_option(option_name, PhpMixed::Bool(true));
-                    }
+        if self.composer.is_none() {
+            if let Some(application) = self.get_application() {
+                let result = {
+                    let mut app_ref = application.borrow_mut();
+                    let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+                    let app = app_dyn
+                        .as_any_mut()
+                        .downcast_mut::<Application>()
+                        .expect("a Composer command's application is a shirabe Application");
+                    app.get_composer(false, disable_plugins, disable_scripts)
+                };
+                if let Ok(composer) = result {
+                    self.composer = composer;
                 }
             }
         }
 
-        if true == input.borrow().has_option("ignore-platform-reqs") {
-            if !input
-                .borrow()
-                .get_option("ignore-platform-reqs")?
-                .as_bool()
-                .unwrap_or(false)
-                && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
-                    .map_or(false, |s| !s.is_empty() && s != "0")
-            {
-                input
-                    .borrow_mut()
-                    .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
+        self.composer.clone()
+    }
 
-                io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
-            }
+    fn set_composer(&mut self, composer: PartialComposerHandle) {
+        self.composer = Some(composer);
+    }
+
+    fn reset_composer(&mut self) -> Result<()> {
+        self.composer = None;
+        if let Some(application) = self.get_application() {
+            let mut app_ref = application.borrow_mut();
+            let app_dyn: &mut dyn shirabe_external_packages::symfony::console::application::Application = &mut *app_ref;
+            let app = app_dyn
+                .as_any_mut()
+                .downcast_mut::<Application>()
+                .expect("a Composer command's application is a shirabe Application");
+            app.reset_composer();
         }
-
-        if true == input.borrow().has_option("ignore-platform-req")
-            && (!input.borrow().has_option("ignore-platform-reqs")
-                || !input
-                    .borrow()
-                    .get_option("ignore-platform-reqs")?
-                    .as_bool()
-                    .unwrap_or(false))
-        {
-            let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
-            let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
-            if 0 == count(&input.borrow().get_option("ignore-platform-req")?)
-                && ignore_platform_req_env.is_some()
-                && "" != ignore_str
-            {
-                input.borrow_mut().set_option(
-                    "ignore-platform-req",
-                    PhpMixed::List(
-                        explode(",", &ignore_str)
-                            .into_iter()
-                            .map(|s| Box::new(PhpMixed::String(s)))
-                            .collect(),
-                    ),
-                );
-
-                io.write_error(&format!(
-                    "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
-                    ignore_str
-                ));
-            }
-        }
-
-        // TODO(phase-b): requires inner Symfony Command initialize
         Ok(())
+    }
+
+    fn get_io(&mut self) -> Rc<RefCell<dyn IOInterface>> {
+        if self.io.is_none() {
+            match self.get_application() {
+                Some(application) => {
+                    let io = {
+                        let app_ref = application.borrow();
+                        let app_dyn: &dyn shirabe_external_packages::symfony::console::application::Application = &*app_ref;
+                        let app = app_dyn
+                            .as_any()
+                            .downcast_ref::<Application>()
+                            .expect("a Composer command's application is a shirabe Application");
+                        app.get_io()
+                    };
+                    self.io = Some(io);
+                }
+                None => {
+                    self.io = Some(Rc::new(RefCell::new(NullIO::new())));
+                }
+            }
+        }
+
+        self.io.clone().unwrap()
+    }
+
+    fn set_io(&mut self, io: Rc<RefCell<dyn IOInterface>>) {
+        self.io = Some(io);
     }
 
     fn create_composer_instance(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
+        io: Rc<RefCell<dyn IOInterface>>,
         config: Option<IndexMap<String, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
@@ -529,8 +372,8 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
         // PHP: if ($app instanceof Application && $app->getDisablePluginsByDefault()) $disablePlugins = true;
         //      (same for getDisableScriptsByDefault()).
-        // TODO(phase-c): these application-default overrides need get_application() (see above) —
-        // a shared Application handle is the prerequisite, so only the passed/flag values apply.
+        // TODO(phase-c): these application-default overrides need a shared Application handle
+        // (deferred), so only the passed/flag values apply.
         let disable_plugins_kind = if disable_plugins {
             crate::factory::DisablePlugins::All
         } else {
@@ -543,7 +386,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn get_preferred_install_options(
         &self,
         config: &Config,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         keep_vcs_requires_prefer_source: bool,
     ) -> Result<(bool, bool)> {
         let mut prefer_source = false;
@@ -666,8 +509,8 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn get_platform_requirement_filter(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    ) -> Result<std::rc::Rc<dyn PlatformRequirementFilterInterface>> {
+        input: Rc<RefCell<dyn InputInterface>>,
+    ) -> Result<Rc<dyn PlatformRequirementFilterInterface>> {
         if !input.borrow().has_option("ignore-platform-reqs")
             || !input.borrow().has_option("ignore-platform-req")
         {
@@ -733,11 +576,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
         parser.parse_name_version_pairs(requirements)
     }
 
-    fn render_table(
-        &self,
-        table: Vec<PhpMixed>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
+    fn render_table(&self, table: Vec<PhpMixed>, output: Rc<RefCell<dyn OutputInterface>>) {
         let mut renderer = Table::new(output);
         renderer
             .set_style(PhpMixed::from("compact"))
@@ -762,7 +601,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
 
     fn get_audit_format(
         &self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
         opt_name: &str,
     ) -> Result<String> {
         if !input.borrow().has_option(opt_name) {
@@ -799,7 +638,7 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     fn create_audit_config(
         &self,
         config: &mut Config,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
     ) -> Result<AuditConfig> {
         // Handle both --audit and --no-audit flags
         let audit = if input.borrow().has_option("audit") {
@@ -854,8 +693,154 @@ impl<C: HasBaseCommandData> BaseCommand for C {
     }
 }
 
-// TODO(phase-c): bridge BaseCommand to Symfony Command for trait-object container usage.
-// Cannot blanket-impl a foreign trait for a local generic (orphan rule); each concrete
-// command must impl symfony Command itself, or a wrapper type must be introduced. This is the
-// same orphan-rule blocker as Application::get_default_commands and is gated on the Symfony
-// command-registry model, which is an intentional external-package todo!() stub.
+/// \Composer\Command\BaseCommand::initialize — runs for every Composer command after the
+/// input is bound. Shared via a free function because Rust has no inheritance; each command's
+/// `Command::initialize` forwards here so the leaf's `is_self_update_command()` override (and
+/// future overrides) bind correctly.
+pub fn base_command_initialize(
+    cmd: &mut dyn BaseCommand,
+    input: Rc<RefCell<dyn InputInterface>>,
+    _output: Rc<RefCell<dyn OutputInterface>>,
+) -> Result<()> {
+    // initialize a plugin-enabled Composer instance, either local or global
+    // PHP also ORs in $this->getApplication()->getDisablePluginsByDefault() /
+    // getDisableScriptsByDefault().
+    // TODO(phase-c): the application-default OR-terms need a shared Application handle
+    // (deferred), so only the input flags are honoured here.
+    let mut disable_plugins = input
+        .borrow()
+        .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
+    let mut disable_scripts = input
+        .borrow()
+        .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
+
+    if cmd.is_self_update_command() {
+        disable_plugins = true;
+        disable_scripts = true;
+    }
+
+    let composer = cmd.try_composer(Some(disable_plugins), Some(disable_scripts));
+    let io = cmd.get_io();
+
+    let disable_plugins_kind = if disable_plugins {
+        crate::factory::DisablePlugins::All
+    } else {
+        crate::factory::DisablePlugins::None
+    };
+    let composer = if composer.is_none() {
+        Factory::create_global(io.clone(), disable_plugins_kind, disable_scripts)
+    } else {
+        composer
+    };
+    if let Some(composer) = composer.as_ref() {
+        let command_name = cmd.get_name().unwrap_or_default();
+        let mut pre_command_run_event = PreCommandRunEvent::new(
+            PluginEvents::PRE_COMMAND_RUN.to_string(),
+            input.clone(),
+            command_name,
+        );
+        let pre_command_run_event_name = pre_command_run_event.get_name().to_string();
+        let dispatcher = composer.borrow_partial().get_event_dispatcher();
+        dispatcher.borrow_mut().dispatch(
+            Some(&pre_command_run_event_name),
+            Some(&mut pre_command_run_event),
+        )?;
+    }
+
+    if input
+        .borrow()
+        .has_parameter_option(PhpMixed::from(vec!["--no-ansi"]), false)
+        && input.borrow().has_option("no-progress")
+    {
+        input
+            .borrow_mut()
+            .set_option("no-progress", PhpMixed::Bool(true));
+    }
+
+    let env_options: IndexMap<&str, Vec<&str>> = [
+        ("COMPOSER_NO_AUDIT", vec!["no-audit"]),
+        ("COMPOSER_NO_DEV", vec!["no-dev", "update-no-dev"]),
+        ("COMPOSER_PREFER_STABLE", vec!["prefer-stable"]),
+        ("COMPOSER_PREFER_LOWEST", vec!["prefer-lowest"]),
+        ("COMPOSER_MINIMAL_CHANGES", vec!["minimal-changes"]),
+        ("COMPOSER_WITH_DEPENDENCIES", vec!["with-dependencies"]),
+        (
+            "COMPOSER_WITH_ALL_DEPENDENCIES",
+            vec!["with-all-dependencies"],
+        ),
+        (
+            "COMPOSER_NO_SECURITY_BLOCKING",
+            vec!["no-security-blocking"],
+        ),
+    ]
+    .into_iter()
+    .collect();
+    for (env_name, option_names) in &env_options {
+        for option_name in option_names {
+            if true == input.borrow().has_option(option_name) {
+                if false
+                    == input
+                        .borrow()
+                        .get_option(option_name)?
+                        .as_bool()
+                        .unwrap_or(false)
+                    && Platform::get_env(env_name).map_or(false, |s| !s.is_empty() && s != "0")
+                {
+                    input
+                        .borrow_mut()
+                        .set_option(option_name, PhpMixed::Bool(true));
+                }
+            }
+        }
+    }
+
+    if true == input.borrow().has_option("ignore-platform-reqs") {
+        if !input
+            .borrow()
+            .get_option("ignore-platform-reqs")?
+            .as_bool()
+            .unwrap_or(false)
+            && Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQS")
+                .map_or(false, |s| !s.is_empty() && s != "0")
+        {
+            input
+                .borrow_mut()
+                .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
+
+            io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
+        }
+    }
+
+    if true == input.borrow().has_option("ignore-platform-req")
+        && (!input.borrow().has_option("ignore-platform-reqs")
+            || !input
+                .borrow()
+                .get_option("ignore-platform-reqs")?
+                .as_bool()
+                .unwrap_or(false))
+    {
+        let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
+        let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
+        if 0 == count(&input.borrow().get_option("ignore-platform-req")?)
+            && ignore_platform_req_env.is_some()
+            && "" != ignore_str
+        {
+            input.borrow_mut().set_option(
+                "ignore-platform-req",
+                PhpMixed::List(
+                    explode(",", &ignore_str)
+                        .into_iter()
+                        .map(|s| Box::new(PhpMixed::String(s)))
+                        .collect(),
+                ),
+            );
+
+            io.write_error(&format!(
+                "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
+                ignore_str
+            ));
+        }
+    }
+
+    Ok(())
+}

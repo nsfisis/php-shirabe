@@ -1,14 +1,22 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php
 
+use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::exception::InvalidArgumentException;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, array_map, strtolower};
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::config::ConfigSourceInterface;
 use crate::config::JsonConfigSource;
 use crate::console::input::InputArgument;
@@ -16,6 +24,7 @@ use crate::console::input::InputOption;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
@@ -31,13 +40,24 @@ pub struct RemoveCommand {
 }
 
 impl RemoveCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = RemoveCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("RemoveCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for RemoveCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_root_requirement() for `packages` argument
-        self
-            .set_name("remove")
-            .set_aliases(&["rm".to_string(), "uninstall".to_string()])
-            .set_description("Removes a package from the require or require-dev")
-            .set_definition(&[
+        self.set_name("remove")?;
+        self.set_aliases(vec!["rm".to_string(), "uninstall".to_string()])?;
+        self.set_description("Removes a package from the require or require-dev");
+        self.set_definition(&[
                 InputArgument::new("packages",
             Some(InputArgument::IS_ARRAY),
             "Packages that should be removed.",
@@ -147,19 +167,20 @@ impl RemoveCommand {
         Some(InputOption::VALUE_REQUIRED),
         "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader",
         None,).unwrap().into(),
-        ])
-            .set_help(
-                "The <info>remove</info> command removes a package from the current\n\
+        ]);
+        self.set_help(
+            "The <info>remove</info> command removes a package from the current\n\
                 list of installed packages\n\n\
                 <info>php composer.phar remove</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm"
-            );
+                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         if input
             .borrow()
@@ -693,14 +714,24 @@ impl RemoveCommand {
 
         Ok(status)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for RemoveCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for RemoveCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

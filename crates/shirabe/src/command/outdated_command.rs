@@ -1,15 +1,25 @@
 //! ref: composer/src/Composer/Command/OutdatedCommand.php
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::io::IOInterface;
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::ArrayInput;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
+use crate::console::input::InputArgument;
+use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::io::IOInterface;
 
 #[derive(Debug)]
 pub struct OutdatedCommand {
@@ -17,13 +27,24 @@ pub struct OutdatedCommand {
 }
 
 impl OutdatedCommand {
-    pub fn configure(&mut self) {
+    pub fn new() -> Self {
+        let mut command = OutdatedCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("OutdatedCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for OutdatedCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_installed_package(false, false) for `package` argument and `--ignore` option
-        self
-            .set_name("outdated")
-            .set_description("Shows a list of installed packages that have updates available, including their latest version")
-            .set_definition(&[
-                InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None).unwrap().into(),
+        self.set_name("outdated")?;
+        self.set_description("Shows a list of installed packages that have updates available, including their latest version");
+        self.set_definition(&[
+            InputArgument::new("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None).unwrap().into(),
         InputOption::new("outdated", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
         InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None).unwrap().into(),
         InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None).unwrap().into(),
@@ -38,24 +59,25 @@ impl OutdatedCommand {
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
         InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
-            ])
-            .set_help(
-                "The outdated command is just a proxy for `composer show -l`\n\n\
-                The color coding (or signage if you have ANSI colors disabled) for dependency versions is as such:\n\n\
-                - <info>green</info> (=): Dependency is in the latest version and is up to date.\n\
-                - <comment>yellow</comment> (~): Dependency has a new version available that includes backwards\n  \
-                  compatibility breaks according to semver, so upgrade when you can but it\n  \
-                  may involve work.\n\
-                - <highlight>red</highlight> (!): Dependency has a new version that is semver-compatible and you should upgrade it.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#outdated"
-            );
+        ]);
+        self.set_help(
+            "The outdated command is just a proxy for `composer show -l`\n\n\
+            The color coding (or signage if you have ANSI colors disabled) for dependency versions is as such:\n\n\
+            - <info>green</info> (=): Dependency is in the latest version and is up to date.\n\
+            - <comment>yellow</comment> (~): Dependency has a new version available that includes backwards\n  \
+              compatibility breaks according to semver, so upgrade when you can but it\n  \
+              may involve work.\n\
+            - <highlight>red</highlight> (!): Dependency has a new version that is semver-compatible and you should upgrade it.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#outdated"
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let mut args: IndexMap<String, PhpMixed> = IndexMap::new();
         args.insert("command".to_string(), PhpMixed::String("show".to_string()));
         args.insert("--latest".to_string(), PhpMixed::Bool(true));
@@ -185,22 +207,34 @@ impl OutdatedCommand {
             None,
         )?;
 
-        let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
-            std::rc::Rc::new(std::cell::RefCell::new(input));
-        self.get_application()?.run(Some(input), Some(output))
+        let input: Rc<RefCell<dyn InputInterface>> = Rc::new(RefCell::new(input));
+        // TODO(phase-c): proxying to ShowCommand via Application::run needs the shared shirabe
+        // Application handle (deferred with the Application shared-ownership work and registration).
+        let _ = (input, output);
+        todo!("outdated command proxy run pending shared Application handle")
     }
 
-    pub fn is_proxy_command(&self) -> bool {
-        true
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
     }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for OutdatedCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for OutdatedCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
+    fn is_proxy_command(&self) -> bool {
+        true
     }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

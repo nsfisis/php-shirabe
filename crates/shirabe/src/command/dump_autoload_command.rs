@@ -1,12 +1,22 @@
 //! ref: composer/src/Composer/Command/DumpAutoloadCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, file_exists};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
@@ -18,13 +28,24 @@ pub struct DumpAutoloadCommand {
 }
 
 impl DumpAutoloadCommand {
-    pub fn configure(&mut self) {
-        self
-            .set_name("dump-autoload")
-            .set_aliases(&["dumpautoload".to_string()])
-            .set_description("Dumps the autoloader")
-            .set_definition(&[
-                InputOption::new("optimize", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
+    pub fn new() -> Self {
+        let mut command = DumpAutoloadCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("DumpAutoloadCommand::configure uses static, valid metadata");
+        command
+    }
+}
+
+impl Command for DumpAutoloadCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("dump-autoload")?;
+        self.set_aliases(vec!["dumpautoload".to_string()])?;
+        self.set_description("Dumps the autoloader");
+        self.set_definition(&[
+            InputOption::new("optimize", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
         InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
         InputOption::new("apcu", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
         InputOption::new("apcu-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu", None).unwrap().into(),
@@ -35,18 +56,19 @@ impl DumpAutoloadCommand {
         InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
         InputOption::new("strict-psr", None, Some(InputOption::VALUE_NONE), "Return a failed status code (1) if PSR-4 or PSR-0 mapping errors are present. Requires --optimize to work.", None).unwrap().into(),
         InputOption::new("strict-ambiguous", None, Some(InputOption::VALUE_NONE), "Return a failed status code (2) if the same class is found in multiple files. Requires --optimize to work.", None).unwrap().into(),
-            ])
-            .set_help(
-                "<info>php composer.phar dump-autoload</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload"
-            );
+        ]);
+        self.set_help(
+            "<info>php composer.phar dump-autoload</info>\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload",
+        );
+        Ok(())
     }
 
-    pub fn execute(
+    fn execute(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
         let mut composer = crate::command::composer_full_mut(&composer);
 
@@ -290,14 +312,24 @@ impl DumpAutoloadCommand {
 
         Ok(0)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for DumpAutoloadCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for DumpAutoloadCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

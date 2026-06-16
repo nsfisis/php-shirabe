@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
-use crate::symfony::console::command::command::{BaseCommand, Command};
+use crate::symfony::console::command::command::{Command, CommandData};
 use crate::symfony::console::command::lazy_command::LazyCommand;
 use crate::symfony::console::completion::completion_input::CompletionInput;
 use crate::symfony::console::completion::completion_suggestions::{
@@ -16,18 +16,18 @@ use crate::symfony::console::completion::completion_suggestions::{
 use crate::symfony::console::completion::output::completion_output_interface::CompletionOutputInterface;
 use crate::symfony::console::input::input_interface::InputInterface;
 use crate::symfony::console::input::input_option::InputOption;
-use crate::symfony::console::output::output_interface::{self, OutputInterface};
+use crate::symfony::console::output::output_interface::OutputInterface;
 
 /// Responsible for providing the values to the shell completion.
 #[derive(Debug)]
 pub struct CompleteCommand {
-    inner: BaseCommand,
+    inner: CommandData,
     completion_outputs: IndexMap<String, PhpMixed>,
     is_debug: bool,
 }
 
 impl Deref for CompleteCommand {
-    type Target = BaseCommand;
+    type Target = CommandData;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -60,15 +60,108 @@ impl CompleteCommand {
                 )
             });
 
-        let this = Self {
-            inner: BaseCommand::__construct(None)?,
+        let mut this = Self {
+            inner: CommandData::new(None),
             completion_outputs,
             is_debug: false,
         };
+        // PHP: static $defaultName = '|_complete' / $defaultDescription, applied by the parent
+        // constructor before configure().
+        this.inner.apply_default_name(Self::DEFAULT_NAME)?;
+        this.inner.set_description(Self::DEFAULT_DESCRIPTION);
+        this.configure()?;
 
         Ok(this)
     }
 
+    fn create_completion_input(
+        &self,
+        input: &dyn InputInterface,
+    ) -> anyhow::Result<CompletionInput> {
+        let current_index = input.get_option("current")?;
+        if !current_index.to_bool() || !shirabe_php_shim::ctype_digit(&current_index.to_string()) {
+            anyhow::bail!(shirabe_php_shim::RuntimeException {
+                message: "The \"--current\" option must be set and it must be an integer."
+                    .to_string(),
+                code: 0,
+            });
+        }
+
+        let tokens: Vec<String> = match input.get_option("input")?.as_list() {
+            Some(list) => list.iter().map(|v| v.to_string()).collect(),
+            None => Vec::new(),
+        };
+        let mut completion_input = CompletionInput::from_tokens(
+            tokens,
+            current_index.to_string().parse::<i64>().unwrap_or(0),
+        )?;
+
+        // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
+        let application = self.get_application().unwrap();
+        let definition = application.borrow_mut().get_definition();
+        let _ = completion_input.bind(&definition.borrow());
+
+        Ok(completion_input)
+    }
+
+    fn find_command(
+        &self,
+        completion_input: &CompletionInput,
+        _output: &dyn OutputInterface,
+    ) -> Option<Rc<RefCell<dyn Command>>> {
+        // try { ... } catch (CommandNotFoundException $e) {}
+        let input_name = completion_input.get_first_argument()?;
+
+        let application = self.get_application().unwrap();
+        // CommandNotFoundException is caught and swallowed by returning None.
+        application.borrow_mut().find(&input_name).ok()
+    }
+
+    fn log(&self, messages: &str) {
+        self.log_many(vec![messages.to_string()]);
+    }
+
+    fn log_many(&self, messages: Vec<String>) {
+        if !self.is_debug {
+            return;
+        }
+
+        let command_name = shirabe_php_shim::basename(&shirabe_php_shim::server_argv()[0]);
+        shirabe_php_shim::file_put_contents3(
+            &format!(
+                "{}/sf_{}.log",
+                shirabe_php_shim::sys_get_temp_dir(),
+                command_name
+            ),
+            &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
+            shirabe_php_shim::FILE_APPEND,
+        );
+    }
+}
+
+/// \get_class($command instanceof LazyCommand ? $command->getCommand() : $command)
+fn get_class_of_command(command: &Rc<RefCell<dyn Command>>) -> String {
+    let borrowed = command.borrow();
+    let _is_lazy = (*borrowed).as_any().downcast_ref::<LazyCommand>().is_some();
+    // TODO: get_class() takes a PhpMixed but the command is a `dyn Command`; reflecting the
+    // concrete class name of a trait object requires a class-name hook on Command (Phase C).
+    todo!()
+}
+
+/// $command->getDefinition()->getOptions()
+fn get_definition_options(_command: &Rc<RefCell<dyn Command>>) -> Vec<InputOption> {
+    // TODO: InputDefinition::get_options() returns `&IndexMap<String, Rc<InputOption>>` but
+    // CompletionSuggestions::suggest_options() takes `Vec<InputOption>`; the option ownership
+    // model must be reconciled (Phase C).
+    todo!()
+}
+
+/// new $completionOutput();
+fn instantiate_completion_output(_class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
+    todo!()
+}
+
+impl Command for CompleteCommand {
     fn configure(&mut self) -> anyhow::Result<()> {
         let shells = self
             .completion_outputs
@@ -109,17 +202,24 @@ impl CompleteCommand {
         Ok(())
     }
 
-    fn initialize(&mut self, _input: &dyn InputInterface, _output: &dyn OutputInterface) {
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        let _ = (input, output);
         self.is_debug = shirabe_php_shim::filter_var(
             &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG").unwrap_or_default(),
             shirabe_php_shim::FILTER_VALIDATE_BOOLEAN,
         );
+
+        Ok(())
     }
 
     fn execute(
         &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // try { ... } catch (\Throwable $e) { ...; if ($output->isDebug()) { throw $e; } return 2; }
         let result: anyhow::Result<i64> = (|| {
@@ -132,7 +232,7 @@ impl CompleteCommand {
             //    return 126;
             // }
 
-            let shell = input.get_option("shell")?;
+            let shell = input.borrow().get_option("shell")?;
             if !shell.to_bool() {
                 anyhow::bail!(shirabe_php_shim::RuntimeException {
                     message: "The \"--shell\" option must be set.".to_string(),
@@ -160,7 +260,7 @@ impl CompleteCommand {
                 });
             }
 
-            let mut completion_input = self.create_completion_input(input)?;
+            let mut completion_input = self.create_completion_input(&*input.borrow())?;
             let mut suggestions = CompletionSuggestions::new();
 
             self.log_many(vec![
@@ -176,7 +276,7 @@ impl CompleteCommand {
                 "<info>Messages:</>".to_string(),
             ]);
 
-            let command = self.find_command(&completion_input, output);
+            let command = self.find_command(&completion_input, &*output.borrow());
             match command {
                 None => {
                     self.log("  No command found, completing using the Application class.");
@@ -273,7 +373,7 @@ impl CompleteCommand {
                 }
             }
 
-            completion_output.write(&suggestions, output);
+            completion_output.write(&suggestions, &mut *output.borrow_mut());
 
             Ok(0)
         })();
@@ -283,7 +383,7 @@ impl CompleteCommand {
             Err(e) => {
                 self.log_many(vec!["<error>Error!</error>".to_string(), format!("{}", e)]);
 
-                if output.is_debug() {
+                if output.borrow().is_debug() {
                     return Err(e);
                 }
 
@@ -292,214 +392,5 @@ impl CompleteCommand {
         }
     }
 
-    fn create_completion_input(
-        &self,
-        input: &dyn InputInterface,
-    ) -> anyhow::Result<CompletionInput> {
-        let current_index = input.get_option("current")?;
-        if !current_index.to_bool() || !shirabe_php_shim::ctype_digit(&current_index.to_string()) {
-            anyhow::bail!(shirabe_php_shim::RuntimeException {
-                message: "The \"--current\" option must be set and it must be an integer."
-                    .to_string(),
-                code: 0,
-            });
-        }
-
-        let tokens: Vec<String> = match input.get_option("input")?.as_list() {
-            Some(list) => list.iter().map(|v| v.to_string()).collect(),
-            None => Vec::new(),
-        };
-        let mut completion_input = CompletionInput::from_tokens(
-            tokens,
-            current_index.to_string().parse::<i64>().unwrap_or(0),
-        )?;
-
-        // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
-        let application = self.get_application().unwrap();
-        let definition = application.borrow_mut().get_definition();
-        let _ = completion_input.bind(&definition.borrow());
-
-        Ok(completion_input)
-    }
-
-    fn find_command(
-        &self,
-        completion_input: &CompletionInput,
-        _output: &dyn OutputInterface,
-    ) -> Option<Rc<RefCell<dyn Command>>> {
-        // try { ... } catch (CommandNotFoundException $e) {}
-        let input_name = completion_input.get_first_argument()?;
-
-        let application = self.get_application().unwrap();
-        // CommandNotFoundException is caught and swallowed by returning None.
-        application.borrow_mut().find(&input_name).ok()
-    }
-
-    fn log(&self, messages: &str) {
-        self.log_many(vec![messages.to_string()]);
-    }
-
-    fn log_many(&self, messages: Vec<String>) {
-        if !self.is_debug {
-            return;
-        }
-
-        let command_name = shirabe_php_shim::basename(&shirabe_php_shim::server_argv()[0]);
-        shirabe_php_shim::file_put_contents3(
-            &format!(
-                "{}/sf_{}.log",
-                shirabe_php_shim::sys_get_temp_dir(),
-                command_name
-            ),
-            &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
-            shirabe_php_shim::FILE_APPEND,
-        );
-    }
-}
-
-/// \get_class($command instanceof LazyCommand ? $command->getCommand() : $command)
-fn get_class_of_command(command: &Rc<RefCell<dyn Command>>) -> String {
-    let borrowed = command.borrow();
-    let _is_lazy = (*borrowed).as_any().downcast_ref::<LazyCommand>().is_some();
-    // TODO: get_class() takes a PhpMixed but the command is a `dyn Command`; reflecting the
-    // concrete class name of a trait object requires a class-name hook on Command (Phase C).
-    todo!()
-}
-
-/// $command->getDefinition()->getOptions()
-fn get_definition_options(_command: &Rc<RefCell<dyn Command>>) -> Vec<InputOption> {
-    // TODO: InputDefinition::get_options() returns `&IndexMap<String, Rc<InputOption>>` but
-    // CompletionSuggestions::suggest_options() takes `Vec<InputOption>`; the option ownership
-    // model must be reconciled (Phase C).
-    todo!()
-}
-
-/// new $completionOutput();
-fn instantiate_completion_output(_class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
-    todo!()
-}
-
-impl Command for CompleteCommand {
-    fn configure(&mut self) {
-        let _ = CompleteCommand::configure(self);
-    }
-
-    fn run(
-        &mut self,
-        input: &mut dyn InputInterface,
-        output: &mut dyn OutputInterface,
-    ) -> anyhow::Result<i64> {
-        self.inner.run(input, output)
-    }
-
-    fn is_enabled(&self) -> bool {
-        self.inner.is_enabled()
-    }
-
-    fn set_application(
-        &mut self,
-        application: Option<Rc<RefCell<dyn crate::symfony::console::application::Application>>>,
-    ) {
-        self.inner.set_application(application);
-    }
-
-    fn get_application(
-        &self,
-    ) -> Option<Rc<RefCell<dyn crate::symfony::console::application::Application>>> {
-        self.inner.get_application()
-    }
-
-    fn set_helper_set(
-        &mut self,
-        helper_set: Rc<RefCell<crate::symfony::console::helper::helper_set::HelperSet>>,
-    ) {
-        self.inner.set_helper_set(helper_set);
-    }
-
-    fn get_helper_set(
-        &self,
-    ) -> Option<Rc<RefCell<crate::symfony::console::helper::helper_set::HelperSet>>> {
-        self.inner.get_helper_set()
-    }
-
-    fn merge_application_definition(&mut self, merge_args: bool) {
-        self.inner.merge_application_definition(merge_args);
-    }
-
-    fn get_definition(&self) -> &crate::symfony::console::input::input_definition::InputDefinition {
-        self.inner.get_definition()
-    }
-
-    fn get_native_definition(
-        &self,
-    ) -> &crate::symfony::console::input::input_definition::InputDefinition {
-        self.inner.get_native_definition()
-    }
-
-    fn set_name(&mut self, name: &str) -> anyhow::Result<()> {
-        self.inner.set_name(name)?;
-        Ok(())
-    }
-
-    fn get_name(&self) -> Option<String> {
-        self.inner.get_name()
-    }
-
-    fn set_hidden(&mut self, hidden: bool) {
-        self.inner.set_hidden(hidden);
-    }
-
-    fn is_hidden(&self) -> bool {
-        self.inner.is_hidden()
-    }
-
-    fn set_description(&mut self, description: &str) {
-        self.inner.set_description(description);
-    }
-
-    fn get_description(&self) -> String {
-        self.inner.get_description()
-    }
-
-    fn set_help(&mut self, help: &str) {
-        self.inner.set_help(help);
-    }
-
-    fn get_help(&self) -> String {
-        self.inner.get_help()
-    }
-
-    fn get_processed_help(&self) -> String {
-        self.inner.get_processed_help()
-    }
-
-    fn set_aliases(&mut self, aliases: Vec<String>) -> anyhow::Result<()> {
-        self.inner.set_aliases(aliases)?;
-        Ok(())
-    }
-
-    fn get_aliases(&self) -> Vec<String> {
-        self.inner.get_aliases()
-    }
-
-    fn get_synopsis(&mut self, short: bool) -> String {
-        self.inner.get_synopsis(short)
-    }
-
-    fn get_usages(&self) -> Vec<String> {
-        self.inner.get_usages()
-    }
-
-    fn get_helper(
-        &self,
-        name: &str,
-    ) -> anyhow::Result<
-        Result<PhpMixed, crate::symfony::console::exception::logic_exception::LogicException>,
-    > {
-        self.inner.get_helper(name)
-    }
-
-    fn ignore_validation_errors(&mut self) {
-        self.inner.ignore_validation_errors();
-    }
+    crate::delegate_command_trait_impls_to_inner!(inner);
 }

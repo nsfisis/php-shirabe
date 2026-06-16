@@ -144,6 +144,10 @@ pub struct Application {
     disable_scripts_by_default: bool,
     /// Store the initial working directory at startup time
     initial_working_directory: Option<String>,
+    /// Self-reference used to hand commands their owning application (PHP's `$command->setApplication($this)`).
+    /// Set by `new_shared`; the run flow threads the upgraded `Rc` so command callbacks never
+    /// re-borrow the application while it is already borrowed.
+    me: std::rc::Weak<std::cell::RefCell<Application>>,
 }
 
 impl Application {
@@ -212,6 +216,7 @@ impl Application {
             disable_plugins_by_default: false,
             disable_scripts_by_default: false,
             initial_working_directory,
+            me: std::rc::Weak::new(),
         };
         if defined("SIGINT") && SignalRegistry::is_supported() {
             this.signal_registry = Some(SignalRegistry::new());
@@ -225,8 +230,92 @@ impl Application {
         this
     }
 
+    /// Builds the application inside a shared `Rc<RefCell<…>>` and registers the default commands.
+    ///
+    /// Commands hold a back-pointer to their application, which shares this very `RefCell`. So the
+    /// whole run flow is driven through the `Rc` (never a long-lived `borrow_mut`), and command
+    /// registration happens here — before any borrow is taken — so `set_application` can borrow the
+    /// application without a re-entrant conflict.
+    pub fn new_shared(
+        name: String,
+        version: String,
+    ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Application>>> {
+        let application =
+            std::rc::Rc::new(std::cell::RefCell::new(Application::new(name, version)));
+        application.borrow_mut().me = std::rc::Rc::downgrade(&application);
+        Application::init_shared(&application)?;
+        Ok(application)
+    }
+
+    /// Registers the default commands on a shared application (PHP's lazy `init()`), executed once
+    /// with no application borrow held so each `set_application` can borrow back safely.
+    fn init_shared(
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+    ) -> anyhow::Result<()> {
+        {
+            let mut app = application.borrow_mut();
+            if app.initialized {
+                return Ok(());
+            }
+            app.initialized = true;
+        }
+
+        let commands = application.borrow().get_default_commands();
+        for command in commands {
+            Application::add_shared(application, command)?;
+        }
+
+        Ok(())
+    }
+
+    /// Adds a command object to a shared application (PHP's `add()`), without holding an application
+    /// borrow while calling into the command, so `set_application` can borrow back safely.
+    pub fn add_shared(
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
+        command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
+    ) -> anyhow::Result<Option<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>>> {
+        command.borrow_mut().set_application(Some(
+            application.clone() as std::rc::Rc<std::cell::RefCell<dyn BaseApplication>>
+        ));
+
+        if !command.borrow().is_enabled() {
+            command.borrow_mut().set_application(None);
+
+            return Ok(None);
+        }
+
+        // if (!$command instanceof LazyCommand) { $command->getDefinition(); }
+        command.borrow().get_definition();
+
+        if command.borrow().get_name().is_none() {
+            return Err(ConsoleLogicException(shirabe_php_shim::LogicException {
+                message: format!(
+                    "The command defined in \"{}\" cannot have an empty name.",
+                    PhpMixed::from(shirabe_php_shim::get_debug_type_obj(&command)),
+                ),
+                code: 0,
+            })
+            .into());
+        }
+
+        let name = command.borrow().get_name().unwrap();
+        application
+            .borrow_mut()
+            .commands
+            .insert(name, command.clone());
+
+        for alias in command.borrow().get_aliases() {
+            application
+                .borrow_mut()
+                .commands
+                .insert(alias, command.clone());
+        }
+
+        Ok(Some(command))
+    }
+
     pub fn run(
-        &mut self,
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i64> {
@@ -238,18 +327,18 @@ impl Application {
             ),
         };
 
-        self.base_run(input, output)
+        Application::base_run(application, input, output)
     }
 
     pub fn do_run(
-        &mut self,
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        self.disable_plugins_by_default = input
+        application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
-        self.disable_scripts_by_default = input
+        application.borrow_mut().disable_scripts_by_default = input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
 
@@ -271,21 +360,23 @@ impl Application {
         );
         let helper_set = std::rc::Rc::new(std::cell::RefCell::new(HelperSet::default()));
         HelperSet::new(&helper_set, helpers);
-        self.io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
+        application.borrow_mut().io = std::rc::Rc::new(std::cell::RefCell::new(ConsoleIO::new(
             input.clone(),
             output.clone(),
             helper_set.borrow().clone(),
         )));
+        // Cache the IO so the rest of the flow does not re-borrow the application; command callbacks
+        // (e.g. mergeApplicationDefinition) need the application's RefCell free.
+        let io = application.borrow().io.clone();
 
         // Register error handler again to pass it the IO instance
-        ErrorHandler::register(Some(self.io.clone()));
+        ErrorHandler::register(Some(io.clone()));
 
         if input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--no-cache"]), false)
         {
-            self.io
-                .write_error3("Disabling cache usage", true, io_interface::DEBUG);
+            io.write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
                 if Platform::is_windows() {
@@ -297,14 +388,14 @@ impl Application {
         }
 
         // switch working dir
-        let new_work_dir = self.get_new_working_dir(input.clone())?;
+        let new_work_dir = application.borrow().get_new_working_dir(input.clone())?;
         let mut old_working_dir: Option<String> = None;
         if let Some(ref nwd) = new_work_dir {
             old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
             chdir(nwd);
-            self.initial_working_directory = getcwd();
+            application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
-            self.io.write_error3(
+            io.write_error3(
                 &format!(
                     "Changed CWD to {}",
                     if !cwd.is_empty() {
@@ -320,17 +411,14 @@ impl Application {
 
         // determine command name to be executed without including plugin commands
         let mut command_name: Option<String> = Some(String::new());
-        let raw_command_name = self.get_command_name_before_binding(input.clone())?;
+        let raw_command_name = application
+            .borrow_mut()
+            .get_command_name_before_binding(input.clone())?;
         if let Some(ref raw) = raw_command_name {
-            match self.find(raw) {
+            let find_result = application.borrow_mut().find(raw);
+            match find_result {
                 Ok(cmd) => {
-                    // TODO(phase-c): the Symfony Application stub keeps its command registry as
-                    // PhpMixed with a todo!() find(), per the "Symfony stays todo!()" policy.
-                    // Reading the resolved command's getName() needs the full typed-command
-                    // registry, which lives in the external-package stub; until that is modelled
-                    // we cannot recover the bound command name here.
-                    let _ = cmd;
-                    command_name = Some(String::new());
+                    command_name = cmd.borrow().get_name();
                 }
                 Err(e) => {
                     if e.downcast_ref::<CommandNotFoundException>().is_some() {
@@ -355,7 +443,8 @@ impl Application {
             "create-project".to_string(),
             "outdated".to_string(),
         ];
-        let use_parent_dir_if_no_json_available = self.get_use_parent_dir_config_value();
+        let use_parent_dir_if_no_json_available =
+            application.borrow().get_use_parent_dir_config_value();
         let no_composer_json_commands_pm = PhpMixed::List(
             no_composer_json_commands
                 .iter()
@@ -402,18 +491,18 @@ impl Application {
                     Factory::get_composer_file().unwrap_or_default()
                 )) {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
-                        && !self.io.is_interactive()
+                        && !io.is_interactive()
                     {
-                        self.io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
+                        io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || self.io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)
+                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
-                            self.io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
+                            io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
                         } else {
-                            self.io.write_error("<info>Always want to use the parent dir? Use \"composer config --global use-parent-dir true\" to change the default.</info>");
+                            io.write_error("<info>Always want to use the parent dir? Use \"composer config --global use-parent-dir true\" to change the default.</info>");
                         }
                         old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
                         chdir(&dir);
@@ -433,7 +522,7 @@ impl Application {
 
         // Clobber sudo credentials if COMPOSER_ALLOW_SUPERUSER is not set before loading plugins
         if needs_sudo_check {
-            is_non_allowed_root = self.is_running_as_root();
+            is_non_allowed_root = application.borrow().is_running_as_root();
 
             if is_non_allowed_root {
                 let uid: i64 = Platform::get_env("SUDO_UID")
@@ -482,15 +571,17 @@ impl Application {
             || command_name.as_deref() == Some("run-script")
             || raw_command_name != command_name;
 
-        if may_need_plugin_command && !self.disable_plugins_by_default && !self.has_plugin_commands
+        if may_need_plugin_command
+            && !application.borrow().disable_plugins_by_default
+            && !application.borrow().has_plugin_commands
         {
             // at this point plugins are needed, so if we are running as root and it is not allowed we need to prompt
             // if interactive, and abort otherwise
             if is_non_allowed_root {
-                self.io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                if self.io.is_interactive()
-                    && self.io.ask_confirmation(
+                if io.is_interactive()
+                    && io.ask_confirmation(
                         "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                             .to_string(),
                         true,
@@ -499,7 +590,7 @@ impl Application {
                     // avoid a second prompt later
                     is_non_allowed_root = false;
                 } else {
-                    self.io.write_error("<warning>Aborting as no plugin should be loaded if running as super user is not explicitly allowed</warning>");
+                    io.write_error("<warning>Aborting as no plugin should be loaded if running as super user is not explicitly allowed</warning>");
 
                     return Ok(1);
                 }
@@ -510,9 +601,10 @@ impl Application {
             // because get_plugin_commands borrows &mut self, conflicting with io.
             let mut plugin_warnings: Vec<String> = Vec::new();
             match (|| -> anyhow::Result<()> {
-                for command in self.get_plugin_commands()? {
+                let plugin_commands = application.borrow_mut().get_plugin_commands()?;
+                for command in plugin_commands {
                     let cmd_name = command.get_name().unwrap_or_default();
-                    if self.has(&cmd_name) {
+                    if application.borrow_mut().has(&cmd_name) {
                         // TODO(plugin): PHP uses get_class($command) for the skipped-command class
                         // name. Plugin command discovery (get_plugin_commands) is unimplemented, so
                         // this loop never runs; wire the concrete class name with the plugin API.
@@ -539,7 +631,7 @@ impl Application {
 
                         let line = details.line;
 
-                        let mut ghe = GithubActionError::new(self.io.clone());
+                        let mut ghe = GithubActionError::new(io.clone());
                         ghe.emit(&pe.message, file.as_deref(), line);
 
                         return Err(e);
@@ -549,33 +641,39 @@ impl Application {
                 }
             }
             for warning in &plugin_warnings {
-                self.io.write_error(warning);
+                io.write_error(warning);
             }
 
-            self.has_plugin_commands = true;
+            application.borrow_mut().has_plugin_commands = true;
         }
 
-        if !self.disable_plugins_by_default && is_non_allowed_root && !self.io.is_interactive() {
-            self.io.write_error("<error>Composer plugins have been disabled for safety in this non-interactive session.</error>");
-            self.io.write_error("<error>Set COMPOSER_ALLOW_SUPERUSER=1 if you want to allow plugins to run as root/super user.</error>");
-            self.disable_plugins_by_default = true;
+        if !application.borrow().disable_plugins_by_default
+            && is_non_allowed_root
+            && !io.is_interactive()
+        {
+            io.write_error("<error>Composer plugins have been disabled for safety in this non-interactive session.</error>");
+            io.write_error("<error>Set COMPOSER_ALLOW_SUPERUSER=1 if you want to allow plugins to run as root/super user.</error>");
+            application.borrow_mut().disable_plugins_by_default = true;
         }
 
         // determine command name to be executed incl plugin commands, and check if it's a proxy command
-        let is_proxy_command = false;
-        if let Some(ref name) = self.get_command_name_before_binding(input.clone())? {
-            if let Ok(command) = self.find(name) {
-                // TODO(phase-c): same blocker as the earlier find() call — the Symfony command
-                // registry is a PhpMixed/todo!() stub, so the resolved command's name and its
-                // isProxyCommand() flag cannot be recovered until the typed-command registry is
-                // modelled in the external package.
-                let _ = command;
-                command_name = Some(String::new());
+        let mut is_proxy_command = false;
+        let resolved_command_name = application
+            .borrow_mut()
+            .get_command_name_before_binding(input.clone())?;
+        if let Some(ref name) = resolved_command_name {
+            let find_result = application.borrow_mut().find(name);
+            if let Ok(command) = find_result {
+                command_name = command.borrow().get_name();
+                // PHP: $command instanceof Command\BaseCommand && $command->isProxyCommand().
+                // The Symfony `Command` trait exposes `is_proxy_command` (default false) so the
+                // `dyn SymfonyCommand` registry can answer this; Composer proxy commands override it.
+                is_proxy_command = command.borrow().is_proxy_command();
             }
         }
 
         if !is_proxy_command {
-            self.io.write_error3(
+            io.write_error3(
                 &format!(
                     "Running {} ({}) with {} on {}",
                     composer::get_version(),
@@ -596,13 +694,13 @@ impl Application {
             );
 
             if PHP_VERSION_ID < 70205 {
-                self.io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
+                io.write_error(&format!("<warning>Composer supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", PHP_VERSION));
             }
 
             if XdebugHandler::is_xdebug_active()
                 && Platform::get_env("COMPOSER_DISABLE_XDEBUG_WARN").is_none()
             {
-                self.io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
+                io.write_error("<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>");
             }
 
             if defined("COMPOSER_DEV_WARNING_TIME")
@@ -610,7 +708,7 @@ impl Application {
                 && command_name.as_deref() != Some("selfupdate")
                 && time() > shirabe_php_shim::composer_dev_warning_time()
             {
-                self.io.write_error(&format!(
+                io.write_error(&format!(
                     "<warning>Warning: This development build of Composer is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
                     shirabe_php_shim::server_get("PHP_SELF").unwrap_or_default(),
                 ));
@@ -621,10 +719,10 @@ impl Application {
                     && command_name.as_deref() != Some("selfupdate")
                     && command_name.as_deref() != Some("_complete")
                 {
-                    self.io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
+                    io.write_error("<warning>Do not run Composer as root/super user! See https://getcomposer.org/root for details</warning>");
 
-                    if self.io.is_interactive() {
-                        if !self.io.ask_confirmation(
+                    if io.is_interactive() {
+                        if !io.ask_confirmation(
                             "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                                 .to_string(),
                             true,
@@ -660,7 +758,7 @@ impl Application {
             .ok()
             .flatten();
             if let Some(msg) = tempfile_msg {
-                self.io.write_error(&msg);
+                io.write_error(&msg);
             }
 
             // add non-standard scripts as own commands
@@ -677,8 +775,8 @@ impl Application {
                                 str_replace("-", "_", &strtoupper(script))
                             );
                             if !defined(&script_event_const) {
-                                if self.has(script) {
-                                    self.io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
+                                if application.borrow_mut().has(script) {
+                                    io.write_error(&format!("<warning>A script named {} would override a Composer command and has been skipped</warning>", script));
                                 } else {
                                     let mut description = format!(
                                         "Runs the {} script as defined in composer.json",
@@ -708,7 +806,9 @@ impl Application {
                                         })
                                         .unwrap_or_default();
 
-                                    if let Some(composer) = self.get_composer(false, None, None)? {
+                                    let composer_opt =
+                                        application.borrow_mut().get_composer(false, None, None)?;
+                                    if let Some(composer) = composer_opt {
                                         let composer = crate::command::composer_full(&composer);
                                         let root_package = composer.get_package();
                                         let generator = composer.get_autoload_generator().clone();
@@ -753,7 +853,7 @@ impl Application {
                                             "Symfony\\Component\\Console\\SingleCommandApplication",
                                             true,
                                         ) {
-                                            self.io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                            io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
                                         let mut cmd = shirabe_php_shim::instantiate_class(
                                             &dummy_str,
@@ -821,17 +921,17 @@ impl Application {
                 let _ = start_time.unwrap();
             }
 
-            let result: i64 = self.base_do_run(input.clone(), output.clone())?;
+            let result: i64 = Application::base_do_run(application, input.clone(), output.clone())?;
 
             if input
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), true)
             {
-                self.io.write_error(&format!(
+                io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
                     PHP_VERSION, PHP_BINARY,
                 ));
-                self.io.write_error(
+                io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",
                 );
             }
@@ -848,7 +948,7 @@ impl Application {
             }
 
             if let Some(st) = start_time {
-                self.io.write_error(&format!(
+                io.write_error(&format!(
                     "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
                     round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
                     round((memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0, 2),
@@ -863,12 +963,12 @@ impl Application {
             Ok(r) => Ok(r),
             Err(e) => {
                 if let Some(see) = e.downcast_ref::<ScriptExecutionException>() {
-                    if self.get_disable_plugins_by_default()
-                        && self.is_running_as_root()
-                        && !self.io.is_interactive()
+                    if application.borrow().get_disable_plugins_by_default()
+                        && application.borrow().is_running_as_root()
+                        && !io.is_interactive()
                     {
-                        self.io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
-                        self.io.write_error3(
+                        io.write_error3("<error>Plugins have been disabled automatically as you are running as root, this may be the cause of the script failure.</error>", true, io_interface::QUIET);
+                        io.write_error3(
                             "<error>See also https://getcomposer.org/root</error>",
                             true,
                             io_interface::QUIET,
@@ -877,10 +977,10 @@ impl Application {
 
                     Ok(see.get_code())
                 } else {
-                    let mut ghe = GithubActionError::new(self.io.clone());
+                    let mut ghe = GithubActionError::new(io.clone());
                     ghe.emit(&e.to_string(), None, None);
 
-                    self.hint_common_errors(&e, output);
+                    application.borrow_mut().hint_common_errors(&e, output);
 
                     // override TransportException's code for the purpose of parent::run() using it as process exit code
                     // as http error codes are all beyond the 255 range of permitted exit codes
@@ -1146,14 +1246,43 @@ impl Application {
     pub(crate) fn get_default_commands(
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        // PHP: array_merge(parent::getDefaultCommands(), [new AboutCommand(), ...]).
-        // TODO(phase-c): the composer commands implement the shirabe BaseCommand trait, not the
-        // Symfony SymfonyCommand trait, and the orphan rule forbids a blanket
-        // `impl<C: HasBaseCommandData> SymfonyCommand for C`. Each command needs its own `impl
-        // SymfonyCommand`
-        // (or a wrapper) before they can be merged with `base_get_default_commands()` and returned;
-        // the parent list (`base_get_default_commands`) is likewise a stub.
-        vec![]
+        let mut commands = self.base_get_default_commands();
+        let composer_commands: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> = vec![
+            std::rc::Rc::new(std::cell::RefCell::new(AboutCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ConfigCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DependsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ProhibitsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(InitCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(InstallCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(CreateProjectCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(UpdateCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SearchCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ValidateCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(AuditCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ShowCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SuggestsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RequireCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DumpAutoloadCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(StatusCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ArchiveCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(DiagnoseCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RunScriptCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(LicensesCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(GlobalCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ClearCacheCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RemoveCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(HomeCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ExecCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(OutdatedCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(CheckPlatformReqsCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(FundCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(ReinstallCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(BumpCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(RepositoryCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(SelfUpdateCommand::new())),
+        ];
+        commands.extend(composer_commands);
+        commands
     }
 
     /// This ensures we can find the correct command name even if a global input option is present before it
@@ -1311,13 +1440,17 @@ impl Application {
 
     /// Runs the current application (Symfony base; `parent::run`).
     pub fn base_run(
-        &mut self,
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i64> {
         if shirabe_php_shim::function_exists("putenv") {
-            shirabe_php_shim::putenv(&format!("LINES={}", self.terminal.get_height()));
-            shirabe_php_shim::putenv(&format!("COLUMNS={}", self.terminal.get_width()));
+            let (height, width) = {
+                let app = application.borrow();
+                (app.terminal.get_height(), app.terminal.get_width())
+            };
+            shirabe_php_shim::putenv(&format!("LINES={}", height));
+            shirabe_php_shim::putenv(&format!("COLUMNS={}", width));
         }
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
@@ -1347,9 +1480,9 @@ impl Application {
             };
 
         let result = (|| -> anyhow::Result<i64> {
-            self.configure_io(&input, &output)?;
+            application.borrow_mut().configure_io(&input, &output)?;
 
-            let exit_code = self.do_run(input.clone(), output.clone())?;
+            let exit_code = Application::do_run(application, input.clone(), output.clone())?;
 
             Ok(exit_code)
         })();
@@ -1357,11 +1490,11 @@ impl Application {
         let mut exit_code = match result {
             Ok(exit_code) => exit_code,
             Err(e) => {
-                if !self.catch_exceptions {
+                if !application.borrow().catch_exceptions {
                     return Err(e);
                 }
 
-                render_exception(self, &e, &output);
+                render_exception(&application.borrow(), &e, &output);
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
@@ -1379,7 +1512,7 @@ impl Application {
 
         // finally: handler restore. See TODO above; no-op here.
 
-        if self.auto_exit {
+        if application.borrow().auto_exit {
             if exit_code > 255 {
                 exit_code = 255;
             }
@@ -1392,7 +1525,7 @@ impl Application {
 
     /// Runs the current application (Symfony base; `parent::doRun`).
     pub fn base_do_run(
-        &mut self,
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -1403,15 +1536,17 @@ impl Application {
             ]),
             true,
         ) {
+            let long_version = application.borrow().get_long_version();
             output
                 .borrow()
-                .writeln(&[self.get_long_version()], output_interface::OUTPUT_NORMAL);
+                .writeln(&[long_version], output_interface::OUTPUT_NORMAL);
 
             return Ok(0);
         }
 
         // Makes ArgvInput::getFirstArgument() able to distinguish an option from an argument.
-        match input.borrow_mut().bind(&self.get_definition().borrow()) {
+        let definition = application.borrow_mut().get_definition();
+        match input.borrow_mut().bind(&definition.borrow()) {
             Ok(()) => {}
             Err(e) => {
                 // Errors must be ignored, full binding/validation happens later when the command is known.
@@ -1422,7 +1557,7 @@ impl Application {
         }
 
         let mut input = input;
-        let mut name = self.get_command_name(&*input.borrow());
+        let mut name = application.borrow().get_command_name(&*input.borrow());
         if input.borrow().has_parameter_option(
             PhpMixed::from(vec![
                 PhpMixed::from("--help".to_string()),
@@ -1432,29 +1567,30 @@ impl Application {
         ) {
             if name.is_none() {
                 name = Some("help".to_string());
+                let default_command = application.borrow().default_command.clone();
                 input = std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(
                     vec![(
                         PhpMixed::from("command_name".to_string()),
-                        PhpMixed::from(self.default_command.clone()),
+                        PhpMixed::from(default_command),
                     )],
                     None,
                 )?));
             } else {
-                self.want_helps = true;
+                application.borrow_mut().want_helps = true;
             }
         }
 
         let name = match name {
             Some(name) => name,
             None => {
-                let name = self.default_command.clone();
-                let definition = self.get_definition();
+                let name = application.borrow().default_command.clone();
+                let definition = application.borrow_mut().get_definition();
                 let command_description = definition
                     .borrow()
                     .get_argument(&PhpMixed::from("command".to_string()))?
                     .get_description()
                     .to_string();
-                let _new_command_argument = InputArgument::new(
+                let new_command_argument = InputArgument::new(
                     "command".to_string(),
                     Some(InputArgument::OPTIONAL),
                     command_description,
@@ -1462,24 +1598,29 @@ impl Application {
                 )?;
                 // $definition->setArguments(array_merge($definition->getArguments(),
                 //     ['command' => new InputArgument('command', InputArgument::OPTIONAL, ...)]))
-                // TODO(review): get_arguments() yields Rc<InputArgument> (shared, non-Clone) while
-                // set_arguments() consumes owned InputArgument values. Re-building the merged
-                // argument list requires an InputArgument clone/ownership strategy not yet present.
-                definition.borrow_mut().set_arguments(todo!(
-                    "merge existing arguments with the new 'command' argument"
-                ))?;
+                let mut merged_arguments: Vec<InputArgument> = Vec::new();
+                let mut replaced_command = false;
+                for (key, argument) in definition.borrow().get_arguments() {
+                    if key == "command" {
+                        merged_arguments.push(new_command_argument.clone());
+                        replaced_command = true;
+                    } else {
+                        merged_arguments.push((**argument).clone());
+                    }
+                }
+                if !replaced_command {
+                    merged_arguments.push(new_command_argument);
+                }
+                definition.borrow_mut().set_arguments(merged_arguments)?;
 
                 name
             }
         };
 
         let command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>;
-        let find_result =
-            (|| -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-                self.running_command = None;
-                // the command name MUST be the first element of the input
-                self.find(&name)
-            })();
+        application.borrow_mut().running_command = None;
+        // the command name MUST be the first element of the input
+        let find_result = application.borrow_mut().find(&name);
 
         match find_result {
             Ok(c) => {
@@ -1528,7 +1669,7 @@ impl Application {
                     return Ok(1);
                 }
 
-                command = self.find(&alternative)?;
+                command = application.borrow_mut().find(&alternative)?;
             }
         }
 
@@ -1538,9 +1679,16 @@ impl Application {
         // needs a design decision about how lazy commands are represented.
         let _ = std::marker::PhantomData::<LazyCommand>;
 
-        self.running_command = Some(command.clone());
-        let exit_code = self.do_run_command(command.clone(), input.clone(), output.clone())?;
-        self.running_command = None;
+        application.borrow_mut().running_command = Some(command.clone());
+        // do_run_command invokes the command's run(), which calls back into the application
+        // (mergeApplicationDefinition etc.); it must run with no application borrow held.
+        let exit_code = Application::do_run_command(
+            application,
+            command.clone(),
+            input.clone(),
+            output.clone(),
+        )?;
+        application.borrow_mut().running_command = None;
 
         Ok(exit_code)
     }
@@ -2393,7 +2541,7 @@ impl Application {
     ///
     /// Returns 0 if everything went fine, or an error code.
     pub fn do_run_command(
-        &mut self,
+        application: &std::rc::Rc<std::cell::RefCell<Application>>,
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -2408,14 +2556,14 @@ impl Application {
             }
         }
 
-        if !self.signals_to_dispatch_event.is_empty() {
+        if !application.borrow().signals_to_dispatch_event.is_empty() {
             // $commandSignals = $command instanceof SignalableCommandInterface ? $command->getSubscribedSignals() : []
             // TODO(review): SymfonyCommand is not a SignalableCommandInterface here; downcast needed.
             let command_signals: Vec<i64> = Vec::new();
             let _ = std::marker::PhantomData::<dyn SignalableCommandInterface>;
 
             if !command_signals.is_empty() {
-                if self.signal_registry.is_none() {
+                if application.borrow().signal_registry.is_none() {
                     return Err(ConsoleRuntimeException(shirabe_php_shim::RuntimeException {
                         message: "Unable to subscribe to signal events. Make sure that the `pcntl` extension is installed and that \"pcntl_*\" functions are not disabled by your php.ini's \"disable_functions\" directive.".to_string(),
                         code: 0,
@@ -2440,10 +2588,7 @@ impl Application {
             }
         }
 
-        command.borrow_mut().run(
-            &mut *borrow_input_mut(&input),
-            &mut *borrow_output_mut(&output),
-        )
+        command.borrow_mut().run(input.clone(), output.clone())
     }
 
     /// Gets the name of the command based on input.
@@ -2540,18 +2685,21 @@ impl Application {
     pub fn base_get_default_commands(
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        // return [new HelpCommand(), new ListCommand(), new CompleteCommand(), new DumpCompletionCommand()];
-        // TODO(review): HelpCommand/ListCommand/CompleteCommand/DumpCompletionCommand are ported as
-        // distinct structs (not subtypes of the concrete `SymfonyCommand` struct), so they cannot populate
-        // a Vec<Rc<RefCell<dyn SymfonyCommand>>>. Reconciling SymfonyCommand subclassing with Rust requires the
-        // command-hierarchy design decision (see also `add`/`find`/LazyCommand handling).
-        let _ = std::marker::PhantomData::<(
-            shirabe_external_packages::symfony::console::command::help_command::HelpCommand,
-            shirabe_external_packages::symfony::console::command::list_command::ListCommand,
-            shirabe_external_packages::symfony::console::command::complete_command::CompleteCommand,
-            shirabe_external_packages::symfony::console::command::dump_completion_command::DumpCompletionCommand,
-        )>;
-        todo!("construct default commands once SymfonyCommand-subclass representation is decided")
+        use shirabe_external_packages::symfony::console::command::complete_command::CompleteCommand;
+        use shirabe_external_packages::symfony::console::command::dump_completion_command::DumpCompletionCommand;
+        use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
+        use shirabe_external_packages::symfony::console::command::list_command::ListCommand;
+
+        vec![
+            std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))
+                as std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
+            std::rc::Rc::new(std::cell::RefCell::new(ListCommand::new())),
+            std::rc::Rc::new(std::cell::RefCell::new(
+                CompleteCommand::new(IndexMap::new())
+                    .expect("CompleteCommand with default outputs is valid"),
+            )),
+            std::rc::Rc::new(std::cell::RefCell::new(DumpCompletionCommand::new())),
+        ]
     }
 
     /// Gets the default helper set with the helpers that should always be available.

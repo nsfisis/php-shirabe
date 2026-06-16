@@ -2,11 +2,21 @@
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
+use shirabe_php_shim::PhpMixed;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::dumper::ArrayDumper;
@@ -27,62 +37,14 @@ impl StatusCommand {
     const EXIT_CODE_UNPUSHED_CHANGES: i64 = 2;
     const EXIT_CODE_VERSION_CHANGES: i64 = 4;
 
-    pub fn configure(&mut self) {
-        self
-            .set_name("status")
-            .set_description("Shows a list of locally modified packages")
-            .set_definition(&[
-                InputOption::new("verbose", Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Show modified files for each directory that contains changes.", None).unwrap().into(),
-            ])
-            .set_help(
-                "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status"
-            );
-    }
-
-    pub fn execute(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
-        let composer_rc = self.require_composer(None, None)?;
-        {
-            let composer = crate::command::composer_full(&composer_rc);
-
-            // TODO(plugin): dispatch CommandEvent
-            let command_event =
-                CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
-
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::PRE_STATUS_CMD,
-                    true,
-                    vec![],
-                    indexmap::IndexMap::new(),
-                );
-        }
-
-        let exit_code = self.do_execute(input)?;
-
-        {
-            let composer = crate::command::composer_full(&composer_rc);
-            composer
-                .get_event_dispatcher()
-                .borrow_mut()
-                .dispatch_script(
-                    ScriptEvents::POST_STATUS_CMD,
-                    true,
-                    vec![],
-                    indexmap::IndexMap::new(),
-                );
-        }
-
-        Ok(exit_code)
+    pub fn new() -> Self {
+        let mut command = StatusCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("StatusCommand::configure uses static, valid metadata");
+        command
     }
 
     fn do_execute(
@@ -357,12 +319,88 @@ impl StatusCommand {
     }
 }
 
-impl HasBaseCommandData for StatusCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl Command for StatusCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("status")?;
+        self.set_description("Shows a list of locally modified packages");
+        self.set_definition(&[InputOption::new(
+            "verbose",
+            Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())),
+            Some(InputOption::VALUE_NONE),
+            "Show modified files for each directory that contains changes.",
+            None,
+        )
+        .unwrap()
+        .into()]);
+        self.set_help(
+            "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status"
+        );
+        Ok(())
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
+    fn execute(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
+        let composer_rc = self.require_composer(None, None)?;
+        {
+            let composer = crate::command::composer_full(&composer_rc);
+
+            // TODO(plugin): dispatch CommandEvent
+            let command_event =
+                CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch(Some(command_event.get_name()), None);
+
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::PRE_STATUS_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
+        }
+
+        let exit_code = self.do_execute(input)?;
+
+        {
+            let composer = crate::command::composer_full(&composer_rc);
+            composer
+                .get_event_dispatcher()
+                .borrow_mut()
+                .dispatch_script(
+                    ScriptEvents::POST_STATUS_CMD,
+                    true,
+                    vec![],
+                    indexmap::IndexMap::new(),
+                );
+        }
+
+        Ok(exit_code)
     }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for StatusCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }

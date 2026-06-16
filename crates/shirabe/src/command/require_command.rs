@@ -5,6 +5,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use shirabe_external_packages::composer::pcre::Preg;
 use shirabe_external_packages::seld::signal::SignalHandler;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{
@@ -12,16 +13,22 @@ use shirabe_php_shim::{
     array_keys, array_map, array_merge, array_unique, count, empty, file_exists, file_get_contents,
     file_put_contents, filesize, implode, is_writable, sprintf, strtolower, unlink,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
+use crate::advisory::AuditConfig;
 use crate::advisory::Auditor;
 use crate::command::PackageDiscoveryTrait;
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::dependency_resolver::Request;
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::installer::Installer;
 use crate::installer::InstallerEvents;
 use crate::io::IOInterface;
@@ -58,6 +65,26 @@ pub struct RequireCommand {
     /// contents before modification if the lock file exists
     lock_backup: Option<String>,
     dependency_resolution_completed: bool,
+}
+
+impl RequireCommand {
+    pub fn new() -> Self {
+        let mut command = RequireCommand {
+            base_command_data: BaseCommandData::new(None),
+            newly_created: false,
+            first_require: false,
+            json: None,
+            file: String::new(),
+            composer_backup: String::new(),
+            lock: String::new(),
+            lock_backup: None,
+            dependency_resolution_completed: false,
+        };
+        command
+            .configure()
+            .expect("RequireCommand::configure uses static, valid metadata");
+        command
+    }
 }
 
 impl PackageDiscoveryTrait for RequireCommand {
@@ -101,60 +128,60 @@ impl PackageDiscoveryTrait for RequireCommand {
     }
 }
 
-impl RequireCommand {
-    pub fn configure(&mut self) {
+impl Command for RequireCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
         // TODO(cli-completion): suggest_available_package_incl_platform / suggest_prefer_install
-        self
-            .set_name("require")
-            .set_aliases(&["r".to_string()])
-            .set_description("Adds required packages to your composer.json and installs them")
-            .set_definition(&[
-                InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Optional package name can also include a version constraint, e.g. foo/bar or foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None).unwrap().into(),
-                InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Add requirement to require-dev.", None).unwrap().into(),
-                InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
-                InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
-                InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
-                InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
-                InputOption::new("fixed", None, Some(InputOption::VALUE_NONE), "Write fixed version to the composer.json.", None).unwrap().into(),
-                InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
-                InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-                InputOption::new("no-update", None, Some(InputOption::VALUE_NONE), "Disables the automatic update of the dependencies (implies --no-install).", None).unwrap().into(),
-                InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
-                InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-                InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
-                InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
-                InputOption::new("update-no-dev", None, Some(InputOption::VALUE_NONE), "Run the dependency update with the --no-dev option.", None).unwrap().into(),
-                InputOption::new("update-with-dependencies", Some(PhpMixed::String("w".to_string())), Some(InputOption::VALUE_NONE), "Allows inherited dependencies to be updated, except those that are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
-                InputOption::new("update-with-all-dependencies", Some(PhpMixed::String("W".to_string())), Some(InputOption::VALUE_NONE), "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
-                InputOption::new("with-dependencies", None, Some(InputOption::VALUE_NONE), "Alias for --update-with-dependencies", None).unwrap().into(),
-                InputOption::new("with-all-dependencies", None, Some(InputOption::VALUE_NONE), "Alias for --update-with-all-dependencies", None).unwrap().into(),
-                InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-                InputOption::new("prefer-stable", None, Some(InputOption::VALUE_NONE), "Prefer stable versions of dependencies (can also be set via the COMPOSER_PREFER_STABLE=1 env var).", None).unwrap().into(),
-                InputOption::new("prefer-lowest", None, Some(InputOption::VALUE_NONE), "Prefer lowest versions of dependencies (can also be set via the COMPOSER_PREFER_LOWEST=1 env var).", None).unwrap().into(),
-                InputOption::new("minimal-changes", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
-                InputOption::new("sort-packages", None, Some(InputOption::VALUE_NONE), "Sorts packages when adding/updating a new dependency", None).unwrap().into(),
-                InputOption::new("optimize-autoloader", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-                InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
-                InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
-            ])
-            .set_help(
-                "The require command adds required packages to your composer.json and installs them.\n\
-                \n\
-                If you do not specify a package, composer will prompt you to search for a package, and given results, provide a list of\n\
-                matches to require.\n\
-                \n\
-                If you do not specify a version constraint, composer will choose a suitable one based on the available package versions.\n\
-                \n\
-                If you do not want to install the new dependencies immediately you can call it with --no-update\n\
-                \n\
-                Read more at https://getcomposer.org/doc/03-cli.md#require-r"
-            );
+        self.set_name("require")?;
+        self.set_aliases(vec!["r".to_string()])?;
+        self.set_description("Adds required packages to your composer.json and installs them");
+        self.set_definition(&[
+            InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Optional package name can also include a version constraint, e.g. foo/bar or foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None).unwrap().into(),
+            InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Add requirement to require-dev.", None).unwrap().into(),
+            InputOption::new("dry-run", None, Some(InputOption::VALUE_NONE), "Outputs the operations but will not execute anything (implicitly enables --verbose).", None).unwrap().into(),
+            InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
+            InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
+            InputOption::new("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None).unwrap().into(),
+            InputOption::new("fixed", None, Some(InputOption::VALUE_NONE), "Write fixed version to the composer.json.", None).unwrap().into(),
+            InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
+            InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
+            InputOption::new("no-update", None, Some(InputOption::VALUE_NONE), "Disables the automatic update of the dependencies (implies --no-install).", None).unwrap().into(),
+            InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
+            InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
+            InputOption::new("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string()))).unwrap().into(),
+            InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
+            InputOption::new("update-no-dev", None, Some(InputOption::VALUE_NONE), "Run the dependency update with the --no-dev option.", None).unwrap().into(),
+            InputOption::new("update-with-dependencies", Some(PhpMixed::String("w".to_string())), Some(InputOption::VALUE_NONE), "Allows inherited dependencies to be updated, except those that are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("update-with-all-dependencies", Some(PhpMixed::String("W".to_string())), Some(InputOption::VALUE_NONE), "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("with-dependencies", None, Some(InputOption::VALUE_NONE), "Alias for --update-with-dependencies", None).unwrap().into(),
+            InputOption::new("with-all-dependencies", None, Some(InputOption::VALUE_NONE), "Alias for --update-with-all-dependencies", None).unwrap().into(),
+            InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
+            InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
+            InputOption::new("prefer-stable", None, Some(InputOption::VALUE_NONE), "Prefer stable versions of dependencies (can also be set via the COMPOSER_PREFER_STABLE=1 env var).", None).unwrap().into(),
+            InputOption::new("prefer-lowest", None, Some(InputOption::VALUE_NONE), "Prefer lowest versions of dependencies (can also be set via the COMPOSER_PREFER_LOWEST=1 env var).", None).unwrap().into(),
+            InputOption::new("minimal-changes", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
+            InputOption::new("sort-packages", None, Some(InputOption::VALUE_NONE), "Sorts packages when adding/updating a new dependency", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
+            InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
+        ]);
+        self.set_help(
+            "The require command adds required packages to your composer.json and installs them.\n\
+            \n\
+            If you do not specify a package, composer will prompt you to search for a package, and given results, provide a list of\n\
+            matches to require.\n\
+            \n\
+            If you do not specify a version constraint, composer will choose a suitable one based on the available package versions.\n\
+            \n\
+            If you do not want to install the new dependencies immediately you can call it with --no-update\n\
+            \n\
+            Read more at https://getcomposer.org/doc/03-cli.md#require-r"
+        );
+        Ok(())
     }
 
     /// @throws \Seld\JsonLint\ParsingException
-    pub fn execute(
+    fn execute(
         &mut self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -636,6 +663,35 @@ impl RequireCommand {
         result
     }
 
+    fn interact(
+        &mut self,
+        _input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) {
+    }
+
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
+    }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl BaseCommand for RequireCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
+    }
+
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+impl RequireCommand {
     /// @param array<string, string> $newRequirements
     /// @return string[]
     fn get_inconsistent_require_keys(
@@ -1232,13 +1288,6 @@ impl RequireCommand {
         true
     }
 
-    pub(crate) fn interact(
-        &self,
-        _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) {
-    }
-
     fn revert_composer_file(&mut self) {
         if self.newly_created {
             let msg = format!(
@@ -1269,15 +1318,5 @@ impl RequireCommand {
                 file_put_contents(&self.lock, lock_backup.as_bytes());
             }
         }
-    }
-}
-
-impl HasBaseCommandData for RequireCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
-    }
-
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
     }
 }

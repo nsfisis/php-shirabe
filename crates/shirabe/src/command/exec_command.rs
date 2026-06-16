@@ -1,13 +1,23 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php
 
 use anyhow::Result;
+use indexmap::IndexMap;
+use shirabe_external_packages::symfony::console::command::command::Command;
 use shirabe_external_packages::symfony::console::input::InputInterface;
 use shirabe_external_packages::symfony::console::output::OutputInterface;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob};
+use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::command::{BaseCommand, BaseCommandData, HasBaseCommandData};
+use crate::advisory::AuditConfig;
+use crate::command::BaseCommand;
+use crate::command::BaseCommandData;
+use crate::command::base_command::base_command_initialize;
+use crate::composer::PartialComposerHandle;
+use crate::config::Config;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 
@@ -17,73 +27,123 @@ pub struct ExecCommand {
 }
 
 impl ExecCommand {
-    pub fn configure(&mut self) {
-        self
-            .set_name("exec")
-            .set_description("Executes a vendored binary/script")
-            .set_definition(&[
-                InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
-                // TODO(cli-completion): suggest installed binary names (via get_binaries) for `binary` argument
-                InputArgument::new("binary",
-                Some(InputArgument::OPTIONAL),
-                "The binary to run, e.g. phpunit",
-                None,).unwrap().into(),
-                InputArgument::new("args",
-                Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
-                "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
-                None,).unwrap().into(),
-            ])
-            .set_help(
-                "Executes a vendored binary/script.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#exec"
-            );
+    pub fn new() -> Self {
+        let mut command = ExecCommand {
+            base_command_data: BaseCommandData::new(None),
+        };
+        command
+            .configure()
+            .expect("ExecCommand::configure uses static, valid metadata");
+        command
     }
 
-    pub fn interact(
-        &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<()> {
-        let binaries = self.get_binaries(false)?;
-        if binaries.is_empty() {
-            return Ok(());
+    fn get_binaries(&mut self, for_display: bool) -> Result<Vec<String>> {
+        let composer = self.require_composer(None, None)?;
+        let composer_ref = crate::command::composer_full_mut(&composer);
+        let bin_dir = composer_ref
+            .get_config()
+            .borrow_mut()
+            .get("bin-dir")
+            .as_string()
+            .unwrap_or("")
+            .to_string();
+        let bins = glob(&format!("{}/*", bin_dir));
+        let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
+        let local_bins: Vec<String> = if for_display {
+            local_bins_raw
+                .into_iter()
+                .map(|e| format!("{} (local)", e))
+                .collect()
+        } else {
+            local_bins_raw
+        };
+
+        let mut binaries: Vec<String> = Vec::new();
+        let mut previous_bin: Option<String> = None;
+        for bin in bins.iter().chain(local_bins.iter()) {
+            if let Some(prev) = &previous_bin {
+                if bin == &format!("{}.bat", prev) {
+                    continue;
+                }
+            }
+            previous_bin = Some(bin.clone());
+            binaries.push(basename(bin));
         }
 
-        if input.borrow().get_argument("binary")?.as_string().is_some()
-            || input
-                .borrow()
-                .get_option("list")?
-                .as_bool()
-                .unwrap_or(false)
-        {
-            return Ok(());
-        }
+        Ok(binaries)
+    }
+}
 
-        let io = self.get_io();
-        let binary = io.select(
-            "Binary to run: ".to_string(),
-            binaries.clone(),
-            PhpMixed::String(String::new()),
-            PhpMixed::Int(1),
-            "Invalid binary name \"%s\"".to_string(),
-            false,
+impl Command for ExecCommand {
+    fn configure(&mut self) -> anyhow::Result<()> {
+        self.set_name("exec")?;
+        self.set_description("Executes a vendored binary/script");
+        self.set_definition(&[
+            InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
+            // TODO(cli-completion): suggest installed binary names (via get_binaries) for `binary` argument
+            InputArgument::new("binary",
+            Some(InputArgument::OPTIONAL),
+            "The binary to run, e.g. phpunit",
+            None,).unwrap().into(),
+            InputArgument::new("args",
+            Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
+            "Arguments to pass to the binary. Use <info>--</info> to separate from composer arguments",
+            None,).unwrap().into(),
+        ]);
+        self.set_help(
+            "Executes a vendored binary/script.\n\n\
+            Read more at https://getcomposer.org/doc/03-cli.md#exec",
         );
-
-        if let Some(idx) = binary.as_int() {
-            input.borrow_mut().set_argument(
-                "binary",
-                shirabe_php_shim::PhpMixed::String(binaries[idx as usize].clone()),
-            );
-        }
-
         Ok(())
     }
 
-    pub fn execute(
+    fn interact(
         &mut self,
-        input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> Result<i64> {
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) {
+        let _ = (|| -> anyhow::Result<()> {
+            let binaries = self.get_binaries(false)?;
+            if binaries.is_empty() {
+                return Ok(());
+            }
+
+            if input.borrow().get_argument("binary")?.as_string().is_some()
+                || input
+                    .borrow()
+                    .get_option("list")?
+                    .as_bool()
+                    .unwrap_or(false)
+            {
+                return Ok(());
+            }
+
+            let io = self.get_io();
+            let binary = io.select(
+                "Binary to run: ".to_string(),
+                binaries.clone(),
+                PhpMixed::String(String::new()),
+                PhpMixed::Int(1),
+                "Invalid binary name \"%s\"".to_string(),
+                false,
+            );
+
+            if let Some(idx) = binary.as_int() {
+                input.borrow_mut().set_argument(
+                    "binary",
+                    shirabe_php_shim::PhpMixed::String(binaries[idx as usize].clone()),
+                );
+            }
+
+            Ok(())
+        })();
+    }
+
+    fn execute(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        _output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<i64> {
         let composer = self.require_composer(None, None)?;
 
         if input
@@ -137,7 +197,10 @@ impl ExecCommand {
             0,
         );
 
-        let initial_working_directory = self.get_application()?.get_initial_working_directory();
+        // TODO(phase-c): getApplication()->getInitialWorkingDirectory() needs the shared shirabe
+        // Application handle (deferred with the Application shared-ownership work). Until then the
+        // working-directory restore is skipped.
+        let initial_working_directory: Option<String> = None;
         if let Some(ref iwd) = initial_working_directory {
             if getcwd().as_deref() != Some(iwd.as_str()) {
                 chdir(iwd).map_err(|e| RuntimeException {
@@ -166,49 +229,23 @@ impl ExecCommand {
         )?)
     }
 
-    fn get_binaries(&mut self, for_display: bool) -> Result<Vec<String>> {
-        let composer = self.require_composer(None, None)?;
-        let composer_ref = crate::command::composer_full_mut(&composer);
-        let bin_dir = composer_ref
-            .get_config()
-            .borrow_mut()
-            .get("bin-dir")
-            .as_string()
-            .unwrap_or("")
-            .to_string();
-        let bins = glob(&format!("{}/*", bin_dir));
-        let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
-        let local_bins: Vec<String> = if for_display {
-            local_bins_raw
-                .into_iter()
-                .map(|e| format!("{} (local)", e))
-                .collect()
-        } else {
-            local_bins_raw
-        };
-
-        let mut binaries: Vec<String> = Vec::new();
-        let mut previous_bin: Option<String> = None;
-        for bin in bins.iter().chain(local_bins.iter()) {
-            if let Some(prev) = &previous_bin {
-                if bin == &format!("{}.bat", prev) {
-                    continue;
-                }
-            }
-            previous_bin = Some(bin.clone());
-            binaries.push(basename(bin));
-        }
-
-        Ok(binaries)
+    fn initialize(
+        &mut self,
+        input: Rc<RefCell<dyn InputInterface>>,
+        output: Rc<RefCell<dyn OutputInterface>>,
+    ) -> anyhow::Result<()> {
+        base_command_initialize(self, input, output)
     }
+
+    shirabe_external_packages::delegate_command_trait_impls_to_inner!(base_command_data);
 }
 
-impl HasBaseCommandData for ExecCommand {
-    fn base_command_data(&self) -> &BaseCommandData {
-        &self.base_command_data
+impl BaseCommand for ExecCommand {
+    fn command_data_mut(
+        &mut self,
+    ) -> &mut shirabe_external_packages::symfony::console::command::command::CommandData {
+        self.base_command_data.command_data_mut()
     }
 
-    fn base_command_data_mut(&mut self) -> &mut BaseCommandData {
-        &mut self.base_command_data
-    }
+    crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
 }
