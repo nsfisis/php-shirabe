@@ -4,7 +4,9 @@ use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;
 use crate::symfony::console::descriptor::application_description::ApplicationDescription;
 use crate::symfony::console::descriptor::descriptor::Descriptor;
-use crate::symfony::console::descriptor::descriptor_interface::DescriptorInterface;
+use crate::symfony::console::descriptor::descriptor_interface::{
+    DescribableObject, DescriptorInterface,
+};
 use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
@@ -372,7 +374,7 @@ impl DescriptorInterface for XmlDescriptor {
     fn describe(
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        object: PhpMixed,
+        object: DescribableObject,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         Descriptor::describe(self, output, object, options)

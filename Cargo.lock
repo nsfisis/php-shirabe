@@ -1023,6 +1023,7 @@ dependencies = [
  "indexmap",
  "regex",
  "serde",
+ "serde_json",
  "zip",
 ]
 

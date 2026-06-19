@@ -6,6 +6,7 @@ use crate::symfony::console::completion::completion_suggestions::{
     CompletionSuggestions, StringOrSuggestion,
 };
 use crate::symfony::console::descriptor::application_description::ApplicationDescription;
+use crate::symfony::console::descriptor::descriptor_interface::DescribableObject;
 use crate::symfony::console::helper::descriptor_helper::DescriptorHelper;
 use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_definition::DefinitionItem;
@@ -137,15 +138,12 @@ impl Command for HelpCommand {
             self.command = Some(application.borrow_mut().find(&command_name)?);
         }
 
-        let helper = DescriptorHelper::new();
-        // TODO: DescriptorHelper::describe2 takes the described object as Option<PhpMixed>,
-        // but PhpMixed cannot hold a Command. The Command/Application object mixing for
-        // describe needs a dedicated type (Phase C).
-        let object: Option<PhpMixed> = todo!();
+        let mut helper = DescriptorHelper::new();
+        let object = DescribableObject::Command(self.command.clone().unwrap());
         let mut options = indexmap::IndexMap::new();
         options.insert("format".to_string(), input.borrow().get_option("format")?);
         options.insert("raw_text".to_string(), input.borrow().get_option("raw")?);
-        let _ = helper.describe2(&mut *output.borrow_mut(), object, options);
+        helper.describe2(output.clone(), object, options)?;
 
         self.command = None;
 

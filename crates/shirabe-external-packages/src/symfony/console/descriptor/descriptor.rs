@@ -2,8 +2,9 @@
 
 use crate::symfony::console::application::Application;
 use crate::symfony::console::command::command::Command;
-use crate::symfony::console::descriptor::descriptor_interface::DescriptorInterface;
-use crate::symfony::console::exception::invalid_argument_exception::InvalidArgumentException;
+use crate::symfony::console::descriptor::descriptor_interface::{
+    DescribableObject, DescriptorInterface,
+};
 use crate::symfony::console::input::input_argument::InputArgument;
 use crate::symfony::console::input::input_definition::InputDefinition;
 use crate::symfony::console::input::input_option::InputOption;
@@ -20,51 +21,28 @@ pub trait Descriptor: DescriptorInterface {
     fn describe(
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        object: PhpMixed,
+        object: DescribableObject,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         self.set_output(output);
 
-        // PHP dispatches via `$object instanceof ...`. The concrete runtime type of
-        // `object` must be recovered to route to the correct describe* method.
-        match true {
-            // case $object instanceof InputArgument:
-            _ if todo!("$object instanceof InputArgument") => {
-                let argument: InputArgument = todo!("downcast object to InputArgument");
+        // PHP dispatches via `$object instanceof ...`; the explicit `DescribableObject` enum makes
+        // that dispatch a `match`.
+        match object {
+            DescribableObject::InputArgument(argument) => {
                 self.describe_input_argument(&argument, options)?;
             }
-            // case $object instanceof InputOption:
-            _ if todo!("$object instanceof InputOption") => {
-                let option: InputOption = todo!("downcast object to InputOption");
+            DescribableObject::InputOption(option) => {
                 self.describe_input_option(&option, options)?;
             }
-            // case $object instanceof InputDefinition:
-            _ if todo!("$object instanceof InputDefinition") => {
-                let definition: InputDefinition = todo!("downcast object to InputDefinition");
+            DescribableObject::InputDefinition(definition) => {
                 self.describe_input_definition(&definition, options)?;
             }
-            // case $object instanceof Command:
-            _ if todo!("$object instanceof Command") => {
-                let mut command: Box<dyn Command> = todo!("downcast object to Command");
-                self.describe_command(command.as_mut(), options)?;
+            DescribableObject::Command(command) => {
+                self.describe_command(&mut *command.borrow_mut(), options)?;
             }
-            // case $object instanceof Application:
-            _ if todo!("$object instanceof Application") => {
-                let application: std::rc::Rc<std::cell::RefCell<dyn Application>> =
-                    todo!("downcast object to Application");
+            DescribableObject::Application(application) => {
                 self.describe_application(application, options)?;
-            }
-            _ => {
-                return Err(
-                    InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
-                        message: format!(
-                            "Object of type \"{}\" is not describable.",
-                            shirabe_php_shim::get_debug_type(&object)
-                        ),
-                        code: 0,
-                    })
-                    .into(),
-                );
             }
         }
 

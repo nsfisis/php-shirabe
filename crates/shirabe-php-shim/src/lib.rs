@@ -492,8 +492,14 @@ pub fn array_keys<V>(_array: &IndexMap<String, V>) -> Vec<String> {
     _array.keys().cloned().collect()
 }
 
-pub fn str_replace(_search: &str, _replace: &str, _subject: &str) -> String {
-    todo!()
+pub fn str_replace(search: &str, replace: &str, subject: &str) -> String {
+    // PHP returns the subject unchanged when the search string is empty, whereas Rust's
+    // `str::replace` would insert `replace` between every character.
+    if search.is_empty() {
+        return subject.to_string();
+    }
+
+    subject.replace(search, replace)
 }
 
 pub fn php_to_string(value: &PhpMixed) -> String {
@@ -1362,8 +1368,35 @@ pub fn filesize(_path: &str) -> Option<i64> {
     std::fs::metadata(_path).ok().map(|m| m.len() as i64)
 }
 
-pub fn json_encode_ex<T: serde::Serialize + ?Sized>(_value: &T, _flags: i64) -> Option<String> {
-    todo!()
+pub fn json_encode_ex<T: serde::Serialize + ?Sized>(value: &T, flags: i64) -> Option<String> {
+    // serde_json's compact output already matches PHP's `json_encode` with both
+    // JSON_UNESCAPED_SLASHES and JSON_UNESCAPED_UNICODE set: forward slashes and non-ASCII
+    // characters are emitted verbatim. The two flags below re-apply PHP's default escaping when
+    // they are absent.
+    // TODO(phase-c): other flags (e.g. JSON_PRETTY_PRINT, JSON_HEX_*, JSON_THROW_ON_ERROR) are not
+    // handled yet; add them when a call site needs them.
+    let mut s = serde_json::to_string(value).ok()?;
+
+    if flags & JSON_UNESCAPED_SLASHES == 0 {
+        s = s.replace('/', "\\/");
+    }
+
+    if flags & JSON_UNESCAPED_UNICODE == 0 {
+        let mut out = String::with_capacity(s.len());
+        for c in s.chars() {
+            if (c as u32) <= 0x7F {
+                out.push(c);
+            } else {
+                let mut buf = [0u16; 2];
+                for unit in c.encode_utf16(&mut buf) {
+                    out.push_str(&format!("\\u{:04x}", unit));
+                }
+            }
+        }
+        s = out;
+    }
+
+    Some(s)
 }
 
 pub const JSON_INVALID_UTF8_IGNORE: i64 = 1048576;
@@ -1650,8 +1683,15 @@ pub fn feof(_stream: PhpMixed) -> bool {
     todo!()
 }
 
-pub fn str_replace_array(_search: &[String], _replace: &[String], _subject: &str) -> String {
-    todo!()
+pub fn str_replace_array(search: &[String], replace: &[String], subject: &str) -> String {
+    // PHP's array form of str_replace replaces each search element in order with the replace
+    // element at the same index, falling back to an empty string when replace is shorter.
+    let mut result = subject.to_string();
+    for (i, s) in search.iter().enumerate() {
+        let r = replace.get(i).map(String::as_str).unwrap_or("");
+        result = str_replace(s, r, &result);
+    }
+    result
 }
 
 pub fn file(_filename: &str, _flags: i64) -> Option<Vec<String>> {

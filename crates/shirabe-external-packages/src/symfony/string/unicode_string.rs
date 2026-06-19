@@ -6,12 +6,32 @@ pub struct UnicodeString {
 }
 
 impl UnicodeString {
-    pub fn new(_string: &str) -> Self {
-        todo!()
+    // TODO(phase-c): the real constructor runs `normalizer_normalize` (Unicode NFC normalization),
+    // which has no Rust std equivalent and would need a dedicated normalization implementation.
+    // Normalization is skipped here, which is only correct for already-NFC input such as ASCII.
+    pub fn new(string: &str) -> Self {
+        Self {
+            string: string.to_string(),
+        }
     }
 
-    pub fn width(&self, _ignore_unsupported_encoding: bool) -> i64 {
-        todo!()
+    // TODO(phase-c): ASCII-only provisional implementation. The faithful `width()` uses `wcswidth`
+    // with the Unicode width tables to treat wide characters as width 2 and skip zero-width /
+    // combining characters; here every character counts as width 1, correct only for ASCII. The
+    // ANSI/control-character stripping driven by `ignore_ansi_decoration` is likewise not handled.
+    pub fn width(&self, _ignore_ansi_decoration: bool) -> i64 {
+        let s = self.string.replace(['\x00', '\x05', '\x07'], "");
+        let s = s.replace("\r\n", "\n").replace('\r', "\n");
+
+        let mut width: i64 = 0;
+        for line in s.split('\n') {
+            let line_width = line.chars().count() as i64;
+            if line_width > width {
+                width = line_width;
+            }
+        }
+
+        width
     }
 
     pub fn length(&self) -> i64 {

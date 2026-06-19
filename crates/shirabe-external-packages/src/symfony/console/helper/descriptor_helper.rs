@@ -1,6 +1,8 @@
 //! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
 
-use crate::symfony::console::descriptor::descriptor_interface::DescriptorInterface;
+use crate::symfony::console::descriptor::descriptor_interface::{
+    DescribableObject, DescriptorInterface,
+};
 use crate::symfony::console::descriptor::json_descriptor::JsonDescriptor;
 use crate::symfony::console::descriptor::markdown_descriptor::MarkdownDescriptor;
 use crate::symfony::console::descriptor::text_descriptor::TextDescriptor;
@@ -39,16 +41,10 @@ impl DescriptorHelper {
             inner: Helper::default(),
             descriptors: IndexMap::new(),
         };
-        // The XML/JSON/Markdown descriptors do not yet expose a constructor
-        // (no `Default`/`new`); their construction is deferred until those
-        // descriptor types provide one.
-        let xml: Box<dyn DescriptorInterface> = todo!();
-        let json: Box<dyn DescriptorInterface> = todo!();
-        let md: Box<dyn DescriptorInterface> = todo!();
         this.register("txt", Box::new(TextDescriptor::default()))
-            .register("xml", xml)
-            .register("json", json)
-            .register("md", md);
+            .register("xml", Box::new(XmlDescriptor::default()))
+            .register("json", Box::new(JsonDescriptor::default()))
+            .register("md", Box::new(MarkdownDescriptor::default()));
         this
     }
 
@@ -60,11 +56,11 @@ impl DescriptorHelper {
     ///
     /// @throws InvalidArgumentException when the given format is not supported
     pub fn describe2(
-        &self,
-        output: &dyn OutputInterface,
-        object: Option<shirabe_php_shim::PhpMixed>,
+        &mut self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+        object: DescribableObject,
         options: IndexMap<String, shirabe_php_shim::PhpMixed>,
-    ) -> Result<(), InvalidArgumentException> {
+    ) -> anyhow::Result<()> {
         let mut merged: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
         merged.insert(
             "raw_text".to_string(),
@@ -85,23 +81,20 @@ impl DescriptorHelper {
         };
 
         if !self.descriptors.contains_key(&format) {
-            return Err(InvalidArgumentException(
-                shirabe_php_shim::InvalidArgumentException {
+            return Err(
+                InvalidArgumentException(shirabe_php_shim::InvalidArgumentException {
                     message: format!(
                         "Unsupported format \"{}\".",
                         shirabe_php_shim::PhpMixed::String(format.clone()),
                     ),
                     code: 0,
-                },
-            ));
+                })
+                .into(),
+            );
         }
 
-        let _ = (&self.descriptors[&format], output, object, options);
-        // `DescriptorInterface::describe` takes an owned
-        // `Rc<RefCell<dyn OutputInterface>>` and `&mut self`, while the helper
-        // only holds a shared `&dyn OutputInterface` and `&self`. Reconciling
-        // this ownership/mutability gap is a Phase C decision.
-        todo!("dispatch to DescriptorInterface::describe (Phase C ownership)");
+        let descriptor = self.descriptors.get_mut(&format).unwrap();
+        descriptor.describe(output, object, options)
     }
 
     /// Registers a descriptor.

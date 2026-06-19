@@ -8,6 +8,7 @@ use shirabe_external_packages::composer::xdebug_handler::XdebugHandler;
 use shirabe_external_packages::seld::json_lint::ParsingException;
 use shirabe_external_packages::symfony::console::application::Application as BaseApplication;
 use shirabe_external_packages::symfony::console::command::Command as SymfonyCommand;
+use shirabe_external_packages::symfony::console::command::help_command::HelpCommand;
 use shirabe_external_packages::symfony::console::command::lazy_command::LazyCommand;
 use shirabe_external_packages::symfony::console::command::signalable_command_interface::SignalableCommandInterface;
 use shirabe_external_packages::symfony::console::command_loader::command_loader_interface::CommandLoaderInterface;
@@ -1371,15 +1372,6 @@ impl Application {
         // downcasts each plugin's CommandProvider capability — this is the Plugin API surface,
         // which is intentionally unimplemented (see TODO(plugin) above). Returns an empty list
         // until the plugin capability model exists.
-        let _ = self.get_composer(false, Some(false), None)?;
-        let _ = UnexpectedValueException {
-            message: String::new(),
-            code: 0,
-        };
-        let _: fn(PhpMixed, PhpMixed) -> PhpMixed = array_merge;
-        let _: fn(&PhpMixed) -> String = get_class;
-        let _ = shirabe_php_shim::ArrayObject::new(None);
-        let _: IndexMap<String, PhpMixed> = IndexMap::new();
 
         Ok(commands)
     }
@@ -1913,16 +1905,13 @@ impl Application {
             self.want_helps = false;
 
             let help_command = self.get("help")?;
-            // $helpCommand->setCommand($command);
-            // TODO(review): setCommand() is defined on HelpCommand, not on the concrete
-            // `SymfonyCommand`
-            // struct; calling it through the Rc<RefCell<dyn SymfonyCommand>> needs the
-            // SymfonyCommand-subclass
-            // representation decision (downcast to HelpCommand).
-            let _ = &command;
-            todo!("help_command.set_command(command)");
+            help_command
+                .borrow_mut()
+                .as_any_mut()
+                .downcast_mut::<HelpCommand>()
+                .expect("the help command is a HelpCommand instance")
+                .set_command(command);
 
-            #[allow(unreachable_code)]
             return Ok(help_command);
         }
 
@@ -2067,7 +2056,18 @@ impl Application {
         let commands_snapshot: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
             self.commands.values().cloned().collect();
         for command in &commands_snapshot {
-            for alias in command.borrow().get_aliases() {
+            // A command's run() can re-enter find() (e.g. HelpCommand looks up the command it
+            // describes). That command is mutably borrowed for the duration of its run(), so it
+            // cannot be borrowed here. It is safe to skip: find() always completes this alias pass
+            // before returning a command, so any command currently executing already had its
+            // aliases registered in the earlier find() call that located it.
+            // TODO: this work-around could be solved.
+            let Ok(borrowed) = command.try_borrow() else {
+                continue;
+            };
+            let aliases = borrowed.get_aliases();
+            drop(borrowed);
+            for alias in aliases {
                 if !self.has(&alias) {
                     self.commands.insert(alias, command.clone());
                 }
