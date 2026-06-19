@@ -206,7 +206,7 @@ impl JsonConfigSource {
     }
 
     /// PHP:
-    /// ```
+    /// ```php
     /// if (!array_is_list($config['repositories'] ?? [])) { convert the keyed map to a list }
     /// ```
     fn normalize_repositories_to_list(root: &mut IndexMap<String, Box<PhpMixed>>) {
@@ -243,7 +243,7 @@ impl JsonConfigSource {
     }
 
     /// PHP:
-    /// ```
+    /// ```php
     /// $config['repositories'] = array_values(
     ///     array_filter(
     ///         $config['repositories'] ?? [],

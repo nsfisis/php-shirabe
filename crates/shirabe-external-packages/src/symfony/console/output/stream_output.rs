@@ -10,11 +10,15 @@ use crate::symfony::console::output::output_interface::VERBOSITY_NORMAL;
 ///
 /// Usage:
 ///
-///     $output = new StreamOutput(fopen('php://stdout', 'w'));
+/// ```php
+/// $output = new StreamOutput(fopen('php://stdout', 'w'));
+/// ```
 ///
 /// As `StreamOutput` can use any stream, you can also use a file:
 ///
-///     $output = new StreamOutput(fopen('/path/to/output.log', 'a', false));
+/// ```php
+/// $output = new StreamOutput(fopen('/path/to/output.log', 'a', false));
+/// ```
 #[derive(Debug)]
 pub struct StreamOutput {
     inner: Output,

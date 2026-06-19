@@ -11,12 +11,16 @@ use crate::symfony::console::output::stream_output::StreamOutput;
 ///
 /// This class is a convenient wrapper around `StreamOutput` for both STDOUT and STDERR.
 ///
-///     $output = new ConsoleOutput();
+/// ```php
+/// $output = new ConsoleOutput();
+/// ```
 ///
 /// This is equivalent to:
 ///
-///     $output = new StreamOutput(fopen('php://stdout', 'w'));
-///     $stdErr = new StreamOutput(fopen('php://stderr', 'w'));
+/// ```php
+/// $output = new StreamOutput(fopen('php://stdout', 'w'));
+/// $stdErr = new StreamOutput(fopen('php://stderr', 'w'));
+/// ```
 #[derive(Debug)]
 pub struct ConsoleOutput {
     inner: StreamOutput,

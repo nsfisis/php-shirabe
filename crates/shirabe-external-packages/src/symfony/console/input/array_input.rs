@@ -12,7 +12,9 @@ use shirabe_php_shim::PhpMixed;
 ///
 /// Usage:
 ///
-///     $input = new ArrayInput(['command' => 'foo:bar', 'foo' => 'bar', '--bar' => 'foobar']);
+/// ```php
+/// $input = new ArrayInput(['command' => 'foo:bar', 'foo' => 'bar', '--bar' => 'foobar']);
+/// ```
 ///
 /// PHP arrays can mix integer and string keys; `parameters` preserves both the
 /// key type (`PhpMixed::Int` / `PhpMixed::String`) and the insertion order.

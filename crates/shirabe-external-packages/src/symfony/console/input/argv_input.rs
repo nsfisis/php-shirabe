@@ -12,13 +12,17 @@ use shirabe_php_shim::PhpMixed;
 ///
 /// Usage:
 ///
-///     $input = new ArgvInput();
+/// ```php
+/// $input = new ArgvInput();
+/// ```
 ///
 /// By default, the `$_SERVER['argv']` array is used for the input values.
 ///
 /// This can be overridden by explicitly passing the input values in the constructor:
 ///
-///     $input = new ArgvInput($_SERVER['argv']);
+/// ```php
+/// $input = new ArgvInput($_SERVER['argv']);
+/// ```
 ///
 /// If you pass it yourself, don't forget that the first element of the array
 /// is the name of the running application.

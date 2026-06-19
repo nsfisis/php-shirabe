@@ -11,7 +11,9 @@ use shirabe_php_shim::{CaptureKey, PhpMixed};
 ///
 /// Usage:
 ///
-///     $input = new StringInput('foo --bar="foobar"');
+/// ```php
+/// $input = new StringInput('foo --bar="foobar"');
+/// ```
 #[derive(Debug, Clone)]
 pub struct StringInput {
     pub(crate) inner: ArgvInput,
