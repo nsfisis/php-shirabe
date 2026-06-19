@@ -556,7 +556,7 @@ impl JsonManipulator {
                     .get(name)
                     .map(|v| v.as_bool() == Some(false))
                     .unwrap_or(false)
-                    && 1 == count(&PhpMixed::Array(repository_as_array.clone()))
+                    && 1 == repository_as_array.len()
                 {
                     let idx: i64 = repository_index.parse().unwrap_or(0);
                     if !self.remove_list_item("repositories", idx)? {

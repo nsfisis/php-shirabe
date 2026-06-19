@@ -736,22 +736,7 @@ impl CurlDownloader {
     }
 
     pub fn tick(&mut self) -> anyhow::Result<()> {
-        if count(&PhpMixed::Array(
-            self.jobs
-                .iter()
-                .map(|(k, v)| {
-                    (
-                        k.to_string(),
-                        Box::new(PhpMixed::Array(
-                            v.iter()
-                                .map(|(k2, v2)| (k2.clone(), Box::new(v2.clone())))
-                                .collect(),
-                        )),
-                    )
-                })
-                .collect(),
-        )) == 0
-        {
+        if self.jobs.is_empty() {
             return Ok(());
         }
 

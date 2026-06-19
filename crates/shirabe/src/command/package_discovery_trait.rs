@@ -268,10 +268,7 @@ pub trait PackageDiscoveryTrait {
                 None,
             )?;
 
-            if count(&PhpMixed::List(
-                matches.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
-            )) > 0
-            {
+            if matches.len() > 0 {
                 // Remove existing packages from search results.
                 matches.retain(|found_package| {
                     !in_array(
@@ -298,10 +295,7 @@ pub trait PackageDiscoveryTrait {
                 if !exact_match {
                     let providers: IndexMap<String, crate::repository::ProviderInfo> =
                         self.get_repos().get_providers(package.clone())?;
-                    if count(&PhpMixed::List(
-                        providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
-                    )) > 0
-                    {
+                    if providers.len() > 0 {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
                         matches.insert(
                             0,
@@ -536,10 +530,7 @@ pub trait PackageDiscoveryTrait {
 
             // Check if it is a virtual package provided by others
             let providers = repo_set.borrow().get_providers(name)?;
-            if count(&PhpMixed::List(
-                providers.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
-            )) > 0
-            {
+            if providers.len() > 0 {
                 let mut constraint = "*".to_string();
                 if input.borrow().is_interactive() {
                     let providers_count = providers.len();
@@ -702,10 +693,7 @@ pub trait PackageDiscoveryTrait {
 
             // Check for similar names/typos
             let similar = self.find_similar(name)?;
-            if count(&PhpMixed::List(
-                similar.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
-            )) > 0
-            {
+            if similar.len() > 0 {
                 if in_array(
                     PhpMixed::String(name.to_string()),
                     &PhpMixed::List(
@@ -925,10 +913,7 @@ pub trait PackageDiscoveryTrait {
             }
         }
 
-        if count(&PhpMixed::List(
-            details.iter().map(|_| Box::new(PhpMixed::Null)).collect(),
-        )) == 0
-        {
+        if details.is_empty() {
             return Ok(String::new());
         }
 

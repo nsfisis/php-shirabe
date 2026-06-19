@@ -682,13 +682,7 @@ impl Perforce {
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
                 let res_bits = explode(" ", line);
-                if count(&PhpMixed::List(
-                    res_bits
-                        .iter()
-                        .map(|s| Box::new(PhpMixed::String(s.clone())))
-                        .collect(),
-                )) > 4
-                {
+                if res_bits.len() > 4 {
                     let branch = Preg::replace(
                         r"/[^A-Za-z0-9 ]/",
                         "",

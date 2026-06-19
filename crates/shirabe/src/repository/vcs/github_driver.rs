@@ -1066,19 +1066,7 @@ impl GitHubDriver {
                         let scopes_failed = array_diff(&scopes_needed, &scopes_issued);
                         // non-authenticated requests get no scopesNeeded, so ask for credentials
                         // authenticated requests which failed some scopes should ask for new credentials too
-                        if headers.is_empty()
-                            || count(&PhpMixed::List(
-                                scopes_needed
-                                    .iter()
-                                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                    .collect(),
-                            )) == 0
-                            || count(&PhpMixed::List(
-                                scopes_failed
-                                    .iter()
-                                    .map(|s| Box::new(PhpMixed::String(s.clone())))
-                                    .collect(),
-                            )) > 0
+                        if headers.is_empty() || scopes_needed.is_empty() || scopes_failed.len() > 0
                         {
                             git_hub_util.authorize_oauth_interactively(
                                 &self.inner.origin_url,

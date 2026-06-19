@@ -165,24 +165,14 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if count(&PhpMixed::List(
-                        urls.iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    )) > 0
-                    {
+                    } else if urls.len() > 0 {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
                     }
-                    if count(&PhpMixed::List(
-                        urls.iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    )) == 0
-                    {
+                    if urls.len() == 0 {
                         return Err(e);
                     }
                 }
@@ -279,24 +269,14 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if count(&PhpMixed::List(
-                        urls.iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    )) > 0
-                    {
+                    } else if urls.len() > 0 {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,
                             io_interface::NORMAL,
                         );
                     }
-                    if count(&PhpMixed::List(
-                        urls.iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    )) == 0
-                    {
+                    if urls.len() == 0 {
                         return Err(e);
                     }
                 }
@@ -358,12 +338,7 @@ pub trait VcsDownloader:
                             true,
                             io_interface::NORMAL,
                         );
-                    } else if count(&PhpMixed::List(
-                        urls.iter()
-                            .map(|s| Box::new(PhpMixed::String(s.clone())))
-                            .collect(),
-                    )) > 0
-                    {
+                    } else if urls.len() > 0 {
                         self.io().write_error3(
                             "    Failed, trying the next URL",
                             true,

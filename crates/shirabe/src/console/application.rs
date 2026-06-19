@@ -1116,7 +1116,7 @@ impl Application {
                     .map(|s| Box::new(PhpMixed::String(s.clone())))
                     .collect(),
             );
-            if is_array(&avast_detect_pm) && count(&avast_detect_pm) != 0 {
+            if is_array(&avast_detect_pm) && avast_detect.len() != 0 {
                 io.write_error3("<error>The following exception indicates a possible issue with the Avast Firewall</error>", true, io_interface::QUIET);
                 io.write_error3(
                     "<error>Check https://getcomposer.org/local-issuer for details</error>",

@@ -2137,8 +2137,20 @@ pub fn trim(s: &str, chars: Option<&str>) -> String {
     s.trim_matches(|c| mask.contains(&c)).to_string()
 }
 
-pub fn count(_value: &PhpMixed) -> i64 {
-    todo!()
+pub fn count(value: &PhpMixed) -> usize {
+    match value {
+        PhpMixed::List(items) => items.len(),
+        PhpMixed::Array(entries) => entries.len(),
+        PhpMixed::Object(object) => object.count(),
+        // PHP 8 throws a `TypeError` for non-countable arguments.
+        PhpMixed::Null
+        | PhpMixed::Bool(_)
+        | PhpMixed::Int(_)
+        | PhpMixed::Float(_)
+        | PhpMixed::String(_) => {
+            panic!("count(): Argument #1 ($value) must be of type Countable|array")
+        }
+    }
 }
 
 pub fn array_shift<T>(_array: &mut Vec<T>) -> Option<T> {
@@ -2799,6 +2811,10 @@ impl ArrayObject {
 
     pub fn to_array(&self) -> IndexMap<String, Box<PhpMixed>> {
         self.data.clone()
+    }
+
+    pub fn count(&self) -> usize {
+        self.data.len()
     }
 }
 
