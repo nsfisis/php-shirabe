@@ -41,7 +41,7 @@ impl Command for AboutCommand {
     fn configure(&mut self) -> anyhow::Result<()> {
         self.set_name("about")?;
         self.set_description("Shows a short information about Composer");
-        self.set_help("<info>php composer.phar about</info>");
+        self.set_help("<info>shirabe about</info>");
         Ok(())
     }
 

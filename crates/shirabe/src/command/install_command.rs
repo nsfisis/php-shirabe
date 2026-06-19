@@ -78,7 +78,7 @@ impl Command for InstallCommand {
             the current directory, processes it, and downloads and installs all the\n\
             libraries and dependencies outlined in that file. If the file does not\n\
             exist it will look for composer.json and do the same.\n\n\
-            <info>php composer.phar install</info>\n\n\
+            <info>shirabe install</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#install-i",
         );
         Ok(())

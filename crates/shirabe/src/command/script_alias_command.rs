@@ -104,7 +104,7 @@ impl Command for ScriptAliasCommand {
         ]);
         self.set_help(
             "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
-            <info>php composer.phar run-script post-update-cmd</info>\n\n\
+            <info>shirabe run-script post-update-cmd</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
         );
         Ok(())

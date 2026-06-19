@@ -128,7 +128,7 @@ impl Command for InitCommand {
             "The <info>init</info> command creates a basic composer.json file\n\
                 in the current directory.\n\
                 \n\
-                <info>php composer.phar init</info>\n\
+                <info>shirabe init</info>\n\
                 \n\
                 Read more at https://getcomposer.org/doc/03-cli.md#init",
         );

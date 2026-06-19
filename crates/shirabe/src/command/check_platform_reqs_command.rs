@@ -185,7 +185,7 @@ impl Command for CheckPlatformReqsCommand {
         self.set_help(
             "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
             Unlike update/install, this command will ignore config.platform settings and check the real platform packages so you can be certain you have the required platform dependencies.\n\n\
-            <info>php composer.phar check-platform-reqs</info>\n\n"
+            <info>shirabe check-platform-reqs</info>\n\n"
         );
         Ok(())
     }

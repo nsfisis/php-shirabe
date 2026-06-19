@@ -62,7 +62,7 @@ impl Command for SelfUpdateCommand {
             "The <info>self-update</info> command checks getcomposer.org for newer\n\
             versions of composer and if found, installs the latest.\n\
             \n\
-            <info>php composer.phar self-update</info>\n\
+            <info>shirabe self-update</info>\n\
             \n\
             Read more at https://getcomposer.org/doc/03-cli.md#self-update-selfupdate",
         );

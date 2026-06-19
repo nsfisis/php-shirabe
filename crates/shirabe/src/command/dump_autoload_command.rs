@@ -58,7 +58,7 @@ impl Command for DumpAutoloadCommand {
         InputOption::new("strict-ambiguous", None, Some(InputOption::VALUE_NONE), "Return a failed status code (2) if the same class is found in multiple files. Requires --optimize to work.", None).unwrap().into(),
         ]);
         self.set_help(
-            "<info>php composer.phar dump-autoload</info>\n\n\
+            "<info>shirabe dump-autoload</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload",
         );
         Ok(())

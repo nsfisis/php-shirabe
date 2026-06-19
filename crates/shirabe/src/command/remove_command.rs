@@ -171,7 +171,7 @@ impl Command for RemoveCommand {
         self.set_help(
             "The <info>remove</info> command removes a package from the current\n\
                 list of installed packages\n\n\
-                <info>php composer.phar remove</info>\n\n\
+                <info>shirabe remove</info>\n\n\
                 Read more at https://getcomposer.org/doc/03-cli.md#remove-rm",
         );
         Ok(())

@@ -789,7 +789,7 @@ impl Command for ConfigCommand {
             }
 
             return Err(RuntimeException {
-                message: "You must pass the type and a url. Example: php composer.phar config repositories.foo vcs https://bar.com".to_string(),
+                message: "You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com".to_string(),
                 code: 0,
             }
             .into());
@@ -1285,7 +1285,8 @@ impl ConfigCommand {
         let (validator, normalizer) = callbacks;
         if 1 != values.len() {
             return Err(RuntimeException {
-                message: "You can only pass one value. Example: php composer.phar config process-timeout 300".to_string(),
+                message: "You can only pass one value. Example: shirabe config process-timeout 300"
+                    .to_string(),
                 code: 0,
             }
             .into());

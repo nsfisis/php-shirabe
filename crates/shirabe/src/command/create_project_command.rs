@@ -112,9 +112,9 @@ impl Command for CreateProjectCommand {
                 with a composer.json file it installs the packages for the current project.\n\n\
                 You can use this command to bootstrap new projects or setup a clean\n\
                 version-controlled installation for developers of your project.\n\n\
-                <info>php composer.phar create-project vendor/project target-directory [version]</info>\n\n\
+                <info>shirabe create-project vendor/project target-directory [version]</info>\n\n\
                 You can also specify the version with the package name using = or : as separator.\n\n\
-                <info>php composer.phar create-project vendor/project:version target-directory</info>\n\n\
+                <info>shirabe create-project vendor/project:version target-directory</info>\n\n\
                 To install unstable packages, either specify the version you want, or use the\n\
                 --stability=dev (where dev can be one of RC, beta, alpha or dev).\n\n\
                 To setup a developer workable version you should create the project using the source\n\

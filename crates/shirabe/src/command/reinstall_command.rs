@@ -76,7 +76,7 @@ impl Command for ReinstallCommand {
             uninstalls them and reinstalls them. This lets you do a clean install\n\
             of a package if you messed with its files, or if you wish to change\n\
             the installation type using --prefer-install.\n\n\
-            <info>php composer.phar reinstall acme/foo \"acme/bar-*\"</info>\n\n\
+            <info>shirabe reinstall acme/foo \"acme/bar-*\"</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#reinstall",
         );
         Ok(())

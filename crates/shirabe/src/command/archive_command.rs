@@ -71,7 +71,7 @@ impl Command for ArchiveCommand {
             "The <info>archive</info> command creates an archive of the specified format\n\
             containing the files and directories of the Composer project or the specified\n\
             package in the specified version and writes it to the specified directory.\n\n\
-            <info>php composer.phar archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
+            <info>shirabe archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#archive"
         );
         Ok(())

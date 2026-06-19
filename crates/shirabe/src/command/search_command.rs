@@ -97,7 +97,7 @@ impl Command for SearchCommand {
         ]);
         self.set_help(
             "The search command searches for packages by its name\n\
-            <info>php composer.phar search symfony composer</info>\n\n\
+            <info>shirabe search symfony composer</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#search",
         );
         Ok(())

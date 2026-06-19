@@ -74,17 +74,17 @@ impl Command for UpdateCommand {
             "The <info>update</info> command reads the composer.json file from the\n\
             current directory, processes it, and updates, removes or installs all the\n\
             dependencies.\n\n\
-            <info>php composer.phar update</info>\n\n\
+            <info>shirabe update</info>\n\n\
             To limit the update operation to a few packages, you can list the package(s)\n\
             you want to update as such:\n\n\
-            <info>php composer.phar update vendor/package1 foo/mypackage [...]</info>\n\n\
+            <info>shirabe update vendor/package1 foo/mypackage [...]</info>\n\n\
             You may also use an asterisk (*) pattern to limit the update operation to package(s)\n\
             from a specific vendor:\n\n\
-            <info>php composer.phar update vendor/package1 foo/* [...]</info>\n\n\
+            <info>shirabe update vendor/package1 foo/* [...]</info>\n\n\
             To run an update with more restrictive constraints you can use:\n\n\
-            <info>php composer.phar update --with vendor/package:1.0.*</info>\n\n\
+            <info>shirabe update --with vendor/package:1.0.*</info>\n\n\
             To run a partial update with more restrictive constraints you can use the shorthand:\n\n\
-            <info>php composer.phar update vendor/package:1.0.*</info>\n\n\
+            <info>shirabe update vendor/package:1.0.*</info>\n\n\
             To select packages names interactively with auto-completion use <info>-i</info>.\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n",
         );

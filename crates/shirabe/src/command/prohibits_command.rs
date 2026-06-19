@@ -103,7 +103,7 @@ impl Command for ProhibitsCommand {
         ]);
         self.set_help(
             "Displays detailed information about why a package cannot be installed.\n\n\
-            <info>php composer.phar prohibits composer/composer</info>\n\n\
+            <info>shirabe prohibits composer/composer</info>\n\n\
             Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not",
         );
         Ok(())
