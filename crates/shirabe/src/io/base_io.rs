@@ -13,6 +13,13 @@ use shirabe_php_shim::{
     UnexpectedValueException, array_merge, in_array, json_encode_ex,
 };
 
+fn log_context(context: &[(&str, &str)]) -> IndexMap<String, Box<PhpMixed>> {
+    context
+        .iter()
+        .map(|(k, v)| (k.to_string(), Box::new(PhpMixed::String(v.to_string()))))
+        .collect()
+}
+
 pub trait BaseIO: IOInterface {
     fn authentications(&self) -> &IndexMap<String, IndexMap<String, Option<String>>>;
     fn authentications_mut(&mut self) -> &mut IndexMap<String, IndexMap<String, Option<String>>>;
@@ -115,12 +122,13 @@ pub trait BaseIO: IOInterface {
                         true,
                     )
                 {
-                    self.debug(
-                        PhpMixed::String(format!(
+                    <Self as BaseIO>::debug(
+                        self,
+                        &format!(
                             "{} is not in the configured github-domains, adding it implicitly as authentication is configured for this domain",
                             domain
-                        )),
-                        IndexMap::new(),
+                        ),
+                        &[],
                     );
                     let merged = array_merge(
                         github_domains.unwrap_or(PhpMixed::List(vec![])),
@@ -160,12 +168,13 @@ pub trait BaseIO: IOInterface {
                         true,
                     )
                 {
-                    self.debug(
-                        PhpMixed::String(format!(
+                    <Self as BaseIO>::debug(
+                        self,
+                        &format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
                             domain
-                        )),
-                        IndexMap::new(),
+                        ),
+                        &[],
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
@@ -200,12 +209,13 @@ pub trait BaseIO: IOInterface {
                         true,
                     )
                 {
-                    self.debug(
-                        PhpMixed::String(format!(
+                    <Self as BaseIO>::debug(
+                        self,
+                        &format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
                             domain
-                        )),
-                        IndexMap::new(),
+                        ),
+                        &[],
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
@@ -247,12 +257,13 @@ pub trait BaseIO: IOInterface {
                     &forgejo_domains.clone().unwrap_or(PhpMixed::List(vec![])),
                     true,
                 ) {
-                    self.debug(
-                        PhpMixed::String(format!(
+                    <Self as BaseIO>::debug(
+                        self,
+                        &format!(
                             "{} is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain",
                             domain
-                        )),
-                        IndexMap::new(),
+                        ),
+                        &[],
                     );
                     let merged = array_merge(
                         forgejo_domains.unwrap_or(PhpMixed::List(vec![])),
@@ -370,7 +381,7 @@ pub trait BaseIO: IOInterface {
         Ok(())
     }
 
-    fn emergency(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn emergency(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::EMERGENCY.to_string()),
             message,
@@ -378,7 +389,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn alert(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn alert(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::ALERT.to_string()),
             message,
@@ -386,7 +397,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn critical(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn critical(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::CRITICAL.to_string()),
             message,
@@ -394,7 +405,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn error(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn error(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::ERROR.to_string()),
             message,
@@ -402,7 +413,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn warning(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn warning(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::WARNING.to_string()),
             message,
@@ -410,7 +421,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn notice(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn notice(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::NOTICE.to_string()),
             message,
@@ -418,7 +429,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn info(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn info(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::INFO.to_string()),
             message,
@@ -426,7 +437,7 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn debug(&mut self, message: PhpMixed, context: IndexMap<String, Box<PhpMixed>>) {
+    fn debug(&self, message: &str, context: &[(&str, &str)]) {
         self.log(
             PhpMixed::String(LogLevel::DEBUG.to_string()),
             message,
@@ -434,18 +445,13 @@ pub trait BaseIO: IOInterface {
         );
     }
 
-    fn log(
-        &mut self,
-        level: PhpMixed,
-        message: PhpMixed,
-        context: IndexMap<String, Box<PhpMixed>>,
-    ) {
-        let mut message_str = message.as_string().unwrap_or("").to_string();
+    fn log(&self, level: PhpMixed, message: &str, context: &[(&str, &str)]) {
+        let mut message_str = message.to_string();
 
         if !context.is_empty() {
             let json: anyhow::Result<Option<String>> = Silencer::call(|| {
                 Ok(json_encode_ex(
-                    &PhpMixed::Array(context.clone()),
+                    &PhpMixed::Array(log_context(context)),
                     JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
                 ))
             });

@@ -693,16 +693,16 @@ impl IOInterfaceImmutable for ConsoleIO {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
-    fn error(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
+    fn error(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::error(self, message, context);
     }
 
-    fn warning(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
+    fn warning(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::warning(self, message, context);
     }
 
-    fn debug(&self, _message: &str, _context: &[(&str, &str)]) {
-        todo!()
+    fn debug(&self, message: &str, context: &[(&str, &str)]) {
+        <Self as BaseIO>::debug(self, message, context);
     }
 }
 
