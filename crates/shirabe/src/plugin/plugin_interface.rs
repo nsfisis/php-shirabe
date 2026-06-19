@@ -15,10 +15,6 @@ pub trait PluginInterface: std::fmt::Debug {
 
     fn uninstall(&mut self, composer: &ComposerHandle, io: Rc<RefCell<dyn IOInterface>>);
 
-    fn clone_box(&self) -> Box<dyn PluginInterface> {
-        todo!()
-    }
-
     // TODO(plugin): PHP-side `instanceof` checks for EventSubscriberInterface / Capable.
     // EventSubscriberInterface is not dyn-compatible (its only method is associated, not
     // a `&self` method), so we expose a boolean predicate instead.

@@ -182,8 +182,11 @@ impl PluginManager {
     }
 
     /// Gets all currently active plugin instances
-    pub fn get_plugins(&self) -> Vec<Box<dyn PluginInterface>> {
-        self.plugins.iter().map(|p| p.clone_box()).collect()
+    ///
+    /// PHP returns `$this->plugins` directly; the plugin objects are shared by reference, so this
+    /// borrows the stored instances rather than cloning them.
+    pub fn get_plugins(&self) -> &[Box<dyn PluginInterface>] {
+        &self.plugins
     }
 
     /// Gets all currently active plugin instances
@@ -723,7 +726,7 @@ impl PluginManager {
     ) -> Vec<Box<dyn Capability>> {
         // TODO(plugin): aggregate capabilities across all loaded plugins
         let mut capabilities: Vec<Box<dyn Capability>> = vec![];
-        for plugin in &self.get_plugins() {
+        for plugin in self.get_plugins() {
             if let Ok(Some(capability)) =
                 self.get_plugin_capability(&**plugin, capability_class_name, ctor_args.clone())
             {
