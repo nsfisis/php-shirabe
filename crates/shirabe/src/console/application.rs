@@ -127,7 +127,6 @@ pub struct Application {
     version: String,
     command_loader: Option<Box<dyn CommandLoaderInterface>>,
     catch_exceptions: bool,
-    auto_exit: bool,
     definition: Option<std::rc::Rc<std::cell::RefCell<InputDefinition>>>,
     helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>,
     terminal: Terminal,
@@ -201,7 +200,6 @@ impl Application {
             version,
             command_loader: None,
             catch_exceptions: true,
-            auto_exit: true,
             definition: None,
             helper_set: None,
             terminal: Terminal::new(),
@@ -318,7 +316,7 @@ impl Application {
         application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<i32> {
         let output = match output {
             Some(output) => Some(output),
             None => Some(
@@ -334,7 +332,7 @@ impl Application {
         application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<i32> {
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
@@ -907,7 +905,7 @@ impl Application {
         }
 
         let mut start_time: Option<f64> = None;
-        let result_outcome: anyhow::Result<i64> = (|| -> anyhow::Result<i64> {
+        let result_outcome: anyhow::Result<i32> = (|| -> anyhow::Result<i32> {
             if input
                 .borrow()
                 .has_parameter_option(PhpMixed::from(vec!["--profile"]), false)
@@ -921,7 +919,7 @@ impl Application {
                 let _ = start_time.unwrap();
             }
 
-            let result: i64 = Application::base_do_run(application, input.clone(), output.clone())?;
+            let result = Application::base_do_run(application, input.clone(), output.clone())?;
 
             if input
                 .borrow()
@@ -975,7 +973,7 @@ impl Application {
                         );
                     }
 
-                    Ok(see.get_code())
+                    Ok(see.get_code() as i32)
                 } else {
                     let mut ghe = GithubActionError::new(io.clone());
                     ghe.emit(&e.to_string(), None, None);
@@ -1443,7 +1441,7 @@ impl Application {
         application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<i32> {
         if shirabe_php_shim::function_exists("putenv") {
             let (height, width) = {
                 let app = application.borrow();
@@ -1479,7 +1477,7 @@ impl Application {
                 this.render_throwable(e, output.clone());
             };
 
-        let result = (|| -> anyhow::Result<i64> {
+        let result = (|| -> anyhow::Result<i32> {
             application.borrow_mut().configure_io(&input, &output)?;
 
             let exit_code = Application::do_run(application, input.clone(), output.clone())?;
@@ -1487,7 +1485,7 @@ impl Application {
             Ok(exit_code)
         })();
 
-        let mut exit_code = match result {
+        let exit_code = match result {
             Ok(exit_code) => exit_code,
             Err(e) => {
                 if !application.borrow().catch_exceptions {
@@ -1512,14 +1510,6 @@ impl Application {
 
         // finally: handler restore. See TODO above; no-op here.
 
-        if application.borrow().auto_exit {
-            if exit_code > 255 {
-                exit_code = 255;
-            }
-
-            shirabe_php_shim::exit(exit_code);
-        }
-
         Ok(exit_code)
     }
 
@@ -1528,7 +1518,7 @@ impl Application {
         application: &std::rc::Rc<std::cell::RefCell<Application>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<i32> {
         if input.borrow().has_parameter_option(
             PhpMixed::from(vec![
                 PhpMixed::from("--version".to_string()),
@@ -1799,16 +1789,6 @@ impl Application {
     /// Sets whether to catch exceptions or not during commands execution.
     pub fn set_catch_exceptions(&mut self, boolean: bool) {
         self.catch_exceptions = boolean;
-    }
-
-    /// Gets whether to automatically exit after a command execution or not.
-    pub fn is_auto_exit_enabled(&self) -> bool {
-        self.auto_exit
-    }
-
-    /// Sets whether to automatically exit after a command execution or not.
-    pub fn set_auto_exit(&mut self, boolean: bool) {
-        self.auto_exit = boolean;
     }
 
     /// Gets the name of the application.
@@ -2545,7 +2525,7 @@ impl Application {
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    ) -> anyhow::Result<i64> {
+    ) -> anyhow::Result<i32> {
         if let Some(helper_set) = command.borrow().get_helper_set() {
             for (_alias, helper) in helper_set.borrow().get_iterator() {
                 // if ($helper instanceof InputAwareInterface) $helper->setInput($input);
@@ -2588,7 +2568,10 @@ impl Application {
             }
         }
 
-        command.borrow_mut().run(input.clone(), output.clone())
+        command
+            .borrow_mut()
+            .run(input.clone(), output.clone())
+            .map(|c| c as i32)
     }
 
     /// Gets the name of the command based on input.

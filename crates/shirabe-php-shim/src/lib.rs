@@ -3178,7 +3178,7 @@ pub fn str_replace_arr(_search: &[&str], _replace: &str, _subject: &str) -> Stri
     todo!()
 }
 
-pub fn php_exception_get_code(_error: &anyhow::Error) -> i64 {
+pub fn php_exception_get_code(_error: &anyhow::Error) -> i32 {
     todo!()
 }
 pub fn sscanf(_subject: &str, _format: &str, _a: &mut i64, _b: &mut i64) -> i64 {
